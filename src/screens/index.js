@@ -13,10 +13,12 @@ export { default as ReportDetail } from './citizen/ReportDetail';
 export { default as ReportSuccess } from './citizen/ReportSuccess';
 export { default as Profile } from './citizen/Profile';
 export { default as EditProfile } from './citizen/EditProfile';
+export { default as TrafficSigns } from './citizen/TrafficSigns';
 export { default as Rewards } from './citizen/Rewards';
 export { default as Notifications } from './citizen/Notifications';
 export { default as FineInformation } from './citizen/FineInformation';
 export { default as ContactUs } from './citizen/ContactUs';
+export { default as SafetyTips } from './citizen/SafetyTips';
 
 // Officer Screens
 export { default as OfficerDashboard } from './officer/OfficerDashboard';

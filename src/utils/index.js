@@ -3,10 +3,14 @@ export {
     COLORS,
     SPACING,
     FONT_SIZES,
+    LINE_HEIGHTS,
     FONT_WEIGHTS,
     BORDER_RADIUS,
     SHADOWS,
+    GRADIENTS,
     globalStyles,
+    SCREEN_WIDTH,
+    SCREEN_HEIGHT,
 } from './theme';
 export {
     ROLES,

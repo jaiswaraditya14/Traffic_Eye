@@ -1,8 +1,9 @@
 import React from 'react';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../utils';
+import { COLORS, BORDER_RADIUS, SHADOWS, FONT_SIZES, FONT_WEIGHTS, SPACING } from '../utils';
 
 // Import Screens from barrel
 import {
@@ -18,21 +19,29 @@ import {
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
+const TAB_CONFIG = {
+    Dashboard: { icon: 'grid', label: 'Dashboard' },
+    Pending: { icon: 'time', label: 'Pending' },
+    Verified: { icon: 'checkmark-circle', label: 'Verified' },
+    OfficerProfileTab: { icon: 'person', label: 'Profile' },
+};
+
 function OfficerTabNavigator() {
     return (
         <Tab.Navigator
             screenOptions={({ route }) => ({
-                tabBarIcon: ({ focused, color, size }) => {
-                    let iconName;
-                    if (route.name === 'Dashboard') iconName = focused ? 'grid' : 'grid-outline';
-                    else if (route.name === 'Pending') iconName = focused ? 'time' : 'time-outline';
-                    else if (route.name === 'Verified') iconName = focused ? 'checkmark-circle' : 'checkmark-circle-outline';
-                    else if (route.name === 'OfficerProfileTab') iconName = focused ? 'person' : 'person-outline';
-                    return <Ionicons name={iconName} size={size} color={color} />;
+                tabBarIcon: ({ focused, color }) => {
+                    const config = TAB_CONFIG[route.name];
+                    const iconName = focused ? config.icon : `${config.icon}-outline`;
+                    return (
+                        <Ionicons name={iconName} size={24} color={color} />
+                    );
                 },
                 tabBarActiveTintColor: COLORS.secondary,
-                tabBarInactiveTintColor: COLORS.gray500,
+                tabBarInactiveTintColor: COLORS.textTertiary,
                 headerShown: false,
+                tabBarStyle: styles.tabBar,
+                tabBarLabelStyle: styles.tabLabel,
             })}
         >
             <Tab.Screen name="Dashboard" component={OfficerDashboard} />
@@ -53,3 +62,21 @@ export default function OfficerNavigator() {
         </Stack.Navigator>
     );
 }
+
+const styles = StyleSheet.create({
+    tabBar: {
+        backgroundColor: COLORS.surface,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.border,
+        elevation: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 4,
+    },
+    tabLabel: {
+        fontSize: 11,
+        fontWeight: '600',
+        marginBottom: Platform.OS === 'ios' ? 0 : 4,
+    },
+});

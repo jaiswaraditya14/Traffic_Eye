@@ -7,6 +7,7 @@ import { Alert } from 'react-native';
 
 export default function useImagePicker() {
     const [image, setImage] = useState(null);
+    const [exifData, setExifData] = useState(null);
     const [loading, setLoading] = useState(false);
 
     const pickFromGallery = async () => {
@@ -20,15 +21,16 @@ export default function useImagePicker() {
 
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: true,
-                aspect: [4, 3],
+                allowsEditing: false,
                 quality: 0.8,
+                exif: true,
             });
 
             if (!result.canceled && result.assets?.length > 0) {
-                const uri = result.assets[0].uri;
-                setImage(uri);
-                return uri;
+                const asset = result.assets[0];
+                setImage(asset.uri);
+                setExifData(asset.exif || null);
+                return { uri: asset.uri, exif: asset.exif || null };
             }
             return null;
         } catch (error) {
@@ -50,15 +52,16 @@ export default function useImagePicker() {
             }
 
             const result = await ImagePicker.launchCameraAsync({
-                allowsEditing: true,
-                aspect: [4, 3],
+                allowsEditing: false,
                 quality: 0.8,
+                exif: true,
             });
 
             if (!result.canceled && result.assets?.length > 0) {
-                const uri = result.assets[0].uri;
-                setImage(uri);
-                return uri;
+                const asset = result.assets[0];
+                setImage(asset.uri);
+                setExifData(asset.exif || null);
+                return { uri: asset.uri, exif: asset.exif || null };
             }
             return null;
         } catch (error) {
@@ -81,7 +84,7 @@ export default function useImagePicker() {
 
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-                allowsEditing: true,
+                allowsEditing: false,
                 quality: 0.8,
             });
 
@@ -110,7 +113,7 @@ export default function useImagePicker() {
 
             const result = await ImagePicker.launchCameraAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-                allowsEditing: true,
+                allowsEditing: false,
                 quality: 0.8,
             });
 
@@ -130,10 +133,12 @@ export default function useImagePicker() {
 
     const clearImage = () => {
         setImage(null);
+        setExifData(null);
     };
 
     return {
         image,
+        exifData,
         loading,
         pickFromGallery,
         captureFromCamera,
@@ -141,5 +146,6 @@ export default function useImagePicker() {
         captureVideoFromCamera,
         clearImage,
         setImage,
+        setExifData,
     };
 }

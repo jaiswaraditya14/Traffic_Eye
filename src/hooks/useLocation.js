@@ -70,6 +70,53 @@ export default function useLocation() {
         }
     };
 
+    // Reverse geocode from arbitrary coordinates (e.g., from image EXIF data)
+    const reverseGeocodeFromCoords = async (latitude, longitude) => {
+        try {
+            setLoading(true);
+
+            const addressData = await Location.reverseGeocodeAsync({
+                latitude,
+                longitude,
+            });
+
+            if (addressData && addressData.length > 0) {
+                const geocode = addressData[0];
+                const parts = [
+                    geocode.name,
+                    geocode.street,
+                    geocode.district,
+                    geocode.city,
+                    geocode.subregion,
+                    geocode.region,
+                    geocode.postalCode,
+                ].filter(Boolean);
+
+                const uniqueParts = [...new Set(parts)];
+                const addr = uniqueParts.join(', ');
+
+                setAddress(addr);
+                setLocation({ latitude, longitude });
+                return { coords: { latitude, longitude }, address: addr };
+            }
+
+            // Fallback to raw coordinates
+            const fallback = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+            setAddress(fallback);
+            setLocation({ latitude, longitude });
+            return { coords: { latitude, longitude }, address: fallback };
+        } catch (error) {
+            console.error('Error reverse geocoding from coords:', error);
+            // Still set the raw coordinates as fallback
+            const fallback = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+            setAddress(fallback);
+            setLocation({ latitude, longitude });
+            return { coords: { latitude, longitude }, address: fallback };
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const clearLocation = () => {
         setLocation(null);
         setAddress('');
@@ -80,6 +127,7 @@ export default function useLocation() {
         address,
         loading,
         detectLocation,
+        reverseGeocodeFromCoords,
         clearLocation,
         setAddress,
     };

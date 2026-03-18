@@ -1,6 +1,6 @@
 // ReportVerification.js
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MobileContainer } from '../../components';
@@ -31,6 +31,11 @@ export default function ReportVerification({ navigation }) {
                 </View>
                 <ScrollView style={styles.content}>
                     <View style={styles.imagePlaceholder}>
+                        <Image
+                            source={require('../../../assets/images/background1.png')}
+                            style={styles.backgroundImage}
+                            resizeMode="cover"
+                        />
                         <Ionicons name="image" size={64} color={COLORS.gray400} />
                     </View>
 
@@ -97,7 +102,25 @@ const styles = StyleSheet.create({
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md },
     title: { fontSize: FONT_SIZES.lg, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary },
     content: { flex: 1, paddingHorizontal: SPACING.lg },
-    imagePlaceholder: { width: '100%', height: 250, backgroundColor: COLORS.gray100, borderRadius: BORDER_RADIUS.xl, justifyContent: 'center', alignItems: 'center', marginBottom: SPACING.lg },
+    imagePlaceholder: {
+        width: '100%',
+        height: 250,
+        backgroundColor: COLORS.white,
+        borderRadius: BORDER_RADIUS.xl,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: SPACING.lg,
+        position: 'relative',
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: COLORS.gray200
+    },
+    backgroundImage: {
+        position: 'absolute',
+        width: '100%',
+        height: '100%',
+        opacity: 0.1,
+    },
     detailCard: { backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.lg, padding: SPACING.md, marginBottom: SPACING.md, ...SHADOWS.sm },
     cardTitle: { fontSize: FONT_SIZES.md, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary, marginBottom: SPACING.md },
     detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: SPACING.sm, borderBottomWidth: 1, borderBottomColor: COLORS.gray200 },

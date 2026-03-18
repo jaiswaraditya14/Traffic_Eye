@@ -51,6 +51,7 @@ export function AuthProvider({ children }) {
     const signUpOfficer = async (...args) => authService.signUpOfficer(...args);
     const signIn = async (...args) => authService.signIn(...args);
     const signInWithBadge = async (...args) => authService.signInWithBadge(...args);
+    const signInWithGoogle = async (...args) => authService.signInWithGoogle(...args);
     const signOut = async () => authService.signOut();
     const resetPassword = async (email) => authService.resetPassword(email);
 
@@ -66,6 +67,7 @@ export function AuthProvider({ children }) {
         signUpOfficer,
         signIn,
         signInWithBadge,
+        signInWithGoogle,
         signOut,
         resetPassword,
         refreshProfile,

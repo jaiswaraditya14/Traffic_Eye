@@ -1,6 +1,6 @@
 // PendingQueue.js
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MobileContainer } from '../../components';
@@ -13,6 +13,12 @@ export default function PendingQueue({ navigation }) {
         { id: 3, type: 'Parking', location: 'Park Ave', time: '5h ago', priority: 'low' },
     ];
 
+    const getPriorityConfig = (priority) => ({
+        high: { color: COLORS.error, bg: COLORS.errorSurface, label: 'HIGH' },
+        medium: { color: COLORS.warning, bg: COLORS.warningSurface, label: 'MED' },
+        low: { color: COLORS.textTertiary, bg: COLORS.gray100, label: 'LOW' },
+    }[priority]);
+
     return (
         <MobileContainer>
             <SafeAreaView style={styles.container} edges={['top']}>
@@ -22,37 +28,51 @@ export default function PendingQueue({ navigation }) {
                         <Text style={styles.badgeText}>{pendingReports.length}</Text>
                     </View>
                 </View>
-                <ScrollView style={styles.content}>
-                    {pendingReports.map((report) => (
-                        <TouchableOpacity
-                            key={report.id}
-                            style={styles.card}
-                            onPress={() => navigation.navigate('ReportVerification', { reportId: report.id })}
-                        >
-                            <View style={styles.cardHeader}>
-                                <Text style={styles.reportType}>{report.type}</Text>
-                                <View style={[styles.priorityBadge, { backgroundColor: report.priority === 'high' ? `${COLORS.error}15` : report.priority === 'medium' ? `${COLORS.warning}15` : `${COLORS.gray300}` }]}>
-                                    <Text style={[styles.priorityText, { color: report.priority === 'high' ? COLORS.error : report.priority === 'medium' ? COLORS.warning : COLORS.gray600 }]}>
-                                        {report.priority.toUpperCase()}
-                                    </Text>
+                <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                    {pendingReports.map((report) => {
+                        const config = getPriorityConfig(report.priority);
+                        return (
+                            <TouchableOpacity
+                                key={report.id}
+                                style={styles.card}
+                                onPress={() => navigation.getParent()?.navigate('ReportVerification', { reportId: report.id }) ?? navigation.navigate('ReportVerification', { reportId: report.id })}
+                                activeOpacity={0.7}
+                            >
+                                <Image
+                                    source={require('../../../assets/images/traffic_violation.jpg')}
+                                    style={styles.thumbnail}
+                                    resizeMode="cover"
+                                />
+                                <View style={styles.cardBody}>
+                                    <View style={styles.cardHeader}>
+                                        <Text style={styles.reportType}>{report.type}</Text>
+                                        <View style={[styles.priorityBadge, { backgroundColor: config.bg }]}>
+                                            <Text style={[styles.priorityText, { color: config.color }]}>
+                                                {config.label}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    <View style={styles.cardContent}>
+                                        <View style={styles.infoRow}>
+                                            <Ionicons name="location" size={14} color={COLORS.textTertiary} />
+                                            <Text style={styles.infoText}>{report.location}</Text>
+                                        </View>
+                                        <View style={styles.infoRow}>
+                                            <Ionicons name="time" size={14} color={COLORS.textTertiary} />
+                                            <Text style={styles.infoText}>{report.time}</Text>
+                                        </View>
+                                    </View>
+                                    <View style={styles.cardFooter}>
+                                        <View style={styles.reviewBtn}>
+                                            <Text style={styles.reviewText}>Review</Text>
+                                            <Ionicons name="chevron-forward" size={16} color={COLORS.secondary} />
+                                        </View>
+                                    </View>
                                 </View>
-                            </View>
-                            <View style={styles.cardContent}>
-                                <View style={styles.infoRow}>
-                                    <Ionicons name="location" size={16} color={COLORS.textSecondary} />
-                                    <Text style={styles.infoText}>{report.location}</Text>
-                                </View>
-                                <View style={styles.infoRow}>
-                                    <Ionicons name="time" size={16} color={COLORS.textSecondary} />
-                                    <Text style={styles.infoText}>{report.time}</Text>
-                                </View>
-                            </View>
-                            <View style={styles.cardFooter}>
-                                <Ionicons name="chevron-forward" size={20} color={COLORS.primary} />
-                                <Text style={styles.reviewText}>Review</Text>
-                            </View>
-                        </TouchableOpacity>
-                    ))}
+                            </TouchableOpacity>
+                        );
+                    })}
+                    <View style={{ height: SPACING.xxl }} />
                 </ScrollView>
             </SafeAreaView>
         </MobileContainer>
@@ -60,23 +80,103 @@ export default function PendingQueue({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: COLORS.background },
-    header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.lg, gap: SPACING.sm },
-    title: { fontSize: FONT_SIZES.xxl, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary },
-    badge: { backgroundColor: COLORS.warning, borderRadius: 12, paddingHorizontal: SPACING.sm, paddingVertical: 4 },
-    badgeText: { color: COLORS.white, fontSize: FONT_SIZES.xs, fontWeight: FONT_WEIGHTS.bold },
-    content: { flex: 1, paddingHorizontal: SPACING.lg },
-    card: { backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.lg, padding: SPACING.md, marginBottom: SPACING.md, ...SHADOWS.sm },
-    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm },
-    reportType: { fontSize: FONT_SIZES.md, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary },
-    priorityBadge: { paddingHorizontal: SPACING.sm, paddingVertical: 4, borderRadius: BORDER_RADIUS.sm },
-    priorityText: { fontSize: 10, fontWeight: FONT_WEIGHTS.bold },
-    cardContent: { gap: SPACING.xs, marginBottom: SPACING.sm },
-    infoRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
-    infoText: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary },
-    cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4 },
-    reviewText: { fontSize: FONT_SIZES.sm, color: COLORS.primary, fontWeight: FONT_WEIGHTS.semibold },
+    container: {
+        flex: 1,
+        backgroundColor: COLORS.background,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: SPACING.xl,
+        paddingVertical: SPACING.lg,
+        gap: SPACING.md,
+    },
+    title: {
+        fontSize: FONT_SIZES.xxl,
+        fontWeight: FONT_WEIGHTS.bold,
+        color: COLORS.textPrimary,
+        letterSpacing: -0.3,
+    },
+    badge: {
+        backgroundColor: COLORS.warning,
+        borderRadius: BORDER_RADIUS.full,
+        paddingHorizontal: SPACING.md,
+        paddingVertical: SPACING.xxs,
+    },
+    badgeText: {
+        color: COLORS.white,
+        fontSize: FONT_SIZES.xs,
+        fontWeight: FONT_WEIGHTS.bold,
+    },
+    content: {
+        flex: 1,
+        paddingHorizontal: SPACING.xl,
+    },
+    card: {
+        flexDirection: 'row',
+        backgroundColor: COLORS.surface,
+        borderRadius: BORDER_RADIUS.xl,
+        marginBottom: SPACING.md,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        overflow: 'hidden',
+        ...SHADOWS.xs,
+    },
+    thumbnail: {
+        width: 80,
+        height: '100%',
+        minHeight: 110,
+    },
+    cardBody: {
+        flex: 1,
+        padding: SPACING.lg,
+    },
+    cardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: SPACING.sm,
+    },
+    reportType: {
+        fontSize: FONT_SIZES.md,
+        fontWeight: FONT_WEIGHTS.bold,
+        color: COLORS.textPrimary,
+    },
+    priorityBadge: {
+        paddingHorizontal: SPACING.sm,
+        paddingVertical: 3,
+        borderRadius: BORDER_RADIUS.sm,
+    },
+    priorityText: {
+        fontSize: FONT_SIZES.xxs,
+        fontWeight: FONT_WEIGHTS.bold,
+        letterSpacing: 0.5,
+    },
+    cardContent: {
+        gap: SPACING.xs,
+        marginBottom: SPACING.sm,
+    },
+    infoRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: SPACING.xs,
+    },
+    infoText: {
+        fontSize: FONT_SIZES.xs,
+        color: COLORS.textSecondary,
+    },
+    cardFooter: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+    },
+    reviewBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    reviewText: {
+        fontSize: FONT_SIZES.sm,
+        color: COLORS.secondary,
+        fontWeight: FONT_WEIGHTS.semibold,
+    },
 });
-
-
-
