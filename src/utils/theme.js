@@ -1,23 +1,31 @@
-import { StyleSheet, Dimensions } from 'react-native';
+import { StyleSheet, Dimensions, Platform } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
-// Light Mode Colors
+// Responsive scaling utility
+const guidelineBaseWidth = 375;
+const scale = (size) => (width / guidelineBaseWidth) * size;
+const moderateScale = (size, factor = 0.5) => size + (scale(size) - size) * factor;
+
+// Light Mode Colors — refined modern palette
 const LIGHT_COLORS = {
-    // Primary
+    // Primary - Deep Ocean Blue
     primary: '#2563EB',
     primaryLight: '#3B82F6',
-    primaryDark: '#1E40AF',
+    primaryDark: '#1D4ED8',
+    primarySoft: '#EFF6FF',
 
-    // Secondary
-    secondary: '#10B981',
+    // Secondary - Emerald
+    secondary: '#059669',
     secondaryLight: '#34D399',
-    secondaryDark: '#059669',
+    secondaryDark: '#047857',
+    secondarySoft: '#ECFDF5',
 
-    // Accent
+    // Accent - Amber Glow
     accent: '#F59E0B',
     accentLight: '#FBBF24',
     accentDark: '#D97706',
+    accentSoft: '#FFFBEB',
 
     // Status
     success: '#10B981',
@@ -41,63 +49,77 @@ const LIGHT_COLORS = {
     gray900: '#111827',
 
     // Background
-    background: '#FFFFFF',
-    backgroundSecondary: '#F9FAFB',
+    background: '#F8FAFC',
+    backgroundSecondary: '#F1F5F9',
+    surface: '#FFFFFF',
+    surfaceElevated: '#FFFFFF',
 
     // Text
-    textPrimary: '#111827',
-    textSecondary: '#6B7280',
-    textTertiary: '#9CA3AF',
+    textPrimary: '#0F172A',
+    textSecondary: '#64748B',
+    textTertiary: '#94A3B8',
     textInverse: '#FFFFFF',
+
+    // Borders
+    border: '#E2E8F0',
+    borderLight: '#F1F5F9',
+
+    // Overlay
+    overlay: 'rgba(15, 23, 42, 0.4)',
+    overlayLight: 'rgba(15, 23, 42, 0.08)',
 };
 
 // Dark Mode Colors
 const DARK_COLORS = {
-    // Primary
     primary: '#3B82F6',
     primaryLight: '#60A5FA',
     primaryDark: '#2563EB',
+    primarySoft: '#1E3A5F',
 
-    // Secondary
     secondary: '#10B981',
     secondaryLight: '#34D399',
     secondaryDark: '#059669',
+    secondarySoft: '#064E3B',
 
-    // Accent
     accent: '#F59E0B',
     accentLight: '#FBBF24',
     accentDark: '#D97706',
+    accentSoft: '#78350F',
 
-    // Status
     success: '#10B981',
     warning: '#F59E0B',
     error: '#EF4444',
     info: '#3B82F6',
     danger: '#EF4444',
 
-    // Neutrals
     white: '#FFFFFF',
     black: '#000000',
-    gray50: '#1F2937',
-    gray100: '#374151',
-    gray200: '#4B5563',
-    gray300: '#6B7280',
-    gray400: '#9CA3AF',
-    gray500: '#D1D5DB',
-    gray600: '#E5E7EB',
-    gray700: '#F3F4F6',
-    gray800: '#F9FAFB',
+    gray50: '#1E293B',
+    gray100: '#334155',
+    gray200: '#475569',
+    gray300: '#64748B',
+    gray400: '#94A3B8',
+    gray500: '#CBD5E1',
+    gray600: '#E2E8F0',
+    gray700: '#F1F5F9',
+    gray800: '#F8FAFC',
     gray900: '#FFFFFF',
 
-    // Background
-    background: '#111827',
-    backgroundSecondary: '#1F2937',
+    background: '#0F172A',
+    backgroundSecondary: '#1E293B',
+    surface: '#1E293B',
+    surfaceElevated: '#334155',
 
-    // Text
-    textPrimary: '#F9FAFB',
-    textSecondary: '#D1D5DB',
-    textTertiary: '#9CA3AF',
-    textInverse: '#111827',
+    textPrimary: '#F8FAFC',
+    textSecondary: '#CBD5E1',
+    textTertiary: '#94A3B8',
+    textInverse: '#0F172A',
+
+    border: '#334155',
+    borderLight: '#1E293B',
+
+    overlay: 'rgba(0, 0, 0, 0.6)',
+    overlayLight: 'rgba(255, 255, 255, 0.05)',
 };
 
 // Function to get colors based on theme
@@ -109,22 +131,22 @@ export const getColors = (isDarkMode = false) => {
 export const COLORS = LIGHT_COLORS;
 
 export const SPACING = {
-    xs: 4,
-    sm: 8,
-    md: 16,
-    lg: 24,
-    xl: 32,
-    xxl: 48,
+    xs: moderateScale(4),
+    sm: moderateScale(8),
+    md: moderateScale(16),
+    lg: moderateScale(24),
+    xl: moderateScale(32),
+    xxl: moderateScale(48),
 };
 
 export const FONT_SIZES = {
-    xs: 12,
-    sm: 14,
-    md: 16,
-    lg: 18,
-    xl: 20,
-    xxl: 24,
-    xxxl: 32,
+    xs: moderateScale(12),
+    sm: moderateScale(14),
+    md: moderateScale(16),
+    lg: moderateScale(18),
+    xl: moderateScale(20),
+    xxl: moderateScale(24),
+    xxxl: moderateScale(32),
 };
 
 export const FONT_WEIGHTS = {
@@ -132,43 +154,62 @@ export const FONT_WEIGHTS = {
     medium: '500',
     semibold: '600',
     bold: '700',
+    extrabold: '800',
 };
 
 export const BORDER_RADIUS = {
-    sm: 4,
-    md: 8,
-    lg: 12,
-    xl: 16,
+    sm: 6,
+    md: 10,
+    lg: 14,
+    xl: 18,
     xxl: 24,
     full: 9999,
 };
 
 export const SHADOWS = {
     sm: {
-        shadowColor: '#000',
+        shadowColor: '#0F172A',
         shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
+        shadowOpacity: 0.04,
+        shadowRadius: 3,
         elevation: 2,
     },
     md: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
         elevation: 4,
     },
     lg: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.12,
+        shadowRadius: 16,
         elevation: 8,
+    },
+    xl: {
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.16,
+        shadowRadius: 24,
+        elevation: 12,
     },
 };
 
 export const SCREEN_WIDTH = width;
 export const SCREEN_HEIGHT = height;
+
+export const ANIMATION = {
+    fast: 150,
+    normal: 300,
+    slow: 500,
+    spring: {
+        type: 'spring',
+        damping: 20,
+        stiffness: 300,
+    },
+};
 
 export const globalStyles = StyleSheet.create({
     container: {
@@ -194,4 +235,10 @@ export const globalStyles = StyleSheet.create({
         alignItems: 'center',
     },
     shadow: SHADOWS.md,
+    card: {
+        backgroundColor: COLORS.surface,
+        borderRadius: BORDER_RADIUS.xl,
+        padding: SPACING.lg,
+        ...SHADOWS.md,
+    },
 });

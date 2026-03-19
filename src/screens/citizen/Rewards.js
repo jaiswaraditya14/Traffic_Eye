@@ -1,16 +1,26 @@
 // Rewards.js
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MobileContainer } from '../../components';
-import { useAppContext } from '../../context/AppContext';
-
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS } from '../../utils/theme';
+import { useAuth } from '../../context';
+import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, formatPoints } from '../../utils';
 
 export default function Rewards() {
-    const { userPoints } = useAppContext();
+    const { profile } = useAuth();
+    const userPoints = profile?.points_balance || 0;
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+        }).start();
+    }, []);
+
     const rewards = [
         { id: 1, title: 'Coffee Voucher', points: 50, icon: 'cafe', available: true },
         { id: 2, title: 'Movie Ticket', points: 100, icon: 'film', available: true },
@@ -21,38 +31,54 @@ export default function Rewards() {
     return (
         <MobileContainer>
             <SafeAreaView style={styles.container} edges={['top']}>
-                <View style={styles.header}>
+                <Animated.View style={[styles.headerContainer, { opacity: fadeAnim }]}>
                     <Text style={styles.title}>Rewards</Text>
-                </View>
-                <ScrollView style={styles.content}>
-                    <LinearGradient colors={[COLORS.accent, COLORS.accentDark]} style={styles.pointsCard}>
-                        <Ionicons name="trophy" size={48} color="#FFFFFF" />
-                        <Text style={styles.pointsLabel}>Your Points</Text>
-                        <Text style={styles.pointsValue}>{userPoints}</Text>
-                    </LinearGradient>
+                </Animated.View>
+                <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                    <Animated.View style={{ opacity: fadeAnim }}>
+                        <LinearGradient
+                            colors={[COLORS.accent, COLORS.accentDark]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.pointsCard}
+                        >
+                            <View style={styles.pointsIconCircle}>
+                                <Ionicons name="trophy" size={32} color={COLORS.accent} />
+                            </View>
+                            <Text style={styles.pointsLabel}>Your Points</Text>
+                            <Text style={styles.pointsValue}>{formatPoints ? formatPoints(userPoints) : userPoints}</Text>
+                        </LinearGradient>
+                    </Animated.View>
 
                     <Text style={styles.sectionTitle}>Available Rewards</Text>
                     {rewards.map((reward) => (
-                        <View key={reward.id} style={[styles.rewardCard, { backgroundColor: COLORS.white }, !reward.available && styles.disabledCard]}>
-                            <View style={[styles.rewardIcon, { backgroundColor: `${COLORS.primary}15` }]}>
-                                <Ionicons name={reward.icon} size={32} color={COLORS.primary} />
+                        <TouchableOpacity
+                            key={reward.id}
+                            style={[styles.rewardCard, !reward.available && styles.disabledCard]}
+                            activeOpacity={reward.available ? 0.7 : 1}
+                        >
+                            <View style={[styles.rewardIcon, { backgroundColor: COLORS.primarySoft || `${COLORS.primary}15` }]}>
+                                <Ionicons name={reward.icon} size={28} color={COLORS.primary} />
                             </View>
                             <View style={styles.rewardInfo}>
                                 <Text style={styles.rewardTitle}>{reward.title}</Text>
                                 <View style={styles.rewardPoints}>
-                                    <Ionicons name="trophy" size={16} color={COLORS.accent} />
+                                    <Ionicons name="trophy" size={14} color={COLORS.accent} />
                                     <Text style={styles.rewardPointsText}>{reward.points} points</Text>
                                 </View>
                             </View>
                             {reward.available ? (
-                                <Ionicons name="chevron-forward" size={24} color={COLORS.gray400} />
+                                <View style={styles.redeemBadge}>
+                                    <Text style={styles.redeemText}>Redeem</Text>
+                                </View>
                             ) : (
                                 <View style={styles.lockedBadge}>
-                                    <Ionicons name="lock-closed" size={16} color={COLORS.gray500} />
+                                    <Ionicons name="lock-closed" size={16} color={COLORS.textTertiary} />
                                 </View>
                             )}
-                        </View>
+                        </TouchableOpacity>
                     ))}
+                    <View style={{ height: SPACING.xl }} />
                 </ScrollView>
             </SafeAreaView>
         </MobileContainer>
@@ -60,24 +86,61 @@ export default function Rewards() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1 },
-    header: { paddingHorizontal: SPACING.lg, paddingVertical: SPACING.lg },
-    title: { fontSize: FONT_SIZES.xxl, fontWeight: FONT_WEIGHTS.bold },
+    container: { flex: 1, backgroundColor: COLORS.background },
+    headerContainer: { paddingHorizontal: SPACING.lg, paddingVertical: SPACING.lg },
+    title: { fontSize: FONT_SIZES.xxl, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary },
     content: { flex: 1, paddingHorizontal: SPACING.lg },
-    pointsCard: { borderRadius: BORDER_RADIUS.xl, padding: SPACING.xl, alignItems: 'center', marginBottom: SPACING.xl, ...SHADOWS.lg },
-    pointsLabel: { fontSize: FONT_SIZES.md, color: '#FFFFFF', marginTop: SPACING.md, opacity: 0.9 },
-    pointsValue: { fontSize: FONT_SIZES.xxxl * 1.5, fontWeight: FONT_WEIGHTS.bold, color: '#FFFFFF' },
-    sectionTitle: { fontSize: FONT_SIZES.lg, fontWeight: FONT_WEIGHTS.bold, marginBottom: SPACING.md },
-    rewardCard: { flexDirection: 'row', alignItems: 'center', borderRadius: BORDER_RADIUS.lg, padding: SPACING.md, marginBottom: SPACING.md, ...SHADOWS.sm },
+    pointsCard: {
+        borderRadius: BORDER_RADIUS.xl,
+        padding: SPACING.xl,
+        alignItems: 'center',
+        marginBottom: SPACING.xl,
+        ...SHADOWS.lg,
+    },
+    pointsIconCircle: {
+        width: 64,
+        height: 64,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.9)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: SPACING.sm,
+    },
+    pointsLabel: { fontSize: FONT_SIZES.sm, color: 'rgba(255,255,255,0.85)', marginTop: SPACING.xs, fontWeight: FONT_WEIGHTS.medium },
+    pointsValue: { fontSize: FONT_SIZES.xxxl * 1.4, fontWeight: FONT_WEIGHTS.extrabold, color: '#FFFFFF' },
+    sectionTitle: { fontSize: FONT_SIZES.lg, fontWeight: FONT_WEIGHTS.bold, marginBottom: SPACING.md, color: COLORS.textPrimary },
+    rewardCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.surface,
+        borderRadius: BORDER_RADIUS.xl,
+        padding: SPACING.md,
+        marginBottom: SPACING.sm,
+        ...SHADOWS.sm,
+    },
     disabledCard: { opacity: 0.5 },
-    rewardIcon: { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', marginRight: SPACING.md },
+    rewardIcon: {
+        width: 52,
+        height: 52,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: SPACING.md,
+    },
     rewardInfo: { flex: 1 },
-    rewardTitle: { fontSize: FONT_SIZES.md, fontWeight: FONT_WEIGHTS.semibold, marginBottom: SPACING.xs },
+    rewardTitle: { fontSize: FONT_SIZES.md, fontWeight: FONT_WEIGHTS.semibold, marginBottom: SPACING.xs, color: COLORS.textPrimary },
     rewardPoints: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    rewardPointsText: { fontSize: FONT_SIZES.sm, fontWeight: FONT_WEIGHTS.medium },
+    rewardPointsText: { fontSize: FONT_SIZES.sm, fontWeight: FONT_WEIGHTS.medium, color: COLORS.textSecondary },
+    redeemBadge: {
+        backgroundColor: COLORS.primarySoft || `${COLORS.primary}15`,
+        paddingHorizontal: SPACING.md,
+        paddingVertical: SPACING.xs + 2,
+        borderRadius: BORDER_RADIUS.full,
+    },
+    redeemText: {
+        fontSize: FONT_SIZES.xs,
+        fontWeight: FONT_WEIGHTS.semibold,
+        color: COLORS.primary,
+    },
     lockedBadge: { padding: SPACING.sm },
 });
-
-
-
-

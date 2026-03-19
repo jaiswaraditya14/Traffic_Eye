@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MobileContainer, Button, Input } from '../../components';
 import { useAuth } from '../../context';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, isValidEmail, validateRequiredFields } from '../../utils';
+import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, isValidEmail, validateRequiredFields } from '../../utils';
 
 export default function CitizenSignIn({ navigation }) {
     const [email, setEmail] = useState('');
@@ -11,10 +11,27 @@ export default function CitizenSignIn({ navigation }) {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    const { signIn } = useAuth();
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(30)).current;
+
+    const { signIn, signInWithGoogle } = useAuth();
+
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 500,
+                useNativeDriver: true,
+            }),
+            Animated.timing(slideAnim, {
+                toValue: 0,
+                duration: 500,
+                useNativeDriver: true,
+            }),
+        ]).start();
+    }, []);
 
     const handleSignIn = async () => {
-        // Use validation utility
         const validation = validateRequiredFields({ Email: email, Password: password });
         if (!validation.valid) {
             Alert.alert('Error', validation.errors[0]);
@@ -31,7 +48,16 @@ export default function CitizenSignIn({ navigation }) {
             const { error } = await signIn(email.trim(), password);
 
             if (error) {
-                Alert.alert('Sign In Failed', error.message || 'Invalid email or password');
+                // Check if email is not confirmed
+                if (error.message?.toLowerCase().includes('email not confirmed')) {
+                    Alert.alert(
+                        'Email Not Verified',
+                        'Please check your email and click the verification link before signing in.',
+                        [{ text: 'OK' }]
+                    );
+                } else {
+                    Alert.alert('Sign In Failed', error.message || 'Invalid email or password');
+                }
                 return;
             }
         } catch (error) {
@@ -43,10 +69,18 @@ export default function CitizenSignIn({ navigation }) {
     };
 
     const handleGoogleSignIn = async () => {
-        Alert.alert(
-            'Coming Soon!',
-            'Google Sign-In will be available in the next update. It requires a native build to work properly.'
-        );
+        setLoading(true);
+        try {
+            const { error } = await signInWithGoogle();
+            if (error) {
+                Alert.alert('Sign In Failed', error.message || 'Could not connect to Google');
+            }
+        } catch (error) {
+            console.error('Google sign in error:', error);
+            Alert.alert('Error', 'An unexpected error occurred during Google Sign-In.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -55,16 +89,28 @@ export default function CitizenSignIn({ navigation }) {
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.container}
             >
-                <ScrollView contentContainerStyle={styles.scrollContent}>
-                    <View style={styles.header}>
+                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                    <Animated.View style={[styles.header, {
+                        opacity: fadeAnim,
+                        transform: [{ translateY: slideAnim }],
+                    }]}>
                         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                            <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+                            <View style={styles.backButtonCircle}>
+                                <Ionicons name="arrow-back" size={20} color={COLORS.textPrimary} />
+                            </View>
                         </TouchableOpacity>
+
+                        <View style={styles.welcomeIcon}>
+                            <Ionicons name="person-circle" size={56} color={COLORS.primary} />
+                        </View>
                         <Text style={styles.title}>Welcome Back</Text>
                         <Text style={styles.subtitle}>Sign in to continue reporting violations</Text>
-                    </View>
+                    </Animated.View>
 
-                    <View style={styles.form}>
+                    <Animated.View style={[styles.form, {
+                        opacity: fadeAnim,
+                        transform: [{ translateY: slideAnim }],
+                    }]}>
                         <Input
                             label="Email"
                             placeholder="Enter your email"
@@ -74,7 +120,7 @@ export default function CitizenSignIn({ navigation }) {
                             autoCapitalize="none"
                         />
 
-                        <View>
+                        <View style={styles.passwordWrapper}>
                             <Input
                                 label="Password"
                                 placeholder="Enter your password"
@@ -89,7 +135,7 @@ export default function CitizenSignIn({ navigation }) {
                                 <Ionicons
                                     name={showPassword ? 'eye-off' : 'eye'}
                                     size={20}
-                                    color={COLORS.gray500}
+                                    color={COLORS.gray400}
                                 />
                             </TouchableOpacity>
                         </View>
@@ -103,6 +149,7 @@ export default function CitizenSignIn({ navigation }) {
                             fullWidth
                             style={styles.signInButton}
                             disabled={loading}
+                            size="lg"
                         >
                             {loading ? (
                                 <ActivityIndicator color={COLORS.white} />
@@ -136,7 +183,7 @@ export default function CitizenSignIn({ navigation }) {
                                 <Text style={styles.signUpLink}>Sign Up</Text>
                             </TouchableOpacity>
                         </View>
-                    </View>
+                    </Animated.View>
                 </ScrollView>
             </KeyboardAvoidingView>
         </MobileContainer>
@@ -159,32 +206,51 @@ const styles = StyleSheet.create({
     backButton: {
         marginBottom: SPACING.lg,
     },
+    backButtonCircle: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: COLORS.surface,
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...SHADOWS.sm,
+    },
+    welcomeIcon: {
+        alignSelf: 'flex-start',
+        marginBottom: SPACING.md,
+    },
     title: {
         fontSize: FONT_SIZES.xxxl,
         fontWeight: FONT_WEIGHTS.bold,
         color: COLORS.textPrimary,
-        marginBottom: SPACING.sm,
+        marginBottom: SPACING.xs,
     },
     subtitle: {
         fontSize: FONT_SIZES.md,
         color: COLORS.textSecondary,
+        lineHeight: 22,
     },
     form: {
         paddingHorizontal: SPACING.lg,
     },
+    passwordWrapper: {
+        position: 'relative',
+    },
     eyeIcon: {
         position: 'absolute',
         right: SPACING.md,
-        top: 38,
+        top: 40,
+        padding: 4,
     },
     forgotPassword: {
         fontSize: FONT_SIZES.sm,
         color: COLORS.primary,
         textAlign: 'right',
         marginBottom: SPACING.lg,
+        fontWeight: FONT_WEIGHTS.medium,
     },
     signInButton: {
-        marginTop: SPACING.md,
+        marginTop: SPACING.xs,
     },
     divider: {
         flexDirection: 'row',
@@ -194,12 +260,13 @@ const styles = StyleSheet.create({
     dividerLine: {
         flex: 1,
         height: 1,
-        backgroundColor: COLORS.gray300,
+        backgroundColor: COLORS.border,
     },
     dividerText: {
         marginHorizontal: SPACING.md,
-        color: COLORS.textSecondary,
-        fontSize: FONT_SIZES.sm,
+        color: COLORS.textTertiary,
+        fontSize: FONT_SIZES.xs,
+        fontWeight: FONT_WEIGHTS.medium,
     },
     socialButton: {
         marginBottom: SPACING.md,
@@ -218,6 +285,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'center',
         marginTop: SPACING.lg,
+        marginBottom: SPACING.xl,
     },
     footerText: {
         fontSize: FONT_SIZES.sm,

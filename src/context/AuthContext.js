@@ -44,13 +44,35 @@ export function AuthProvider({ children }) {
 
     const fetchProfile = async (userId) => {
         const { data, error } = await authService.getProfile(userId);
-        if (!error) setProfile(data);
+        if (error || !data) {
+            // If profile doesn't exist, check if user is logged in and create a default one
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const newProfile = {
+                    id: user.id,
+                    full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+                    email: user.email,
+                    role: 'citizen', // Default to citizen for OAuth
+                    points_balance: 0,
+                    created_at: new Date().toISOString(),
+                };
+                const { error: insertError } = await authService.updateProfile(user.id, newProfile);
+                if (!insertError) {
+                    setProfile(newProfile);
+                } else {
+                    console.error('Failed to create profile:', insertError);
+                }
+            }
+        } else {
+            setProfile(data);
+        }
     };
 
     const signUpCitizen = async (...args) => authService.signUpCitizen(...args);
     const signUpOfficer = async (...args) => authService.signUpOfficer(...args);
     const signIn = async (...args) => authService.signIn(...args);
     const signInWithBadge = async (...args) => authService.signInWithBadge(...args);
+    const signInWithGoogle = async () => authService.signInWithGoogle();
     const signOut = async () => authService.signOut();
     const resetPassword = async (email) => authService.resetPassword(email);
 
@@ -64,8 +86,9 @@ export function AuthProvider({ children }) {
         loading,
         signUpCitizen,
         signUpOfficer,
-        signIn,
-        signInWithBadge,
+        signIn: async (...args) => authService.signIn(...args),
+        signInWithBadge: async (...args) => authService.signInWithBadge(...args),
+        signInWithGoogle: async () => authService.signInWithGoogle(),
         signOut,
         resetPassword,
         refreshProfile,

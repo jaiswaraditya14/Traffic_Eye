@@ -49,11 +49,21 @@ export default function AppNavigator() {
     // 3. Main Navigation
     return (
         <NavigationContainer>
-            <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Navigator
+                screenOptions={{
+                    headerShown: false,
+                    animation: 'slide_from_right',
+                    animationDuration: 250,
+                }}
+            >
                 {!isAuthenticated ? (
                     // Auth Stack
                     <>
-                        <Stack.Screen name="RoleSelection" component={RoleSelection} />
+                        <Stack.Screen
+                            name="RoleSelection"
+                            component={RoleSelection}
+                            options={{ animation: 'fade' }}
+                        />
                         <Stack.Screen name="CitizenSignIn" component={CitizenSignIn} />
                         <Stack.Screen name="CitizenSignUp" component={CitizenSignUp} />
                         <Stack.Screen name="OfficerSignIn" component={OfficerSignIn} />
@@ -64,10 +74,18 @@ export default function AppNavigator() {
                     <Stack.Screen name="Loading" component={SplashScreen} />
                 ) : profile.role === 'citizen' ? (
                     // Citizen Flow
-                    <Stack.Screen name="Citizen" component={CitizenNavigator} />
+                    <Stack.Screen
+                        name="Citizen"
+                        component={CitizenNavigator}
+                        options={{ animation: 'fade' }}
+                    />
                 ) : (
                     // Officer Flow
-                    <Stack.Screen name="Officer" component={OfficerNavigator} />
+                    <Stack.Screen
+                        name="Officer"
+                        component={OfficerNavigator}
+                        options={{ animation: 'fade' }}
+                    />
                 )}
             </Stack.Navigator>
         </NavigationContainer>

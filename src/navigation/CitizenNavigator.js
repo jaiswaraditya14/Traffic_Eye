@@ -2,7 +2,9 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../utils';
+import { Platform, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, SHADOWS, BORDER_RADIUS } from '../utils';
 
 // Import Screens from barrel
 import {
@@ -26,6 +28,9 @@ const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 function CitizenTabNavigator() {
+    const insets = useSafeAreaInsets();
+    const bottomTabHeight = Platform.OS === 'ios' ? 88 : 68;
+
     return (
         <Tab.Navigator
             screenOptions={({ route }) => ({
@@ -35,11 +40,42 @@ function CitizenTabNavigator() {
                     else if (route.name === 'Reports') iconName = focused ? 'document-text' : 'document-text-outline';
                     else if (route.name === 'Rewards') iconName = focused ? 'trophy' : 'trophy-outline';
                     else if (route.name === 'ProfileTab') iconName = focused ? 'person' : 'person-outline';
-                    return <Ionicons name={iconName} size={size} color={color} />;
+                    return (
+                        <View style={{
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            paddingTop: 2,
+                        }}>
+                            <Ionicons name={iconName} size={22} color={color} />
+                            {focused && (
+                                <View style={{
+                                    width: 4,
+                                    height: 4,
+                                    borderRadius: 2,
+                                    backgroundColor: COLORS.primary,
+                                    marginTop: 4,
+                                }} />
+                            )}
+                        </View>
+                    );
                 },
                 tabBarActiveTintColor: COLORS.primary,
-                tabBarInactiveTintColor: COLORS.gray500,
+                tabBarInactiveTintColor: COLORS.textTertiary,
                 headerShown: false,
+                tabBarShowLabel: true,
+                tabBarLabelStyle: {
+                    fontSize: 11,
+                    fontWeight: FONT_WEIGHTS.medium,
+                    marginTop: -2,
+                },
+                tabBarStyle: {
+                    backgroundColor: COLORS.surface,
+                    borderTopWidth: 0,
+                    height: bottomTabHeight + Math.max(insets.bottom, 4),
+                    paddingBottom: Math.max(insets.bottom, 8),
+                    paddingTop: 10,
+                    ...SHADOWS.md,
+                },
             })}
         >
             <Tab.Screen name="Home" component={CitizenHome} />
@@ -52,7 +88,13 @@ function CitizenTabNavigator() {
 
 export default function CitizenNavigator() {
     return (
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Navigator
+            screenOptions={{
+                headerShown: false,
+                animation: 'slide_from_right',
+                animationDuration: 250,
+            }}
+        >
             <Stack.Screen name="CitizenMain" component={CitizenTabNavigator} />
             <Stack.Screen name="PermissionsRequest" component={PermissionsRequest} />
             <Stack.Screen name="NewReport" component={NewReport} />

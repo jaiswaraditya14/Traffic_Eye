@@ -1,16 +1,52 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MobileContainer, Button, Input } from '../../components';
-import { useAuth } from '../../context/AuthContext';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS } from '../../utils/theme';
+import { useAuth } from '../../context';
+import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, isValidEmail } from '../../utils';
 
 export default function ForgotPassword({ navigation }) {
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
     const [sent, setSent] = useState(false);
 
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(30)).current;
+    const successAnim = useRef(new Animated.Value(0)).current;
+    const successScaleAnim = useRef(new Animated.Value(0.5)).current;
+
     const { resetPassword } = useAuth();
+
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 500,
+                useNativeDriver: true,
+            }),
+            Animated.timing(slideAnim, {
+                toValue: 0,
+                duration: 500,
+                useNativeDriver: true,
+            }),
+        ]).start();
+    }, []);
+
+    const playSuccessAnimation = () => {
+        Animated.parallel([
+            Animated.spring(successScaleAnim, {
+                toValue: 1,
+                tension: 60,
+                friction: 8,
+                useNativeDriver: true,
+            }),
+            Animated.timing(successAnim, {
+                toValue: 1,
+                duration: 500,
+                useNativeDriver: true,
+            }),
+        ]).start();
+    };
 
     const handleResetPassword = async () => {
         if (!email.trim()) {
@@ -18,9 +54,7 @@ export default function ForgotPassword({ navigation }) {
             return;
         }
 
-        // Basic email validation
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email.trim())) {
+        if (!isValidEmail(email.trim())) {
             Alert.alert('Error', 'Please enter a valid email address');
             return;
         }
@@ -35,6 +69,7 @@ export default function ForgotPassword({ navigation }) {
             }
 
             setSent(true);
+            playSuccessAnimation();
         } catch (error) {
             Alert.alert('Error', 'Something went wrong. Please try again.');
             console.error(error);
@@ -47,9 +82,14 @@ export default function ForgotPassword({ navigation }) {
         return (
             <MobileContainer>
                 <View style={styles.container}>
-                    <View style={styles.successContainer}>
+                    <Animated.View style={[styles.successContainer, {
+                        opacity: successAnim,
+                        transform: [{ scale: successScaleAnim }],
+                    }]}>
                         <View style={styles.successIcon}>
-                            <Ionicons name="mail-outline" size={64} color={COLORS.primary} />
+                            <View style={styles.successIconInner}>
+                                <Ionicons name="mail-outline" size={48} color={COLORS.primary} />
+                            </View>
                         </View>
                         <Text style={styles.successTitle}>Check Your Email</Text>
                         <Text style={styles.successText}>
@@ -64,6 +104,7 @@ export default function ForgotPassword({ navigation }) {
                             onPress={() => navigation.navigate('CitizenSignIn')}
                             fullWidth
                             style={styles.backToLoginButton}
+                            size="lg"
                         >
                             Back to Sign In
                         </Button>
@@ -75,9 +116,10 @@ export default function ForgotPassword({ navigation }) {
                             }}
                             style={styles.resendLink}
                         >
+                            <Ionicons name="refresh" size={16} color={COLORS.primary} />
                             <Text style={styles.resendText}>Didn't receive the email? Try again</Text>
                         </TouchableOpacity>
-                    </View>
+                    </Animated.View>
                 </View>
             </MobileContainer>
         );
@@ -89,23 +131,33 @@ export default function ForgotPassword({ navigation }) {
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.container}
             >
-                <ScrollView contentContainerStyle={styles.scrollContent}>
-                    <View style={styles.header}>
+                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                    <Animated.View style={[styles.header, {
+                        opacity: fadeAnim,
+                        transform: [{ translateY: slideAnim }],
+                    }]}>
                         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                            <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+                            <View style={styles.backButtonCircle}>
+                                <Ionicons name="arrow-back" size={20} color={COLORS.textPrimary} />
+                            </View>
                         </TouchableOpacity>
 
                         <View style={styles.iconContainer}>
-                            <Ionicons name="lock-closed-outline" size={48} color={COLORS.primary} />
+                            <View style={styles.iconInner}>
+                                <Ionicons name="lock-closed-outline" size={36} color={COLORS.primary} />
+                            </View>
                         </View>
 
                         <Text style={styles.title}>Forgot Password?</Text>
                         <Text style={styles.subtitle}>
                             No worries! Enter your email address and we'll send you a link to reset your password.
                         </Text>
-                    </View>
+                    </Animated.View>
 
-                    <View style={styles.form}>
+                    <Animated.View style={[styles.form, {
+                        opacity: fadeAnim,
+                        transform: [{ translateY: slideAnim }],
+                    }]}>
                         <Input
                             label="Email Address"
                             placeholder="Enter your email"
@@ -120,6 +172,7 @@ export default function ForgotPassword({ navigation }) {
                             fullWidth
                             style={styles.resetButton}
                             disabled={loading}
+                            size="lg"
                         >
                             {loading ? (
                                 <ActivityIndicator color={COLORS.white} />
@@ -135,7 +188,7 @@ export default function ForgotPassword({ navigation }) {
                             <Ionicons name="arrow-back" size={16} color={COLORS.primary} />
                             <Text style={styles.backLinkText}>Back to Sign In</Text>
                         </TouchableOpacity>
-                    </View>
+                    </Animated.View>
                 </ScrollView>
             </KeyboardAvoidingView>
         </MobileContainer>
@@ -145,10 +198,10 @@ export default function ForgotPassword({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.background
+        backgroundColor: COLORS.background,
     },
     scrollContent: {
-        flexGrow: 1
+        flexGrow: 1,
     },
     header: {
         paddingHorizontal: SPACING.lg,
@@ -158,16 +211,33 @@ const styles = StyleSheet.create({
     },
     backButton: {
         alignSelf: 'flex-start',
-        marginBottom: SPACING.lg
+        marginBottom: SPACING.lg,
+    },
+    backButtonCircle: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: COLORS.surface,
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...SHADOWS.sm,
     },
     iconContainer: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: COLORS.primaryLight || '#e6f2ff',
+        width: 90,
+        height: 90,
+        borderRadius: 45,
+        backgroundColor: COLORS.primarySoft || '#EFF6FF',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: SPACING.lg,
+    },
+    iconInner: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: `${COLORS.primary}15`,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     title: {
         fontSize: FONT_SIZES.xxxl,
@@ -180,7 +250,7 @@ const styles = StyleSheet.create({
         fontSize: FONT_SIZES.md,
         color: COLORS.textSecondary,
         textAlign: 'center',
-        lineHeight: 22,
+        lineHeight: 24,
         paddingHorizontal: SPACING.md,
     },
     form: {
@@ -188,7 +258,7 @@ const styles = StyleSheet.create({
         marginTop: SPACING.lg,
     },
     resetButton: {
-        marginTop: SPACING.lg
+        marginTop: SPACING.md,
     },
     backLink: {
         flexDirection: 'row',
@@ -210,16 +280,24 @@ const styles = StyleSheet.create({
         paddingHorizontal: SPACING.xl,
     },
     successIcon: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        backgroundColor: COLORS.primaryLight || '#e6f2ff',
+        width: 110,
+        height: 110,
+        borderRadius: 55,
+        backgroundColor: COLORS.primarySoft || '#EFF6FF',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: SPACING.xl,
     },
+    successIconInner: {
+        width: 76,
+        height: 76,
+        borderRadius: 38,
+        backgroundColor: `${COLORS.primary}15`,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     successTitle: {
-        fontSize: FONT_SIZES.xxl,
+        fontSize: FONT_SIZES.xxl + 2,
         fontWeight: FONT_WEIGHTS.bold,
         color: COLORS.textPrimary,
         marginBottom: SPACING.md,
@@ -229,6 +307,7 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
         textAlign: 'center',
         marginBottom: SPACING.md,
+        lineHeight: 24,
     },
     emailHighlight: {
         color: COLORS.primary,
@@ -238,14 +317,18 @@ const styles = StyleSheet.create({
         fontSize: FONT_SIZES.sm,
         color: COLORS.textSecondary,
         textAlign: 'center',
-        lineHeight: 20,
+        lineHeight: 22,
         marginBottom: SPACING.xl,
     },
     backToLoginButton: {
-        marginTop: SPACING.lg,
+        marginTop: SPACING.md,
     },
     resendLink: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: SPACING.xs,
         marginTop: SPACING.lg,
+        padding: SPACING.sm,
     },
     resendText: {
         fontSize: FONT_SIZES.sm,

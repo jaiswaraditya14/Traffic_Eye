@@ -6,6 +6,7 @@ export {
     FONT_WEIGHTS,
     BORDER_RADIUS,
     SHADOWS,
+    ANIMATION,
     globalStyles,
 } from './theme';
 export {

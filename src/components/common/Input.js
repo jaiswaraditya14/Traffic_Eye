@@ -1,6 +1,6 @@
-import React from 'react';
-import { TextInput, View, Text, StyleSheet } from 'react-native';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../../utils/theme';
+import React, { useState, useRef } from 'react';
+import { TextInput, View, Text, StyleSheet, Animated } from 'react-native';
+import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from '../../utils/theme';
 
 export const Input = ({
     label,
@@ -16,26 +16,59 @@ export const Input = ({
     inputStyle,
     ...props
 }) => {
+    const [isFocused, setIsFocused] = useState(false);
+    const borderAnim = useRef(new Animated.Value(0)).current;
+
+    const handleFocus = () => {
+        setIsFocused(true);
+        Animated.timing(borderAnim, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: false,
+        }).start();
+    };
+
+    const handleBlur = () => {
+        setIsFocused(false);
+        Animated.timing(borderAnim, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: false,
+        }).start();
+    };
+
+    const borderColor = borderAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [COLORS.border, COLORS.primary],
+    });
+
     return (
         <View style={[styles.container, style]}>
-            {label && <Text style={styles.label}>{label}</Text>}
-            <TextInput
-                style={[
-                    styles.input,
-                    multiline && styles.multiline,
-                    error && styles.inputError,
-                    inputStyle,
-                ]}
-                placeholder={placeholder}
-                placeholderTextColor="#9CA3AF"
-                value={value}
-                onChangeText={onChangeText}
-                secureTextEntry={secureTextEntry}
-                keyboardType={keyboardType}
-                multiline={multiline}
-                numberOfLines={numberOfLines}
-                {...props}
-            />
+            {label && <Text style={[styles.label, isFocused && styles.labelFocused]}>{label}</Text>}
+            <Animated.View style={[
+                styles.inputWrapper,
+                { borderColor: error ? COLORS.error : borderColor },
+                isFocused && styles.inputWrapperFocused,
+            ]}>
+                <TextInput
+                    style={[
+                        styles.input,
+                        multiline && styles.multiline,
+                        inputStyle,
+                    ]}
+                    placeholder={placeholder}
+                    placeholderTextColor={COLORS.textTertiary}
+                    value={value}
+                    onChangeText={onChangeText}
+                    secureTextEntry={secureTextEntry}
+                    keyboardType={keyboardType}
+                    multiline={multiline}
+                    numberOfLines={numberOfLines}
+                    onFocus={handleFocus}
+                    onBlur={handleBlur}
+                    {...props}
+                />
+            </Animated.View>
             {error && <Text style={styles.errorText}>{error}</Text>}
         </View>
     );
@@ -47,30 +80,36 @@ const styles = StyleSheet.create({
     },
     label: {
         fontSize: FONT_SIZES.sm,
-        color: '#111827',
-        marginBottom: SPACING.xs,
-        fontWeight: '500',
+        color: COLORS.textSecondary,
+        marginBottom: SPACING.xs + 2,
+        fontWeight: FONT_WEIGHTS.medium,
+    },
+    labelFocused: {
+        color: COLORS.primary,
+    },
+    inputWrapper: {
+        borderWidth: 1.5,
+        borderColor: COLORS.border,
+        borderRadius: BORDER_RADIUS.lg,
+        backgroundColor: COLORS.surface,
+    },
+    inputWrapperFocused: {
+        backgroundColor: COLORS.primarySoft || '#EFF6FF',
     },
     input: {
-        borderWidth: 1,
-        borderColor: '#D1D5DB',
-        borderRadius: BORDER_RADIUS.lg,
         paddingHorizontal: SPACING.md,
-        paddingVertical: SPACING.md,
+        paddingVertical: SPACING.md - 2,
         fontSize: FONT_SIZES.md,
-        color: '#111827',
-        backgroundColor: '#FFFFFF',
+        color: COLORS.textPrimary,
     },
     multiline: {
         minHeight: 100,
         textAlignVertical: 'top',
     },
-    inputError: {
-        borderColor: COLORS.error,
-    },
     errorText: {
         color: COLORS.error,
         fontSize: FONT_SIZES.xs,
         marginTop: SPACING.xs,
+        fontWeight: FONT_WEIGHTS.medium,
     },
 });

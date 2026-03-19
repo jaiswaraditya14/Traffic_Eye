@@ -1,6 +1,6 @@
-import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS } from '../../utils/theme';
+import React, { useRef } from 'react';
+import { Animated, Text, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
+import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, ANIMATION } from '../../utils/theme';
 
 export const Button = ({
     children,
@@ -13,6 +13,26 @@ export const Button = ({
     style,
     textStyle,
 }) => {
+    const scaleAnim = useRef(new Animated.Value(1)).current;
+
+    const handlePressIn = () => {
+        Animated.spring(scaleAnim, {
+            toValue: 0.97,
+            useNativeDriver: true,
+            speed: 50,
+            bounciness: 4,
+        }).start();
+    };
+
+    const handlePressOut = () => {
+        Animated.spring(scaleAnim, {
+            toValue: 1,
+            useNativeDriver: true,
+            speed: 50,
+            bounciness: 4,
+        }).start();
+    };
+
     const buttonStyles = [
         styles.button,
         styles[variant],
@@ -30,18 +50,23 @@ export const Button = ({
     ];
 
     return (
-        <TouchableOpacity
-            style={buttonStyles}
-            onPress={onPress}
-            disabled={disabled || loading}
-            activeOpacity={0.7}
-        >
-            {loading ? (
-                <ActivityIndicator color={variant === 'primary' ? '#FFFFFF' : COLORS.primary} />
-            ) : (
-                <Text style={textStyles}>{children}</Text>
-            )}
-        </TouchableOpacity>
+        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+            <Pressable
+                style={buttonStyles}
+                onPress={onPress}
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+                disabled={disabled || loading}
+            >
+                {loading ? (
+                    <ActivityIndicator color={variant === 'primary' ? '#FFFFFF' : COLORS.primary} />
+                ) : typeof children === 'string' ? (
+                    <Text style={textStyles}>{children}</Text>
+                ) : (
+                    children
+                )}
+            </Pressable>
+        </Animated.View>
     );
 };
 
@@ -58,37 +83,42 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.primary,
     },
     secondary: {
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: '#D1D5DB',
+        backgroundColor: COLORS.surface,
+        borderWidth: 1.5,
+        borderColor: COLORS.border,
     },
     outline: {
         backgroundColor: 'transparent',
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: COLORS.primary,
     },
     ghost: {
         backgroundColor: 'transparent',
+        shadowColor: 'transparent',
+        elevation: 0,
     },
     danger: {
         backgroundColor: COLORS.error,
     },
     success: {
-        backgroundColor: COLORS.success,
+        backgroundColor: COLORS.secondary,
     },
 
     // Sizes
     sm: {
         paddingVertical: SPACING.sm,
         paddingHorizontal: SPACING.md,
+        minHeight: 36,
     },
     md: {
-        paddingVertical: SPACING.md,
+        paddingVertical: SPACING.md - 2,
         paddingHorizontal: SPACING.lg,
+        minHeight: 48,
     },
     lg: {
-        paddingVertical: SPACING.lg,
+        paddingVertical: SPACING.lg - 4,
         paddingHorizontal: SPACING.xl,
+        minHeight: 56,
     },
 
     fullWidth: {
@@ -102,13 +132,14 @@ const styles = StyleSheet.create({
     // Text styles
     text: {
         fontWeight: FONT_WEIGHTS.semibold,
+        letterSpacing: 0.3,
     },
 
     primaryText: {
         color: '#FFFFFF',
     },
     secondaryText: {
-        color: '#111827',
+        color: COLORS.textPrimary,
     },
     outlineText: {
         color: COLORS.primary,
