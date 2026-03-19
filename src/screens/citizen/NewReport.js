@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, ScrollView, ActivityIndicator, Modal } from 'react-native';
+import MapView, { Marker } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MobileContainer, Button, Input } from '../../components';
@@ -27,6 +28,15 @@ export default function NewReport({ navigation }) {
     } = useLocation();
 
     const [trustLevel, setTrustLevel] = useState(null); // 'Verified Location', 'Gallery Upload', 'Needs Verification / Manual Location'
+    
+    const [isMapVisible, setIsMapVisible] = useState(false);
+    const [selectedCoordinate, setSelectedCoordinate] = useState(null);
+    const [mapRegion, setMapRegion] = useState({
+        latitude: location?.latitude || 28.6139,
+        longitude: location?.longitude || 77.2090,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+    });
 
     const [video, setVideo] = useState(null);
     const [mediaType, setMediaType] = useState(null); // 'image' or 'video'
@@ -174,17 +184,25 @@ export default function NewReport({ navigation }) {
                                 numberOfLines={2}
                                 inputStyle={styles.addressInput}
                             />
-                            <TouchableOpacity
-                                style={styles.locationButton}
-                                onPress={handleDetectLocation}
-                                disabled={loadingLocation}
-                            >
-                                {loadingLocation ? (
-                                    <ActivityIndicator size="small" color={COLORS.white} />
-                                ) : (
-                                    <Ionicons name="location" size={24} color={COLORS.white} />
-                                )}
-                            </TouchableOpacity>
+                            <View style={styles.locationButtonsWrapper}>
+                                <TouchableOpacity
+                                    style={styles.mapButton}
+                                    onPress={() => setIsMapVisible(true)}
+                                >
+                                    <Ionicons name="map" size={20} color={COLORS.white} />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.locationButtonRight}
+                                    onPress={handleDetectLocation}
+                                    disabled={loadingLocation}
+                                >
+                                    {loadingLocation ? (
+                                        <ActivityIndicator size="small" color={COLORS.white} />
+                                    ) : (
+                                        <Ionicons name="location" size={20} color={COLORS.white} />
+                                    )}
+                                </TouchableOpacity>
+                            </View>
                         </View>
 
                         {/* Description */}
@@ -204,6 +222,51 @@ export default function NewReport({ navigation }) {
                     </View>
                 </ScrollView>
             </SafeAreaView>
+
+            {/* Map Picker Modal */}
+            <Modal visible={isMapVisible} animationType="slide">
+                <View style={styles.mapContainer}>
+                    <MapView
+                        style={styles.map}
+                        region={mapRegion}
+                        onRegionChangeComplete={setMapRegion}
+                        onPress={(e) => setSelectedCoordinate(e.nativeEvent.coordinate)}
+                        showsUserLocation={true}
+                    >
+                        {selectedCoordinate && (
+                            <Marker coordinate={selectedCoordinate} />
+                        )}
+                        {!selectedCoordinate && location && (
+                            <Marker coordinate={location} pinColor="blue" />
+                        )}
+                    </MapView>
+                    
+                    <View style={styles.mapHeader}>
+                        <Text style={styles.mapTitle}>Tap Map to Select Location</Text>
+                        <TouchableOpacity onPress={() => setIsMapVisible(false)} style={styles.closeMapButton}>
+                            <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.mapFooter}>
+                        <Button 
+                            fullWidth 
+                            disabled={!selectedCoordinate && !location}
+                            onPress={() => {
+                                setIsMapVisible(false);
+                                setTrustLevel('Manual Location');
+                                if (selectedCoordinate) {
+                                    setManualLocation(selectedCoordinate);
+                                } else if (location) {
+                                    setManualLocation(location);
+                                }
+                            }}
+                        >
+                            Confirm Location
+                        </Button>
+                    </View>
+                </View>
+            </Modal>
         </MobileContainer>
     );
 }
@@ -230,18 +293,37 @@ const styles = StyleSheet.create({
         marginBottom: SPACING.lg
     },
     addressInput: {
-        paddingRight: 64,
+        paddingRight: 110,
     },
-    locationButton: {
+    locationButtonsWrapper: {
         position: 'absolute',
         right: 12,
-        top: 44,
-        backgroundColor: COLORS.primary,
-        width: 48,
-        height: 48,
-        borderRadius: BORDER_RADIUS.lg,
+        top: 40,
+        flexDirection: 'row',
+        gap: SPACING.md,
+    },
+    mapButton: {
+        backgroundColor: COLORS.secondary,
+        width: 44,
+        height: 44,
+        borderRadius: BORDER_RADIUS.md,
         justifyContent: 'center',
         alignItems: 'center',
         ...SHADOWS.md,
     },
+    locationButtonRight: {
+        backgroundColor: COLORS.primary,
+        width: 44,
+        height: 44,
+        borderRadius: BORDER_RADIUS.md,
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...SHADOWS.md,
+    },
+    mapContainer: { flex: 1, backgroundColor: COLORS.white },
+    map: { width: '100%', height: '100%' },
+    mapHeader: { position: 'absolute', top: 50, left: SPACING.lg, right: SPACING.lg, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.white, padding: SPACING.md, borderRadius: BORDER_RADIUS.lg, ...SHADOWS.md },
+    mapTitle: { fontSize: FONT_SIZES.md, fontWeight: FONT_WEIGHTS.bold },
+    closeMapButton: { padding: SPACING.xs },
+    mapFooter: { position: 'absolute', bottom: 40, left: SPACING.lg, right: SPACING.lg, backgroundColor: COLORS.white, padding: SPACING.md, borderRadius: BORDER_RADIUS.lg, ...SHADOWS.lg },
 });
