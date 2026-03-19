@@ -18,11 +18,15 @@ export default function NewReport({ navigation }) {
     } = useImagePicker();
 
     const {
+        location,
         address,
         setAddress,
         loading: loadingLocation,
-        detectLocation
+        detectLocation,
+        setManualLocation
     } = useLocation();
+
+    const [trustLevel, setTrustLevel] = useState(null); // 'Verified Location', 'Gallery Upload', 'Needs Verification / Manual Location'
 
     const [video, setVideo] = useState(null);
     const [mediaType, setMediaType] = useState(null); // 'image' or 'video'
@@ -31,18 +35,28 @@ export default function NewReport({ navigation }) {
     const { setCurrentReport } = useAppContext();
 
     const handleTakePhoto = async () => {
-        const uri = await takePhoto();
-        if (uri) {
+        const result = await takePhoto();
+        if (result && result.uri) {
             setVideo(null);
             setMediaType('image');
+            setTrustLevel('Verified Location');
+            detectLocation();
         }
     };
 
     const handlePickImage = async () => {
-        const uri = await pickImageGallery();
-        if (uri) {
+        const result = await pickImageGallery();
+        if (result && result.uri) {
             setVideo(null);
             setMediaType('image');
+            if (result.location) {
+                setTrustLevel('Gallery Upload');
+                setManualLocation(result.location);
+                Alert.alert('Location Found', 'Location details dynamically extracted from your image.');
+            } else {
+                setTrustLevel('Needs Verification / Manual Location');
+                Alert.alert('Notice', 'No location data found in image. Please use the GPS button or enter the location manually.');
+            }
         }
     };
 
@@ -52,6 +66,8 @@ export default function NewReport({ navigation }) {
             setImage(null);
             setVideo(uri);
             setMediaType('video');
+            setTrustLevel('Verified Location');
+            detectLocation();
         }
     };
 
@@ -61,12 +77,15 @@ export default function NewReport({ navigation }) {
             setImage(null);
             setVideo(uri);
             setMediaType('video');
+            setTrustLevel('Needs Verification / Manual Location');
+            Alert.alert('Notice', 'Please use the GPS button or enter the location manually.');
         }
     };
 
     const handleDetectLocation = async () => {
         const result = await detectLocation();
         if (result) {
+            setTrustLevel('Verified Location');
             Alert.alert('Success', 'Location detected successfully!');
         }
     };
@@ -82,6 +101,8 @@ export default function NewReport({ navigation }) {
             mediaType,
             description,
             address,
+            location,
+            trustLevel: trustLevel || 'Needs Verification / Manual Location',
             timestamp: new Date()
         });
         navigation.navigate('AIProcessing');
@@ -145,7 +166,7 @@ export default function NewReport({ navigation }) {
                         {/* Address with Auto-Detect */}
                         <View style={styles.addressContainer}>
                             <Input
-                                label="Location Address"
+                                label={`Location Address ${trustLevel ? `(${trustLevel})` : ''}`}
                                 placeholder="Enter address or use GPS..."
                                 value={address}
                                 onChangeText={setAddress}

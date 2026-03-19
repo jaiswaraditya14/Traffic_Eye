@@ -75,12 +75,47 @@ export default function useLocation() {
         setAddress('');
     };
 
+    const setManualLocation = async (coords) => {
+        setLocation(coords);
+        try {
+            const addressData = await Location.reverseGeocodeAsync({
+                latitude: coords.latitude,
+                longitude: coords.longitude,
+            });
+
+            if (addressData && addressData.length > 0) {
+                const geocode = addressData[0];
+                const parts = [
+                    geocode.name,
+                    geocode.street,
+                    geocode.district,
+                    geocode.city,
+                    geocode.subregion,
+                    geocode.region,
+                    geocode.postalCode,
+                ].filter(Boolean);
+
+                const uniqueParts = [...new Set(parts)];
+                const addr = uniqueParts.join(', ');
+                setAddress(addr);
+                return;
+            }
+        } catch (geocodeError) {
+            console.warn('Geocoding failed:', geocodeError);
+        }
+        
+        const fallback = `${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`;
+        setAddress(fallback);
+    };
+
     return {
         location,
+        setLocation,
         address,
         loading,
         detectLocation,
         clearLocation,
         setAddress,
+        setManualLocation,
     };
 }

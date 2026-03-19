@@ -20,17 +20,32 @@ export default function useImagePicker() {
 
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: true,
-                aspect: [4, 3],
+                allowsEditing: false, // Set to false to skip the crop screen entirely
                 quality: 0.8,
+                exif: true,
             });
 
             if (!result.canceled && result.assets?.length > 0) {
-                const uri = result.assets[0].uri;
+                const asset = result.assets[0];
+                const uri = asset.uri;
                 setImage(uri);
-                return uri;
+                
+                let location = null;
+                if (asset.exif && asset.exif.GPSLatitude !== undefined && asset.exif.GPSLongitude !== undefined) {
+                    // Extract coordinates
+                    let lat = asset.exif.GPSLatitude;
+                    let lng = asset.exif.GPSLongitude;
+                    
+                    // Handle iOS reference tags if they exist and lat/lng are positive
+                    if (asset.exif.GPSLatitudeRef === 'S' && lat > 0) lat = -lat;
+                    if (asset.exif.GPSLongitudeRef === 'W' && lng > 0) lng = -lng;
+                    
+                    location = { latitude: lat, longitude: lng };
+                }
+                
+                return { uri, location };
             }
-            return null;
+            return { uri: null, location: null };
         } catch (error) {
             console.error('Error picking image:', error);
             Alert.alert('Error', 'Failed to pick image from gallery.');
@@ -50,17 +65,30 @@ export default function useImagePicker() {
             }
 
             const result = await ImagePicker.launchCameraAsync({
-                allowsEditing: true,
-                aspect: [4, 3],
+                allowsEditing: false, // Set to false to skip the crop screen entirely
                 quality: 0.8,
+                exif: true,
             });
 
             if (!result.canceled && result.assets?.length > 0) {
-                const uri = result.assets[0].uri;
+                const asset = result.assets[0];
+                const uri = asset.uri;
                 setImage(uri);
-                return uri;
+                
+                let location = null;
+                if (asset.exif && asset.exif.GPSLatitude !== undefined && asset.exif.GPSLongitude !== undefined) {
+                    let lat = asset.exif.GPSLatitude;
+                    let lng = asset.exif.GPSLongitude;
+                    
+                    if (asset.exif.GPSLatitudeRef === 'S' && lat > 0) lat = -lat;
+                    if (asset.exif.GPSLongitudeRef === 'W' && lng > 0) lng = -lng;
+                    
+                    location = { latitude: lat, longitude: lng };
+                }
+                
+                return { uri, location };
             }
-            return null;
+            return { uri: null, location: null };
         } catch (error) {
             console.error('Error capturing image:', error);
             Alert.alert('Error', 'Failed to capture photo.');
