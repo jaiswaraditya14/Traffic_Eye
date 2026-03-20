@@ -16,6 +16,20 @@ export default function AIResultsVerification({ navigation, route }) {
     const [confidence, setConfidence] = useState(aiResults?.confidence?.toString() || '0');
     const [imageModalVisible, setImageModalVisible] = useState(false);
 
+    const severity = aiResults?.severity || 'Unknown';
+    const allViolations = aiResults?.allViolations || [];
+    const violationDetected = aiResults?.violationDetected !== false;
+
+    const getSeverityColor = (sev) => {
+        switch (sev) {
+            case 'Critical': return '#dc2626';
+            case 'High': return '#ea580c';
+            case 'Medium': return '#eab308';
+            case 'Low': return '#22c55e';
+            default: return COLORS.textSecondary;
+        }
+    };
+
     const handleSubmit = () => {
         if (!vehicleNumber.trim()) {
             Alert.alert('Error', 'Please enter a vehicle number');
@@ -31,6 +45,8 @@ export default function AIResultsVerification({ navigation, route }) {
             verifiedData: {
                 vehicleNumber,
                 violationType,
+                severity,
+                allViolations,
                 confidence: `${confidence}%`,
                 ...currentReport
             }
@@ -77,6 +93,29 @@ export default function AIResultsVerification({ navigation, route }) {
                                 <Text style={styles.confidenceBadgeText}>{confidence}% Confidence</Text>
                             </View>
                         </View>
+
+                        {/* Severity Badge */}
+                        {violationDetected && (
+                            <View style={[styles.severityBadge, { backgroundColor: getSeverityColor(severity) + '20', borderColor: getSeverityColor(severity) }]}>
+                                <Ionicons name="alert-circle" size={16} color={getSeverityColor(severity)} />
+                                <Text style={[styles.severityText, { color: getSeverityColor(severity) }]}>
+                                    Severity: {severity}
+                                </Text>
+                            </View>
+                        )}
+
+                        {/* All Violations List (when multiple) */}
+                        {allViolations.length > 1 && (
+                            <View style={styles.allViolationsBox}>
+                                <Text style={styles.allViolationsTitle}>All Violations Detected ({allViolations.length}):</Text>
+                                {allViolations.map((v, i) => (
+                                    <Text key={i} style={styles.allViolationItem}>
+                                        {i === 0 ? '🔴' : '🟡'} {v} {i === 0 ? '(Most Severe)' : ''}
+                                    </Text>
+                                ))}
+                            </View>
+                        )}
+
                         {aiResults?.description && (
                             <View style={styles.descriptionBox}>
                                 <Ionicons name="information-circle" size={16} color={COLORS.primary} />
@@ -255,6 +294,20 @@ const styles = StyleSheet.create({
     percentSymbol: { fontSize: FONT_SIZES.lg, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary },
     confidenceBar: { height: 6, backgroundColor: COLORS.gray200, borderRadius: BORDER_RADIUS.sm, marginTop: SPACING.sm, overflow: 'hidden' },
     confidenceFill: { height: '100%', borderRadius: BORDER_RADIUS.sm },
+    severityBadge: {
+        flexDirection: 'row', alignItems: 'center', gap: SPACING.xs,
+        paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs,
+        borderRadius: BORDER_RADIUS.md, borderWidth: 1.5,
+        marginBottom: SPACING.sm, alignSelf: 'flex-start',
+    },
+    severityText: { fontSize: FONT_SIZES.sm, fontWeight: FONT_WEIGHTS.bold },
+    allViolationsBox: {
+        backgroundColor: COLORS.gray50, borderRadius: BORDER_RADIUS.md,
+        padding: SPACING.sm, marginBottom: SPACING.sm,
+        borderLeftWidth: 3, borderLeftColor: COLORS.warning,
+    },
+    allViolationsTitle: { fontSize: FONT_SIZES.xs, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary, marginBottom: SPACING.xs },
+    allViolationItem: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: 2 },
     footer: { flexDirection: 'row', gap: SPACING.md, padding: SPACING.lg, borderTopWidth: 1, borderTopColor: COLORS.gray200 },
     footerButton: { flex: 1 },
     modalContainer: { flex: 1, backgroundColor: 'black', justifyContent: 'center', alignItems: 'center' },

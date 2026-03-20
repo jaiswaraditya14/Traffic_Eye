@@ -1,11 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, Animated } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, Dimensions, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MobileContainer } from '../../components';
 import { Button } from '../../components';
 import { useAppContext } from '../../context/AppContext';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from '../../utils/theme';
+import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, GRADIENTS, SHADOWS } from '../../utils/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -14,25 +14,25 @@ const slides = [
         image: require('../../../assets/images/1.jpg'),
         icon: 'camera',
         title: 'Report Violations',
-        description: 'Capture traffic violations with your phone camera. Take photos or videos up to 15 seconds.',
-        color: COLORS.primary,
-        bgColor: COLORS.primarySoft || '#EFF6FF',
+        description: 'Capture traffic violations with your phone camera. Take photos or videos to help keep roads safe.',
+        gradient: ['#4F46E5', '#6366F1'],
+        accentColor: COLORS.primary,
     },
     {
         image: require('../../../assets/images/onboarding_ai.jpg'),
         icon: 'scan',
         title: 'AI Verification',
         description: 'Our AI instantly analyzes license plates, violation types, and location with high accuracy.',
-        color: COLORS.secondary,
-        bgColor: COLORS.secondarySoft || '#ECFDF5',
+        gradient: ['#0D9488', '#14B8A6'],
+        accentColor: COLORS.secondary,
     },
     {
         image: require('../../../assets/images/onboarding_rewards.jpg'),
         icon: 'trophy',
         title: 'Earn Rewards',
         description: 'Get points for verified reports. Climb the leaderboard and make your community safer.',
-        color: COLORS.accent,
-        bgColor: COLORS.accentSoft || '#FFFBEB',
+        gradient: ['#D97706', '#F59E0B'],
+        accentColor: COLORS.accent,
     },
 ];
 
@@ -109,7 +109,7 @@ export default function OnboardingCarousel({ navigation }) {
             ]}>
                 {/* Skip button */}
                 <View style={styles.header}>
-                    <Button variant="ghost" onPress={handleSkip} size="sm">
+                    <Button variant="ghost" onPress={handleSkip} textStyle={styles.skipText}>
                         Skip
                     </Button>
                 </View>
@@ -125,10 +125,35 @@ export default function OnboardingCarousel({ navigation }) {
                 >
                     {slides.map((slide, index) => (
                         <View key={index} style={[styles.slide, { width }]}>
-                            <View style={[styles.iconContainer, { backgroundColor: slide.bgColor }]}>
-                                <View style={[styles.iconInner, { backgroundColor: `${slide.color}20` }]}>
-                                    <Ionicons name={slide.icon} size={56} color={slide.color} />
+                            {/* Image Section with Gradient Overlay */}
+                            <View style={styles.imageContainer}>
+                                <Image
+                                    source={slide.image}
+                                    style={styles.slideImage}
+                                    resizeMode="cover"
+                                />
+                                {/* Gradient overlay on image */}
+                                <LinearGradient
+                                    colors={['transparent', 'rgba(0,0,0,0.1)', COLORS.background]}
+                                    style={styles.imageGradientBottom}
+                                />
+                                {/* Icon badge on top of image */}
+                                <View style={styles.iconOverlay}>
+                                    <LinearGradient
+                                        colors={slide.gradient}
+                                        style={styles.iconBadge}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 1 }}
+                                    >
+                                        <Ionicons name={slide.icon} size={28} color="#FFF" />
+                                    </LinearGradient>
                                 </View>
+                            </View>
+
+                            {/* Text Section */}
+                            <View style={styles.slideTextContainer}>
+                                <Text style={[styles.title, { color: slide.accentColor }]}>{slide.title}</Text>
+                                <Text style={styles.description}>{slide.description}</Text>
                             </View>
                         </View>
                     ))}
@@ -137,16 +162,13 @@ export default function OnboardingCarousel({ navigation }) {
                 {/* Indicators */}
                 <View style={styles.indicators}>
                     {slides.map((slide, index) => (
-                        <Animated.View
+                        <View
                             key={index}
                             style={[
                                 styles.indicator,
-                                {
-                                    width: indicatorWidths[index],
-                                    backgroundColor: index === currentSlide
-                                        ? slides[currentSlide].color
-                                        : COLORS.gray300,
-                                },
+                                index === currentSlide
+                                    ? [styles.activeIndicator, { backgroundColor: slides[currentSlide].accentColor }]
+                                    : styles.inactiveIndicator,
                             ]}
                         />
                     ))}
@@ -155,7 +177,7 @@ export default function OnboardingCarousel({ navigation }) {
                 {/* Button */}
                 <View style={styles.footer}>
                     <Button onPress={handleNext} fullWidth size="lg">
-                        {currentSlide < slides.length - 1 ? 'Next' : 'Get Started'}
+                        {currentSlide < slides.length - 1 ? 'Continue' : 'Get Started'}
                     </Button>
                 </View>
             </Animated.View>
@@ -221,15 +243,8 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        paddingHorizontal: SPACING.xl,
-    },
-    iconContainer: {
-        width: 160,
-        height: 160,
-        borderRadius: 80,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: SPACING.xl,
+        paddingHorizontal: SPACING.xxl,
+        paddingTop: SPACING.lg,
     },
     iconInner: {
         width: 110,
@@ -239,7 +254,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     title: {
-        fontSize: FONT_SIZES.xxl + 2,
+        fontSize: 28,
         fontWeight: FONT_WEIGHTS.bold,
         marginBottom: SPACING.md,
         textAlign: 'center',
@@ -249,7 +264,7 @@ const styles = StyleSheet.create({
         fontSize: FONT_SIZES.md,
         color: COLORS.textSecondary,
         textAlign: 'center',
-        maxWidth: 320,
+        maxWidth: 300,
         lineHeight: 24,
     },
     // ── Indicators ──
@@ -263,8 +278,16 @@ const styles = StyleSheet.create({
         height: 6,
         borderRadius: 3,
     },
+    activeIndicator: {
+        width: 28,
+    },
+    inactiveIndicator: {
+        width: 6,
+        backgroundColor: COLORS.gray300,
+    },
+    // ── Footer ──
     footer: {
-        paddingHorizontal: SPACING.lg,
-        paddingBottom: SPACING.xl + SPACING.md,
+        paddingHorizontal: SPACING.xl,
+        paddingBottom: SPACING.xxl,
     },
 });

@@ -31,8 +31,8 @@ export default function AppNavigator() {
     const { hasSeenOnboarding, showSplash } = useAppContext();
     const { isAuthenticated, loading, profile } = useAuth();
 
-    // 1. Loading/Splash Screen
-    if (loading || showSplash) {
+    // 1. Splash Screen — always shows first on app start for 8 seconds
+    if (showSplash) {
         return (
             <NavigationContainer>
                 <Stack.Navigator screenOptions={{ headerShown: false }}>

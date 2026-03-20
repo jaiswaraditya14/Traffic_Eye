@@ -2,30 +2,29 @@ import { StyleSheet, Dimensions, Platform } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
-// Responsive scaling utility
-const guidelineBaseWidth = 375;
-const scale = (size) => (width / guidelineBaseWidth) * size;
-const moderateScale = (size, factor = 0.5) => size + (scale(size) - size) * factor;
+// ─────────────────────────────────────────────
+// Enterprise Color Palette — "Indigo Authority"
+// ─────────────────────────────────────────────
 
-// Light Mode Colors — refined modern palette
 const LIGHT_COLORS = {
-    // Primary - Police Navy Blue (Trust, Standard Indian State Apps)
-    primary: '#1A365D',
-    primaryLight: '#2B6CB0',
-    primaryDark: '#000000',
-    primarySoft: '#EBF8FF',
+    // Primary — Deep Indigo
+    primary: '#4F46E5',
+    primaryLight: '#6366F1',
+    primaryDark: '#3730A3',
+    primarySurface: '#EEF2FF',       // Very light indigo tint for surfaces
+    primaryBorder: '#C7D2FE',
 
-    // Secondary - Olive/Forest Green
-    secondary: '#2F855A',
-    secondaryLight: '#48BB78',
-    secondaryDark: '#276749',
-    secondarySoft: '#F0FFF4',
+    // Secondary — Teal
+    secondary: '#0D9488',
+    secondaryLight: '#14B8A6',
+    secondaryDark: '#0F766E',
+    secondarySurface: '#F0FDFA',
 
-    // Accent - Traffic Saffron / Indian Orange
-    accent: '#DD6B20',
-    accentLight: '#ED8936',
-    accentDark: '#C05621',
-    accentSoft: '#FFFAF0',
+    // Accent — Amber
+    accent: '#F59E0B',
+    accentLight: '#FBBF24',
+    accentDark: '#D97706',
+    accentSurface: '#FFFBEB',
 
     // Status
     success: '#059669',
@@ -57,41 +56,44 @@ const LIGHT_COLORS = {
     gray900: '#0F172A',
 
     // Background
-    background: '#F7F7F7',
-    backgroundSecondary: '#EAEAEA',
+    background: '#F8FAFC',
+    backgroundSecondary: '#F1F5F9',
     surface: '#FFFFFF',
     surfaceElevated: '#FFFFFF',
 
     // Text
     textPrimary: '#0F172A',
-    textSecondary: '#64748B',
+    textSecondary: '#475569',
     textTertiary: '#94A3B8',
     textInverse: '#FFFFFF',
+    textAccent: '#4F46E5',
 
     // Borders
     border: '#E2E8F0',
     borderLight: '#F1F5F9',
+    borderFocus: '#4F46E5',
 
     // Overlay
-    overlay: 'rgba(15, 23, 42, 0.4)',
+    overlay: 'rgba(15, 23, 42, 0.5)',
     overlayLight: 'rgba(15, 23, 42, 0.08)',
 };
 
 const DARK_COLORS = {
-    primary: '#4F46E5',
+    primary: '#6366F1',
     primaryLight: '#818CF8',
-    primaryDark: '#3730A3',
-    primarySoft: '#312E81',
+    primaryDark: '#4F46E5',
+    primarySurface: '#1E1B4B',
+    primaryBorder: '#4338CA',
 
-    secondary: '#10B981',
-    secondaryLight: '#34D399',
-    secondaryDark: '#059669',
-    secondarySoft: '#064E3B',
+    secondary: '#14B8A6',
+    secondaryLight: '#2DD4BF',
+    secondaryDark: '#0D9488',
+    secondarySurface: '#042F2E',
 
-    accent: '#F59E0B',
-    accentLight: '#FBBF24',
-    accentDark: '#D97706',
-    accentSoft: '#78350F',
+    accent: '#FBBF24',
+    accentLight: '#FCD34D',
+    accentDark: '#F59E0B',
+    accentSurface: '#451A03',
 
     success: '#10B981',
     successLight: '#34D399',
@@ -109,16 +111,16 @@ const DARK_COLORS = {
 
     white: '#FFFFFF',
     black: '#000000',
-    gray50: '#1E293B',
-    gray100: '#334155',
-    gray200: '#475569',
-    gray300: '#64748B',
-    gray400: '#94A3B8',
-    gray500: '#CBD5E1',
-    gray600: '#E2E8F0',
-    gray700: '#F1F5F9',
-    gray800: '#F8FAFC',
-    gray900: '#FFFFFF',
+    gray50: '#0F172A',
+    gray100: '#1E293B',
+    gray200: '#334155',
+    gray300: '#475569',
+    gray400: '#64748B',
+    gray500: '#94A3B8',
+    gray600: '#CBD5E1',
+    gray700: '#E2E8F0',
+    gray800: '#F1F5F9',
+    gray900: '#F8FAFC',
 
     background: '#0F172A',
     backgroundSecondary: '#1E293B',
@@ -127,14 +129,16 @@ const DARK_COLORS = {
 
     textPrimary: '#F8FAFC',
     textSecondary: '#CBD5E1',
-    textTertiary: '#94A3B8',
+    textTertiary: '#64748B',
     textInverse: '#0F172A',
+    textAccent: '#818CF8',
 
     border: '#334155',
     borderLight: '#1E293B',
+    borderFocus: '#6366F1',
 
     overlay: 'rgba(0, 0, 0, 0.6)',
-    overlayLight: 'rgba(255, 255, 255, 0.05)',
+    overlayLight: 'rgba(255, 255, 255, 0.06)',
 };
 
 export const getColors = (isDarkMode = false) => {
@@ -148,12 +152,15 @@ export const COLORS = LIGHT_COLORS;
 // ─────────────────────────────────────
 
 export const SPACING = {
-    xs: moderateScale(4),
-    sm: moderateScale(8),
-    md: moderateScale(16),
-    lg: moderateScale(24),
-    xl: moderateScale(32),
-    xxl: moderateScale(48),
+    xxs: 2,
+    xs: 4,
+    sm: 8,
+    md: 12,
+    lg: 16,
+    xl: 24,
+    xxl: 32,
+    xxxl: 48,
+    '4xl': 64,
 };
 
 // ─────────────────────────────────────
@@ -161,13 +168,27 @@ export const SPACING = {
 // ─────────────────────────────────────
 
 export const FONT_SIZES = {
-    xs: moderateScale(12),
-    sm: moderateScale(14),
-    md: moderateScale(16),
-    lg: moderateScale(18),
-    xl: moderateScale(20),
-    xxl: moderateScale(24),
-    xxxl: moderateScale(32),
+    xxs: 10,
+    xs: 12,
+    sm: 13,
+    md: 15,
+    lg: 17,
+    xl: 20,
+    xxl: 24,
+    xxxl: 30,
+    display: 36,
+};
+
+export const LINE_HEIGHTS = {
+    xxs: 14,
+    xs: 16,
+    sm: 18,
+    md: 22,
+    lg: 24,
+    xl: 28,
+    xxl: 32,
+    xxxl: 38,
+    display: 44,
 };
 
 export const FONT_WEIGHTS = {
@@ -183,11 +204,13 @@ export const FONT_WEIGHTS = {
 // ─────────────────────────────────────
 
 export const BORDER_RADIUS = {
-    sm: 8,
-    md: 12,
-    lg: 20,
-    xl: 24,
-    xxl: 32,
+    xs: 4,
+    sm: 6,
+    md: 8,
+    lg: 12,
+    xl: 16,
+    xxl: 20,
+    xxxl: 28,
     full: 9999,
 };
 
@@ -196,34 +219,79 @@ export const BORDER_RADIUS = {
 // ─────────────────────────────────────
 
 export const SHADOWS = {
-    sm: {
-        shadowColor: '#0F172A',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.04,
-        shadowRadius: 3,
-        elevation: 2,
-    },
-    md: {
-        shadowColor: '#0F172A',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    lg: {
-        shadowColor: '#0F172A',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.12,
-        shadowRadius: 16,
-        elevation: 8,
-    },
-    xl: {
-        shadowColor: '#0F172A',
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.16,
-        shadowRadius: 24,
-        elevation: 12,
-    },
+    xs: Platform.select({
+        ios: {
+            shadowColor: '#0F172A',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.04,
+            shadowRadius: 2,
+        },
+        android: { elevation: 1 },
+    }),
+    sm: Platform.select({
+        ios: {
+            shadowColor: '#0F172A',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.06,
+            shadowRadius: 3,
+        },
+        android: { elevation: 2 },
+    }),
+    md: Platform.select({
+        ios: {
+            shadowColor: '#0F172A',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.08,
+            shadowRadius: 6,
+        },
+        android: { elevation: 4 },
+    }),
+    lg: Platform.select({
+        ios: {
+            shadowColor: '#0F172A',
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.12,
+            shadowRadius: 16,
+        },
+        android: { elevation: 8 },
+    }),
+    xl: Platform.select({
+        ios: {
+            shadowColor: '#0F172A',
+            shadowOffset: { width: 0, height: 12 },
+            shadowOpacity: 0.16,
+            shadowRadius: 24,
+        },
+        android: { elevation: 12 },
+    }),
+    // Colored shadows for CTA buttons
+    primary: Platform.select({
+        ios: {
+            shadowColor: '#4F46E5',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+        },
+        android: { elevation: 6 },
+    }),
+    success: Platform.select({
+        ios: {
+            shadowColor: '#059669',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+        },
+        android: { elevation: 6 },
+    }),
+    error: Platform.select({
+        ios: {
+            shadowColor: '#DC2626',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.25,
+            shadowRadius: 8,
+        },
+        android: { elevation: 6 },
+    }),
 };
 
 // ─────────────────────────────────────
@@ -253,16 +321,9 @@ export const GRADIENTS = {
 export const SCREEN_WIDTH = width;
 export const SCREEN_HEIGHT = height;
 
-export const ANIMATION = {
-    fast: 150,
-    normal: 300,
-    slow: 500,
-    spring: {
-        type: 'spring',
-        damping: 20,
-        stiffness: 300,
-    },
-};
+// ─────────────────────────────────────
+// Global Styles
+// ─────────────────────────────────────
 
 export const globalStyles = StyleSheet.create({
     container: {
@@ -288,10 +349,27 @@ export const globalStyles = StyleSheet.create({
         alignItems: 'center',
     },
     shadow: SHADOWS.md,
+    // Card base style
     card: {
         backgroundColor: COLORS.surface,
         borderRadius: BORDER_RADIUS.xl,
         padding: SPACING.lg,
-        ...SHADOWS.md,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        ...SHADOWS.sm,
+    },
+    // Section title
+    sectionTitle: {
+        fontSize: FONT_SIZES.lg,
+        fontWeight: FONT_WEIGHTS.bold,
+        color: COLORS.textPrimary,
+        letterSpacing: -0.3,
+    },
+    // Badge style
+    badge: {
+        paddingHorizontal: SPACING.sm,
+        paddingVertical: SPACING.xxs,
+        borderRadius: BORDER_RADIUS.full,
+        alignSelf: 'flex-start',
     },
 });

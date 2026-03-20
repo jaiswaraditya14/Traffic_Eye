@@ -3,9 +3,7 @@ import { View, Text, StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { Platform, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, FONT_WEIGHTS, SHADOWS } from '../utils';
+import { COLORS, BORDER_RADIUS, SHADOWS, FONT_SIZES, FONT_WEIGHTS, SPACING } from '../utils';
 
 // Import Screens from barrel
 import {
@@ -35,48 +33,18 @@ function OfficerTabNavigator() {
     return (
         <Tab.Navigator
             screenOptions={({ route }) => ({
-                tabBarIcon: ({ focused, color, size }) => {
-                    let iconName;
-                    if (route.name === 'Dashboard') iconName = focused ? 'grid' : 'grid-outline';
-                    else if (route.name === 'Pending') iconName = focused ? 'time' : 'time-outline';
-                    else if (route.name === 'Verified') iconName = focused ? 'checkmark-circle' : 'checkmark-circle-outline';
-                    else if (route.name === 'OfficerProfileTab') iconName = focused ? 'person' : 'person-outline';
+                tabBarIcon: ({ focused, color }) => {
+                    const config = TAB_CONFIG[route.name];
+                    const iconName = focused ? config.icon : `${config.icon}-outline`;
                     return (
-                        <View style={{
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            paddingTop: 2,
-                        }}>
-                            <Ionicons name={iconName} size={22} color={color} />
-                            {focused && (
-                                <View style={{
-                                    width: 4,
-                                    height: 4,
-                                    borderRadius: 2,
-                                    backgroundColor: COLORS.secondary,
-                                    marginTop: 4,
-                                }} />
-                            )}
-                        </View>
+                        <Ionicons name={iconName} size={24} color={color} />
                     );
                 },
                 tabBarActiveTintColor: COLORS.secondary,
                 tabBarInactiveTintColor: COLORS.textTertiary,
                 headerShown: false,
-                tabBarShowLabel: true,
-                tabBarLabelStyle: {
-                    fontSize: 11,
-                    fontWeight: FONT_WEIGHTS.medium,
-                    marginTop: -2,
-                },
-                tabBarStyle: {
-                    backgroundColor: COLORS.surface,
-                    borderTopWidth: 0,
-                    height: bottomTabHeight + Math.max(insets.bottom, 4),
-                    paddingBottom: Math.max(insets.bottom, 8),
-                    paddingTop: 10,
-                    ...SHADOWS.md,
-                },
+                tabBarStyle: styles.tabBar,
+                tabBarLabelStyle: styles.tabLabel,
             })}
         >
             <Tab.Screen name="Dashboard" component={OfficerDashboard} />

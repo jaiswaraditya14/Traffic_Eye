@@ -72,7 +72,7 @@ export function AuthProvider({ children }) {
     const signUpOfficer = async (...args) => authService.signUpOfficer(...args);
     const signIn = async (...args) => authService.signIn(...args);
     const signInWithBadge = async (...args) => authService.signInWithBadge(...args);
-    const signInWithGoogle = async () => authService.signInWithGoogle();
+    const signInWithGoogle = async (...args) => authService.signInWithGoogle(...args);
     const signOut = async () => authService.signOut();
     const resetPassword = async (email) => authService.resetPassword(email);
 
@@ -86,9 +86,9 @@ export function AuthProvider({ children }) {
         loading,
         signUpCitizen,
         signUpOfficer,
-        signIn: async (...args) => authService.signIn(...args),
-        signInWithBadge: async (...args) => authService.signInWithBadge(...args),
-        signInWithGoogle: async () => authService.signInWithGoogle(),
+        signIn,
+        signInWithBadge,
+        signInWithGoogle,
         signOut,
         resetPassword,
         refreshProfile,

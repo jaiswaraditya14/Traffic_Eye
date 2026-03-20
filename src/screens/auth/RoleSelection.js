@@ -52,9 +52,12 @@ export default function RoleSelection({ navigation }) {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
-
-                    <Text style={styles.title}>Choose Your Role</Text>
+                {/* Header */}
+                <View style={styles.header}>
+                    <View style={styles.logoBadge}>
+                        <Text style={styles.logoEmoji}>🚦</Text>
+                    </View>
+                    <Text style={styles.title}>Welcome to TrafficEye</Text>
                     <Text style={styles.subtitle}>
                         Select how you'd like to use the platform
                     </Text>
@@ -62,80 +65,76 @@ export default function RoleSelection({ navigation }) {
 
                 <View style={styles.content}>
                     {/* Citizen Card */}
-                    <Animated.View style={{
-                        opacity: fadeAnim,
-                        transform: [{ translateY: slideAnim1 }],
-                    }}>
-                        <TouchableOpacity
-                            style={styles.card}
-                            onPress={() => handleRoleSelect(ROLES.CITIZEN)}
-                            activeOpacity={0.8}
-                        >
+                    <TouchableOpacity
+                        style={styles.card}
+                        onPress={() => handleRoleSelect(ROLES.CITIZEN)}
+                        activeOpacity={0.85}
+                    >
+                        <View style={styles.cardHeader}>
                             <LinearGradient
-                                colors={[COLORS.primarySoft || '#EFF6FF', COLORS.background]}
-                                style={styles.cardGradient}
+                                colors={GRADIENTS.primary}
+                                style={styles.iconContainer}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
                             >
-                                <View style={styles.cardHeader}>
-                                    <View style={[styles.iconContainer, { backgroundColor: `${COLORS.primary}15` }]}>
-                                        <Ionicons name="person" size={36} color={COLORS.primary} />
-                                    </View>
-                                    <View style={styles.cardBadge}>
-                                        <Ionicons name="arrow-forward" size={18} color={COLORS.primary} />
-                                    </View>
-                                </View>
-                                <Text style={styles.cardTitle}>Citizen</Text>
-                                <Text style={styles.cardDescription}>
-                                    Report traffic violations and earn rewards for making your community safer
-                                </Text>
-                                <View style={styles.features}>
-                                    {['Report violations', 'Earn rewards', 'Track reports'].map((text, i) => (
-                                        <View key={i} style={styles.feature}>
-                                            <View style={[styles.featureDot, { backgroundColor: COLORS.primary }]} />
-                                            <Text style={styles.featureText}>{text}</Text>
-                                        </View>
-                                    ))}
-                                </View>
+                                <Ionicons name="person" size={28} color="#FFFFFF" />
                             </LinearGradient>
-                        </TouchableOpacity>
-                    </Animated.View>
+                            <View style={styles.cardHeaderText}>
+                                <Text style={styles.cardTitle}>Citizen</Text>
+                                <Text style={styles.cardBadge}>REPORTER</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={22} color={COLORS.textTertiary} />
+                        </View>
+                        <Text style={styles.cardDescription}>
+                            Report traffic violations and earn rewards for making your community safer
+                        </Text>
+                        <View style={styles.features}>
+                            {['Report violations', 'Earn rewards', 'Track reports'].map((text, i) => (
+                                <View key={i} style={styles.feature}>
+                                    <View style={styles.featureCheck}>
+                                        <Ionicons name="checkmark" size={12} color={COLORS.success} />
+                                    </View>
+                                    <Text style={styles.featureText}>{text}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    </TouchableOpacity>
 
                     {/* Officer Card */}
-                    <Animated.View style={{
-                        opacity: fadeAnim,
-                        transform: [{ translateY: slideAnim2 }],
-                    }}>
-                        <TouchableOpacity
-                            style={styles.card}
-                            onPress={() => handleRoleSelect(ROLES.OFFICER)}
-                            activeOpacity={0.8}
-                        >
+                    <TouchableOpacity
+                        style={styles.card}
+                        onPress={() => handleRoleSelect(ROLES.OFFICER)}
+                        activeOpacity={0.85}
+                    >
+                        <View style={styles.cardHeader}>
                             <LinearGradient
-                                colors={[COLORS.secondarySoft || '#ECFDF5', COLORS.background]}
-                                style={styles.cardGradient}
+                                colors={GRADIENTS.secondary}
+                                style={styles.iconContainer}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
                             >
-                                <View style={styles.cardHeader}>
-                                    <View style={[styles.iconContainer, { backgroundColor: `${COLORS.secondary}15` }]}>
-                                        <Ionicons name="shield-checkmark" size={36} color={COLORS.secondary} />
-                                    </View>
-                                    <View style={[styles.cardBadge, { backgroundColor: `${COLORS.secondary}10` }]}>
-                                        <Ionicons name="arrow-forward" size={18} color={COLORS.secondary} />
-                                    </View>
-                                </View>
-                                <Text style={styles.cardTitle}>Traffic Officer</Text>
-                                <Text style={styles.cardDescription}>
-                                    Verify reports, manage violations, and maintain traffic safety
-                                </Text>
-                                <View style={styles.features}>
-                                    {['Verify reports', 'View analytics', 'Export data'].map((text, i) => (
-                                        <View key={i} style={styles.feature}>
-                                            <View style={[styles.featureDot, { backgroundColor: COLORS.secondary }]} />
-                                            <Text style={styles.featureText}>{text}</Text>
-                                        </View>
-                                    ))}
-                                </View>
+                                <Ionicons name="shield-checkmark" size={28} color="#FFFFFF" />
                             </LinearGradient>
-                        </TouchableOpacity>
-                    </Animated.View>
+                            <View style={styles.cardHeaderText}>
+                                <Text style={styles.cardTitle}>Traffic Officer</Text>
+                                <Text style={[styles.cardBadge, styles.cardBadgeSecondary]}>AUTHORITY</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={22} color={COLORS.textTertiary} />
+                        </View>
+                        <Text style={styles.cardDescription}>
+                            Verify reports, manage violations, and maintain traffic safety
+                        </Text>
+                        <View style={styles.features}>
+                            {['Verify reports', 'View analytics', 'Manage queue'].map((text, i) => (
+                                <View key={i} style={styles.feature}>
+                                    <View style={[styles.featureCheck, { backgroundColor: COLORS.secondarySurface }]}>
+                                        <Ionicons name="checkmark" size={12} color={COLORS.secondary} />
+                                    </View>
+                                    <Text style={styles.featureText}>{text}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    </TouchableOpacity>
                 </View>
             </ScrollView>
         </MobileContainer>
@@ -156,12 +155,25 @@ const styles = StyleSheet.create({
         paddingBottom: SPACING.xl,
         alignItems: 'center',
     },
+    logoBadge: {
+        width: 64,
+        height: 64,
+        borderRadius: BORDER_RADIUS.xl,
+        backgroundColor: COLORS.primarySurface,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: SPACING.lg,
+    },
+    logoEmoji: {
+        fontSize: 32,
+    },
 
     title: {
         fontSize: FONT_SIZES.xxl,
         fontWeight: FONT_WEIGHTS.bold,
         color: COLORS.textPrimary,
         marginBottom: SPACING.sm,
+        letterSpacing: -0.3,
         textAlign: 'center',
     },
     subtitle: {
@@ -174,46 +186,50 @@ const styles = StyleSheet.create({
         gap: SPACING.md,
     },
     card: {
+        backgroundColor: COLORS.surface,
         borderRadius: BORDER_RADIUS.xl,
-        ...SHADOWS.md,
-        overflow: 'hidden',
-    },
-    cardGradient: {
-        padding: SPACING.lg,
-        borderRadius: BORDER_RADIUS.xl,
+        padding: SPACING.xl,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        ...SHADOWS.sm,
     },
     cardHeader: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: SPACING.md,
     },
     iconContainer: {
-        width: 64,
-        height: 64,
-        borderRadius: 20,
+        width: 52,
+        height: 52,
+        borderRadius: BORDER_RADIUS.lg,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    cardBadge: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        backgroundColor: `${COLORS.primary}10`,
-        justifyContent: 'center',
-        alignItems: 'center',
+    cardHeaderText: {
+        flex: 1,
+        marginLeft: SPACING.md,
     },
     cardTitle: {
         fontSize: FONT_SIZES.lg,
         fontWeight: FONT_WEIGHTS.bold,
         color: COLORS.textPrimary,
-        marginBottom: SPACING.xs,
+        letterSpacing: -0.2,
+    },
+    cardBadge: {
+        fontSize: FONT_SIZES.xxs,
+        fontWeight: FONT_WEIGHTS.bold,
+        color: COLORS.primary,
+        letterSpacing: 1.5,
+        marginTop: 2,
+    },
+    cardBadgeSecondary: {
+        color: COLORS.secondary,
     },
     cardDescription: {
         fontSize: FONT_SIZES.sm,
         color: COLORS.textSecondary,
-        marginBottom: SPACING.md,
-        lineHeight: 22,
+        marginBottom: SPACING.lg,
+        lineHeight: 20,
     },
     features: {
         gap: SPACING.md,
@@ -230,11 +246,6 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.successSurface,
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    featureDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
     },
     featureText: {
         fontSize: FONT_SIZES.sm,

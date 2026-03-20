@@ -7,7 +7,7 @@ export {
     FONT_WEIGHTS,
     BORDER_RADIUS,
     SHADOWS,
-    ANIMATION,
+    GRADIENTS,
     globalStyles,
     SCREEN_WIDTH,
     SCREEN_HEIGHT,

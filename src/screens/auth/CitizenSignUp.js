@@ -488,4 +488,32 @@ const styles = StyleSheet.create({
         color: COLORS.textPrimary,
         fontWeight: FONT_WEIGHTS.medium,
     },
+    divider: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: SPACING.lg,
+    },
+    dividerLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: COLORS.gray300,
+    },
+    dividerText: {
+        marginHorizontal: SPACING.md,
+        color: COLORS.textSecondary,
+        fontSize: FONT_SIZES.sm,
+    },
+    socialButton: {
+        marginBottom: SPACING.md,
+    },
+    socialButtonContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: SPACING.sm,
+    },
+    socialButtonText: {
+        fontSize: FONT_SIZES.md,
+        color: COLORS.textPrimary,
+        fontWeight: FONT_WEIGHTS.medium,
+    },
 });

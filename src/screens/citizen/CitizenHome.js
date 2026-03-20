@@ -1,5 +1,5 @@
-import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Image } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -31,8 +31,9 @@ export default function CitizenHome({ navigation }) {
     }, []);
 
     const quickStats = [
-        { label: 'Total Reports', value: '12', icon: 'document-text', color: COLORS.primary, bgColor: COLORS.primarySoft },
-        { label: 'Verified', value: '8', icon: 'checkmark-circle', color: COLORS.success, bgColor: COLORS.secondarySoft },
+        { label: 'Reports', value: '12', icon: 'document-text', color: COLORS.primary, bg: COLORS.primarySurface },
+        { label: 'Verified', value: '8', icon: 'checkmark-circle', color: COLORS.success, bg: COLORS.successSurface },
+        { label: 'Points', value: formatNumber(userPoints), icon: 'trophy', color: COLORS.accent, bg: COLORS.accentSurface },
     ];
 
     const recentActivity = [
@@ -58,42 +59,70 @@ export default function CitizenHome({ navigation }) {
             <SafeAreaView style={styles.container} edges={['top']}>
                 <ScrollView showsVerticalScrollIndicator={false}>
                     {/* Header */}
-                    <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
-                        <View>
-                            <Text style={styles.greetingLabel}>Good Day 👋</Text>
-                            <Text style={styles.greeting}>{firstName}</Text>
+                    <View style={styles.header}>
+                        <View style={styles.headerLeft}>
+                            <Text style={styles.greeting}>Hello, {firstName}</Text>
+                            <Text style={styles.headerSubtitle}>Let's keep the roads safe today</Text>
                         </View>
                         <TouchableOpacity
-                            onPress={() => navigation.navigate('Notifications')}
-                            style={styles.notificationButton}
+                            onPress={() => navigation.getParent()?.navigate('Notifications') ?? navigation.navigate('Notifications')}
+                            style={styles.notificationBtn}
                         >
-                            <Ionicons name="notifications-outline" size={22} color={COLORS.textPrimary} />
-                            <View style={styles.notifBadge}>
-                                <Text style={styles.notifBadgeText}>3</Text>
+                            <View style={styles.notificationBtnInner}>
+                                <Ionicons name="notifications-outline" size={22} color={COLORS.textPrimary} />
+                                <View style={styles.badge}>
+                                    <Text style={styles.badgeText}>3</Text>
+                                </View>
                             </View>
                         </TouchableOpacity>
                     </Animated.View>
 
-                    {/* Hero Impact Card */}
-                    <Animated.View style={[styles.heroCard, {
-                        opacity: fadeAnim,
-                        transform: [{ translateY: slideAnims[0] }],
-                    }]}>
-                        <LinearGradient
-                            colors={[COLORS.primary, COLORS.primaryLight]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={styles.heroGradient}
+                    {/* Quick Stats */}
+                    <View style={styles.statsContainer}>
+                        {quickStats.map((stat, index) => (
+                            <View key={index} style={styles.statCard}>
+                                <View style={[styles.statIcon, { backgroundColor: stat.bg }]}>
+                                    <Ionicons name={stat.icon} size={22} color={stat.color} />
+                                </View>
+                                <Text style={styles.statValue}>{stat.value}</Text>
+                                <Text style={styles.statLabel}>{stat.label}</Text>
+                            </View>
+                        ))}
+                    </View>
+
+                    {/* Primary CTA — Report Button with real image */}
+                    <View style={styles.reportSection}>
+                        <TouchableOpacity
+                            activeOpacity={0.9}
+                            onPress={() => navigation.getParent()?.navigate('NewReport') ?? navigation.navigate('NewReport')}
                         >
-                            <Text style={styles.heroCardLabel}>Total Impact Points</Text>
-                            <Text style={styles.heroCardValue}>{formatNumber(userPoints || 2450)}</Text>
-                            <TouchableOpacity style={styles.heroCardAction} activeOpacity={0.8} onPress={() => navigation.navigate('Rewards')}>
-                                <Text style={styles.heroCardActionText}>Redeem Rewards</Text>
-                                <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
-                            </TouchableOpacity>
-                            <Ionicons name="car-sport" size={120} color="rgba(255,255,255,0.1)" style={styles.heroBgIcon} />
-                        </LinearGradient>
-                    </Animated.View>
+                            <View style={styles.reportCard}>
+                                <Image
+                                    source={require('../../../assets/images/hero_image.png')}
+                                    style={styles.reportCardBgImage}
+                                    resizeMode="cover"
+                                />
+                                <LinearGradient
+                                    colors={['rgba(79, 70, 229, 0.92)', 'rgba(99, 102, 241, 0.88)']}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={styles.reportCardOverlay}
+                                >
+                                    <View style={styles.reportCardContent}>
+                                        <View style={styles.reportCardLeft}>
+                                            <Text style={styles.reportCardTitle}>Report a Violation</Text>
+                                            <Text style={styles.reportCardSubtitle}>
+                                                Capture photo or video evidence
+                                            </Text>
+                                        </View>
+                                        <View style={styles.reportCardIcon}>
+                                            <Ionicons name="camera" size={28} color="rgba(255,255,255,0.9)" />
+                                        </View>
+                                    </View>
+                                </LinearGradient>
+                            </View>
+                        </TouchableOpacity>
+                    </View>
 
                     {/* Quick Actions Flex Grid */}
                     <Animated.View style={[styles.section, {
@@ -103,55 +132,55 @@ export default function CitizenHome({ navigation }) {
                         <View style={styles.sectionHeader}>
                             <Text style={styles.sectionTitle}>Quick Actions</Text>
                         </View>
-                        
-                        <View style={styles.actionsGrid}>
-                            <TouchableOpacity style={styles.actionCard} activeOpacity={0.7} onPress={() => navigation.navigate('NewReport')}>
-                                <View style={[styles.actionIcon, { backgroundColor: COLORS.primarySoft, color: COLORS.primary }]}>
-                                    <Ionicons name="camera" size={24} color={COLORS.primary} />
-                                </View>
-                                <View>
-                                    <Text style={styles.actionTitle}>New Report</Text>
-                                    <Text style={styles.actionDesc}>Upload a photo/video</Text>
+
+                        <View style={styles.informationGrid}>
+                            <TouchableOpacity
+                                style={styles.infoCard}
+                                onPress={() => navigation.getParent()?.navigate('SafetyTips') ?? navigation.navigate('SafetyTips')}
+                                activeOpacity={0.7}
+                            >
+                                <View style={[styles.infoIconContainer, { backgroundColor: COLORS.primarySurface }]}>
+                                    <Image
+                                        source={require('../../../assets/images/helmet.png')}
+                                        style={styles.infoImage}
+                                        resizeMode="contain"
+                                    />
                                 </View>
                             </TouchableOpacity>
 
-                            <TouchableOpacity style={styles.actionCard} activeOpacity={0.7} onPress={() => navigation.navigate('SafetyTips')}>
-                                <View style={[styles.actionIcon, { backgroundColor: COLORS.secondarySoft }]}>
-                                    <Image source={require('../../../assets/safety.png')} style={{ width: 38, height: 38 }} resizeMode="contain" />
-                                </View>
-                                <View>
-                                    <Text style={styles.actionTitle}>Safety Tips</Text>
-                                    <Text style={styles.actionDesc}>Learn the guidelines</Text>
+                            <TouchableOpacity
+                                style={styles.infoCard}
+                                onPress={() => navigation.getParent()?.navigate('TrafficSigns') ?? navigation.navigate('TrafficSigns')}
+                                activeOpacity={0.7}
+                            >
+                                <View style={[styles.infoIconContainer, { backgroundColor: COLORS.errorSurface }]}>
+                                    <Image
+                                        source={require('../../../assets/images/crosspath.png')}
+                                        style={styles.infoImage}
+                                        resizeMode="contain"
+                                    />
                                 </View>
                             </TouchableOpacity>
 
-                            <TouchableOpacity style={styles.actionCard} activeOpacity={0.7} onPress={() => navigation.navigate('TrafficSigns')}>
-                                <View style={[styles.actionIcon, { backgroundColor: '#FEF3C7' }]}>
-                                    <Image source={require('../../../assets/traffic_light.jpg')} style={{ width: 44, height: 44, borderRadius: 6 }} resizeMode="cover" />
+                            <TouchableOpacity
+                                style={styles.infoCard}
+                                onPress={() => navigation.getParent()?.navigate('FineInformation') ?? navigation.navigate('FineInformation')}
+                                activeOpacity={0.7}
+                            >
+                                <View style={[styles.infoIconContainer, { backgroundColor: COLORS.successSurface }]}>
+                                    <Image
+                                        source={require('../../../assets/images/image.png')}
+                                        style={styles.infoImage}
+                                        resizeMode="contain"
+                                    />
                                 </View>
-                                <View>
-                                    <Text style={styles.actionTitle}>Traffic Signs</Text>
-                                    <Text style={styles.actionDesc}>Know your signals</Text>
-                                </View>
-                            </TouchableOpacity>
-                            
-                            <TouchableOpacity style={styles.actionCard} activeOpacity={0.7} onPress={() => navigation.navigate('FineInformation')}>
-                                <View style={[styles.actionIcon, { backgroundColor: `${COLORS.accent}15` }]}>
-                                    <Image source={require('../../../assets/fines.png')} style={{ width: 38, height: 38 }} resizeMode="contain" />
-                                </View>
-                                <View>
-                                    <Text style={styles.actionTitle}>Fines</Text>
-                                    <Text style={styles.actionDesc}>Official penalties</Text>
-                                </View>
+                                <Text style={styles.infoCardTitle}>Fine Info</Text>
                             </TouchableOpacity>
                         </View>
                     </Animated.View>
 
                     {/* Recent Activity */}
-                    <Animated.View style={[styles.section, {
-                        opacity: fadeAnim,
-                        transform: [{ translateY: slideAnims[3] }],
-                    }]}>
+                    <View style={[styles.section, { marginBottom: SPACING.xxl }]}>
                         <View style={styles.sectionHeader}>
                             <Text style={styles.sectionTitle}>Recent Activity</Text>
                             <TouchableOpacity onPress={handleSeeAllReports}>
@@ -159,37 +188,30 @@ export default function CitizenHome({ navigation }) {
                             </TouchableOpacity>
                         </View>
 
-                        {recentActivity.map((activity) => (
-                            <TouchableOpacity key={activity.id} style={styles.activityCardNew}>
-                                <View style={[
-                                    styles.activityAvatarBase,
-                                    { backgroundColor: activity.status === 'success' ? COLORS.secondarySoft : COLORS.warning + '15' }
-                                ]}>
-                                    <Ionicons name={activity.status === 'success' ? 'car' : 'warning'} size={24} color={activity.status === 'success' ? COLORS.success : COLORS.warning} />
-                                </View>
-                                <View style={styles.activityContent}>
-                                    <Text style={styles.activityType}>{activity.type}</Text>
-                                    <View style={styles.activityMetaRow}>
-                                        <Ionicons name="calendar-outline" size={12} color={COLORS.textSecondary} />
-                                        <Text style={styles.activityTime}>{activity.time}</Text>
+                        {recentActivity.map((activity) => {
+                            const config = getStatusConfig(activity.status);
+                            return (
+                                <TouchableOpacity
+                                    key={activity.id}
+                                    style={styles.activityCard}
+                                    activeOpacity={0.7}
+                                    onPress={() => navigation.getParent()?.navigate('ReportDetail', { reportId: activity.id }) ?? navigation.navigate('ReportDetail', { reportId: activity.id })}
+                                >
+                                    <View style={[styles.activityIcon, { backgroundColor: config.bg }]}>
+                                        <Ionicons name={config.icon} size={22} color={config.color} />
                                     </View>
-                                </View>
-                                <View style={[
-                                    styles.statusPill,
-                                    { backgroundColor: activity.status === 'success' ? '#D1FAE5' : '#FEF3C7' }
-                                ]}>
-                                    <Text style={[
-                                        styles.statusPillText,
-                                        { color: activity.status === 'success' ? '#059669' : '#D97706' }
-                                    ]}>
-                                        {activity.status === 'success' ? 'Verified' : 'Pending'}
-                                    </Text>
-                                </View>
-                            </TouchableOpacity>
-                        ))}
-                    </Animated.View>
-
-                    <View style={{ height: SPACING.lg }} />
+                                    <View style={styles.activityContent}>
+                                        <View style={styles.activityTopRow}>
+                                            <Text style={styles.activityType}>{activity.type}</Text>
+                                            <View style={[styles.statusDot, { backgroundColor: config.color }]} />
+                                        </View>
+                                        <Text style={styles.activityDesc}>{activity.desc}</Text>
+                                    </View>
+                                    <Text style={styles.activityTime}>{activity.time}</Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
                 </ScrollView>
             </SafeAreaView>
         </MobileContainer>
@@ -197,167 +219,256 @@ export default function CitizenHome({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: COLORS.background },
+    container: {
+        flex: 1,
+    },
+    // ── Header ──
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: SPACING.lg,
-        paddingVertical: SPACING.lg,
+        alignItems: 'flex-start',
+        paddingHorizontal: SPACING.xl,
+        paddingTop: SPACING.lg,
+        paddingBottom: SPACING.lg,
     },
-    greetingLabel: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.textSecondary,
-        marginBottom: 2,
+    headerLeft: {
+        flex: 1,
     },
     greeting: {
-        fontSize: FONT_SIZES.xxl + 2,
+        fontSize: FONT_SIZES.xxl,
         fontWeight: FONT_WEIGHTS.bold,
         color: COLORS.textPrimary,
+        letterSpacing: -0.3,
     },
-    notificationButton: {
+    headerSubtitle: {
+        fontSize: FONT_SIZES.sm,
+        color: COLORS.textSecondary,
+        marginTop: SPACING.xxs,
+    },
+    notificationBtn: {
+        marginTop: SPACING.xs,
+    },
+    notificationBtnInner: {
         width: 44,
         height: 44,
-        borderRadius: 14,
+        borderRadius: BORDER_RADIUS.lg,
         backgroundColor: COLORS.surface,
+        borderWidth: 1,
+        borderColor: COLORS.border,
         justifyContent: 'center',
         alignItems: 'center',
-        ...SHADOWS.sm,
+        position: 'relative',
     },
-    notifBadge: {
+    badge: {
         position: 'absolute',
-        top: 8,
-        right: 8,
+        top: -4,
+        right: -4,
         backgroundColor: COLORS.error,
-        borderRadius: 8,
-        width: 16,
-        height: 16,
+        borderRadius: 10,
+        width: 20,
+        height: 20,
         justifyContent: 'center',
         alignItems: 'center',
+        borderWidth: 2,
+        borderColor: COLORS.background,
     },
-    notifBadgeText: { color: '#FFFFFF', fontSize: 9, fontWeight: FONT_WEIGHTS.bold },
+    badgeText: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: FONT_WEIGHTS.bold,
+    },
+
+    // ── Stats ──
     statsContainer: {
         flexDirection: 'row',
-        paddingHorizontal: SPACING.lg,
-        gap: SPACING.sm,
+        paddingHorizontal: SPACING.xl,
+        gap: SPACING.md,
         marginBottom: SPACING.lg,
     },
-    heroCard: {
-        paddingHorizontal: SPACING.lg,
+    statCard: {
+        flex: 1,
+        backgroundColor: COLORS.surface,
+        borderRadius: BORDER_RADIUS.xl,
+        padding: SPACING.lg,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        ...SHADOWS.xs,
+    },
+    statIcon: {
+        width: 44,
+        height: 44,
+        borderRadius: BORDER_RADIUS.lg,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: SPACING.sm,
+    },
+    statValue: {
+        fontSize: FONT_SIZES.xl,
+        fontWeight: FONT_WEIGHTS.bold,
+        color: COLORS.textPrimary,
+        letterSpacing: -0.3,
+    },
+    statLabel: {
+        fontSize: FONT_SIZES.xxs,
+        color: COLORS.textTertiary,
+        fontWeight: FONT_WEIGHTS.medium,
+        marginTop: 2,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+
+    // ── Report CTA ──
+    reportSection: {
+        paddingHorizontal: SPACING.xl,
         marginBottom: SPACING.xl,
     },
-    heroGradient: {
+    reportCard: {
         borderRadius: BORDER_RADIUS.xl,
-        padding: SPACING.xl,
-        position: 'relative',
         overflow: 'hidden',
-        ...SHADOWS.md,
+        ...SHADOWS.primary,
     },
-    heroCardLabel: {
-        fontSize: FONT_SIZES.sm,
-        color: 'rgba(255,255,255,0.9)',
-        fontWeight: FONT_WEIGHTS.medium,
-        marginBottom: SPACING.xs,
+    reportCardBgImage: {
+        position: 'absolute',
+        width: '100%',
+        height: '100%',
     },
-    heroCardValue: {
-        fontSize: 40,
-        fontWeight: FONT_WEIGHTS.extrabold,
-        color: '#FFFFFF',
-        marginBottom: SPACING.lg,
-        letterSpacing: -1,
+    reportCardOverlay: {
+        padding: SPACING.xl,
     },
-    heroCardAction: {
-        alignSelf: 'flex-start',
+    reportCardContent: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.25)',
-        paddingVertical: SPACING.sm,
-        paddingHorizontal: SPACING.md,
-        borderRadius: BORDER_RADIUS.full,
-        gap: 8,
+        justifyContent: 'space-between',
     },
-    heroCardActionText: {
+    reportCardLeft: {
+        flex: 1,
+    },
+    reportCardTitle: {
+        fontSize: FONT_SIZES.lg,
+        fontWeight: FONT_WEIGHTS.bold,
         color: '#FFFFFF',
+        marginBottom: SPACING.xxs,
+        letterSpacing: -0.2,
+    },
+    reportCardSubtitle: {
         fontSize: FONT_SIZES.sm,
-        fontWeight: FONT_WEIGHTS.semibold,
+        color: 'rgba(255, 255, 255, 0.85)',
     },
-    heroBgIcon: {
-        position: 'absolute',
-        right: -20,
-        bottom: -20,
-        transform: [{ rotate: '-15deg' }],
+    reportCardIcon: {
+        width: 56,
+        height: 56,
+        borderRadius: BORDER_RADIUS.lg,
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginLeft: SPACING.md,
     },
-    section: { paddingHorizontal: SPACING.lg, marginBottom: SPACING.xl },
+
+    // ── Sections ──
+    section: {
+        paddingHorizontal: SPACING.xl,
+        marginBottom: SPACING.lg,
+    },
     sectionHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: SPACING.md,
+        marginBottom: SPACING.lg,
     },
-    sectionTitle: { fontSize: FONT_SIZES.lg, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary },
-    seeAll: { fontSize: FONT_SIZES.sm, color: COLORS.primary, fontWeight: FONT_WEIGHTS.semibold },
-    actionsGrid: {
+    sectionTitle: {
+        fontSize: FONT_SIZES.lg,
+        fontWeight: FONT_WEIGHTS.bold,
+        color: COLORS.textPrimary,
+        letterSpacing: -0.2,
+    },
+    seeAll: {
+        fontSize: FONT_SIZES.sm,
+        color: COLORS.primary,
+        fontWeight: FONT_WEIGHTS.semibold,
+    },
+
+    // ── Info Cards ──
+    informationGrid: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
         gap: SPACING.md,
+        justifyContent: 'space-between',
     },
-    actionCard: {
-        width: '47%',
+    infoCard: {
+        flex: 1,
         backgroundColor: COLORS.surface,
-        borderRadius: BORDER_RADIUS.lg,
+        borderRadius: BORDER_RADIUS.xl,
         padding: SPACING.lg,
+        alignItems: 'center',
         borderWidth: 1,
         borderColor: COLORS.border,
-        ...SHADOWS.sm,
-        gap: SPACING.sm,
+        ...SHADOWS.xs,
     },
-    actionIcon: {
-        width: 48,
-        height: 48,
-        borderRadius: BORDER_RADIUS.md,
+    infoIconContainer: {
+        width: 52,
+        height: 52,
+        borderRadius: BORDER_RADIUS.lg,
         justifyContent: 'center',
         alignItems: 'center',
+        marginBottom: SPACING.sm,
     },
-    actionTitle: {
-        fontSize: FONT_SIZES.sm,
+    infoImage: {
+        width: 30,
+        height: 30,
+    },
+    infoCardTitle: {
+        fontSize: FONT_SIZES.xs,
         fontWeight: FONT_WEIGHTS.semibold,
         color: COLORS.textPrimary,
-        marginBottom: 2,
+        textAlign: 'center',
     },
-    actionDesc: {
-        fontSize: FONT_SIZES.xs,
-        color: COLORS.textSecondary,
-    },
-    activityCardNew: {
+
+    // ── Activity Cards ──
+    activityCard: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: COLORS.surface,
-        borderRadius: BORDER_RADIUS.lg,
-        padding: SPACING.md,
+        borderRadius: BORDER_RADIUS.xl,
+        padding: SPACING.lg,
         marginBottom: SPACING.sm,
         borderWidth: 1,
         borderColor: COLORS.border,
-        ...SHADOWS.sm,
-        gap: SPACING.md,
+        ...SHADOWS.xs,
     },
-    activityAvatarBase: {
-        width: 50,
-        height: 50,
-        borderRadius: BORDER_RADIUS.md,
+    activityIcon: {
+        width: 44,
+        height: 44,
+        borderRadius: BORDER_RADIUS.lg,
         justifyContent: 'center',
         alignItems: 'center',
+        marginRight: SPACING.md,
     },
-    activityContent: { flex: 1 },
-    activityType: { fontSize: FONT_SIZES.sm, fontWeight: FONT_WEIGHTS.semibold, color: COLORS.textPrimary, marginBottom: 4 },
-    activityMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    activityTime: { fontSize: 11, color: COLORS.textSecondary },
-    statusPill: {
-        paddingVertical: 4,
-        paddingHorizontal: 10,
-        borderRadius: BORDER_RADIUS.full,
+    activityContent: {
+        flex: 1,
     },
-    statusPillText: {
-        fontSize: 10,
-        fontWeight: FONT_WEIGHTS.bold,
+    activityTopRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: SPACING.sm,
+    },
+    activityType: {
+        fontSize: FONT_SIZES.sm,
+        fontWeight: FONT_WEIGHTS.semibold,
+        color: COLORS.textPrimary,
+    },
+    statusDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+    },
+    activityDesc: {
+        fontSize: FONT_SIZES.xs,
+        color: COLORS.textSecondary,
+        marginTop: 2,
+    },
+    activityTime: {
+        fontSize: FONT_SIZES.xxs,
+        color: COLORS.textTertiary,
+        fontWeight: FONT_WEIGHTS.medium,
     },
 });
