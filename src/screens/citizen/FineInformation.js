@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MobileContainer } from '../../components';
@@ -478,8 +478,14 @@ export default function FineInformation({ navigation }) {
                             </View>
 
                             <View style={styles.fineAmountContainer}>
-                                <Ionicons name="cash" size={16} color={COLORS.success} />
-                                <Text style={styles.fineAmount}>{item.fine}</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Image
+                                        source={require('../../../assets/images/image.png')}
+                                        style={{ width: 16, height: 16, marginRight: 4 }}
+                                        resizeMode="contain"
+                                    />
+                                    <Text style={styles.fineAmount}>{item.fine}</Text>
+                                </View>
                             </View>
                         </View>
                     ))}

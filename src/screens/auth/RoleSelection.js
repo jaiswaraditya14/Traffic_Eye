@@ -1,9 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MobileContainer } from '../../components';
 import { useAppContext } from '../../context';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, ROLES } from '../../utils';
+import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, GRADIENTS, ROLES } from '../../utils';
 
 export default function RoleSelection({ navigation }) {
     const { setUserRole } = useAppContext();
@@ -24,10 +25,14 @@ export default function RoleSelection({ navigation }) {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
+                {/* Header */}
                 <View style={styles.header}>
-                    <Text style={styles.title}>Choose Your Role</Text>
+                    <View style={styles.logoBadge}>
+                        <Text style={styles.logoEmoji}>🚦</Text>
+                    </View>
+                    <Text style={styles.title}>Welcome to TrafficEye</Text>
                     <Text style={styles.subtitle}>
-                        Select how you'd like to use TrafficEye
+                        Select how you'd like to use the platform
                     </Text>
                 </View>
 
@@ -36,28 +41,35 @@ export default function RoleSelection({ navigation }) {
                     <TouchableOpacity
                         style={styles.card}
                         onPress={() => handleRoleSelect(ROLES.CITIZEN)}
-                        activeOpacity={0.8}
+                        activeOpacity={0.85}
                     >
-                        <View style={[styles.iconContainer, { backgroundColor: `${COLORS.primary}15` }]}>
-                            <Ionicons name="person" size={48} color={COLORS.primary} />
+                        <View style={styles.cardHeader}>
+                            <LinearGradient
+                                colors={GRADIENTS.primary}
+                                style={styles.iconContainer}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                            >
+                                <Ionicons name="person" size={28} color="#FFFFFF" />
+                            </LinearGradient>
+                            <View style={styles.cardHeaderText}>
+                                <Text style={styles.cardTitle}>Citizen</Text>
+                                <Text style={styles.cardBadge}>REPORTER</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={22} color={COLORS.textTertiary} />
                         </View>
-                        <Text style={styles.cardTitle}>Citizen</Text>
                         <Text style={styles.cardDescription}>
                             Report traffic violations and earn rewards for making your community safer
                         </Text>
                         <View style={styles.features}>
-                            <View style={styles.feature}>
-                                <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
-                                <Text style={styles.featureText}>Report violations</Text>
-                            </View>
-                            <View style={styles.feature}>
-                                <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
-                                <Text style={styles.featureText}>Earn rewards</Text>
-                            </View>
-                            <View style={styles.feature}>
-                                <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
-                                <Text style={styles.featureText}>Track reports</Text>
-                            </View>
+                            {['Report violations', 'Earn rewards', 'Track reports'].map((text, i) => (
+                                <View key={i} style={styles.feature}>
+                                    <View style={styles.featureCheck}>
+                                        <Ionicons name="checkmark" size={12} color={COLORS.success} />
+                                    </View>
+                                    <Text style={styles.featureText}>{text}</Text>
+                                </View>
+                            ))}
                         </View>
                     </TouchableOpacity>
 
@@ -65,28 +77,35 @@ export default function RoleSelection({ navigation }) {
                     <TouchableOpacity
                         style={styles.card}
                         onPress={() => handleRoleSelect(ROLES.OFFICER)}
-                        activeOpacity={0.8}
+                        activeOpacity={0.85}
                     >
-                        <View style={[styles.iconContainer, { backgroundColor: `${COLORS.secondary}15` }]}>
-                            <Ionicons name="shield-checkmark" size={48} color={COLORS.secondary} />
+                        <View style={styles.cardHeader}>
+                            <LinearGradient
+                                colors={GRADIENTS.secondary}
+                                style={styles.iconContainer}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                            >
+                                <Ionicons name="shield-checkmark" size={28} color="#FFFFFF" />
+                            </LinearGradient>
+                            <View style={styles.cardHeaderText}>
+                                <Text style={styles.cardTitle}>Traffic Officer</Text>
+                                <Text style={[styles.cardBadge, styles.cardBadgeSecondary]}>AUTHORITY</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={22} color={COLORS.textTertiary} />
                         </View>
-                        <Text style={styles.cardTitle}>Traffic Officer</Text>
                         <Text style={styles.cardDescription}>
                             Verify reports, manage violations, and maintain traffic safety
                         </Text>
                         <View style={styles.features}>
-                            <View style={styles.feature}>
-                                <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
-                                <Text style={styles.featureText}>Verify reports</Text>
-                            </View>
-                            <View style={styles.feature}>
-                                <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
-                                <Text style={styles.featureText}>View analytics</Text>
-                            </View>
-                            <View style={styles.feature}>
-                                <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
-                                <Text style={styles.featureText}>Export data</Text>
-                            </View>
+                            {['Verify reports', 'View analytics', 'Manage queue'].map((text, i) => (
+                                <View key={i} style={styles.feature}>
+                                    <View style={[styles.featureCheck, { backgroundColor: COLORS.secondarySurface }]}>
+                                        <Ionicons name="checkmark" size={12} color={COLORS.secondary} />
+                                    </View>
+                                    <Text style={styles.featureText}>{text}</Text>
+                                </View>
+                            ))}
                         </View>
                     </TouchableOpacity>
                 </View>
@@ -101,63 +120,108 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.background,
     },
     scrollContent: {
-        paddingBottom: SPACING.xl,
+        paddingBottom: SPACING.xxl,
     },
     header: {
-        paddingHorizontal: SPACING.lg,
-        paddingTop: SPACING.xxl,
+        paddingHorizontal: SPACING.xl,
+        paddingTop: SPACING.xxxl,
         paddingBottom: SPACING.xl,
+        alignItems: 'center',
+    },
+    logoBadge: {
+        width: 64,
+        height: 64,
+        borderRadius: BORDER_RADIUS.xl,
+        backgroundColor: COLORS.primarySurface,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: SPACING.lg,
+    },
+    logoEmoji: {
+        fontSize: 32,
     },
     title: {
-        fontSize: FONT_SIZES.xxxl,
+        fontSize: FONT_SIZES.xxl,
         fontWeight: FONT_WEIGHTS.bold,
         color: COLORS.textPrimary,
         marginBottom: SPACING.sm,
+        letterSpacing: -0.3,
+        textAlign: 'center',
     },
     subtitle: {
         fontSize: FONT_SIZES.md,
         color: COLORS.textSecondary,
+        textAlign: 'center',
     },
     content: {
         paddingHorizontal: SPACING.lg,
         gap: SPACING.lg,
     },
     card: {
-        backgroundColor: COLORS.white,
+        backgroundColor: COLORS.surface,
         borderRadius: BORDER_RADIUS.xl,
-        padding: SPACING.lg,
-        ...SHADOWS.md,
+        padding: SPACING.xl,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        ...SHADOWS.sm,
     },
-    iconContainer: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        justifyContent: 'center',
+    cardHeader: {
+        flexDirection: 'row',
         alignItems: 'center',
         marginBottom: SPACING.md,
     },
+    iconContainer: {
+        width: 52,
+        height: 52,
+        borderRadius: BORDER_RADIUS.lg,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    cardHeaderText: {
+        flex: 1,
+        marginLeft: SPACING.md,
+    },
     cardTitle: {
-        fontSize: FONT_SIZES.xl,
+        fontSize: FONT_SIZES.lg,
         fontWeight: FONT_WEIGHTS.bold,
         color: COLORS.textPrimary,
-        marginBottom: SPACING.sm,
+        letterSpacing: -0.2,
+    },
+    cardBadge: {
+        fontSize: FONT_SIZES.xxs,
+        fontWeight: FONT_WEIGHTS.bold,
+        color: COLORS.primary,
+        letterSpacing: 1.5,
+        marginTop: 2,
+    },
+    cardBadgeSecondary: {
+        color: COLORS.secondary,
     },
     cardDescription: {
         fontSize: FONT_SIZES.sm,
         color: COLORS.textSecondary,
-        marginBottom: SPACING.md,
+        marginBottom: SPACING.lg,
         lineHeight: 20,
     },
     features: {
-        gap: SPACING.sm,
+        gap: SPACING.md,
     },
     feature: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: SPACING.sm,
+        gap: SPACING.md,
+    },
+    featureCheck: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: COLORS.successSurface,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     featureText: {
         fontSize: FONT_SIZES.sm,
         color: COLORS.textPrimary,
+        fontWeight: FONT_WEIGHTS.medium,
     },
 });

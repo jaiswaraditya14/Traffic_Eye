@@ -1,31 +1,38 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MobileContainer } from '../../components';
 import { Button } from '../../components';
 import { useAppContext } from '../../context/AppContext';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS } from '../../utils/theme';
+import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, GRADIENTS, SHADOWS } from '../../utils/theme';
 
 const { width } = Dimensions.get('window');
 
 const slides = [
     {
+        image: require('../../../assets/images/1.jpg'),
         icon: 'camera',
         title: 'Report Violations',
-        description: 'Capture traffic violations with your phone camera. Take photos or videos up to 15 seconds.',
-        color: COLORS.primary,
+        description: 'Capture traffic violations with your phone camera. Take photos or videos to help keep roads safe.',
+        gradient: ['#4F46E5', '#6366F1'],
+        accentColor: COLORS.primary,
     },
     {
-        icon: 'sparkles',
+        image: require('../../../assets/images/onboarding_ai.jpg'),
+        icon: 'scan',
         title: 'AI Verification',
         description: 'Our AI instantly analyzes license plates, violation types, and location with high accuracy.',
-        color: COLORS.secondary,
+        gradient: ['#0D9488', '#14B8A6'],
+        accentColor: COLORS.secondary,
     },
     {
+        image: require('../../../assets/images/onboarding_rewards.jpg'),
         icon: 'trophy',
         title: 'Earn Rewards',
         description: 'Get points for verified reports. Climb the leaderboard and make your community safer.',
-        color: COLORS.accent,
+        gradient: ['#D97706', '#F59E0B'],
+        accentColor: COLORS.accent,
     },
 ];
 
@@ -41,13 +48,11 @@ export default function OnboardingCarousel({ navigation }) {
             scrollViewRef.current?.scrollTo({ x: width * nextSlide, animated: true });
         } else {
             setHasSeenOnboarding(true);
-            // Navigation is handled automatically by AppNavigator's conditional rendering
         }
     };
 
     const handleSkip = () => {
         setHasSeenOnboarding(true);
-        // Navigation is handled automatically by AppNavigator's conditional rendering
     };
 
     const handleScroll = (event) => {
@@ -60,7 +65,7 @@ export default function OnboardingCarousel({ navigation }) {
             <View style={styles.container}>
                 {/* Skip button */}
                 <View style={styles.header}>
-                    <Button variant="ghost" onPress={handleSkip}>
+                    <Button variant="ghost" onPress={handleSkip} textStyle={styles.skipText}>
                         Skip
                     </Button>
                 </View>
@@ -76,23 +81,50 @@ export default function OnboardingCarousel({ navigation }) {
                 >
                     {slides.map((slide, index) => (
                         <View key={index} style={[styles.slide, { width }]}>
-                            <View style={[styles.iconContainer, { backgroundColor: `${slide.color}15` }]}>
-                                <Ionicons name={slide.icon} size={64} color={slide.color} />
+                            {/* Image Section with Gradient Overlay */}
+                            <View style={styles.imageContainer}>
+                                <Image
+                                    source={slide.image}
+                                    style={styles.slideImage}
+                                    resizeMode="cover"
+                                />
+                                {/* Gradient overlay on image */}
+                                <LinearGradient
+                                    colors={['transparent', 'rgba(0,0,0,0.1)', COLORS.background]}
+                                    style={styles.imageGradientBottom}
+                                />
+                                {/* Icon badge on top of image */}
+                                <View style={styles.iconOverlay}>
+                                    <LinearGradient
+                                        colors={slide.gradient}
+                                        style={styles.iconBadge}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 1 }}
+                                    >
+                                        <Ionicons name={slide.icon} size={28} color="#FFF" />
+                                    </LinearGradient>
+                                </View>
                             </View>
-                            <Text style={styles.title}>{slide.title}</Text>
-                            <Text style={styles.description}>{slide.description}</Text>
+
+                            {/* Text Section */}
+                            <View style={styles.slideTextContainer}>
+                                <Text style={[styles.title, { color: slide.accentColor }]}>{slide.title}</Text>
+                                <Text style={styles.description}>{slide.description}</Text>
+                            </View>
                         </View>
                     ))}
                 </ScrollView>
 
                 {/* Indicators */}
                 <View style={styles.indicators}>
-                    {slides.map((_, index) => (
+                    {slides.map((slide, index) => (
                         <View
                             key={index}
                             style={[
                                 styles.indicator,
-                                index === currentSlide ? styles.activeIndicator : styles.inactiveIndicator,
+                                index === currentSlide
+                                    ? [styles.activeIndicator, { backgroundColor: slides[currentSlide].accentColor }]
+                                    : styles.inactiveIndicator,
                             ]}
                         />
                     ))}
@@ -100,8 +132,8 @@ export default function OnboardingCarousel({ navigation }) {
 
                 {/* Button */}
                 <View style={styles.footer}>
-                    <Button onPress={handleNext} fullWidth>
-                        {currentSlide < slides.length - 1 ? 'Next' : 'Get Started'}
+                    <Button onPress={handleNext} fullWidth size="lg">
+                        {currentSlide < slides.length - 1 ? 'Continue' : 'Get Started'}
                     </Button>
                 </View>
             </View>
@@ -119,33 +151,72 @@ const styles = StyleSheet.create({
         paddingHorizontal: SPACING.lg,
         paddingTop: SPACING.xl,
     },
+    skipText: {
+        color: COLORS.textTertiary,
+        fontWeight: FONT_WEIGHTS.medium,
+    },
     slide: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    // ── Image Section ──
+    imageContainer: {
+        width: '100%',
+        height: '50%',
+        overflow: 'hidden',
+        position: 'relative',
+    },
+    slideImage: {
+        width: '100%',
+        height: '100%',
+    },
+    imageGradientBottom: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 120,
+    },
+    iconOverlay: {
+        position: 'absolute',
+        bottom: 20,
+        alignSelf: 'center',
+    },
+    iconBadge: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        elevation: 8,
+    },
+    // ── Text Section ──
+    slideTextContainer: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        paddingHorizontal: SPACING.xl,
-    },
-    iconContainer: {
-        width: 128,
-        height: 128,
-        borderRadius: 64,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: SPACING.xl,
+        paddingHorizontal: SPACING.xxl,
+        paddingTop: SPACING.lg,
     },
     title: {
-        fontSize: FONT_SIZES.xxl,
+        fontSize: 28,
         fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
         marginBottom: SPACING.md,
         textAlign: 'center',
+        letterSpacing: -0.5,
     },
     description: {
         fontSize: FONT_SIZES.md,
         color: COLORS.textSecondary,
         textAlign: 'center',
         maxWidth: 300,
+        lineHeight: 24,
     },
+    // ── Indicators ──
     indicators: {
         flexDirection: 'row',
         justifyContent: 'center',
@@ -153,22 +224,19 @@ const styles = StyleSheet.create({
         marginBottom: SPACING.xl,
     },
     indicator: {
-        height: 8,
-        borderRadius: 4,
+        height: 6,
+        borderRadius: 3,
     },
     activeIndicator: {
-        width: 32,
-        backgroundColor: COLORS.primary,
+        width: 28,
     },
     inactiveIndicator: {
-        width: 8,
+        width: 6,
         backgroundColor: COLORS.gray300,
     },
+    // ── Footer ──
     footer: {
-        paddingHorizontal: SPACING.lg,
-        paddingBottom: SPACING.xl,
+        paddingHorizontal: SPACING.xl,
+        paddingBottom: SPACING.xxl,
     },
 });
-
-
-
