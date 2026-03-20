@@ -39,47 +39,12 @@ const slides = [
 export default function OnboardingCarousel({ navigation }) {
     const [currentSlide, setCurrentSlide] = useState(0);
     const { setHasSeenOnboarding } = useAppContext();
-    const scrollViewRef = useRef(null);
-
-    // Fade animations for content transition
-    const fadeAnim = useRef(new Animated.Value(1)).current;
-    const slideUpAnim = useRef(new Animated.Value(0)).current;
-    const indicatorWidths = useRef(slides.map((_, i) =>
-        new Animated.Value(i === 0 ? 32 : 8)
-    )).current;
-
-    useEffect(() => {
-        // Entrance animation
-        Animated.parallel([
-            Animated.timing(fadeAnim, {
-                toValue: 1,
-                duration: 500,
-                useNativeDriver: true,
-            }),
-            Animated.timing(slideUpAnim, {
-                toValue: 0,
-                duration: 500,
-                useNativeDriver: true,
-            }),
-        ]).start();
-    }, []);
-
-    const animateIndicators = (index) => {
-        slides.forEach((_, i) => {
-            Animated.spring(indicatorWidths[i], {
-                toValue: i === index ? 32 : 8,
-                useNativeDriver: false,
-                tension: 100,
-                friction: 10,
-            }).start();
-        });
-    };
+    const scrollViewRef = React.useRef(null);
 
     const handleNext = () => {
         if (currentSlide < slides.length - 1) {
             const nextSlide = currentSlide + 1;
             setCurrentSlide(nextSlide);
-            animateIndicators(nextSlide);
             scrollViewRef.current?.scrollTo({ x: width * nextSlide, animated: true });
         } else {
             setHasSeenOnboarding(true);
@@ -92,21 +57,12 @@ export default function OnboardingCarousel({ navigation }) {
 
     const handleScroll = (event) => {
         const slideIndex = Math.round(event.nativeEvent.contentOffset.x / width);
-        if (slideIndex !== currentSlide) {
-            setCurrentSlide(slideIndex);
-            animateIndicators(slideIndex);
-        }
+        setCurrentSlide(slideIndex);
     };
 
     return (
         <MobileContainer>
-            <Animated.View style={[
-                styles.container,
-                {
-                    opacity: fadeAnim,
-                    transform: [{ translateY: slideUpAnim }],
-                },
-            ]}>
+            <View style={styles.container}>
                 {/* Skip button */}
                 <View style={styles.header}>
                     <Button variant="ghost" onPress={handleSkip} textStyle={styles.skipText}>
@@ -180,7 +136,7 @@ export default function OnboardingCarousel({ navigation }) {
                         {currentSlide < slides.length - 1 ? 'Continue' : 'Get Started'}
                     </Button>
                 </View>
-            </Animated.View>
+            </View>
         </MobileContainer>
     );
 }
@@ -245,13 +201,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: SPACING.xxl,
         paddingTop: SPACING.lg,
-    },
-    iconInner: {
-        width: 110,
-        height: 110,
-        borderRadius: 55,
-        justifyContent: 'center',
-        alignItems: 'center',
     },
     title: {
         fontSize: 28,

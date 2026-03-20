@@ -75,11 +75,6 @@ export default function SplashScreen({ navigation }) {
         return () => clearTimeout(timer);
     }, []);
 
-    const loadingWidth = loadingAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['0%', '100%']
-    });
-
     return (
         <View style={styles.container}>
             {/* Background image — 2.jpg traffic signal */}
