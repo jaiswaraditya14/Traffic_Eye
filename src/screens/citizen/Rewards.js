@@ -1,11 +1,11 @@
 // Rewards.js
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MobileContainer } from '../../components';
-import { useAppContext } from '../../context/AppContext';
+import { useAuth } from '../../context';
 import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, GRADIENTS } from '../../utils/theme';
 
 export default function Rewards() {
@@ -33,7 +33,7 @@ export default function Rewards() {
             <SafeAreaView style={styles.container} edges={['top']}>
                 <Animated.View style={[styles.headerContainer, { opacity: fadeAnim }]}>
                     <Text style={styles.title}>Rewards</Text>
-                </View>
+                </Animated.View>
                 <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
                     {/* Points Card */}
                     <LinearGradient

@@ -53,7 +53,7 @@ export default function RoleSelection({ navigation }) {
                 showsVerticalScrollIndicator={false}
             >
                 {/* Header */}
-                <View style={styles.header}>
+                <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
                     <View style={styles.logoBadge}>
                         <Text style={styles.logoEmoji}>🚦</Text>
                     </View>

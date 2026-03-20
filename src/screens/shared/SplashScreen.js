@@ -103,18 +103,6 @@ export default function SplashScreen({ navigation }) {
             <View style={styles.glowGreen} />
 
             <View style={styles.content}>
-                {/* Logo Icon */}
-                <Animated.View style={[
-                    styles.iconContainer,
-                    { transform: [{ scale: logoScale }], opacity: logoOpacity },
-                ]}>
-                    <View style={styles.iconOuter}>
-                        <View style={styles.iconInner}>
-                            <Text style={styles.icon}>🚦</Text>
-                        </View>
-                    </View>
-                </Animated.View>
-
                 {/* App Name */}
                 <Animated.Text style={[styles.title, { opacity: textOpacity }]}>
                     Traffic<Text style={styles.titleAccent}>Eye</Text>

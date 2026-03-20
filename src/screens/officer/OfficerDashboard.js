@@ -43,7 +43,7 @@ export default function OfficerDashboard({ navigation }) {
                         <TouchableOpacity style={styles.notificationBtn}>
                             <Ionicons name="notifications-outline" size={22} color={COLORS.textPrimary} />
                         </TouchableOpacity>
-                    </Animated.View>
+                    </View>
 
                     {/* Stats */}
                     <View style={styles.statsContainer}>
@@ -63,7 +63,7 @@ export default function OfficerDashboard({ navigation }) {
                                 </LinearGradient>
                             </View>
                         ))}
-                    </Animated.View>
+                    </View>
 
                     {/* Quick Actions */}
                     <View style={styles.section}>

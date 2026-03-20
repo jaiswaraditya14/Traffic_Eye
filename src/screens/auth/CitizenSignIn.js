@@ -186,7 +186,6 @@ export default function CitizenSignIn({ navigation }) {
                             size="lg"
                             style={styles.signInButton}
                             disabled={loading}
-                            size="lg"
                         >
                             {loading ? (
                                 <ActivityIndicator color={COLORS.white} />
@@ -228,7 +227,7 @@ export default function CitizenSignIn({ navigation }) {
                                 <Text style={styles.signUpLink}>Sign Up</Text>
                             </TouchableOpacity>
                         </View>
-                    </Animated.View>
+                    </View>
                 </ScrollView>
             </KeyboardAvoidingView>
         </MobileContainer>

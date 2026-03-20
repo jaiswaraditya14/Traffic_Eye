@@ -12,7 +12,6 @@ const { width } = Dimensions.get('window');
 const slides = [
     {
         image: require('../../../assets/images/1.jpg'),
-        icon: 'camera',
         title: 'Report Violations',
         description: 'Capture traffic violations with your phone camera. Take photos or videos to help keep roads safe.',
         gradient: ['#4F46E5', '#6366F1'],
@@ -20,7 +19,6 @@ const slides = [
     },
     {
         image: require('../../../assets/images/onboarding_ai.jpg'),
-        icon: 'scan',
         title: 'AI Verification',
         description: 'Our AI instantly analyzes license plates, violation types, and location with high accuracy.',
         gradient: ['#0D9488', '#14B8A6'],
@@ -28,7 +26,6 @@ const slides = [
     },
     {
         image: require('../../../assets/images/onboarding_rewards.jpg'),
-        icon: 'trophy',
         title: 'Earn Rewards',
         description: 'Get points for verified reports. Climb the leaderboard and make your community safer.',
         gradient: ['#D97706', '#F59E0B'],
@@ -93,17 +90,6 @@ export default function OnboardingCarousel({ navigation }) {
                                     colors={['transparent', 'rgba(0,0,0,0.1)', COLORS.background]}
                                     style={styles.imageGradientBottom}
                                 />
-                                {/* Icon badge on top of image */}
-                                <View style={styles.iconOverlay}>
-                                    <LinearGradient
-                                        colors={slide.gradient}
-                                        style={styles.iconBadge}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 1 }}
-                                    >
-                                        <Ionicons name={slide.icon} size={28} color="#FFF" />
-                                    </LinearGradient>
-                                </View>
                             </View>
 
                             {/* Text Section */}

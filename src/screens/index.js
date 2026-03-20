@@ -18,9 +18,7 @@ export { default as Rewards } from './citizen/Rewards';
 export { default as Notifications } from './citizen/Notifications';
 export { default as FineInformation } from './citizen/FineInformation';
 export { default as SafetyTips } from './citizen/SafetyTips';
-export { default as TrafficSigns } from './citizen/TrafficSigns';
 export { default as ContactUs } from './citizen/ContactUs';
-export { default as SafetyTips } from './citizen/SafetyTips';
 
 // Officer Screens
 export { default as OfficerDashboard } from './officer/OfficerDashboard';
