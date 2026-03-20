@@ -40,7 +40,10 @@ export default function useImagePicker() {
                     if (asset.exif.GPSLatitudeRef === 'S' && lat > 0) lat = -lat;
                     if (asset.exif.GPSLongitudeRef === 'W' && lng > 0) lng = -lng;
                     
-                    location = { latitude: lat, longitude: lng };
+                    // Ignore empty boilerplate coordinates (0,0)
+                    if (lat !== 0 || lng !== 0) {
+                        location = { latitude: lat, longitude: lng };
+                    }
                 }
                 
                 return { uri, location };
@@ -83,7 +86,10 @@ export default function useImagePicker() {
                     if (asset.exif.GPSLatitudeRef === 'S' && lat > 0) lat = -lat;
                     if (asset.exif.GPSLongitudeRef === 'W' && lng > 0) lng = -lng;
                     
-                    location = { latitude: lat, longitude: lng };
+                    // Ignore empty boilerplate coordinates (0,0)
+                    if (lat !== 0 || lng !== 0) {
+                        location = { latitude: lat, longitude: lng };
+                    }
                 }
                 
                 return { uri, location };
