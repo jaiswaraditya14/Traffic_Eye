@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { View, ActivityIndicator } from 'react-native';
 import { useAppContext, useAuth } from '../context';
 
 // Navigators
@@ -20,12 +21,18 @@ import {
 
 const Stack = createNativeStackNavigator();
 
+const ProfileLoadingScreen = () => (
+    <View style={{ flex: 1, backgroundColor: '#050309', justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+    </View>
+);
+
 export default function AppNavigator() {
-    const { hasSeenOnboarding } = useAppContext();
+    const { hasSeenOnboarding, showSplash } = useAppContext();
     const { isAuthenticated, loading, profile } = useAuth();
 
     // 1. Loading/Splash Screen
-    if (loading) {
+    if (loading || showSplash) {
         return (
             <NavigationContainer>
                 <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -71,7 +78,7 @@ export default function AppNavigator() {
                     </>
                 ) : !profile ? (
                     // Profile loading state
-                    <Stack.Screen name="Loading" component={SplashScreen} />
+                    <Stack.Screen name="Loading" component={ProfileLoadingScreen} />
                 ) : profile.role === 'citizen' ? (
                     // Citizen Flow
                     <Stack.Screen

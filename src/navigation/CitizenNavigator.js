@@ -21,6 +21,8 @@ import {
     Notifications,
     ContactUs,
     FineInformation,
+    SafetyTips,
+    TrafficSigns,
     PermissionsRequest
 } from '../screens';
 
@@ -106,6 +108,8 @@ export default function CitizenNavigator() {
             <Stack.Screen name="EditProfile" component={EditProfile} />
             <Stack.Screen name="ContactUs" component={ContactUs} />
             <Stack.Screen name="FineInformation" component={FineInformation} />
+            <Stack.Screen name="SafetyTips" component={SafetyTips} />
+            <Stack.Screen name="TrafficSigns" component={TrafficSigns} />
         </Stack.Navigator>
     );
 }

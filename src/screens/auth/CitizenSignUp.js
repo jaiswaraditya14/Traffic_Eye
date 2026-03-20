@@ -23,7 +23,6 @@ export default function CitizenSignUp({ navigation }) {
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-    const [referralCode, setReferralCode] = useState('');
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -123,8 +122,7 @@ export default function CitizenSignUp({ navigation }) {
                 email.trim(),
                 password,
                 name.trim(),
-                phone.trim(),
-                referralCode.trim() || null
+                phone.trim()
             );
 
             if (error) {
@@ -301,14 +299,6 @@ export default function CitizenSignUp({ navigation }) {
                                 />
                             </TouchableOpacity>
                         </View>
-
-                        <Input
-                            label="Referral Code (Optional)"
-                            placeholder="Enter referral code"
-                            value={referralCode}
-                            onChangeText={setReferralCode}
-                            autoCapitalize="none"
-                        />
 
                         <Button
                             onPress={handleSignUp}

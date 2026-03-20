@@ -9,23 +9,23 @@ const moderateScale = (size, factor = 0.5) => size + (scale(size) - size) * fact
 
 // Light Mode Colors — refined modern palette
 const LIGHT_COLORS = {
-    // Primary - Deep Ocean Blue
-    primary: '#2563EB',
-    primaryLight: '#3B82F6',
-    primaryDark: '#1D4ED8',
-    primarySoft: '#EFF6FF',
+    // Primary - Police Navy Blue (Trust, Standard Indian State Apps)
+    primary: '#1A365D',
+    primaryLight: '#2B6CB0',
+    primaryDark: '#000000',
+    primarySoft: '#EBF8FF',
 
-    // Secondary - Emerald
-    secondary: '#059669',
-    secondaryLight: '#34D399',
-    secondaryDark: '#047857',
-    secondarySoft: '#ECFDF5',
+    // Secondary - Olive/Forest Green
+    secondary: '#2F855A',
+    secondaryLight: '#48BB78',
+    secondaryDark: '#276749',
+    secondarySoft: '#F0FFF4',
 
-    // Accent - Amber Glow
-    accent: '#F59E0B',
-    accentLight: '#FBBF24',
-    accentDark: '#D97706',
-    accentSoft: '#FFFBEB',
+    // Accent - Traffic Saffron / Indian Orange
+    accent: '#DD6B20',
+    accentLight: '#ED8936',
+    accentDark: '#C05621',
+    accentSoft: '#FFFAF0',
 
     // Status
     success: '#10B981',
@@ -49,8 +49,8 @@ const LIGHT_COLORS = {
     gray900: '#111827',
 
     // Background
-    background: '#F8FAFC',
-    backgroundSecondary: '#F1F5F9',
+    background: '#F7F7F7',
+    backgroundSecondary: '#EAEAEA',
     surface: '#FFFFFF',
     surfaceElevated: '#FFFFFF',
 
@@ -71,10 +71,10 @@ const LIGHT_COLORS = {
 
 // Dark Mode Colors
 const DARK_COLORS = {
-    primary: '#3B82F6',
-    primaryLight: '#60A5FA',
-    primaryDark: '#2563EB',
-    primarySoft: '#1E3A5F',
+    primary: '#4F46E5',
+    primaryLight: '#818CF8',
+    primaryDark: '#3730A3',
+    primarySoft: '#312E81',
 
     secondary: '#10B981',
     secondaryLight: '#34D399',
@@ -158,11 +158,11 @@ export const FONT_WEIGHTS = {
 };
 
 export const BORDER_RADIUS = {
-    sm: 6,
-    md: 10,
-    lg: 14,
-    xl: 18,
-    xxl: 24,
+    sm: 8,
+    md: 12,
+    lg: 20,
+    xl: 24,
+    xxl: 32,
     full: 9999,
 };
 

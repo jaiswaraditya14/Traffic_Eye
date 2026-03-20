@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -31,15 +31,13 @@ export default function CitizenHome({ navigation }) {
     }, []);
 
     const quickStats = [
-        { label: 'Reports', value: '12', icon: 'document-text', color: COLORS.primary, bgColor: COLORS.primarySoft },
+        { label: 'Total Reports', value: '12', icon: 'document-text', color: COLORS.primary, bgColor: COLORS.primarySoft },
         { label: 'Verified', value: '8', icon: 'checkmark-circle', color: COLORS.success, bgColor: COLORS.secondarySoft },
-        { label: 'Points', value: formatNumber(userPoints), icon: 'trophy', color: COLORS.accent, bgColor: COLORS.accentSoft },
     ];
 
     const recentActivity = [
-        { id: 1, type: 'Verified', desc: 'Speeding violation verified', time: '2h ago', status: 'success' },
-        { id: 2, type: 'Pending', desc: 'Red light violation under review', time: '5h ago', status: 'pending' },
-        { id: 3, type: 'Rejected', desc: 'Parking violation rejected', time: '1d ago', status: 'rejected' },
+        { id: 1, type: 'Illegal Parking', desc: 'At Downtown St.', time: 'Today, 10:45 AM', status: 'pending' },
+        { id: 2, type: 'Red Light Violation', desc: 'At Main intersection', time: 'Oct 12, 4:20 PM', status: 'success' },
     ];
 
     const firstName = profile?.full_name?.split(' ')[0] || 'User';
@@ -65,81 +63,75 @@ export default function CitizenHome({ navigation }) {
                         </TouchableOpacity>
                     </Animated.View>
 
-                    {/* Quick Stats */}
-                    <Animated.View style={[styles.statsContainer, {
+                    {/* Hero Impact Card */}
+                    <Animated.View style={[styles.heroCard, {
                         opacity: fadeAnim,
                         transform: [{ translateY: slideAnims[0] }],
                     }]}>
-                        {quickStats.map((stat, index) => (
-                            <View key={index} style={styles.statCard}>
-                                <View style={[styles.statIcon, { backgroundColor: stat.bgColor || `${stat.color}15` }]}>
-                                    <Ionicons name={stat.icon} size={22} color={stat.color} />
-                                </View>
-                                <Text style={styles.statValue}>{stat.value}</Text>
-                                <Text style={styles.statLabel}>{stat.label}</Text>
-                            </View>
-                        ))}
+                        <LinearGradient
+                            colors={[COLORS.primary, COLORS.primaryLight]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.heroGradient}
+                        >
+                            <Text style={styles.heroCardLabel}>Total Impact Points</Text>
+                            <Text style={styles.heroCardValue}>{formatNumber(userPoints || 2450)}</Text>
+                            <TouchableOpacity style={styles.heroCardAction} activeOpacity={0.8} onPress={() => navigation.navigate('Rewards')}>
+                                <Text style={styles.heroCardActionText}>Redeem Rewards</Text>
+                                <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+                            </TouchableOpacity>
+                            <Ionicons name="car-sport" size={120} color="rgba(255,255,255,0.1)" style={styles.heroBgIcon} />
+                        </LinearGradient>
                     </Animated.View>
 
-                    {/* Report Button */}
-                    <Animated.View style={[styles.reportSection, {
+                    {/* Quick Actions Flex Grid */}
+                    <Animated.View style={[styles.section, {
                         opacity: fadeAnim,
                         transform: [{ translateY: slideAnims[1] }],
                     }]}>
-                        <TouchableOpacity
-                            activeOpacity={0.85}
-                            onPress={() => navigation.navigate('NewReport')}
-                        >
-                            <LinearGradient
-                                colors={[COLORS.primary, COLORS.primaryDark]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={styles.reportGradient}
-                            >
-                                <View style={styles.reportIconCircle}>
-                                    <Ionicons name="camera" size={28} color={COLORS.primary} />
-                                </View>
-                                <View style={styles.reportTextContainer}>
-                                    <Text style={styles.reportButtonTitle}>Report Violation</Text>
-                                    <Text style={styles.reportButtonSubtitle}>Capture photo or video</Text>
-                                </View>
-                                <Ionicons name="arrow-forward-circle" size={32} color="rgba(255,255,255,0.8)" />
-                            </LinearGradient>
-                        </TouchableOpacity>
-                    </Animated.View>
-
-                    {/* Information Section */}
-                    <Animated.View style={[styles.section, {
-                        opacity: fadeAnim,
-                        transform: [{ translateY: slideAnims[2] }],
-                    }]}>
                         <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Information</Text>
+                            <Text style={styles.sectionTitle}>Quick Actions</Text>
                         </View>
-
-                        <View style={styles.informationGrid}>
-                            <TouchableOpacity style={styles.infoCard}>
-                                <View style={[styles.infoIconContainer, { backgroundColor: COLORS.primarySoft || `${COLORS.primary}15` }]}>
-                                    <Ionicons name="information-circle" size={28} color={COLORS.primary} />
+                        
+                        <View style={styles.actionsGrid}>
+                            <TouchableOpacity style={styles.actionCard} activeOpacity={0.7} onPress={() => navigation.navigate('NewReport')}>
+                                <View style={[styles.actionIcon, { backgroundColor: COLORS.primarySoft, color: COLORS.primary }]}>
+                                    <Ionicons name="camera" size={24} color={COLORS.primary} />
                                 </View>
-                                <Text style={styles.infoCardTitle}>Safety Tips</Text>
+                                <View>
+                                    <Text style={styles.actionTitle}>New Report</Text>
+                                    <Text style={styles.actionDesc}>Upload a photo/video</Text>
+                                </View>
                             </TouchableOpacity>
 
-                            <TouchableOpacity style={styles.infoCard}>
-                                <View style={[styles.infoIconContainer, { backgroundColor: `${COLORS.error}10` }]}>
-                                    <Ionicons name="warning" size={28} color={COLORS.error} />
+                            <TouchableOpacity style={styles.actionCard} activeOpacity={0.7} onPress={() => navigation.navigate('SafetyTips')}>
+                                <View style={[styles.actionIcon, { backgroundColor: COLORS.secondarySoft }]}>
+                                    <Image source={require('../../../assets/safety.png')} style={{ width: 38, height: 38 }} resizeMode="contain" />
                                 </View>
-                                <Text style={styles.infoCardTitle}>Traffic Signs</Text>
+                                <View>
+                                    <Text style={styles.actionTitle}>Safety Tips</Text>
+                                    <Text style={styles.actionDesc}>Learn the guidelines</Text>
+                                </View>
                             </TouchableOpacity>
 
-                            <TouchableOpacity
-                                style={styles.infoCard}
-                                onPress={() => navigation.navigate('FineInformation')}
-                            >
-                                <View style={[styles.infoIconContainer, { backgroundColor: COLORS.secondarySoft || `${COLORS.success}15` }]}>
-                                    <Ionicons name="cash" size={28} color={COLORS.success} />
+                            <TouchableOpacity style={styles.actionCard} activeOpacity={0.7} onPress={() => navigation.navigate('TrafficSigns')}>
+                                <View style={[styles.actionIcon, { backgroundColor: '#FEF3C7' }]}>
+                                    <Image source={require('../../../assets/traffic_light.jpg')} style={{ width: 44, height: 44, borderRadius: 6 }} resizeMode="cover" />
                                 </View>
-                                <Text style={styles.infoCardTitle}>Fines</Text>
+                                <View>
+                                    <Text style={styles.actionTitle}>Traffic Signs</Text>
+                                    <Text style={styles.actionDesc}>Know your signals</Text>
+                                </View>
+                            </TouchableOpacity>
+                            
+                            <TouchableOpacity style={styles.actionCard} activeOpacity={0.7} onPress={() => navigation.navigate('FineInformation')}>
+                                <View style={[styles.actionIcon, { backgroundColor: `${COLORS.accent}15` }]}>
+                                    <Image source={require('../../../assets/fines.png')} style={{ width: 38, height: 38 }} resizeMode="contain" />
+                                </View>
+                                <View>
+                                    <Text style={styles.actionTitle}>Fines</Text>
+                                    <Text style={styles.actionDesc}>Official penalties</Text>
+                                </View>
                             </TouchableOpacity>
                         </View>
                     </Animated.View>
@@ -157,28 +149,31 @@ export default function CitizenHome({ navigation }) {
                         </View>
 
                         {recentActivity.map((activity) => (
-                            <TouchableOpacity key={activity.id} style={styles.activityCard}>
+                            <TouchableOpacity key={activity.id} style={styles.activityCardNew}>
                                 <View style={[
-                                    styles.activityIcon,
-                                    {
-                                        backgroundColor: activity.status === 'success'
-                                            ? (COLORS.secondarySoft || `${COLORS.success}15`)
-                                            : activity.status === 'pending'
-                                                ? (COLORS.accentSoft || `${COLORS.warning}15`)
-                                                : `${COLORS.error}10`
-                                    }
+                                    styles.activityAvatarBase,
+                                    { backgroundColor: activity.status === 'success' ? COLORS.secondarySoft : COLORS.warning + '15' }
                                 ]}>
-                                    <Ionicons
-                                        name={activity.status === 'success' ? 'checkmark-circle' : activity.status === 'pending' ? 'time' : 'close-circle'}
-                                        size={22}
-                                        color={activity.status === 'success' ? COLORS.success : activity.status === 'pending' ? COLORS.warning : COLORS.error}
-                                    />
+                                    <Ionicons name={activity.status === 'success' ? 'car' : 'warning'} size={24} color={activity.status === 'success' ? COLORS.success : COLORS.warning} />
                                 </View>
                                 <View style={styles.activityContent}>
                                     <Text style={styles.activityType}>{activity.type}</Text>
-                                    <Text style={styles.activityDesc}>{activity.desc}</Text>
+                                    <View style={styles.activityMetaRow}>
+                                        <Ionicons name="calendar-outline" size={12} color={COLORS.textSecondary} />
+                                        <Text style={styles.activityTime}>{activity.time}</Text>
+                                    </View>
                                 </View>
-                                <Text style={styles.activityTime}>{activity.time}</Text>
+                                <View style={[
+                                    styles.statusPill,
+                                    { backgroundColor: activity.status === 'success' ? '#D1FAE5' : '#FEF3C7' }
+                                ]}>
+                                    <Text style={[
+                                        styles.statusPillText,
+                                        { color: activity.status === 'success' ? '#059669' : '#D97706' }
+                                    ]}>
+                                        {activity.status === 'success' ? 'Verified' : 'Pending'}
+                                    </Text>
+                                </View>
                             </TouchableOpacity>
                         ))}
                     </Animated.View>
@@ -236,53 +231,52 @@ const styles = StyleSheet.create({
         gap: SPACING.sm,
         marginBottom: SPACING.lg,
     },
-    statCard: {
-        flex: 1,
-        backgroundColor: COLORS.surface,
-        borderRadius: BORDER_RADIUS.xl,
-        padding: SPACING.md,
-        alignItems: 'center',
-        ...SHADOWS.sm,
+    heroCard: {
+        paddingHorizontal: SPACING.lg,
+        marginBottom: SPACING.xl,
     },
-    statIcon: {
-        width: 44,
-        height: 44,
-        borderRadius: 14,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: SPACING.sm,
-    },
-    statValue: { fontSize: FONT_SIZES.xl, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary },
-    statLabel: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: 2 },
-    reportSection: { paddingHorizontal: SPACING.lg, marginBottom: SPACING.lg },
-    reportGradient: {
+    heroGradient: {
         borderRadius: BORDER_RADIUS.xl,
-        padding: SPACING.lg,
+        padding: SPACING.xl,
+        position: 'relative',
+        overflow: 'hidden',
+        ...SHADOWS.md,
+    },
+    heroCardLabel: {
+        fontSize: FONT_SIZES.sm,
+        color: 'rgba(255,255,255,0.9)',
+        fontWeight: FONT_WEIGHTS.medium,
+        marginBottom: SPACING.xs,
+    },
+    heroCardValue: {
+        fontSize: 40,
+        fontWeight: FONT_WEIGHTS.extrabold,
+        color: '#FFFFFF',
+        marginBottom: SPACING.lg,
+        letterSpacing: -1,
+    },
+    heroCardAction: {
+        alignSelf: 'flex-start',
         flexDirection: 'row',
         alignItems: 'center',
-        ...SHADOWS.lg,
+        backgroundColor: 'rgba(255,255,255,0.25)',
+        paddingVertical: SPACING.sm,
+        paddingHorizontal: SPACING.md,
+        borderRadius: BORDER_RADIUS.full,
+        gap: 8,
     },
-    reportIconCircle: {
-        width: 52,
-        height: 52,
-        borderRadius: 16,
-        backgroundColor: 'rgba(255,255,255,0.9)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: SPACING.md,
-    },
-    reportTextContainer: { flex: 1 },
-    reportButtonTitle: {
-        fontSize: FONT_SIZES.lg,
-        fontWeight: FONT_WEIGHTS.bold,
+    heroCardActionText: {
         color: '#FFFFFF',
-        marginBottom: 2,
+        fontSize: FONT_SIZES.sm,
+        fontWeight: FONT_WEIGHTS.semibold,
     },
-    reportButtonSubtitle: {
-        fontSize: FONT_SIZES.xs,
-        color: 'rgba(255,255,255,0.8)',
+    heroBgIcon: {
+        position: 'absolute',
+        right: -20,
+        bottom: -20,
+        transform: [{ rotate: '-15deg' }],
     },
-    section: { paddingHorizontal: SPACING.lg, marginBottom: SPACING.md },
+    section: { paddingHorizontal: SPACING.lg, marginBottom: SPACING.xl },
     sectionHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -290,53 +284,69 @@ const styles = StyleSheet.create({
         marginBottom: SPACING.md,
     },
     sectionTitle: { fontSize: FONT_SIZES.lg, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary },
-    seeAll: { fontSize: FONT_SIZES.sm, color: COLORS.primary, fontWeight: FONT_WEIGHTS.medium },
-    activityCard: {
+    seeAll: { fontSize: FONT_SIZES.sm, color: COLORS.primary, fontWeight: FONT_WEIGHTS.semibold },
+    actionsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: SPACING.md,
+    },
+    actionCard: {
+        width: '47%',
+        backgroundColor: COLORS.surface,
+        borderRadius: BORDER_RADIUS.lg,
+        padding: SPACING.lg,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        ...SHADOWS.sm,
+        gap: SPACING.sm,
+    },
+    actionIcon: {
+        width: 48,
+        height: 48,
+        borderRadius: BORDER_RADIUS.md,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    actionTitle: {
+        fontSize: FONT_SIZES.sm,
+        fontWeight: FONT_WEIGHTS.semibold,
+        color: COLORS.textPrimary,
+        marginBottom: 2,
+    },
+    actionDesc: {
+        fontSize: FONT_SIZES.xs,
+        color: COLORS.textSecondary,
+    },
+    activityCardNew: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: COLORS.surface,
         borderRadius: BORDER_RADIUS.lg,
         padding: SPACING.md,
         marginBottom: SPACING.sm,
+        borderWidth: 1,
+        borderColor: COLORS.border,
         ...SHADOWS.sm,
+        gap: SPACING.md,
     },
-    activityIcon: {
-        width: 44,
-        height: 44,
-        borderRadius: 14,
+    activityAvatarBase: {
+        width: 50,
+        height: 50,
+        borderRadius: BORDER_RADIUS.md,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: SPACING.md,
     },
     activityContent: { flex: 1 },
-    activityType: { fontSize: FONT_SIZES.sm, fontWeight: FONT_WEIGHTS.semibold, color: COLORS.textPrimary },
-    activityDesc: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: 2 },
-    activityTime: { fontSize: FONT_SIZES.xs, color: COLORS.textTertiary },
-    informationGrid: {
-        flexDirection: 'row',
-        gap: SPACING.sm,
-        justifyContent: 'space-between',
+    activityType: { fontSize: FONT_SIZES.sm, fontWeight: FONT_WEIGHTS.semibold, color: COLORS.textPrimary, marginBottom: 4 },
+    activityMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    activityTime: { fontSize: 11, color: COLORS.textSecondary },
+    statusPill: {
+        paddingVertical: 4,
+        paddingHorizontal: 10,
+        borderRadius: BORDER_RADIUS.full,
     },
-    infoCard: {
-        flex: 1,
-        backgroundColor: COLORS.surface,
-        borderRadius: BORDER_RADIUS.xl,
-        padding: SPACING.md,
-        alignItems: 'center',
-        ...SHADOWS.sm,
-    },
-    infoIconContainer: {
-        width: 52,
-        height: 52,
-        borderRadius: 16,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: SPACING.sm,
-    },
-    infoCardTitle: {
-        fontSize: FONT_SIZES.xs,
-        fontWeight: FONT_WEIGHTS.semibold,
-        color: COLORS.textPrimary,
-        textAlign: 'center',
+    statusPillText: {
+        fontSize: 10,
+        fontWeight: FONT_WEIGHTS.bold,
     },
 });

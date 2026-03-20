@@ -53,9 +53,7 @@ export default function RoleSelection({ navigation }) {
                 showsVerticalScrollIndicator={false}
             >
                 <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
-                    <View style={styles.logoContainer}>
-                        <Text style={styles.logoEmoji}>🚦</Text>
-                    </View>
+
                     <Text style={styles.title}>Choose Your Role</Text>
                     <Text style={styles.subtitle}>
                         Select how you'd like to use TrafficEye
@@ -158,18 +156,7 @@ const styles = StyleSheet.create({
         paddingBottom: SPACING.xl,
         alignItems: 'center',
     },
-    logoContainer: {
-        width: 64,
-        height: 64,
-        borderRadius: 20,
-        backgroundColor: `${COLORS.primary}10`,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: SPACING.lg,
-    },
-    logoEmoji: {
-        fontSize: 32,
-    },
+
     title: {
         fontSize: FONT_SIZES.xxxl,
         fontWeight: FONT_WEIGHTS.bold,

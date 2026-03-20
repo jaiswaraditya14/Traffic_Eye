@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MobileContainer } from '../../components';
@@ -439,6 +439,14 @@ export default function FineInformation({ navigation }) {
                     <View style={styles.placeholder} />
                 </View>
 
+                {/* Hero Graphic */}
+                <View style={styles.heroContainer}>
+                    <Image source={{ uri: 'https://images.unsplash.com/photo-1549317336-206569e8475c?auto=format&fit=crop&w=800&q=80' }} style={styles.heroImage} />
+                    <View style={styles.heroOverlay}>
+                        <Text style={styles.heroText}>Official Penalty Data</Text>
+                    </View>
+                </View>
+
                 {/* Search Bar */}
                 <View style={styles.searchContainer}>
                     <Ionicons name="search" size={20} color={COLORS.textSecondary} style={styles.searchIcon} />
@@ -524,6 +532,32 @@ const styles = StyleSheet.create({
     },
     placeholder: {
         width: 40,
+    },
+    heroContainer: {
+        height: 140,
+        marginHorizontal: SPACING.lg,
+        marginTop: SPACING.lg,
+        borderRadius: BORDER_RADIUS.lg,
+        overflow: 'hidden',
+        ...SHADOWS.md,
+    },
+    heroImage: {
+        width: '100%',
+        height: '100%',
+    },
+    heroOverlay: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        paddingVertical: SPACING.sm,
+        paddingHorizontal: SPACING.md,
+    },
+    heroText: {
+        color: COLORS.white,
+        fontWeight: FONT_WEIGHTS.bold,
+        fontSize: FONT_SIZES.md,
     },
     searchContainer: {
         flexDirection: 'row',
