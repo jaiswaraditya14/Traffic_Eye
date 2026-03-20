@@ -1,29 +1,37 @@
 // OfficerProfile.js
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MobileContainer } from '../../components';
-import { useAppContext } from '../../context/AppContext';
-import { useAuth } from '../../context/AuthContext';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, GRADIENTS } from '../../utils/theme';
+import { useAppContext, useAuth } from '../../context';
+import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS } from '../../utils';
 
 export default function OfficerProfile({ navigation }) {
     const { setIsAuthenticated, setUserRole } = useAppContext();
     const { profile, signOut } = useAuth();
     const [loggingOut, setLoggingOut] = useState(false);
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+        }).start();
+    }, []);
 
     const stats = [
-        { label: 'Verified', value: '156', icon: 'checkmark-circle', color: COLORS.success, bg: COLORS.successSurface },
-        { label: 'Rejected', value: '24', icon: 'close-circle', color: COLORS.error, bg: COLORS.errorSurface },
-        { label: 'This Month', value: '45', icon: 'calendar', color: COLORS.info, bg: COLORS.infoSurface },
+        { label: 'Verified', value: '156', icon: 'checkmark-circle', color: COLORS.success },
+        { label: 'Rejected', value: '24', icon: 'close-circle', color: COLORS.error },
+        { label: 'This Month', value: '45', icon: 'calendar', color: COLORS.info },
     ];
 
     const settingsItems = [
-        { icon: 'settings-outline', label: 'App Settings', description: 'Configure app preferences', screen: 'OfficerSettings', color: COLORS.primary },
-        { icon: 'chatbubbles-outline', label: 'Contact Administrator', description: 'Technical support & issues', action: 'contact', color: COLORS.secondary },
-        { icon: 'help-circle-outline', label: 'Help Center', description: 'Guidelines & documentation', action: 'help', color: COLORS.accent },
+        { icon: 'settings-outline', label: 'App Settings', description: 'Configure application preferences', screen: 'OfficerSettings', color: COLORS.secondary },
+        { icon: 'chatbubbles-outline', label: 'Contact Administrator', description: 'Technical support & account issues', action: 'contact', color: COLORS.primary },
+        { icon: 'help-circle-outline', label: 'Help Center', description: 'Guidelines and documentation', action: 'help', color: COLORS.accent },
     ];
 
     const handleAction = (item) => {
@@ -79,53 +87,42 @@ export default function OfficerProfile({ navigation }) {
     return (
         <MobileContainer>
             <SafeAreaView style={styles.container} edges={['top']}>
-                <ScrollView showsVerticalScrollIndicator={false}>
-                    {/* Hero Header */}
-                    <LinearGradient
-                        colors={GRADIENTS.secondary}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.heroHeader}
-                    >
-                        <Text style={styles.headerTitle}>Officer Profile</Text>
-                        <View style={styles.avatarContainer}>
+                <Animated.View style={{ opacity: fadeAnim, flex: 1 }}>
+                    <View style={styles.header}>
+                        <Text style={styles.title}>Officer Profile</Text>
+                    </View>
+                    <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                        <View style={styles.profileCard}>
                             <View style={styles.avatar}>
-                                <Text style={styles.avatarText}>{initials}</Text>
+                                <Text style={styles.avatarText}>
+                                    {displayName.charAt(0).toUpperCase()}
+                                </Text>
                             </View>
-                            <View style={styles.shieldBadge}>
-                                <Ionicons name="shield-checkmark" size={16} color={COLORS.secondary} />
+                            <Text style={styles.name}>{displayName}</Text>
+                            <View style={styles.badgeContainer}>
+                                <Ionicons name="id-card" size={14} color={COLORS.secondary} />
+                                <Text style={styles.badgeId}>Badge #{displayBadge}</Text>
                             </View>
-                        </View>
-                        <Text style={styles.name}>{displayName}</Text>
-                        <View style={styles.badgeContainer}>
-                            <Ionicons name="id-card" size={14} color="rgba(255,255,255,0.8)" />
-                            <Text style={styles.badgeId}>Badge #{displayBadge}</Text>
-                        </View>
-                    </LinearGradient>
+                            <Text style={styles.email}>{displayEmail}</Text>
 
-                    <View style={styles.content}>
-                        {/* Info Row */}
-                        <View style={styles.infoRow}>
-                            <View style={styles.infoItem}>
-                                <Ionicons name="mail" size={16} color={COLORS.textTertiary} />
-                                <Text style={styles.infoText}>{displayEmail}</Text>
-                            </View>
-                            <View style={styles.infoItem}>
-                                <Ionicons name="business" size={16} color={COLORS.textTertiary} />
-                                <Text style={styles.infoText}>{displayDepartment}</Text>
-                            </View>
-                            <View style={styles.infoItem}>
-                                <Ionicons name="location" size={16} color={COLORS.textTertiary} />
-                                <Text style={styles.infoText}>{displayJurisdiction}</Text>
+                            <View style={styles.infoRow}>
+                                <View style={styles.infoItem}>
+                                    <Ionicons name="business" size={14} color={COLORS.textSecondary} />
+                                    <Text style={styles.infoText}>{displayDepartment}</Text>
+                                </View>
+                                <View style={styles.infoDot} />
+                                <View style={styles.infoItem}>
+                                    <Ionicons name="location" size={14} color={COLORS.textSecondary} />
+                                    <Text style={styles.infoText}>{displayJurisdiction}</Text>
+                                </View>
                             </View>
                         </View>
 
-                        {/* Stats */}
                         <View style={styles.statsContainer}>
                             {stats.map((stat, index) => (
                                 <View key={index} style={styles.statCard}>
-                                    <View style={[styles.statIcon, { backgroundColor: stat.bg }]}>
-                                        <Ionicons name={stat.icon} size={22} color={stat.color} />
+                                    <View style={[styles.statIconBox, { backgroundColor: `${stat.color}10` }]}>
+                                        <Ionicons name={stat.icon} size={24} color={stat.color} />
                                     </View>
                                     <Text style={styles.statValue}>{stat.value}</Text>
                                     <Text style={styles.statLabel}>{stat.label}</Text>
@@ -133,29 +130,27 @@ export default function OfficerProfile({ navigation }) {
                             ))}
                         </View>
 
-                        {/* Settings */}
-                        <Text style={styles.sectionTitle}>Settings & Support</Text>
-                        {settingsItems.map((item, index) => (
-                            <TouchableOpacity
-                                key={index}
-                                style={styles.settingCard}
-                                onPress={() => item.action ? handleAction(item) : navigation.getParent()?.navigate(item.screen) ?? navigation.navigate(item.screen)}
-                                activeOpacity={0.7}
-                            >
-                                <View style={[styles.settingIcon, { backgroundColor: `${item.color}12` }]}>
-                                    <Ionicons name={item.icon} size={20} color={item.color} />
-                                </View>
-                                <View style={styles.settingContent}>
-                                    <Text style={styles.settingLabel}>{item.label}</Text>
-                                    <Text style={styles.settingDesc}>{item.description}</Text>
-                                </View>
-                                <View style={styles.settingChevron}>
-                                    <Ionicons name="chevron-forward" size={16} color={COLORS.textTertiary} />
-                                </View>
-                            </TouchableOpacity>
-                        ))}
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Settings & Support</Text>
+                            {settingsItems.map((item, index) => (
+                                <TouchableOpacity
+                                    key={index}
+                                    style={styles.settingCard}
+                                    onPress={() => item.action ? handleAction(item) : navigation.navigate(item.screen)}
+                                    activeOpacity={0.7}
+                                >
+                                    <View style={[styles.settingIcon, { backgroundColor: `${item.color}10` }]}>
+                                        <Ionicons name={item.icon} size={20} color={item.color} />
+                                    </View>
+                                    <View style={styles.settingContent}>
+                                        <Text style={styles.settingLabel}>{item.label}</Text>
+                                        <Text style={styles.settingDescription}>{item.description}</Text>
+                                    </View>
+                                    <Ionicons name="chevron-forward" size={18} color={COLORS.textTertiary} />
+                                </TouchableOpacity>
+                            ))}
+                        </View>
 
-                        {/* Logout */}
                         <TouchableOpacity
                             style={styles.logoutButton}
                             onPress={handleLogout}
@@ -165,212 +160,121 @@ export default function OfficerProfile({ navigation }) {
                             {loggingOut ? (
                                 <ActivityIndicator size="small" color={COLORS.error} />
                             ) : (
-                                <Ionicons name="log-out" size={20} color={COLORS.error} />
+                                <Ionicons name="log-out-outline" size={22} color={COLORS.error} />
                             )}
                             <Text style={styles.logoutText}>
                                 {loggingOut ? 'Logging out...' : 'Logout'}
                             </Text>
                         </TouchableOpacity>
-                    </View>
-                </ScrollView>
+                    </ScrollView>
+                </Animated.View>
             </SafeAreaView>
         </MobileContainer>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: COLORS.background,
-    },
-    // ── Hero ──
-    heroHeader: {
-        paddingTop: SPACING.xl,
-        paddingBottom: SPACING.xxl,
-        paddingHorizontal: SPACING.xl,
+    container: { flex: 1, backgroundColor: COLORS.background },
+    header: { paddingHorizontal: SPACING.lg, paddingVertical: SPACING.lg },
+    title: { fontSize: FONT_SIZES.xxl, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary },
+    content: { flex: 1, paddingHorizontal: SPACING.lg },
+    profileCard: {
+        backgroundColor: COLORS.surface,
+        borderRadius: BORDER_RADIUS.xl,
+        padding: SPACING.xl,
         alignItems: 'center',
-    },
-    headerTitle: {
-        fontSize: FONT_SIZES.sm,
-        color: 'rgba(255,255,255,0.7)',
-        fontWeight: FONT_WEIGHTS.medium,
-        textTransform: 'uppercase',
-        letterSpacing: 1,
-        alignSelf: 'flex-start',
-        marginBottom: SPACING.xl,
-    },
-    avatarContainer: {
-        position: 'relative',
-        marginBottom: SPACING.md,
+        marginBottom: SPACING.lg,
+        ...SHADOWS.md,
     },
     avatar: {
         width: 88,
         height: 88,
-        borderRadius: 44,
-        backgroundColor: 'rgba(255,255,255,0.2)',
+        borderRadius: 28,
+        backgroundColor: COLORS.secondary,
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 3,
-        borderColor: 'rgba(255,255,255,0.3)',
+        marginBottom: SPACING.md,
     },
     avatarText: {
-        fontSize: FONT_SIZES.xxl,
+        fontSize: FONT_SIZES.xxxl,
         fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.white,
+        color: '#FFFFFF',
     },
-    shieldBadge: {
-        position: 'absolute',
-        bottom: 0,
-        right: -4,
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: COLORS.white,
-        justifyContent: 'center',
-        alignItems: 'center',
-        ...SHADOWS.md,
-    },
-    name: {
-        fontSize: FONT_SIZES.xl,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.white,
-        marginBottom: SPACING.xs,
-    },
+    name: { fontSize: FONT_SIZES.xl, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary, marginBottom: SPACING.xs },
     badgeContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: SPACING.xs,
+        backgroundColor: COLORS.secondarySoft || '#ECFDF5',
+        paddingHorizontal: SPACING.md,
+        paddingVertical: SPACING.xs + 2,
+        borderRadius: BORDER_RADIUS.full,
+        marginBottom: SPACING.sm,
     },
-    badgeId: {
-        fontSize: FONT_SIZES.sm,
-        color: 'rgba(255,255,255,0.8)',
-        fontWeight: FONT_WEIGHTS.medium,
-    },
-    // ── Content ──
-    content: {
-        paddingHorizontal: SPACING.xl,
-        paddingTop: SPACING.xl,
-    },
+    badgeId: { fontSize: FONT_SIZES.sm, fontWeight: FONT_WEIGHTS.semibold, color: COLORS.secondary },
+    email: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginBottom: SPACING.md },
     infoRow: {
-        backgroundColor: COLORS.surface,
-        borderRadius: BORDER_RADIUS.xl,
-        padding: SPACING.lg,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        gap: SPACING.md,
-        marginBottom: SPACING.lg,
-        ...SHADOWS.xs,
-    },
-    infoItem: {
         flexDirection: 'row',
+        justifyContent: 'center',
         alignItems: 'center',
-        gap: SPACING.md,
+        gap: SPACING.sm,
+        marginTop: SPACING.xs,
     },
-    infoText: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.textSecondary,
-    },
-    // ── Stats ──
-    statsContainer: {
-        flexDirection: 'row',
-        gap: SPACING.md,
-        marginBottom: SPACING.xl,
-    },
+    infoItem: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
+    infoDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: COLORS.textTertiary },
+    infoText: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary },
+    statsContainer: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.lg },
     statCard: {
         flex: 1,
         backgroundColor: COLORS.surface,
         borderRadius: BORDER_RADIUS.xl,
-        padding: SPACING.lg,
+        padding: SPACING.md,
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        ...SHADOWS.xs,
+        ...SHADOWS.sm,
     },
-    statIcon: {
+    statIconBox: {
         width: 44,
         height: 44,
-        borderRadius: BORDER_RADIUS.lg,
+        borderRadius: 14,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: SPACING.sm,
+        marginBottom: SPACING.xs,
     },
-    statValue: {
-        fontSize: FONT_SIZES.xl,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
-    },
-    statLabel: {
-        fontSize: FONT_SIZES.xxs,
-        color: COLORS.textTertiary,
-        fontWeight: FONT_WEIGHTS.medium,
-        textAlign: 'center',
-        marginTop: 2,
-    },
-    // ── Settings ──
-    sectionTitle: {
-        fontSize: FONT_SIZES.lg,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
-        marginBottom: SPACING.lg,
-        letterSpacing: -0.2,
-    },
+    statValue: { fontSize: FONT_SIZES.xl, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary, marginTop: SPACING.xs },
+    statLabel: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, textAlign: 'center', marginTop: 2 },
+    section: { marginBottom: SPACING.lg },
+    sectionTitle: { fontSize: FONT_SIZES.md, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary, marginBottom: SPACING.md },
     settingCard: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: COLORS.surface,
-        borderRadius: BORDER_RADIUS.xl,
-        padding: SPACING.lg,
-        marginBottom: SPACING.sm,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        ...SHADOWS.xs,
+        borderRadius: BORDER_RADIUS.lg,
+        padding: SPACING.md,
+        marginBottom: SPACING.xs,
+        ...SHADOWS.sm,
     },
     settingIcon: {
         width: 40,
         height: 40,
-        borderRadius: BORDER_RADIUS.md,
+        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: SPACING.md,
     },
-    settingContent: {
-        flex: 1,
-    },
-    settingLabel: {
-        fontSize: FONT_SIZES.md,
-        fontWeight: FONT_WEIGHTS.semibold,
-        color: COLORS.textPrimary,
-        marginBottom: 2,
-    },
-    settingDesc: {
-        fontSize: FONT_SIZES.xs,
-        color: COLORS.textSecondary,
-    },
-    settingChevron: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        backgroundColor: COLORS.gray50,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    // ── Logout ──
+    settingContent: { flex: 1 },
+    settingLabel: { fontSize: FONT_SIZES.md, fontWeight: FONT_WEIGHTS.semibold, color: COLORS.textPrimary },
+    settingDescription: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: 2 },
     logoutButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap: SPACING.sm,
-        padding: SPACING.lg,
-        backgroundColor: COLORS.errorSurface,
-        borderRadius: BORDER_RADIUS.xl,
-        marginTop: SPACING.md,
+        padding: SPACING.md,
+        backgroundColor: `${COLORS.error}08`,
+        borderRadius: BORDER_RADIUS.lg,
         marginBottom: SPACING.xxl,
         borderWidth: 1,
-        borderColor: `${COLORS.error}20`,
+        borderColor: `${COLORS.error}15`,
     },
-    logoutText: {
-        fontSize: FONT_SIZES.md,
-        fontWeight: FONT_WEIGHTS.semibold,
-        color: COLORS.error,
-    },
+    logoutText: { fontSize: FONT_SIZES.md, fontWeight: FONT_WEIGHTS.semibold, color: COLORS.error },
 });

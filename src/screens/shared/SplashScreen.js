@@ -1,255 +1,184 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, ImageBackground, Dimensions } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import { useAppContext } from '../../context/AppContext';
-import { COLORS, FONT_SIZES, FONT_WEIGHTS, SPACING } from '../../utils/theme';
-
-const { width, height } = Dimensions.get('window');
+import { COLORS, FONT_SIZES, FONT_WEIGHTS, SPACING, SCREEN_WIDTH, SCREEN_HEIGHT } from '../../utils/theme';
 
 export default function SplashScreen({ navigation }) {
     const { setShowSplash } = useAppContext();
-    const logoScale = useRef(new Animated.Value(0.5)).current;
-    const logoOpacity = useRef(new Animated.Value(0)).current;
-    const textOpacity = useRef(new Animated.Value(0)).current;
-    const subtitleOpacity = useRef(new Animated.Value(0)).current;
-    const bgOpacity = useRef(new Animated.Value(0)).current;
-    const shimmer = useRef(new Animated.Value(0)).current;
+    const appOpacityAnim = useRef(new Animated.Value(1)).current; // Root opacity for seamless fade out
+    // Start at 1 for scale to seamlessly match the static native splash image from Expo
+    const fadeAnim = useRef(new Animated.Value(1)).current;
+    const scaleAnim = useRef(new Animated.Value(1.0)).current;
+    const contentFadeAnim = useRef(new Animated.Value(0)).current;
+    const contentSlideAnim = useRef(new Animated.Value(20)).current;
+    const loadingAnim = useRef(new Animated.Value(0)).current; // For the loading bar
 
     useEffect(() => {
-        // Background fade in first
-        Animated.timing(bgOpacity, {
-            toValue: 1,
-            duration: 600,
+        // Subtle, smooth zoom effect extending off the native splash
+        Animated.timing(scaleAnim, {
+            toValue: 1.05,
+            duration: 6000,
             useNativeDriver: true,
         }).start();
 
-        // Entrance animations
-        Animated.sequence([
-            Animated.delay(300),
-            Animated.parallel([
-                Animated.spring(logoScale, {
-                    toValue: 1,
-                    tension: 50,
-                    friction: 7,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(logoOpacity, {
-                    toValue: 1,
-                    duration: 400,
-                    useNativeDriver: true,
-                }),
-            ]),
-            Animated.timing(textOpacity, {
-                toValue: 1,
-                duration: 300,
-                useNativeDriver: true,
-            }),
-            Animated.timing(subtitleOpacity, {
-                toValue: 1,
-                duration: 200,
-                useNativeDriver: true,
-            }),
-        ]).start();
+        // Loading bar animation
+        Animated.timing(loadingAnim, {
+            toValue: 1,
+            duration: 4000,
+            useNativeDriver: false,
+        }).start();
 
-        // Shimmer loop
-        Animated.loop(
-            Animated.sequence([
-                Animated.timing(shimmer, {
+        // Delay content so the native to JS transition is completely imperceptible
+        Animated.sequence([
+            Animated.delay(800),
+            Animated.parallel([
+                Animated.timing(contentFadeAnim, {
                     toValue: 1,
-                    duration: 1000,
+                    duration: 1200,
                     useNativeDriver: true,
                 }),
-                Animated.timing(shimmer, {
+                Animated.timing(contentSlideAnim, {
                     toValue: 0,
-                    duration: 1000,
+                    duration: 1200,
                     useNativeDriver: true,
                 }),
             ])
-        ).start();
+        ]).start();
 
         const timer = setTimeout(() => {
-            setShowSplash(false);
-        }, 8000);
+            // Smoothly fade out the entire splash screen into the main app
+            Animated.timing(appOpacityAnim, {
+                toValue: 0,
+                duration: 600,
+                useNativeDriver: true,
+            }).start(() => {
+                setShowSplash(false);
+            });
+        }, 4500);
 
         return () => clearTimeout(timer);
     }, []);
 
+    const loadingWidth = loadingAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0%', '100%']
+    });
+
     return (
-        <View style={styles.container}>
-            {/* Background image — 2.jpg traffic signal */}
-            <Animated.View style={[styles.bgImageContainer, { opacity: bgOpacity }]}>
-                <ImageBackground
-                    source={require('../../../assets/images/2.jpg')}
-                    style={styles.bgImage}
-                    resizeMode="cover"
-                >
-                    {/* Dark gradient overlay for readability */}
-                    <LinearGradient
-                        colors={[
-                            'rgba(8, 28, 36, 0.75)',
-                            'rgba(8, 28, 36, 0.6)',
-                            'rgba(8, 28, 36, 0.85)',
-                            'rgba(8, 28, 36, 0.95)',
-                        ]}
-                        locations={[0, 0.3, 0.7, 1]}
-                        style={styles.overlay}
-                    />
-                </ImageBackground>
-            </Animated.View>
+        <Animated.View style={[styles.container, { opacity: appOpacityAnim }]}>
+            <Animated.Image
+                source={require('../../../assets/s-s.png')}
+                style={[
+                    styles.backgroundImage,
+                    {
+                        opacity: fadeAnim,
+                        transform: [{ scale: scaleAnim }],
+                    },
+                ]}
+                resizeMode="cover"
+            />
 
-            {/* Decorative glowing circles matching traffic light colors */}
-            <Animated.View style={[styles.glowRed, { opacity: shimmer }]} />
-            <View style={styles.glowGreen} />
-
-            <View style={styles.content}>
-                {/* Logo Icon */}
+            <View style={styles.overlay}>
                 <Animated.View style={[
-                    styles.iconContainer,
-                    { transform: [{ scale: logoScale }], opacity: logoOpacity },
+                    styles.content,
+                    {
+                        opacity: contentFadeAnim,
+                        transform: [{ translateY: contentSlideAnim }],
+                    },
                 ]}>
-                    <View style={styles.iconOuter}>
-                        <View style={styles.iconInner}>
-                            <Text style={styles.icon}>🚦</Text>
-                        </View>
+
+                    <Text style={styles.title}>TrafficEye</Text>
+                    <Text style={styles.subtitle}>Smart Violation Reporting</Text>
+
+                    <View style={styles.taglineBox}>
+                        <View style={styles.dot} />
+                        <Text style={styles.taglineText}>REDEFINING ROAD SAFETY</Text>
+                        <View style={styles.dot} />
                     </View>
                 </Animated.View>
 
-                {/* App Name */}
-                <Animated.Text style={[styles.title, { opacity: textOpacity }]}>
-                    Traffic<Text style={styles.titleAccent}>Eye</Text>
-                </Animated.Text>
-
-                {/* Tagline */}
-                <Animated.Text style={[styles.subtitle, { opacity: subtitleOpacity }]}>
-                    Smart Violation Reporting
-                </Animated.Text>
-
-                {/* Divider line */}
-                <Animated.View style={[styles.divider, { opacity: subtitleOpacity }]} />
-
-                {/* Version badge */}
-                <Animated.View style={[styles.versionBadge, { opacity: subtitleOpacity }]}>
-                    <Ionicons name="shield-checkmark" size={12} color="#2DD4BF" />
-                    <Text style={styles.versionText}>AI-Powered • Secure</Text>
-                </Animated.View>
+                <View style={styles.footer}>
+                    <View style={styles.loadingTrack}>
+                        <Animated.View style={[styles.loadingBar, { width: loadingWidth }]} />
+                    </View>
+                </View>
             </View>
-        </View>
+        </Animated.View>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#081C24',
+        backgroundColor: '#050309',
     },
-    bgImageContainer: {
+    backgroundImage: {
+        width: SCREEN_WIDTH,
+        height: SCREEN_HEIGHT,
         position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-    },
-    bgImage: {
-        flex: 1,
-        width: '100%',
-        height: '100%',
     },
     overlay: {
         flex: 1,
-    },
-    // Traffic-light inspired glowing decorations
-    glowRed: {
-        position: 'absolute',
-        width: 200,
-        height: 200,
-        borderRadius: 100,
-        backgroundColor: 'rgba(239, 68, 68, 0.08)',
-        top: height * 0.1,
-        right: -40,
-    },
-    glowGreen: {
-        position: 'absolute',
-        width: 160,
-        height: 160,
-        borderRadius: 80,
-        backgroundColor: 'rgba(45, 212, 191, 0.06)',
-        bottom: height * 0.15,
-        left: -30,
+        backgroundColor: 'rgba(5, 3, 9, 0.4)', // Premium dark overlay matching image
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        paddingBottom: 160,
     },
     content: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: SPACING.xl,
-    },
-    iconContainer: {
-        marginBottom: SPACING.xxl,
-    },
-    iconOuter: {
-        width: 130,
-        height: 130,
-        borderRadius: 36,
-        backgroundColor: 'rgba(45, 212, 191, 0.12)',
-        borderWidth: 1,
-        borderColor: 'rgba(45, 212, 191, 0.2)',
-        justifyContent: 'center',
         alignItems: 'center',
     },
-    iconInner: {
-        width: 100,
-        height: 100,
-        borderRadius: 28,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    icon: {
-        fontSize: 52,
-    },
+
     title: {
-        fontSize: 40,
-        fontWeight: FONT_WEIGHTS.extrabold,
+        fontSize: 48,
+        fontWeight: '800',
         color: '#FFFFFF',
-        marginBottom: SPACING.sm,
-        letterSpacing: -1,
-    },
-    titleAccent: {
-        color: '#2DD4BF',
+        letterSpacing: 1,
+        marginBottom: 4,
+        textShadowColor: 'rgba(0, 0, 0, 0.4)',
+        textShadowOffset: { width: 0, height: 4 },
+        textShadowRadius: 10,
     },
     subtitle: {
-        fontSize: FONT_SIZES.sm,
-        color: 'rgba(255, 255, 255, 0.6)',
-        fontWeight: FONT_WEIGHTS.medium,
-        letterSpacing: 3,
-        textTransform: 'uppercase',
+        fontSize: 18,
+        color: 'rgba(255, 255, 255, 0.8)',
+        fontWeight: '500',
+        letterSpacing: 0.5,
+        marginBottom: SPACING.xl,
     },
-    divider: {
-        width: 50,
-        height: 3,
-        backgroundColor: '#2DD4BF',
-        borderRadius: 2,
-        marginTop: SPACING.xl,
-        opacity: 0.6,
-    },
-    versionBadge: {
+    taglineBox: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        marginTop: SPACING.lg,
-        paddingHorizontal: SPACING.md,
-        paddingVertical: SPACING.xs + 2,
-        borderRadius: 20,
-        backgroundColor: 'rgba(45, 212, 191, 0.08)',
-        borderWidth: 1,
-        borderColor: 'rgba(45, 212, 191, 0.15)',
+        gap: 12,
+        opacity: 0.7,
     },
-    versionText: {
-        fontSize: FONT_SIZES.xxs,
-        color: 'rgba(255, 255, 255, 0.5)',
-        fontWeight: FONT_WEIGHTS.medium,
-        letterSpacing: 0.5,
+    dot: {
+        width: 4,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: '#FFFFFF',
+    },
+    taglineText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '700',
+        letterSpacing: 3,
+    },
+    footer: {
+        position: 'absolute',
+        bottom: 80,
+        width: '100%',
+        alignItems: 'center',
+    },
+    loadingTrack: {
+        width: 140,
+        height: 4,
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        borderRadius: 2,
+        overflow: 'hidden',
+    },
+    loadingBar: {
+        height: '100%',
+        backgroundColor: COLORS.primary || '#3B82F6',
+        borderRadius: 2,
     },
 });

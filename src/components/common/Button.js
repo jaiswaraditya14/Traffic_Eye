@@ -1,7 +1,6 @@
-import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, GRADIENTS } from '../../utils/theme';
+import React, { useRef } from 'react';
+import { Animated, Text, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
+import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, ANIMATION } from '../../utils/theme';
 
 export const Button = ({
     children,
@@ -16,8 +15,25 @@ export const Button = ({
     style,
     textStyle,
 }) => {
-    const isPrimary = variant === 'primary';
-    const isGradient = isPrimary && !disabled;
+    const scaleAnim = useRef(new Animated.Value(1)).current;
+
+    const handlePressIn = () => {
+        Animated.spring(scaleAnim, {
+            toValue: 0.97,
+            useNativeDriver: true,
+            speed: 50,
+            bounciness: 4,
+        }).start();
+    };
+
+    const handlePressOut = () => {
+        Animated.spring(scaleAnim, {
+            toValue: 1,
+            useNativeDriver: true,
+            speed: 50,
+            bounciness: 4,
+        }).start();
+    };
 
     const buttonStyles = [
         styles.button,
@@ -78,14 +94,23 @@ export const Button = ({
     }
 
     return (
-        <TouchableOpacity
-            style={buttonStyles}
-            onPress={onPress}
-            disabled={disabled || loading}
-            activeOpacity={0.7}
-        >
-            {renderContent()}
-        </TouchableOpacity>
+        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+            <Pressable
+                style={buttonStyles}
+                onPress={onPress}
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+                disabled={disabled || loading}
+            >
+                {loading ? (
+                    <ActivityIndicator color={variant === 'primary' ? '#FFFFFF' : COLORS.primary} />
+                ) : typeof children === 'string' ? (
+                    <Text style={textStyles}>{children}</Text>
+                ) : (
+                    children
+                )}
+            </Pressable>
+        </Animated.View>
     );
 };
 
@@ -117,12 +142,14 @@ const styles = StyleSheet.create({
     },
     ghost: {
         backgroundColor: 'transparent',
+        shadowColor: 'transparent',
+        elevation: 0,
     },
     danger: {
         backgroundColor: COLORS.error,
     },
     success: {
-        backgroundColor: COLORS.success,
+        backgroundColor: COLORS.secondary,
     },
     soft: {
         backgroundColor: COLORS.primarySurface,
@@ -131,17 +158,17 @@ const styles = StyleSheet.create({
     // ── Sizes ──
     size_sm: {
         paddingVertical: SPACING.sm,
-        paddingHorizontal: SPACING.lg,
+        paddingHorizontal: SPACING.md,
         minHeight: 36,
     },
-    size_md: {
-        paddingVertical: SPACING.md,
-        paddingHorizontal: SPACING.xl,
+    md: {
+        paddingVertical: SPACING.md - 2,
+        paddingHorizontal: SPACING.lg,
         minHeight: 48,
     },
-    size_lg: {
-        paddingVertical: SPACING.lg,
-        paddingHorizontal: SPACING.xxl,
+    lg: {
+        paddingVertical: SPACING.lg - 4,
+        paddingHorizontal: SPACING.xl,
         minHeight: 56,
     },
 
@@ -160,7 +187,7 @@ const styles = StyleSheet.create({
     // ── Text styles ──
     text: {
         fontWeight: FONT_WEIGHTS.semibold,
-        letterSpacing: 0.2,
+        letterSpacing: 0.3,
     },
     primaryText: {
         color: '#FFFFFF',
@@ -168,7 +195,6 @@ const styles = StyleSheet.create({
     },
     secondaryText: {
         color: COLORS.textPrimary,
-        fontSize: FONT_SIZES.md,
     },
     outlineText: {
         color: COLORS.primary,

@@ -72,7 +72,7 @@ export default function EditProfile({ navigation }) {
                         <View style={styles.readOnlyContainer}>
                             <Text style={styles.readOnlyLabel}>Phone Number (Cannot be changed)</Text>
                             <View style={styles.readOnlyInput}>
-                                <Text style={styles.readOnlyText}>{phone || 'Not set'}</Text>
+                                <Text style={styles.readOnlyText}>{profile?.phone || user?.phone || 'Not available'}</Text>
                             </View>
                         </View>
 

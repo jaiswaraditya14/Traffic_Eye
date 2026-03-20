@@ -1,15 +1,12 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { MobileContainer, Button, Input } from '../../components';
 import { useAuth } from '../../context';
-import { supabase } from '../../services';
 import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, isValidEmail, validateRequiredFields } from '../../utils';
-
-WebBrowser.maybeCompleteAuthSession();
 
 export default function CitizenSignIn({ navigation }) {
     const [email, setEmail] = useState('');
@@ -18,7 +15,25 @@ export default function CitizenSignIn({ navigation }) {
     const [loading, setLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
 
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(30)).current;
+
     const { signIn, signInWithGoogle } = useAuth();
+
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 500,
+                useNativeDriver: true,
+            }),
+            Animated.timing(slideAnim, {
+                toValue: 0,
+                duration: 500,
+                useNativeDriver: true,
+            }),
+        ]).start();
+    }, []);
 
     const handleSignIn = async () => {
         const validation = validateRequiredFields({ Email: email, Password: password });
@@ -37,7 +52,16 @@ export default function CitizenSignIn({ navigation }) {
             const { error } = await signIn(email.trim(), password);
 
             if (error) {
-                Alert.alert('Sign In Failed', error.message || 'Invalid email or password');
+                // Check if email is not confirmed
+                if (error.message?.toLowerCase().includes('email not confirmed')) {
+                    Alert.alert(
+                        'Email Not Verified',
+                        'Please check your email and click the verification link before signing in.',
+                        [{ text: 'OK' }]
+                    );
+                } else {
+                    Alert.alert('Sign In Failed', error.message || 'Invalid email or password');
+                }
                 return;
             }
         } catch (error) {
@@ -49,69 +73,17 @@ export default function CitizenSignIn({ navigation }) {
     };
 
     const handleGoogleSignIn = async () => {
-        setGoogleLoading(true);
+        setLoading(true);
         try {
-            const redirectUri = AuthSession.makeRedirectUri({
-                scheme: 'trafficeye',
-                path: 'auth/callback'
-            });
-
-            console.log('1. [OAuth] Initiating with redirect URI:', redirectUri);
-
-            const { data, error } = await signInWithGoogle(redirectUri);
-
+            const { error } = await signInWithGoogle();
             if (error) {
-                console.log('2. [OAuth] Supabase Error:', error.message);
-                Alert.alert('Configuration Error', error.message);
-                throw error;
-            }
-
-            if (data?.url) {
-                console.log('3. [OAuth] Opening Browser at:', data.url);
-                const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
-                console.log('4. [OAuth] Browser Session Finished. Result Type:', result.type);
-
-                if (result.type === 'success' && result.url) {
-                    console.log('5. [OAuth] Success! URL received:', result.url);
-
-                    const getParam = (url, param) => {
-                        const regex = new RegExp(`[#|?|&]${param}=([^&]*)`);
-                        const match = url.match(regex);
-                        return match ? decodeURIComponent(match[1]) : null;
-                    };
-
-                    const access_token = getParam(result.url, 'access_token');
-                    const refresh_token = getParam(result.url, 'refresh_token');
-
-                    console.log('6. [OAuth] Tokens extracted:', !!access_token, !!refresh_token);
-
-                    if (access_token && refresh_token) {
-                        console.log('7. [OAuth] Setting session...');
-                        const { error: sessionError } = await supabase.auth.setSession({
-                            access_token,
-                            refresh_token,
-                        });
-
-                        if (sessionError) {
-                            console.error('8. [OAuth] Session Error:', sessionError);
-                            throw sessionError;
-                        }
-                        console.log('✅ Session set successfully');
-                    } else {
-                        throw new Error('No authentication tokens found in the redirect. Please try again.');
-                    }
-                } else if (result.type === 'cancel') {
-                    console.log('User cancelled the sign-in');
-                    Alert.alert('Cancelled', 'Sign in was cancelled');
-                } else {
-                    console.log('Unexpected result type:', result.type);
-                }
+                Alert.alert('Sign In Failed', error.message || 'Could not connect to Google');
             }
         } catch (error) {
             console.error('Google sign in error:', error);
-            Alert.alert('Error', error.message || 'Failed to sign in with Google');
+            Alert.alert('Error', 'An unexpected error occurred during Google Sign-In.');
         } finally {
-            setGoogleLoading(false);
+            setLoading(false);
         }
     };
 
@@ -122,22 +94,27 @@ export default function CitizenSignIn({ navigation }) {
                 style={styles.container}
             >
                 <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                    {/* Header */}
-                    <View style={styles.header}>
+                    <Animated.View style={[styles.header, {
+                        opacity: fadeAnim,
+                        transform: [{ translateY: slideAnim }],
+                    }]}>
                         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                            <View style={styles.backButtonInner}>
+                            <View style={styles.backButtonCircle}>
                                 <Ionicons name="arrow-back" size={20} color={COLORS.textPrimary} />
                             </View>
                         </TouchableOpacity>
 
-                        <View style={styles.headerTextContainer}>
-                            <Text style={styles.title}>Welcome Back</Text>
-                            <Text style={styles.subtitle}>Sign in to continue reporting violations</Text>
+                        <View style={styles.welcomeIcon}>
+                            <Ionicons name="person-circle" size={56} color={COLORS.primary} />
                         </View>
-                    </View>
+                        <Text style={styles.title}>Welcome Back</Text>
+                        <Text style={styles.subtitle}>Sign in to continue reporting violations</Text>
+                    </Animated.View>
 
-                    {/* Form */}
-                    <View style={styles.form}>
+                    <Animated.View style={[styles.form, {
+                        opacity: fadeAnim,
+                        transform: [{ translateY: slideAnim }],
+                    }]}>
                         <Input
                             label="Email"
                             placeholder="you@example.com"
@@ -147,7 +124,7 @@ export default function CitizenSignIn({ navigation }) {
                             autoCapitalize="none"
                         />
 
-                        <View>
+                        <View style={styles.passwordWrapper}>
                             <Input
                                 label="Password"
                                 placeholder="Enter your password"
@@ -162,7 +139,7 @@ export default function CitizenSignIn({ navigation }) {
                                 <Ionicons
                                     name={showPassword ? 'eye-off' : 'eye'}
                                     size={20}
-                                    color={COLORS.textTertiary}
+                                    color={COLORS.gray400}
                                 />
                             </TouchableOpacity>
                         </View>
@@ -177,6 +154,7 @@ export default function CitizenSignIn({ navigation }) {
                             size="lg"
                             style={styles.signInButton}
                             disabled={loading}
+                            size="lg"
                         >
                             {loading ? (
                                 <ActivityIndicator color={COLORS.white} />
@@ -218,7 +196,7 @@ export default function CitizenSignIn({ navigation }) {
                                 <Text style={styles.signUpLink}>Sign Up</Text>
                             </TouchableOpacity>
                         </View>
-                    </View>
+                    </Animated.View>
                 </ScrollView>
             </KeyboardAvoidingView>
         </MobileContainer>
@@ -254,11 +232,24 @@ const styles = StyleSheet.create({
     headerTextContainer: {
         gap: SPACING.sm,
     },
+    backButtonCircle: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: COLORS.surface,
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...SHADOWS.sm,
+    },
+    welcomeIcon: {
+        alignSelf: 'flex-start',
+        marginBottom: SPACING.md,
+    },
     title: {
         fontSize: FONT_SIZES.xxxl,
         fontWeight: FONT_WEIGHTS.bold,
         color: COLORS.textPrimary,
-        letterSpacing: -0.5,
+        marginBottom: SPACING.xs,
     },
     subtitle: {
         fontSize: FONT_SIZES.md,
@@ -269,21 +260,24 @@ const styles = StyleSheet.create({
         paddingHorizontal: SPACING.xl,
         paddingTop: SPACING.sm,
     },
+    passwordWrapper: {
+        position: 'relative',
+    },
     eyeIcon: {
         position: 'absolute',
-        right: SPACING.lg,
+        right: SPACING.md,
         top: 40,
-        padding: SPACING.xs,
+        padding: 4,
     },
     forgotPassword: {
         fontSize: FONT_SIZES.sm,
         color: COLORS.primary,
         textAlign: 'right',
         marginBottom: SPACING.lg,
-        fontWeight: FONT_WEIGHTS.semibold,
+        fontWeight: FONT_WEIGHTS.medium,
     },
     signInButton: {
-        marginTop: SPACING.sm,
+        marginTop: SPACING.xs,
     },
     divider: {
         flexDirection: 'row',
@@ -296,11 +290,10 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.border,
     },
     dividerText: {
-        marginHorizontal: SPACING.lg,
+        marginHorizontal: SPACING.md,
         color: COLORS.textTertiary,
         fontSize: FONT_SIZES.xs,
-        fontWeight: FONT_WEIGHTS.semibold,
-        letterSpacing: 1,
+        fontWeight: FONT_WEIGHTS.medium,
     },
     socialButton: {
         marginBottom: SPACING.md,
@@ -318,8 +311,8 @@ const styles = StyleSheet.create({
     footer: {
         flexDirection: 'row',
         justifyContent: 'center',
-        marginTop: SPACING.xl,
-        paddingBottom: SPACING.xxl,
+        marginTop: SPACING.lg,
+        marginBottom: SPACING.xl,
     },
     footerText: {
         fontSize: FONT_SIZES.sm,

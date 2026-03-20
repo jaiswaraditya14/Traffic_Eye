@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "TrafficViolationApp",
-    "slug": "TrafficViolationApp",
+    "name": "TrafficEye",
+    "slug": "TrafficEye",
     "scheme": "trafficeye",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "image": "./assets/splashscreen.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#050309"
     },
     "ios": {
       "supportsTablet": true,
@@ -31,9 +31,15 @@
         "ACCESS_COARSE_LOCATION",
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE"
       ],
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.anonymous.TrafficEye"
     },
     "web": {
       "favicon": "./assets/favicon.png"

@@ -1,4 +1,9 @@
+import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
 import { supabase } from '../supabase';
+
+// Ensure WebBrowser session clears
+WebBrowser.maybeCompleteAuthSession();
 
 export const authService = {
     /**
@@ -122,6 +127,62 @@ export const authService = {
             email,
             password,
         });
+    },
+
+    /**
+     * Sign in with Google using OAuth
+     */
+    signInWithGoogle: async () => {
+        try {
+            const redirectUrl = AuthSession.makeRedirectUri({
+                scheme: 'trafficeye',
+                path: 'auth-callback',
+                preferNative: true
+            });
+            console.log('Redirecting to:', redirectUrl);
+
+            const { data, error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: redirectUrl,
+                    skipBrowserRedirect: true,
+                },
+            });
+
+            if (error) throw error;
+            if (!data?.url) throw new Error('No auth URL returned');
+
+            const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+
+            if (result.type === 'success' && result.url) {
+                // Robust parsing for custom scheme URIs
+                const hash = result.url.split('#')[1];
+                if (!hash) {
+                    return { data: null, error: new Error('Authentication parameters not found in redirect URL') };
+                }
+
+                const params = Object.fromEntries(
+                    hash.split('&').map(pair => pair.split('='))
+                );
+
+                const access_token = params.access_token;
+                const refresh_token = params.refresh_token;
+
+                if (access_token && refresh_token) {
+                    const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+                        access_token,
+                        refresh_token,
+                    });
+                    if (sessionError) throw sessionError;
+                    return { data: sessionData, error: null };
+                }
+            }
+            
+            return { data: null, error: new Error('Sign in was cancelled or failed') };
+        } catch (error) {
+            console.error('Google Sign-In Error:', error);
+            return { data: null, error };
+        }
     },
 
     /**

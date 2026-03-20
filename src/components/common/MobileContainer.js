@@ -1,46 +1,43 @@
 import React from 'react';
-import { View, ImageBackground, StyleSheet } from 'react-native';
-import { BlurView } from 'expo-blur';
+import { View, StyleSheet, StatusBar, Platform, ImageBackground } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { SCREEN_WIDTH, COLORS } from '../../utils/theme';
 
-export const MobileContainer = ({ children, style, noBackground }) => {
-    if (noBackground) {
-        return (
-            <View style={[styles.container, style]}>
-                {children}
-            </View>
-        );
-    }
-
+export const MobileContainer = ({ children, style, statusBarStyle = 'dark-content' }) => {
     return (
-        <View style={[styles.container, style]}>
+        <SafeAreaView style={[styles.container, style]} edges={['right', 'left']}>
+            <StatusBar
+                barStyle={statusBarStyle}
+                backgroundColor={COLORS.background}
+                translucent={false}
+            />
             <ImageBackground
-                source={require('../../../assets/images/background1.png')}
-                style={styles.backgroundImage}
-                resizeMode="cover"
+                source={require('../../../assets/traffic_pattern_bg.png')}
+                style={styles.bgImage}
+                imageStyle={{ opacity: 1, resizeMode: 'repeat' }}
             >
-                <BlurView intensity={60} tint="light" style={styles.blurOverlay}>
+                <View style={styles.innerContainer}>
                     {children}
-                </BlurView>
+                </View>
             </ImageBackground>
-        </View>
+        </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: COLORS.background,
         maxWidth: 428,
         width: SCREEN_WIDTH,
         alignSelf: 'center',
     },
-    backgroundImage: {
+    bgImage: {
         flex: 1,
         width: '100%',
         height: '100%',
     },
-    blurOverlay: {
+    innerContainer: {
         flex: 1,
-        backgroundColor: 'rgba(249, 250, 251, 0.85)',
-    },
+    }
 });
