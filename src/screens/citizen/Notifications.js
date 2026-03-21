@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.12)',
         justifyContent: 'center', alignItems: 'center',
     },
-    headerTitle: { fontSize: 20, fontWeight: '700', color: C.white, letterSpacing: -0.3 },
+    headerTitle: { fontSize: 20, fontFamily: 'DMSans-Bold', color: C.white, letterSpacing: -0.3 },
     markAllRead: {
         width: 36, height: 36, borderRadius: 10,
         backgroundColor: 'rgba(255,255,255,0.12)',
@@ -156,8 +156,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 4,
     },
-    notifTitle: { fontSize: 15, fontWeight: '600', color: C.textPrimary },
-    notifTitleUnread: { fontWeight: '800' },
-    notifTime: { fontSize: 12, color: C.textTertiary, fontWeight: '500' },
+    notifTitle: { fontSize: 15, fontFamily: 'DMSans-SemiBold', color: C.textPrimary },
+    notifTitleUnread: { fontFamily: 'DMSans-Bold' },
+    notifTime: { fontSize: 12, color: C.textTertiary, fontFamily: 'DMSans-Medium' },
     notifMessage: { fontSize: 13, color: C.textSecondary, lineHeight: 18 },
 });

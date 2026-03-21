@@ -255,13 +255,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     slideTitle: {
+        fontFamily: 'DMSans-Bold',
         fontSize: 28,
-        fontWeight: '700',
         letterSpacing: -0.5,
         marginBottom: 12,
         textAlign: 'center',
     },
     slideDescription: {
+        fontFamily: 'DMSans-Regular',
         fontSize: 15,
         color: C.textSecondary,
         textAlign: 'center',
@@ -305,8 +306,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#EDEEF0',
     },
     skipText: {
+        fontFamily: 'DMSans-SemiBold',
         fontSize: 15,
-        fontWeight: '600',
         color: C.textTertiary,
     },
     nextButtonWrapper: {},
@@ -323,8 +324,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: 24,
     },
     nextButtonText: {
+        fontFamily: 'DMSans-Bold',
         fontSize: 16,
-        fontWeight: '700',
         color: C.white,
     },
     trustRow: {
@@ -334,8 +335,8 @@ const styles = StyleSheet.create({
         gap: 6,
     },
     trustText: {
+        fontFamily: 'DMSans-Medium',
         fontSize: 11,
         color: C.textTertiary,
-        fontWeight: '500',
     },
 });

@@ -219,14 +219,15 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255,255,255,0.15)',
     },
     headerTitle: {
+        fontFamily: 'DMSans-Bold',
         fontSize: 24,
-        fontWeight: '700',
         color: C.white,
         letterSpacing: -0.5,
         textAlign: 'center',
         marginBottom: 8,
     },
     headerSubtitle: {
+        fontFamily: 'DMSans-Regular',
         fontSize: 14,
         color: 'rgba(255,255,255,0.65)',
         textAlign: 'center',
@@ -279,8 +280,8 @@ const styles = StyleSheet.create({
         flexWrap: 'wrap',
     },
     cardTitle: {
+        fontFamily: 'DMSans-Bold',
         fontSize: 18,
-        fontWeight: '700',
         color: C.textPrimary,
         letterSpacing: -0.3,
     },
@@ -290,11 +291,12 @@ const styles = StyleSheet.create({
         borderRadius: 20,
     },
     roleBadgeText: {
+        fontFamily: 'DMSans-Bold',
         fontSize: 9,
-        fontWeight: '700',
         letterSpacing: 1.2,
     },
     cardDescription: {
+        fontFamily: 'DMSans-Regular',
         fontSize: 13,
         color: C.textSecondary,
         lineHeight: 19,
@@ -314,9 +316,9 @@ const styles = StyleSheet.create({
         borderRadius: 3,
     },
     featureText: {
+        fontFamily: 'DMSans-Medium',
         fontSize: 12,
         color: C.textPrimary,
-        fontWeight: '500',
     },
 
     // Footer note
@@ -328,6 +330,7 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
     footerNoteText: {
+        fontFamily: 'DMSans-Regular',
         fontSize: 11,
         color: C.textTertiary,
         textAlign: 'center',

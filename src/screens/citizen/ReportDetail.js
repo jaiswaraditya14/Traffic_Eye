@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 20,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: C.white,
         letterSpacing: -0.3,
     },
@@ -196,13 +196,13 @@ const styles = StyleSheet.create({
     imageTagText: {
         fontSize: 11,
         color: C.navy,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         letterSpacing: 0.2,
     },
     imageDate: {
         fontSize: 13,
         color: 'rgba(255,255,255,0.9)',
-        fontWeight: '500',
+        fontFamily: 'DMSans-Medium',
     },
 
     // Status
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
     },
     statusLabel: {
         fontSize: 15,
-        fontWeight: '600',
+        fontFamily: 'DMSans-SemiBold',
         color: C.textPrimary,
     },
     statusBadge: {
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
     },
     statusText: {
         fontSize: 13,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
     },
 
     // Details Card
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     },
     detailCardTitle: {
         fontSize: 16,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: C.navyMid,
     },
     detailRow: {
@@ -274,16 +274,16 @@ const styles = StyleSheet.create({
     detailLabel: {
         fontSize: 14,
         color: C.textSecondary,
-        fontWeight: '500',
+        fontFamily: 'DMSans-Medium',
     },
     detailValue: {
         fontSize: 14,
-        fontWeight: '600',
+        fontFamily: 'DMSans-SemiBold',
         color: C.textPrimary,
     },
     vehiclePlate: {
         fontSize: 13,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: C.navyMid,
         letterSpacing: 0.5,
         backgroundColor: '#F2F4F6',
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
     },
     pointsValue: {
         fontSize: 13,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: C.amberDark,
     },
 });

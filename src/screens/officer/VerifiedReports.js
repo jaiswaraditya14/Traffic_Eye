@@ -103,9 +103,9 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.12)',
         justifyContent: 'center', alignItems: 'center',
     },
-    headerTitle: { fontSize: 20, fontWeight: '700', color: C.white },
+    headerTitle: { fontSize: 20, fontFamily: 'DMSans-Bold', color: C.white },
     badge: { backgroundColor: C.successSurface, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 4, minWidth: 36, alignItems: 'center' },
-    badgeText: { fontSize: 14, fontWeight: '800', color: C.success },
+    badgeText: { fontSize: 14, fontFamily: 'DMSans-Bold', color: C.success },
 
     content: { flex: 1 },
     scrollContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 },
@@ -120,15 +120,15 @@ const styles = StyleSheet.create({
     cardContent: { flex: 1, padding: 12 },
     
     cardTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-    reportType: { fontSize: 14, fontWeight: '700', color: C.textPrimary, flex: 1 },
+    reportType: { fontSize: 14, fontFamily: 'DMSans-Bold', color: C.textPrimary, flex: 1 },
     
     vehicleRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
-    vehicleText: { fontSize: 12, color: C.navyMid, fontWeight: '700', letterSpacing: 0.5 },
+    vehicleText: { fontSize: 12, color: C.navyMid, fontFamily: 'DMSans-Bold', letterSpacing: 0.5 },
     
     metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
     metaText: { fontSize: 11, color: C.textSecondary },
 
     bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
     officerBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.successSurface, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-    officerText: { fontSize: 10, fontWeight: '700', color: C.success },
+    officerText: { fontSize: 10, fontFamily: 'DMSans-Bold', color: C.success },
 });

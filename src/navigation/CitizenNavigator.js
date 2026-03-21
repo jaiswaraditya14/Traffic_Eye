@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
     },
     tabLabel: {
         fontSize: 11,
-        fontWeight: '600',
+        fontFamily: 'DMSans-SemiBold',
         marginBottom: Platform.OS === 'ios' ? 0 : 4,
     },
 });

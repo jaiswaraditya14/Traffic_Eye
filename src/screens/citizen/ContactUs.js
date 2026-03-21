@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.12)',
         justifyContent: 'center', alignItems: 'center',
     },
-    headerTitle: { fontSize: 20, fontWeight: '700', color: C.white },
+    headerTitle: { fontSize: 20, fontFamily: 'DMSans-Bold', color: C.white },
 
     content: { flex: 1 },
     scrollInner: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 },
@@ -140,10 +140,10 @@ const styles = StyleSheet.create({
         width: 64, height: 64, borderRadius: 32, backgroundColor: C.infoSurface,
         justifyContent: 'center', alignItems: 'center', marginBottom: 16,
     },
-    heroTitle: { fontSize: 20, fontWeight: '800', color: C.navyMid, marginBottom: 8 },
+    heroTitle: { fontSize: 20, fontFamily: 'DMSans-Bold', color: C.navyMid, marginBottom: 8 },
     heroText: { fontSize: 14, color: C.textSecondary, textAlign: 'center', lineHeight: 22 },
 
-    sectionTitle: { fontSize: 16, fontWeight: '800', color: C.textPrimary, marginBottom: 12, marginLeft: 4, marginTop: 10 },
+    sectionTitle: { fontSize: 16, fontFamily: 'DMSans-Bold', color: C.textPrimary, marginBottom: 12, marginLeft: 4, marginTop: 10 },
 
     // Contact Cards
     contactCard: {
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
     },
     contactDetails: { flex: 1 },
     contactLabel: { fontSize: 13, color: C.textSecondary, marginBottom: 2 },
-    contactValue: { fontSize: 15, fontWeight: '700', color: C.navyMid },
+    contactValue: { fontSize: 15, fontFamily: 'DMSans-Bold', color: C.navyMid },
 
     // About
     aboutCard: {
@@ -167,5 +167,5 @@ const styles = StyleSheet.create({
     aboutText: { fontSize: 14, color: C.textSecondary, lineHeight: 22 },
     aboutDivider: { height: 1, backgroundColor: '#F2F4F6', marginVertical: 16 },
     featureItem: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
-    featureText: { fontSize: 14, fontWeight: '500', color: C.textPrimary },
+    featureText: { fontSize: 14, fontFamily: 'DMSans-Medium', color: C.textPrimary },
 });

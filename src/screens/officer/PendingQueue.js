@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 22,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: C.white,
         letterSpacing: -0.4,
     },
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
     },
     countBadgeText: {
         fontSize: 15,
-        fontWeight: '800',
+        fontFamily: 'DMSans-Bold',
         color: C.navy,
     },
     prioritySummary: {
@@ -209,13 +209,13 @@ const styles = StyleSheet.create({
     },
     priorityStatCount: {
         fontSize: 16,
-        fontWeight: '800',
+        fontFamily: 'DMSans-Bold',
         color: C.white,
     },
     priorityStatLabel: {
         fontSize: 9,
         color: 'rgba(255,255,255,0.55)',
-        fontWeight: '600',
+        fontFamily: 'DMSans-SemiBold',
     },
 
     // List
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
     },
     reportType: {
         fontSize: 14,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: C.textPrimary,
         flex: 1,
         marginRight: 6,
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     },
     priorityChipText: {
         fontSize: 9,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         letterSpacing: 0.5,
     },
     vehicleRow: {
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
     vehicleText: {
         fontSize: 12,
         color: C.navyMid,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         letterSpacing: 0.5,
     },
     metaRow: {

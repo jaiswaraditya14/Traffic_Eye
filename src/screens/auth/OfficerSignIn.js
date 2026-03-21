@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
     secureText: {
         fontSize: 10,
         color: '#34D399',
-        fontWeight: '600',
+        fontFamily: 'DMSans-SemiBold',
     },
     badgeIconContainer: {
         width: 100,
@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
     },
     heroTitle: {
         fontSize: 22,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: C.white,
         letterSpacing: -0.4,
         textAlign: 'center',
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: 'rgba(255,255,255,0.55)',
         fontStyle: 'italic',
-        fontWeight: '500',
+        fontFamily: 'DMSans-Medium',
         marginTop: 5,
     },
     diagonalAccent: {
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
     },
     fieldLabel: {
         fontSize: 12,
-        fontWeight: '600',
+        fontFamily: 'DMSans-SemiBold',
         color: C.navyMid,
         marginBottom: 8,
         letterSpacing: 0.2,
@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
     },
     signInText: {
         fontSize: 16,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: C.white,
     },
     buttonDisabled: {
@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
     contactText: {
         fontSize: 14,
         color: C.navyMid,
-        fontWeight: '600',
+        fontFamily: 'DMSans-SemiBold',
     },
 
     // Notice box

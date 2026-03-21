@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.12)',
         justifyContent: 'center', alignItems: 'center',
     },
-    headerTitle: { fontSize: 20, fontWeight: '700', color: C.white },
+    headerTitle: { fontSize: 20, fontFamily: 'DMSans-Bold', color: C.white },
 
     listContainer: { padding: 12, paddingBottom: 40 },
     signCard: {
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center', alignItems: 'center', position: 'relative',
         backgroundColor: C.white,
     },
-    speedValue: { fontSize: 18, fontWeight: '900', color: '#111827' },
+    speedValue: { fontSize: 18, fontFamily: 'DMSans-Bold', color: '#111827' },
     slashLine: { position: 'absolute', width: '120%', height: 3.5, backgroundColor: C.redAlert, transform: [{ rotate: '-45deg' }] },
-    signTitle: { fontSize: 11, fontWeight: '700', color: C.textPrimary, textAlign: 'center', lineHeight: 14 },
+    signTitle: { fontSize: 11, fontFamily: 'DMSans-Bold', color: C.textPrimary, textAlign: 'center', lineHeight: 14 },
 });

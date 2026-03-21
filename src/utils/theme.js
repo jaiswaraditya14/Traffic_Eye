@@ -157,8 +157,17 @@ export const SPACING = {
 };
 
 // ─────────────────────────────────────
-// Typography — Inter scale
+// Typography — DM Sans scale
 // ─────────────────────────────────────
+
+export const FONT_FAMILIES = {
+    regular: 'DMSans-Regular',
+    regularItalic: 'DMSans-RegularItalic',
+    medium: 'DMSans-Medium',
+    semibold: 'DMSans-SemiBold',
+    bold: 'DMSans-Bold',
+    boldItalic: 'DMSans-BoldItalic',
+};
 
 export const FONT_SIZES = {
     xxs: 10,
@@ -366,8 +375,8 @@ export const globalStyles = StyleSheet.create({
     },
     // Section title
     sectionTitle: {
+        fontFamily: 'DMSans-Bold',
         fontSize: FONT_SIZES.lg,
-        fontWeight: FONT_WEIGHTS.bold,
         color: COLORS.textPrimary,
         letterSpacing: -0.2,
     },

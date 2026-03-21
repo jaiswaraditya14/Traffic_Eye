@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 22,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: C.white,
         letterSpacing: -0.4,
     },
@@ -245,14 +245,14 @@ const styles = StyleSheet.create({
     },
     pointsLabel: {
         fontSize: 9,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: 'rgba(255,255,255,0.6)',
         letterSpacing: 1.5,
         marginBottom: 3,
     },
     pointsValue: {
         fontSize: 30,
-        fontWeight: '800',
+        fontFamily: 'DMSans-Bold',
         color: C.amber,
         letterSpacing: -1,
     },
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     },
     levelBadgeText: {
         fontSize: 11,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: C.navy,
     },
     progressLabel: {
@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 17,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: C.textPrimary,
         letterSpacing: -0.2,
         marginBottom: 14,
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     },
     badgeLabel: {
         fontSize: 10,
-        fontWeight: '600',
+        fontFamily: 'DMSans-SemiBold',
         color: C.textPrimary,
         textAlign: 'center',
     },
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
     },
     historyLabel: {
         fontSize: 13,
-        fontWeight: '600',
+        fontFamily: 'DMSans-SemiBold',
         color: C.textPrimary,
     },
     historyTime: {
@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
     },
     historyPoints: {
         fontSize: 13,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: C.success,
     },
 
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
     redeemContent: { flex: 1 },
     redeemTitle: {
         fontSize: 14,
-        fontWeight: '600',
+        fontFamily: 'DMSans-SemiBold',
         color: C.textPrimary,
         marginBottom: 4,
     },
@@ -413,7 +413,7 @@ const styles = StyleSheet.create({
     },
     redeemPts: {
         fontSize: 12,
-        fontWeight: '500',
+        fontFamily: 'DMSans-Medium',
         color: C.amberDark,
     },
     redeemBtn: {
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
     },
     redeemBtnText: {
         fontSize: 12,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: C.navyMid,
     },
 

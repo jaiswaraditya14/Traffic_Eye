@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     headerTitle: {
         color: COLORS.white,
         fontSize: FONT_SIZES.md,
-        fontWeight: FONT_WEIGHTS.bold,
+        fontFamily: 'DMSans-Bold',
         letterSpacing: 0.3,
     },
     instructionBanner: {
@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
     instructionText: {
         color: 'rgba(45, 212, 191, 0.8)',
         fontSize: FONT_SIZES.xs,
-        fontWeight: FONT_WEIGHTS.medium,
+        fontFamily: 'DMSans-Medium',
     },
     cropWrapper: {
         flex: 1,
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
     zoomText: {
         color: '#2DD4BF',
         fontSize: FONT_SIZES.xs,
-        fontWeight: FONT_WEIGHTS.bold,
+        fontFamily: 'DMSans-Bold',
     },
     zoomControls: {
         flexDirection: 'row',
@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
     useImageText: {
         color: COLORS.white,
         fontSize: FONT_SIZES.lg,
-        fontWeight: FONT_WEIGHTS.bold,
+        fontFamily: 'DMSans-Bold',
         letterSpacing: 0.3,
     },
     // Bottom row buttons
@@ -452,7 +452,7 @@ const styles = StyleSheet.create({
     cancelText: {
         color: 'rgba(255,255,255,0.7)',
         fontSize: FONT_SIZES.sm,
-        fontWeight: FONT_WEIGHTS.semibold,
+        fontFamily: 'DMSans-SemiBold',
     },
     confirmBtn: {
         flex: 1,
@@ -470,6 +470,6 @@ const styles = StyleSheet.create({
     confirmText: {
         color: COLORS.white,
         fontSize: FONT_SIZES.sm,
-        fontWeight: FONT_WEIGHTS.bold,
+        fontFamily: 'DMSans-Bold',
     },
 });

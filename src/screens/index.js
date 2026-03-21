@@ -4,6 +4,7 @@ export { default as CitizenSignIn } from './auth/CitizenSignIn';
 export { default as CitizenSignUp } from './auth/CitizenSignUp';
 export { default as OfficerSignIn } from './auth/OfficerSignIn';
 export { default as ForgotPassword } from './auth/ForgotPassword';
+export { default as SignUpSuccess } from './auth/SignUpSuccess';
 
 // Citizen Screens
 export { default as CitizenHome } from './citizen/CitizenHome';

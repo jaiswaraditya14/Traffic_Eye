@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.12)',
         justifyContent: 'center', alignItems: 'center',
     },
-    headerTitle: { fontSize: 20, fontWeight: '700', color: C.white },
+    headerTitle: { fontSize: 20, fontFamily: 'DMSans-Bold', color: C.white },
 
     // Tabs
     tabContainer: {
@@ -145,8 +145,8 @@ const styles = StyleSheet.create({
         borderBottomWidth: 3, borderBottomColor: 'transparent',
     },
     tabBtnActive: { borderBottomColor: C.amber },
-    tabText: { fontSize: 13, fontWeight: '600', color: C.textTertiary },
-    tabTextActive: { color: C.navyMid, fontWeight: '800' },
+    tabText: { fontSize: 13, fontFamily: 'DMSans-SemiBold', color: C.textTertiary },
+    tabTextActive: { color: C.navyMid, fontFamily: 'DMSans-Bold' },
 
     // Content
     content: { flex: 1 },
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     },
     mainImage: { width: '100%', height: '100%' },
 
-    screenTitle: { fontSize: 22, fontWeight: '800', color: C.navyMid, marginBottom: 16, letterSpacing: -0.5 },
+    screenTitle: { fontSize: 22, fontFamily: 'DMSans-Bold', color: C.navyMid, marginBottom: 16, letterSpacing: -0.5 },
 
     sectionCard: {
         backgroundColor: C.surface, borderRadius: 16, padding: 18, marginBottom: 16,
@@ -167,6 +167,6 @@ const styles = StyleSheet.create({
     },
     sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
     bulletBox: { width: 6, height: 16, backgroundColor: C.amber, borderRadius: 3 },
-    sectionTitle: { fontSize: 15, fontWeight: '700', color: C.textPrimary },
+    sectionTitle: { fontSize: 15, fontFamily: 'DMSans-Bold', color: C.textPrimary },
     sectionContent: { fontSize: 14, color: C.textSecondary, lineHeight: 22, paddingLeft: 16 },
 });

@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 20,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: C.white,
         letterSpacing: -0.3,
     },
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
     readOnlyContainer: { marginBottom: 12 },
     readOnlyLabel: {
         fontSize: 12,
-        fontWeight: '600',
+        fontFamily: 'DMSans-SemiBold',
         color: C.navyMid,
         marginBottom: 8,
     },
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
         flex: 1,
         color: C.textSecondary,
         fontSize: 15,
-        fontWeight: '500',
+        fontFamily: 'DMSans-Medium',
     },
     lockIcon: { marginLeft: 'auto' },
     readOnlyHelp: {
@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
     },
     saveText: {
         fontSize: 16,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: C.white,
     },
 });

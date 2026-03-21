@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    headerTitle: { fontSize: 20, fontWeight: '700', color: C.white },
+    headerTitle: { fontSize: 20, fontFamily: 'DMSans-Bold', color: C.white },
 
     scrollContent: { flex: 1 },
     scrollInner: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
@@ -409,14 +409,14 @@ const styles = StyleSheet.create({
         backgroundColor: C.amber,
         justifyContent: 'center', alignItems: 'center'
     },
-    stepDotText: { fontSize: 12, fontWeight: '700', color: C.textTertiary },
-    stepDotTextActive: { fontSize: 12, fontWeight: '700', color: C.navy },
+    stepDotText: { fontSize: 12, fontFamily: 'DMSans-Bold', color: C.textTertiary },
+    stepDotTextActive: { fontSize: 12, fontFamily: 'DMSans-Bold', color: C.navy },
     stepLine: { width: 30, height: 2, backgroundColor: '#E5E7EB' },
     stepLineActive: { width: 30, height: 2, backgroundColor: C.amber },
 
     stepHeader: {
         fontSize: 15,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: C.navyMid,
         marginBottom: 12,
         letterSpacing: -0.2,
@@ -437,22 +437,22 @@ const styles = StyleSheet.create({
     },
     mediaImage: { width: '100%', height: '100%', resizeMode: 'cover' },
     cameraPlaceholder: { alignItems: 'center' },
-    placeholderText: { fontSize: 14, fontWeight: '600', color: C.textSecondary, marginTop: 10 },
+    placeholderText: { fontSize: 14, fontFamily: 'DMSans-SemiBold', color: C.textSecondary, marginTop: 10 },
     placeholderSub: { fontSize: 12, color: C.textTertiary, marginTop: 4 },
     videoPlaceholder: { alignItems: 'center' },
-    videoText: { fontSize: 14, fontWeight: '700', color: C.navyMid, marginTop: 8 },
+    videoText: { fontSize: 14, fontFamily: 'DMSans-Bold', color: C.navyMid, marginTop: 8 },
 
     mediaBtnRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
     mediaBtn: { flex: 1, borderRadius: 12, overflow: 'hidden' },
     mediaBtnGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12 },
-    mediaBtnText: { fontSize: 14, fontWeight: '700', color: C.white },
+    mediaBtnText: { fontSize: 14, fontFamily: 'DMSans-Bold', color: C.white },
     mediaBtnOutline: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: '#C4C6D0', backgroundColor: C.surface },
-    mediaBtnOutlineText: { fontSize: 14, fontWeight: '700', color: C.navyMid },
+    mediaBtnOutlineText: { fontSize: 14, fontFamily: 'DMSans-Bold', color: C.navyMid },
 
     banner: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, backgroundColor: C.primarySurface, borderRadius: 12, borderWidth: 1, borderColor: C.navyMid + '40', marginBottom: 20 },
-    bannerText: { fontSize: 13, fontWeight: '600' },
+    bannerText: { fontSize: 13, fontFamily: 'DMSans-SemiBold' },
 
-    fieldLabel: { fontSize: 12, fontWeight: '600', color: C.navyMid, marginBottom: 8, marginTop: 10 },
+    fieldLabel: { fontSize: 12, fontFamily: 'DMSans-SemiBold', color: C.navyMid, marginBottom: 8, marginTop: 10 },
     addressBox: { flexDirection: 'row', backgroundColor: C.surfaceInput, borderRadius: 12, paddingLeft: 14, paddingRight: 6, paddingVertical: 6, alignItems: 'center' },
     addressInput: { flex: 1, fontSize: 14, color: C.textPrimary, paddingRight: 10, paddingVertical: 8 },
     addressBtns: { flexDirection: 'row', gap: 6 },
@@ -463,13 +463,13 @@ const styles = StyleSheet.create({
 
     submitBtn: { borderRadius: 14, overflow: 'hidden', shadowColor: C.amberDark, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 6 },
     submitGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 },
-    submitText: { fontSize: 16, fontWeight: '800', color: C.navy },
+    submitText: { fontSize: 16, fontFamily: 'DMSans-Bold', color: C.navy },
 
     mapContainer: { flex: 1, backgroundColor: C.offWhite },
     map: { flex: 1 },
     mapHeaderLine: { position: 'absolute', top: 50, left: 20, right: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: C.surface, padding: 16, borderRadius: 16, elevation: 4 },
-    mapTitle: { fontSize: 16, fontWeight: '700', color: C.textPrimary },
+    mapTitle: { fontSize: 16, fontFamily: 'DMSans-Bold', color: C.textPrimary },
     closeMap: { padding: 4 },
     mapConfirm: { position: 'absolute', bottom: 40, left: 20, right: 20, backgroundColor: C.navyMid, padding: 16, borderRadius: 14, alignItems: 'center', elevation: 4 },
-    mapConfirmText: { color: C.white, fontSize: 16, fontWeight: '700' },
+    mapConfirmText: { color: C.white, fontSize: 16, fontFamily: 'DMSans-Bold' },
 });

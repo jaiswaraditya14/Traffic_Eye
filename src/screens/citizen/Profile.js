@@ -232,14 +232,14 @@ const styles = StyleSheet.create({
     },
     avatarText: {
         fontSize: 22,
-        fontWeight: '800',
+        fontFamily: 'DMSans-Bold',
         color: C.navy,
         letterSpacing: 1,
     },
     heroInfo: { flex: 1 },
     heroName: {
         fontSize: 18,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: C.white,
         letterSpacing: -0.3,
     },
@@ -268,14 +268,14 @@ const styles = StyleSheet.create({
     },
     heroStatValue: {
         fontSize: 18,
-        fontWeight: '800',
+        fontFamily: 'DMSans-Bold',
         color: C.white,
         letterSpacing: -0.5,
     },
     heroStatLabel: {
         fontSize: 10,
         color: 'rgba(255,255,255,0.55)',
-        fontWeight: '500',
+        fontFamily: 'DMSans-Medium',
         marginTop: 2,
     },
     heroStatDivider: {
@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
     },
     menuSectionTitle: {
         fontSize: 12,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: C.textTertiary,
         letterSpacing: 0.8,
         textTransform: 'uppercase',
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: 15,
         color: C.textPrimary,
-        fontWeight: '500',
+        fontFamily: 'DMSans-Medium',
     },
 
     // Referral card
@@ -353,12 +353,12 @@ const styles = StyleSheet.create({
     },
     referralTitle: {
         fontSize: 14,
-        fontWeight: '600',
+        fontFamily: 'DMSans-SemiBold',
         color: C.textPrimary,
     },
     referralCode: {
         fontSize: 22,
-        fontWeight: '800',
+        fontFamily: 'DMSans-Bold',
         color: C.navyMid,
         textAlign: 'center',
         letterSpacing: 4,
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
     },
     signOutText: {
         fontSize: 15,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: C.error,
     },
 });

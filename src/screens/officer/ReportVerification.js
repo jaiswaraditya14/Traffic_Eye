@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.12)',
         justifyContent: 'center', alignItems: 'center',
     },
-    headerTitle: { fontSize: 20, fontWeight: '700', color: C.white },
+    headerTitle: { fontSize: 20, fontFamily: 'DMSans-Bold', color: C.white },
 
     content: { flex: 1 },
     scrollContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 },
@@ -153,36 +153,36 @@ const styles = StyleSheet.create({
     evidenceImage: { width: '100%', height: '100%' },
     imageOverlayTop: { position: 'absolute', top: 12, left: 12 },
     priorityBadge: { backgroundColor: '#DC2626', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-    priorityText: { color: C.white, fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+    priorityText: { color: C.white, fontSize: 10, fontFamily: 'DMSans-Bold', letterSpacing: 0.5 },
 
     // AI Card
     aiCard: { borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#BBF7D0' },
     aiCardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-    aiCardTitle: { fontSize: 15, fontWeight: '700', color: '#166534', marginLeft: 6, flex: 1 },
+    aiCardTitle: { fontSize: 15, fontFamily: 'DMSans-Bold', color: '#166534', marginLeft: 6, flex: 1 },
     confidenceBadge: { backgroundColor: '#166534', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
-    confidenceText: { fontSize: 11, fontWeight: '700', color: C.white },
+    confidenceText: { fontSize: 11, fontFamily: 'DMSans-Bold', color: C.white },
     aiRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-    aiLabel: { fontSize: 13, color: '#166534', fontWeight: '500' },
-    aiValuePlate: { fontSize: 15, fontWeight: '800', color: C.navy, backgroundColor: '#FFF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#166534' },
-    aiValue: { fontSize: 14, fontWeight: '700', color: '#166534' },
+    aiLabel: { fontSize: 13, color: '#166534', fontFamily: 'DMSans-Medium' },
+    aiValuePlate: { fontSize: 15, fontFamily: 'DMSans-Bold', color: C.navy, backgroundColor: '#FFF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: '#166534' },
+    aiValue: { fontSize: 14, fontFamily: 'DMSans-Bold', color: '#166534' },
 
     // Details Card
     detailCard: { backgroundColor: C.surface, borderRadius: 16, padding: 16, marginBottom: 20, elevation: 2, shadowColor: C.navyMid, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6 },
-    cardSectionTitle: { fontSize: 15, fontWeight: '700', color: C.navyMid, marginBottom: 16 },
+    cardSectionTitle: { fontSize: 15, fontFamily: 'DMSans-Bold', color: C.navyMid, marginBottom: 16 },
     detailRow: { flexDirection: 'row', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#F2F4F6', paddingVertical: 10 },
     detailLabel: { fontSize: 13, color: C.textSecondary },
-    detailValue: { fontSize: 13, fontWeight: '600', color: C.textPrimary },
+    detailValue: { fontSize: 13, fontFamily: 'DMSans-SemiBold', color: C.textPrimary },
 
     // Notes
-    label: { fontSize: 13, fontWeight: '700', color: C.navyMid, marginBottom: 8 },
+    label: { fontSize: 13, fontFamily: 'DMSans-Bold', color: C.navyMid, marginBottom: 8 },
     notesBox: { backgroundColor: C.surface, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', padding: 12 },
     notesInput: { fontSize: 14, color: C.textPrimary, textAlignVertical: 'top', height: 80 },
 
     // Footer
     footer: { flexDirection: 'row', padding: 16, backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: '#F2F4F6', gap: 12 },
     rejectBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: C.error, backgroundColor: C.errorSurface },
-    rejectText: { fontSize: 15, fontWeight: '700', color: C.error },
+    rejectText: { fontSize: 15, fontFamily: 'DMSans-Bold', color: C.error },
     verifyBtn: { flex: 2, borderRadius: 12, overflow: 'hidden' },
     verifyGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14 },
-    verifyText: { fontSize: 15, fontWeight: '700', color: C.white },
+    verifyText: { fontSize: 15, fontFamily: 'DMSans-Bold', color: C.white },
 });

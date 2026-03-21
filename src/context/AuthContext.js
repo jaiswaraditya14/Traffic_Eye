@@ -15,13 +15,18 @@ export function AuthProvider({ children }) {
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
-                setUser(session?.user ?? null);
-                if (session?.user) {
-                    await fetchProfile(session.user.id);
-                } else {
-                    setProfile(null);
+                try {
+                    setUser(session?.user ?? null);
+                    if (session?.user) {
+                        await fetchProfile(session.user.id);
+                    } else {
+                        setProfile(null);
+                    }
+                } catch (error) {
+                    console.error('Auth state change error:', error);
+                } finally {
+                    setLoading(false);
                 }
-                setLoading(false);
             }
         );
 
@@ -43,11 +48,19 @@ export function AuthProvider({ children }) {
     };
 
     const fetchProfile = async (userId) => {
-        const { data, error } = await authService.getProfile(userId);
-        if (error || !data) {
-            // If profile doesn't exist, check if user is logged in and create a default one
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
+        try {
+            const { data, error } = await authService.getProfile(userId);
+            if (error || !data) {
+                // If profile doesn't exist, check if user is logged in and create a default one
+                const { data: { user }, error: userError } = await supabase.auth.getUser();
+                if (userError || !user) {
+                    console.error('User not found or session invalid', userError);
+                    setUser(null);
+                    setProfile(null);
+                    await supabase.auth.signOut();
+                    return;
+                }
+                
                 const newProfile = {
                     id: user.id,
                     full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
@@ -56,15 +69,25 @@ export function AuthProvider({ children }) {
                     points_balance: 0,
                     created_at: new Date().toISOString(),
                 };
-                const { error: insertError } = await authService.updateProfile(user.id, newProfile);
+                
+                // Use upsert to ensure it correctly creates the profile if missing
+                const { error: insertError } = await supabase.from('profiles').upsert(newProfile);
                 if (!insertError) {
                     setProfile(newProfile);
                 } else {
                     console.error('Failed to create profile:', insertError);
+                    setUser(null);
+                    setProfile(null);
+                    await supabase.auth.signOut();
                 }
+            } else {
+                setProfile(data);
             }
-        } else {
-            setProfile(data);
+        } catch (err) {
+            console.error('Fatal error fetching profile:', err);
+            setUser(null);
+            setProfile(null);
+            await supabase.auth.signOut();
         }
     };
 

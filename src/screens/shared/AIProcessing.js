@@ -112,6 +112,6 @@ const styles = StyleSheet.create({
     spinCircle: { position: 'absolute', width: 160, height: 160, borderRadius: 80, borderTopColor: C.amber, borderTopWidth: 2, borderRightColor: 'transparent', borderRightWidth: 2, borderBottomColor: 'transparent', borderBottomWidth: 2, borderLeftColor: 'transparent', borderLeftWidth: 2, opacity: 0.8 },
     scanLine: { position: 'absolute', top: 0, left: 80, width: 80, height: 80, backgroundColor: 'rgba(245, 158, 11, 0.15)', borderLeftWidth: 1, borderLeftColor: C.amber },
     centerIcon: { position: 'absolute' },
-    title: { fontSize: 24, fontWeight: '800', color: C.white, marginBottom: 12 },
-    subtitle: { fontSize: 16, color: C.amber, fontWeight: '600' },
+    title: { fontSize: 24, fontFamily: 'DMSans-Bold', color: C.white, marginBottom: 12 },
+    subtitle: { fontSize: 16, color: C.amber, fontFamily: 'DMSans-SemiBold' },
 });

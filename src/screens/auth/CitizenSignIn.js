@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 24,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: C.white,
         letterSpacing: -0.5,
         marginBottom: 4,
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
     headerSubtitle: {
         fontSize: 13,
         color: 'rgba(255,255,255,0.6)',
-        fontWeight: '500',
+        fontFamily: 'DMSans-Medium',
     },
 
     // ── Form ──
@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
     },
     fieldLabel: {
         fontSize: 12,
-        fontWeight: '600',
+        fontFamily: 'DMSans-SemiBold',
         color: C.navyMid,
         marginBottom: 8,
         letterSpacing: 0.2,
@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
     forgotText: {
         fontSize: 13,
         color: C.navyMid,
-        fontWeight: '600',
+        fontFamily: 'DMSans-SemiBold',
     },
 
     // Primary button
@@ -377,7 +377,7 @@ const styles = StyleSheet.create({
     },
     primaryButtonText: {
         fontSize: 16,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: C.white,
     },
     buttonDisabled: {
@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
     dividerText: {
         fontSize: 12,
         color: C.textTertiary,
-        fontWeight: '500',
+        fontFamily: 'DMSans-Medium',
     },
 
     // Google button
@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
     },
     googleButtonText: {
         fontSize: 15,
-        fontWeight: '600',
+        fontFamily: 'DMSans-SemiBold',
         color: C.textPrimary,
     },
 
@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
     },
     signUpLink: {
         fontSize: 14,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: C.amber,
     },
 });

@@ -225,20 +225,20 @@ const styles = StyleSheet.create({
 
     // ── Typography ──
     appName: {
+        fontFamily: 'DMSans-Bold',
         fontSize: 44,
-        fontWeight: '800',
-        color: C.white,
         letterSpacing: -1.5,
+        color: C.white,
         textAlign: 'center',
     },
     appNameAccent: {
         color: C.amber,
     },
     tagline: {
-        fontSize: 13,
+        fontFamily: 'DMSans-Medium',
+        fontSize: 12,
         color: 'rgba(255,255,255,0.55)',
-        fontWeight: '500',
-        letterSpacing: 0.5,
+        letterSpacing: 1.5,
         textTransform: 'uppercase',
         marginTop: 8,
         textAlign: 'center',
@@ -264,10 +264,10 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(245,158,11,0.2)',
     },
     authorityText: {
+        fontFamily: 'DMSans-Medium',
         fontSize: 11,
         color: 'rgba(255,255,255,0.55)',
-        fontWeight: '500',
-        letterSpacing: 0.3,
+        letterSpacing: 0.5,
     },
 
     // ── Loading Bar ──
@@ -277,10 +277,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     loadingLabel: {
-        fontSize: 11,
+        fontFamily: 'DMSans-Medium',
+        fontSize: 10,
         color: 'rgba(255,255,255,0.35)',
-        fontWeight: '500',
-        letterSpacing: 1.5,
+        letterSpacing: 2,
         textTransform: 'uppercase',
         marginBottom: 10,
     },

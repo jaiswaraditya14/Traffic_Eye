@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
 
     title: {
         fontSize: 26,
-        fontWeight: '800',
+        fontFamily: 'DMSans-Bold',
         color: C.textPrimary,
         marginBottom: 12,
         letterSpacing: -0.5,
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
     },
     pointsText: {
         fontSize: 16,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: C.textPrimary,
     },
 
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
     },
     primaryText: {
         fontSize: 16,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: C.white,
     },
     secondaryButton: {
@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
     },
     secondaryText: {
         fontSize: 16,
-        fontWeight: '700',
+        fontFamily: 'DMSans-Bold',
         color: C.navyMid,
     },
 });

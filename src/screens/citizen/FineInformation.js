@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.12)',
         justifyContent: 'center', alignItems: 'center',
     },
-    headerTitle: { fontSize: 20, fontWeight: '700', color: C.white },
+    headerTitle: { fontSize: 20, fontFamily: 'DMSans-Bold', color: C.white },
 
     content: { flex: 1 },
 
@@ -157,12 +157,12 @@ const styles = StyleSheet.create({
     fineTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
     iconBg: { width: 36, height: 36, borderRadius: 18, backgroundColor: C.primarySurface, justifyContent: 'center', alignItems: 'center' },
     sectionBadge: { backgroundColor: '#F2F4F6', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-    sectionText: { fontSize: 11, fontWeight: '600', color: C.textSecondary },
-    offenseText: { fontSize: 15, fontWeight: '700', color: C.textPrimary, lineHeight: 22, marginBottom: 16 },
+    sectionText: { fontSize: 11, fontFamily: 'DMSans-SemiBold', color: C.textSecondary },
+    offenseText: { fontSize: 15, fontFamily: 'DMSans-Bold', color: C.textPrimary, lineHeight: 22, marginBottom: 16 },
     fineFooter: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F2F4F6' },
-    fineAmount: { fontSize: 15, fontWeight: '800', color: C.success },
+    fineAmount: { fontSize: 15, fontFamily: 'DMSans-Bold', color: C.success },
 
     emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
-    emptyTitle: { fontSize: 18, fontWeight: '700', color: C.textPrimary, marginTop: 16 },
+    emptyTitle: { fontSize: 18, fontFamily: 'DMSans-Bold', color: C.textPrimary, marginTop: 16 },
     emptySub: { fontSize: 14, color: C.textSecondary, marginTop: 8 },
 });

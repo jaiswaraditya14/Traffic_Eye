@@ -1,7 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, GRADIENTS } from '../../utils/theme';
+import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, FONT_FAMILIES, BORDER_RADIUS, SHADOWS, GRADIENTS } from '../../utils/theme';
 
 export const Button = ({
     children,
@@ -164,8 +164,8 @@ const styles = StyleSheet.create({
 
     // ── Text styles ──
     text: {
-        fontWeight: FONT_WEIGHTS.semibold,
-        letterSpacing: 0.2,
+        fontFamily: FONT_FAMILIES.semibold,
+        letterSpacing: 0.3,
     },
     primaryText: {
         color: '#FFFFFF',
