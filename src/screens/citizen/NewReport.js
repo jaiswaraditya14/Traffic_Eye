@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, ScrollView, ActivityIndicator, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, ScrollView, ActivityIndicator, Animated, Modal } from 'react-native';
+import MapView, { Marker } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,12 +21,25 @@ export default function NewReport({ navigation }) {
     } = useImagePicker();
 
     const {
+        location,
         address,
         setAddress,
         loading: loadingLocation,
         detectLocation,
+        setManualLocation,
         reverseGeocodeFromCoords
     } = useLocation();
+
+    const [trustLevel, setTrustLevel] = useState(null); // 'Verified Location', 'Gallery Upload', 'Needs Verification / Manual Location'
+    
+    const [isMapVisible, setIsMapVisible] = useState(false);
+    const [selectedCoordinate, setSelectedCoordinate] = useState(null);
+    const [mapRegion, setMapRegion] = useState({
+        latitude: location?.latitude || 28.6139,
+        longitude: location?.longitude || 77.2090,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+    });
 
     const [video, setVideo] = useState(null);
     const [mediaType, setMediaType] = useState(null);
@@ -182,6 +196,8 @@ export default function NewReport({ navigation }) {
             setImage(null);
             setVideo(uri);
             setMediaType('video');
+            setTrustLevel('Verified Location');
+            detectLocation();
         }
     };
 
@@ -191,12 +207,15 @@ export default function NewReport({ navigation }) {
             setImage(null);
             setVideo(uri);
             setMediaType('video');
+            setTrustLevel('Needs Verification / Manual Location');
+            Alert.alert('Notice', 'Please use the GPS button or enter the location manually.');
         }
     };
 
     const handleDetectLocation = async () => {
         const result = await detectLocation();
         if (result) {
+            setTrustLevel('Verified Location');
             Alert.alert('Success', 'Location detected successfully!');
         }
     };
@@ -212,6 +231,8 @@ export default function NewReport({ navigation }) {
             mediaType,
             description,
             address,
+            location,
+            trustLevel: trustLevel || 'Needs Verification / Manual Location',
             timestamp: new Date()
         });
         navigation.navigate('AIProcessing');
@@ -392,25 +413,41 @@ export default function NewReport({ navigation }) {
                                     numberOfLines={2}
                                     inputStyle={styles.addressInput}
                                 />
-                                <TouchableOpacity
-                                    style={styles.locationButton}
-                                    onPress={handleDetectLocation}
-                                    disabled={loadingLocation}
-                                    activeOpacity={0.8}
-                                >
-                                    <LinearGradient
-                                        colors={GRADIENTS.primary}
-                                        style={styles.locationButtonInner}
-                                        start={{ x: 0, y: 0 }}
-                                        end={{ x: 1, y: 1 }}
+                                <View style={styles.locationButtonsWrapper}>
+                                    <TouchableOpacity
+                                        style={styles.mapButton}
+                                        onPress={() => setIsMapVisible(true)}
+                                        activeOpacity={0.8}
                                     >
-                                        {loadingLocation ? (
-                                            <ActivityIndicator size="small" color={COLORS.white} />
-                                        ) : (
-                                            <Ionicons name="location" size={22} color={COLORS.white} />
-                                        )}
-                                    </LinearGradient>
-                                </TouchableOpacity>
+                                        <LinearGradient
+                                            colors={GRADIENTS.secondary}
+                                            style={styles.locationButtonInner}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 1 }}
+                                        >
+                                            <Ionicons name="map" size={22} color={COLORS.white} />
+                                        </LinearGradient>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={styles.locationButtonRight}
+                                        onPress={handleDetectLocation}
+                                        disabled={loadingLocation}
+                                        activeOpacity={0.8}
+                                    >
+                                        <LinearGradient
+                                            colors={GRADIENTS.primary}
+                                            style={styles.locationButtonInner}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 1 }}
+                                        >
+                                            {loadingLocation ? (
+                                                <ActivityIndicator size="small" color={COLORS.white} />
+                                            ) : (
+                                                <Ionicons name="location" size={22} color={COLORS.white} />
+                                            )}
+                                        </LinearGradient>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
 
                             {/* Description */}
@@ -434,6 +471,51 @@ export default function NewReport({ navigation }) {
                     </ScrollView>
                 </SafeAreaView>
             </MobileContainer>
+
+            {/* Map Picker Modal */}
+            <Modal visible={isMapVisible} animationType="slide">
+                <View style={styles.mapContainer}>
+                    <MapView
+                        style={styles.map}
+                        region={mapRegion}
+                        onRegionChangeComplete={setMapRegion}
+                        onPress={(e) => setSelectedCoordinate(e.nativeEvent.coordinate)}
+                        showsUserLocation={true}
+                    >
+                        {selectedCoordinate && (
+                            <Marker coordinate={selectedCoordinate} />
+                        )}
+                        {!selectedCoordinate && location && (
+                            <Marker coordinate={location} pinColor="blue" />
+                        )}
+                    </MapView>
+                    
+                    <View style={styles.mapHeader}>
+                        <Text style={styles.mapTitle}>Tap Map to Select Location</Text>
+                        <TouchableOpacity onPress={() => setIsMapVisible(false)} style={styles.closeMapButton}>
+                            <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.mapFooter}>
+                        <Button 
+                            fullWidth 
+                            disabled={!selectedCoordinate && !location}
+                            onPress={() => {
+                                setIsMapVisible(false);
+                                setTrustLevel('Manual Location');
+                                if (selectedCoordinate) {
+                                    setManualLocation(selectedCoordinate);
+                                } else if (location) {
+                                    setManualLocation(location);
+                                }
+                            }}
+                        >
+                            Confirm Location
+                        </Button>
+                    </View>
+                </View>
+            </Modal>
 
             {/* Image Crop/Zoom Modal */}
             <ImageCropModal
@@ -690,12 +772,22 @@ const styles = StyleSheet.create({
         marginBottom: SPACING.sm,
     },
     addressInput: {
-        paddingRight: 64,
+        paddingRight: 110,
     },
-    locationButton: {
+    locationButtonsWrapper: {
         position: 'absolute',
         right: 8,
         top: 36,
+        flexDirection: 'row',
+        gap: SPACING.sm,
+    },
+    mapButton: {
+        borderRadius: BORDER_RADIUS.lg,
+        ...SHADOWS.sm,
+    },
+    locationButtonRight: {
+        borderRadius: BORDER_RADIUS.lg,
+        ...SHADOWS.sm,
     },
     locationButtonInner: {
         width: 44,
@@ -704,4 +796,19 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
+    locationButtonRight: {
+        backgroundColor: COLORS.primary,
+        width: 44,
+        height: 44,
+        borderRadius: BORDER_RADIUS.md,
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...SHADOWS.md,
+    },
+    mapContainer: { flex: 1, backgroundColor: COLORS.white },
+    map: { width: '100%', height: '100%' },
+    mapHeader: { position: 'absolute', top: 50, left: SPACING.lg, right: SPACING.lg, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.white, padding: SPACING.md, borderRadius: BORDER_RADIUS.lg, ...SHADOWS.md },
+    mapTitle: { fontSize: FONT_SIZES.md, fontWeight: FONT_WEIGHTS.bold },
+    closeMapButton: { padding: SPACING.xs },
+    mapFooter: { position: 'absolute', bottom: 40, left: SPACING.lg, right: SPACING.lg, backgroundColor: COLORS.white, padding: SPACING.md, borderRadius: BORDER_RADIUS.lg, ...SHADOWS.lg },
 });

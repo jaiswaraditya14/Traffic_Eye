@@ -32,7 +32,7 @@ export default function useImagePicker() {
                 setExifData(asset.exif || null);
                 return { uri: asset.uri, exif: asset.exif || null };
             }
-            return null;
+            return { uri: null, location: null };
         } catch (error) {
             console.error('Error picking image:', error);
             Alert.alert('Error', 'Failed to pick image from gallery.');
@@ -63,7 +63,7 @@ export default function useImagePicker() {
                 setExifData(asset.exif || null);
                 return { uri: asset.uri, exif: asset.exif || null };
             }
-            return null;
+            return { uri: null, location: null };
         } catch (error) {
             console.error('Error capturing image:', error);
             Alert.alert('Error', 'Failed to capture photo.');
