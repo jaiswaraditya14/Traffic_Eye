@@ -127,7 +127,7 @@ export default function ForgotPassword({ navigation }) {
     // ── Main Form ──
     return (
         <MobileContainer>
-            <StatusBar barStyle="light-content" backgroundColor={C.navyMid} />
+            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FB" />
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.container}
@@ -143,68 +143,75 @@ export default function ForgotPassword({ navigation }) {
                             <Ionicons name="arrow-back" size={20} color={C.white} />
                         </TouchableOpacity>
                         <View style={styles.lockIconBg}>
-                            <Ionicons name="lock-closed-outline" size={36} color={C.amber} />
+                            <Ionicons name="shield-half" size={36} color={C.amber} />
                         </View>
-                        <Text style={styles.headerTitle}>Forgot Password?</Text>
+                        <Text style={styles.headerTitle}>Access Recovery</Text>
                         <Text style={styles.headerSubtitle}>
-                            Enter your email and we'll send a reset link
+                            Initiate security protocol to reset your credentials
                         </Text>
                     </LinearGradient>
 
-                    {/* Form */}
-                    <Animated.View style={[styles.formSection, { opacity: fadeAnim }]}>
-                        <Text style={styles.fieldLabel}>Email Address</Text>
-                        <View style={[styles.inputRow, focused && styles.inputRowFocused]}>
-                            <Ionicons
-                                name="mail-outline"
-                                size={17}
-                                color={focused ? C.navyMid : C.textTertiary}
-                            />
-                            <TextInput
-                                style={styles.textInput}
-                                placeholder="you@example.com"
-                                placeholderTextColor={C.textTertiary}
-                                value={email}
-                                onChangeText={setEmail}
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                                onFocus={() => setFocused(true)}
-                                onBlur={() => setFocused(false)}
-                            />
-                        </View>
+                    {/* Form — Recovery Card */}
+                    <View style={styles.formContainer}>
+                        <View style={styles.authCard}>
+                            <Text style={styles.welcomeText}>Verify Identity</Text>
+                            <Text style={styles.subWelcomeText}>Enter your registered email below</Text>
 
-                        {/* Reset Button */}
-                        <TouchableOpacity
-                            style={[styles.resetButton, loading && { opacity: 0.6 }]}
-                            onPress={handleResetPassword}
-                            disabled={loading}
-                            activeOpacity={0.88}
-                        >
-                            <LinearGradient
-                                colors={[C.navy, C.navyMid]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.resetGradient}
+                            <View style={styles.fieldGroup}>
+                                <Text style={styles.fieldLabel}>REGISTERED EMAIL</Text>
+                                <View style={[styles.inputRow, focused && styles.inputRowFocused]}>
+                                    <Ionicons
+                                        name="mail"
+                                        size={17}
+                                        color={focused ? C.navyMid : '#94A3B8'}
+                                    />
+                                    <TextInput
+                                        style={styles.textInput}
+                                        placeholder="you@authority.com"
+                                        placeholderTextColor="#94A3B8"
+                                        value={email}
+                                        onChangeText={setEmail}
+                                        keyboardType="email-address"
+                                        autoCapitalize="none"
+                                        onFocus={() => setFocused(true)}
+                                        onBlur={() => setFocused(false)}
+                                    />
+                                </View>
+                            </View>
+
+                            {/* Reset Button */}
+                            <TouchableOpacity
+                                style={[styles.resetButton, loading && { opacity: 0.6 }]}
+                                onPress={handleResetPassword}
+                                disabled={loading}
+                                activeOpacity={0.88}
                             >
-                                {loading ? (
-                                    <ActivityIndicator color={C.white} />
-                                ) : (
-                                    <>
-                                        <Text style={styles.resetText}>Send Reset Link</Text>
-                                        <Ionicons name="send" size={15} color={C.white} />
-                                    </>
-                                )}
-                            </LinearGradient>
-                        </TouchableOpacity>
+                                <LinearGradient
+                                    colors={[C.navy, C.navyMid]}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={styles.resetGradient}
+                                >
+                                    {loading ? (
+                                        <ActivityIndicator color={C.white} />
+                                    ) : (
+                                        <>
+                                            <Text style={styles.resetText}>Send Recovery Link</Text>
+                                            <Ionicons name="paper-plane" size={15} color={C.white} style={{ marginLeft: 8 }} />
+                                        </>
+                                    )}
+                                </LinearGradient>
+                            </TouchableOpacity>
 
-                        <TouchableOpacity
-                            style={styles.backLink}
-                            onPress={() => navigation.goBack()}
-                        >
-                            <Ionicons name="arrow-back" size={15} color={C.navyMid} />
-                            <Text style={styles.backLinkText}>Back to Sign In</Text>
-                        </TouchableOpacity>
-                    </Animated.View>
+                            <TouchableOpacity
+                                style={styles.backLink}
+                                onPress={() => navigation.goBack()}
+                            >
+                                <Text style={styles.backLinkText}>Return to Secure Login</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <Text style={styles.legalNotice}>If you no longer have access to this email, contact administration.</Text>
+                    </View>
                 </ScrollView>
             </KeyboardAvoidingView>
         </MobileContainer>
@@ -260,56 +267,89 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
     },
 
-    // Form
-    formSection: {
-        paddingHorizontal: 24,
-        paddingTop: 28,
+    // ── Form Container & Auth Card ──
+    formContainer: {
+        marginTop: -32,
+        paddingHorizontal: 16,
+        paddingBottom: 40,
+    },
+    authCard: {
+        backgroundColor: C.white,
+        borderRadius: 32,
+        padding: 24,
+        shadowColor: C.navy,
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.1,
+        shadowRadius: 24,
+        elevation: 8,
+    },
+    welcomeText: {
+        fontSize: 22,
+        fontFamily: 'Nunito-Bold',
+        color: C.navy,
+        textAlign: 'center',
+    },
+    subWelcomeText: {
+        fontSize: 14,
+        color: C.textSecondary,
+        fontFamily: 'Nunito-Medium',
+        textAlign: 'center',
+        marginTop: 4,
+        marginBottom: 32,
+    },
+
+    // Fields
+    fieldGroup: {
+        marginBottom: 24,
     },
     fieldLabel: {
-        fontSize: 12,
-        fontFamily: 'Nunito-SemiBold',
-        color: C.navyMid,
+        fontSize: 10,
+        fontFamily: 'Nunito-ExtraBold',
+        color: C.textTertiary,
         marginBottom: 8,
-        letterSpacing: 0.2,
+        letterSpacing: 1.2,
+        marginLeft: 4,
     },
     inputRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: C.surfaceInput,
-        borderRadius: 12,
-        paddingHorizontal: 13,
-        paddingVertical: 13,
-        gap: 9,
-        marginBottom: 20,
-        borderBottomWidth: 2,
-        borderBottomColor: 'transparent',
+        backgroundColor: C.offWhite,
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        gap: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
     },
     inputRowFocused: {
-        borderBottomColor: C.navyMid,
-        backgroundColor: C.surface,
+        borderColor: C.navyMid,
+        backgroundColor: C.white,
+        shadowColor: C.navyMid,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 2,
     },
     textInput: {
         flex: 1,
         fontSize: 15,
         color: C.textPrimary,
+        fontFamily: 'Nunito-SemiBold',
         padding: 0,
     },
+
+    // Reset button
     resetButton: {
-        borderRadius: 14,
+        borderRadius: 16,
         overflow: 'hidden',
-        marginBottom: 20,
-        shadowColor: C.navy,
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.22,
-        shadowRadius: 10,
-        elevation: 6,
+        marginBottom: 24,
+        elevation: 4,
     },
     resetGradient: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 8,
-        paddingVertical: 16,
+        paddingVertical: 18,
     },
     resetText: {
         fontSize: 16,
@@ -317,18 +357,24 @@ const styles = StyleSheet.create({
         color: C.white,
     },
     backLink: {
-        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        gap: 6,
+        paddingVertical: 12,
     },
     backLinkText: {
         fontSize: 14,
         color: C.navyMid,
+        fontFamily: 'Nunito-Bold',
+    },
+    legalNotice: {
+        fontSize: 11,
+        color: '#94A3B8',
+        textAlign: 'center',
+        marginTop: 24,
         fontFamily: 'Nunito-Medium',
+        paddingHorizontal: 16,
     },
 
-    // Success state
+    // Success Page
     successPage: {
         flex: 1,
         backgroundColor: C.offWhite,
@@ -341,60 +387,65 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     successIconOuter: {
-        width: 110,
-        height: 110,
-        borderRadius: 28,
-        backgroundColor: C.primarySurface,
+        width: 120,
+        height: 120,
+        borderRadius: 32,
+        backgroundColor: C.white,
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 24,
+        shadowColor: C.navyMid,
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+        elevation: 6,
     },
     successIconInner: {
-        width: 76,
-        height: 76,
-        borderRadius: 20,
-        backgroundColor: 'rgba(27,58,107,0.08)',
+        width: 80,
+        height: 80,
+        borderRadius: 24,
+        backgroundColor: C.primarySurface,
         justifyContent: 'center',
         alignItems: 'center',
     },
     successTitle: {
-        fontSize: 22,
+        fontSize: 26,
         fontFamily: 'Nunito-Bold',
-        color: C.textPrimary,
-        marginBottom: 10,
-        letterSpacing: -0.4,
+        color: C.navy,
+        textAlign: 'center',
+        marginBottom: 12,
+        letterSpacing: -0.5,
     },
     successBody: {
-        fontSize: 14,
+        fontSize: 15,
         color: C.textSecondary,
         textAlign: 'center',
         lineHeight: 22,
-        marginBottom: 10,
+        marginBottom: 12,
+        fontFamily: 'Nunito-Medium',
     },
     emailHighlight: {
         color: C.navyMid,
-        fontFamily: 'Nunito-SemiBold',
+        fontFamily: 'Nunito-Bold',
     },
     successInstruction: {
-        fontSize: 12,
+        fontSize: 13,
         color: C.textTertiary,
         textAlign: 'center',
         lineHeight: 20,
-        marginBottom: 28,
+        marginBottom: 32,
+        fontFamily: 'Nunito-Medium',
+        paddingHorizontal: 8,
     },
     successCTA: {
         alignSelf: 'stretch',
-        borderRadius: 14,
+        borderRadius: 16,
         overflow: 'hidden',
-        marginBottom: 16,
-        shadowColor: C.navy,
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.2,
-        shadowRadius: 10,
-        elevation: 6,
+        marginBottom: 20,
+        elevation: 4,
     },
     successCTAGradient: {
-        paddingVertical: 16,
+        paddingVertical: 18,
         alignItems: 'center',
     },
     successCTAText: {
@@ -405,11 +456,11 @@ const styles = StyleSheet.create({
     tryAgainRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: 8,
     },
     tryAgainText: {
-        fontSize: 13,
+        fontSize: 14,
         color: C.navyMid,
-        fontFamily: 'Nunito-Medium',
+        fontFamily: 'Nunito-Bold',
     },
 });

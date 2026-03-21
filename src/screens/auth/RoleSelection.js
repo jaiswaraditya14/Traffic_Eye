@@ -62,7 +62,7 @@ export default function RoleSelection({ navigation }) {
 
     return (
         <MobileContainer>
-            <StatusBar barStyle="light-content" backgroundColor={C.navyMid} />
+            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FB" />
             <ScrollView
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}

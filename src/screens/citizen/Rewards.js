@@ -41,16 +41,7 @@ export default function Rewards() {
         ]).start();
     }, []);
 
-    const level = userPoints >= 1000 ? 'Guardian' : userPoints >= 500 ? 'Volunteer' : 'Newcomer';
-    const nextLevelPoints = userPoints >= 1000 ? 2000 : userPoints >= 500 ? 1000 : 500;
-    const progress = Math.min(userPoints / nextLevelPoints, 1);
 
-    const badges = [
-        { icon: 'star', label: 'First Report', color: C.amber, earned: true },
-        { icon: 'shield-checkmark', label: 'Verified 5×', color: C.navyMid, earned: true },
-        { icon: 'ribbon', label: 'Guardian', color: C.success, earned: true },
-        { icon: 'trophy', label: 'Top Reporter', color: C.textTertiary, earned: false },
-    ];
 
     const history = [
         { icon: 'camera', label: 'Report Submitted', points: '+10', time: 'Today' },
@@ -66,7 +57,7 @@ export default function Rewards() {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor={C.navyMid} />
+            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FB" />
             <SafeAreaView style={styles.safeArea} edges={['top']}>
                 <ScrollView showsVerticalScrollIndicator={false}>
 
@@ -74,8 +65,7 @@ export default function Rewards() {
                     <LinearGradient colors={[C.navy, C.navyMid]} style={styles.header}>
                         <View style={styles.headerTop}>
                             <View>
-                                <Text style={styles.headerTitle}>Sentinel Rewards</Text>
-                                <Text style={styles.headerSubtitle}>Status: {level} Citizen</Text>
+                                <Text style={styles.headerTitle}>Rewards</Text>
                             </View>
                             <View style={styles.authorityShield}>
                                 <Ionicons name="shield-checkmark" size={24} color={C.amber} />
@@ -92,79 +82,20 @@ export default function Rewards() {
                             <View style={styles.pointsCardMain}>
                                 <View style={styles.trophyFrame}>
                                     <View style={styles.trophyCircle}>
-                                        <Ionicons name="trophy" size={28} color={C.amberDark} />
+                                        <Ionicons name="trophy" size={32} color={C.amberDark} />
                                     </View>
                                 </View>
                                 <View style={styles.pointsCol}>
                                     <Text style={styles.pointsLabel}>REWARD BALANCE</Text>
                                     <Text style={styles.pointsValue}>{userPoints.toLocaleString()}</Text>
-                                    <View style={styles.pointsBadgeRow}>
-                                        <Ionicons name="star" size={12} color={C.amber} />
-                                        <Text style={styles.badgeText}>Top 5% Contributor</Text>
-                                    </View>
-                                </View>
-                            </View>
-
-                            <View style={styles.progressSection}>
-                                <View style={styles.progressHeader}>
-                                    <Text style={styles.progressInfo}>Next level in {nextLevelPoints - userPoints} pts</Text>
-                                    <Text style={styles.progressPercent}>{Math.round(progress * 100)}%</Text>
-                                </View>
-                                <View style={styles.progressTrackOuter}>
-                                    <LinearGradient
-                                        colors={[C.amberDark, C.amber]}
-                                        start={{x: 0, y: 0}}
-                                        end={{x: 1, y: 0}}
-                                        style={[styles.progressFill, { width: `${progress * 100}%` }]}
-                                    />
                                 </View>
                             </View>
                         </Animated.View>
                     </LinearGradient>
 
-                    {/* ── Achievements (Circular Badges) ── */}
-                    <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
-                        <Text style={styles.sectionTitle}>Authority Badges</Text>
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.badgesScroll}
-                        >
-                            {badges.map((badge, idx) => (
-                                <View
-                                    key={idx}
-                                    style={[styles.badgeFrame]}
-                                >
-                                    <View style={[styles.badgeOuterCircle, !badge.earned && styles.badgeLocked]}>
-                                        <View
-                                            style={[
-                                                styles.badgeInnerCircle,
-                                                { backgroundColor: badge.earned ? `${badge.color}10` : '#F1F5F9' },
-                                            ]}
-                                        >
-                                            <Ionicons 
-                                                name={badge.earned ? badge.icon : 'lock-closed'} 
-                                                size={28} 
-                                                color={badge.earned ? badge.color : '#94A3B8'} 
-                                            />
-                                        </View>
-                                        {badge.earned && (
-                                            <View style={styles.earnedDot}>
-                                                <Ionicons name="checkmark" size={10} color={C.white} />
-                                            </View>
-                                        )}
-                                    </View>
-                                    <Text style={[styles.badgeLabel, !badge.earned && { color: '#94A3B8' }]}>
-                                        {badge.label}
-                                    </Text>
-                                </View>
-                            ))}
-                        </ScrollView>
-                    </Animated.View>
-
                     {/* ── Points History ── */}
                     <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
-                        <Text style={styles.sectionTitle}>Sentinel Activity</Text>
+                        <Text style={styles.sectionTitle}>Activity History</Text>
                         <View style={styles.historyContainer}>
                             {history.map((h, idx) => (
                                 <View key={idx} style={styles.historyItem}>
@@ -207,10 +138,10 @@ export default function Rewards() {
                                     </View>
                                 </View>
                                 <View style={[styles.redeemAction, !r.available && styles.redeemActionLocked]}>
-                                    <Ionicons 
-                                        name={r.available ? "arrow-forward" : "lock-closed"} 
-                                        size={18} 
-                                        color={r.available ? C.navyMid : '#94A3B8'} 
+                                    <Ionicons
+                                        name={r.available ? "arrow-forward" : "lock-closed"}
+                                        size={18}
+                                        color={r.available ? C.navyMid : '#94A3B8'}
                                     />
                                 </View>
                             </TouchableOpacity>

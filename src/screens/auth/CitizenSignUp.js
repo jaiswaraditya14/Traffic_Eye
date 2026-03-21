@@ -178,16 +178,12 @@ export default function CitizenSignUp({ navigation }) {
 
     // ── Sign Up Form ──
     return (
-        <MobileContainer>
-            <StatusBar barStyle="light-content" backgroundColor={C.navyMid} />
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.container}
-            >
-                <ScrollView
+        <View style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FB" />
+            <ScrollView
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
-                    keyboardShouldPersistTaps="handled"
+                    keyboardShouldPersistTaps="always"
                 >
                     {/* Navy Header */}
                     <LinearGradient colors={[C.navy, C.navyMid]} style={styles.header}>
@@ -198,134 +194,139 @@ export default function CitizenSignUp({ navigation }) {
                             <View style={styles.logoMark}>
                                 <Ionicons name="person-add" size={28} color={C.amber} />
                             </View>
-                            <Text style={styles.headerTitle}>Create Account</Text>
-                            <Text style={styles.headerSubtitle}>Join us in making roads safer</Text>
+                            <Text style={styles.headerTitle}>Join the Force</Text>
+                            <Text style={styles.headerSubtitle}></Text>
                         </View>
                     </LinearGradient>
 
-                    {/* Form */}
-                    <Animated.View style={[styles.form, { opacity: fadeAnim }]}>
-                        {/* Full Name */}
-                        <View style={styles.fieldGroup}>
-                            <Text style={styles.fieldLabel}>Full Name</Text>
-                            <View style={styles.inputRow}>
-                                <Ionicons name="person-outline" size={17} color={C.textTertiary} />
-                                <TextInput
-                                    style={styles.textInput}
-                                    placeholder="Enter your full name"
-                                    placeholderTextColor={C.textTertiary}
-                                    value={name}
-                                    onChangeText={setName}
-                                />
-                            </View>
-                        </View>
+                    {/* Form — Enrollment Card */}
+                    <View style={styles.formContainer}>
+                        <View style={styles.authCard}>
+                            <Text style={styles.welcomeText}>New Enrollment</Text>
+                            <Text style={styles.subWelcomeText}>Provide your credentials to begin service</Text>
 
-                        {/* Email */}
-                        <View style={styles.fieldGroup}>
-                            <Text style={styles.fieldLabel}>Email Address</Text>
-                            <View style={styles.inputRow}>
-                                <Ionicons name="mail-outline" size={17} color={C.textTertiary} />
-                                <TextInput
-                                    style={styles.textInput}
-                                    placeholder="you@example.com"
-                                    placeholderTextColor={C.textTertiary}
-                                    value={email}
-                                    onChangeText={setEmail}
-                                    keyboardType="email-address"
-                                    autoCapitalize="none"
-                                />
+                            {/* Full Name */}
+                            <View style={styles.fieldGroup}>
+                                <Text style={styles.fieldLabel}>FULL IDENTITY NAME</Text>
+                                <View style={styles.inputRow}>
+                                    <Ionicons name="person" size={17} color="#94A3B8" />
+                                    <TextInput
+                                        style={styles.textInput}
+                                        placeholder="Full Name"
+                                        placeholderTextColor="#94A3B8"
+                                        value={name}
+                                        onChangeText={setName}
+                                    />
+                                </View>
                             </View>
-                        </View>
 
-                        {/* Phone */}
-                        <View style={styles.fieldGroup}>
-                            <Text style={styles.fieldLabel}>Phone Number</Text>
-                            <View style={styles.inputRow}>
-                                <Ionicons name="call-outline" size={17} color={C.textTertiary} />
-                                <TextInput
-                                    style={styles.textInput}
-                                    placeholder="+91 00000 00000"
-                                    placeholderTextColor={C.textTertiary}
-                                    value={phone}
-                                    onChangeText={setPhone}
-                                    keyboardType="phone-pad"
-                                />
+                            {/* Email */}
+                            <View style={styles.fieldGroup}>
+                                <Text style={styles.fieldLabel}>AUTHORITY EMAIL</Text>
+                                <View style={styles.inputRow}>
+                                    <Ionicons name="mail" size={17} color="#94A3B8" />
+                                    <TextInput
+                                        style={styles.textInput}
+                                        placeholder="you@authority.com"
+                                        placeholderTextColor="#94A3B8"
+                                        value={email}
+                                        onChangeText={setEmail}
+                                        keyboardType="email-address"
+                                        autoCapitalize="none"
+                                    />
+                                </View>
                             </View>
-                        </View>
 
-                        {/* Password */}
-                        <View style={styles.fieldGroup}>
-                            <Text style={styles.fieldLabel}>Password</Text>
-                            <View style={styles.inputRow}>
-                                <Ionicons name="lock-closed-outline" size={17} color={C.textTertiary} />
-                                <TextInput
-                                    style={styles.textInput}
-                                    placeholder="Min 6 characters"
-                                    placeholderTextColor={C.textTertiary}
-                                    value={password}
-                                    onChangeText={setPassword}
-                                    secureTextEntry={!showPassword}
-                                />
-                                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                                    <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={17} color={C.textTertiary} />
-                                </TouchableOpacity>
+                            {/* Phone */}
+                            <View style={styles.fieldGroup}>
+                                <Text style={styles.fieldLabel}>CONTACT NUMBER</Text>
+                                <View style={styles.inputRow}>
+                                    <Ionicons name="call" size={17} color="#94A3B8" />
+                                    <TextInput
+                                        style={styles.textInput}
+                                        placeholder="+91 00000 00000"
+                                        placeholderTextColor="#94A3B8"
+                                        value={phone}
+                                        onChangeText={setPhone}
+                                        keyboardType="phone-pad"
+                                    />
+                                </View>
                             </View>
-                        </View>
 
-                        {/* Confirm Password */}
-                        <View style={styles.fieldGroup}>
-                            <Text style={styles.fieldLabel}>Confirm Password</Text>
-                            <View style={styles.inputRow}>
-                                <Ionicons name="lock-closed-outline" size={17} color={C.textTertiary} />
-                                <TextInput
-                                    style={styles.textInput}
-                                    placeholder="Re-enter your password"
-                                    placeholderTextColor={C.textTertiary}
-                                    value={confirmPassword}
-                                    onChangeText={setConfirmPassword}
-                                    secureTextEntry={!showConfirmPassword}
-                                />
-                                <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
-                                    <Ionicons name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'} size={17} color={C.textTertiary} />
-                                </TouchableOpacity>
+                            {/* Password */}
+                            <View style={styles.fieldGroup}>
+                                <Text style={styles.fieldLabel}>SECURE PASSWORD</Text>
+                                <View style={styles.inputRow}>
+                                    <Ionicons name="lock-closed" size={17} color="#94A3B8" />
+                                    <TextInput
+                                        style={styles.textInput}
+                                        placeholder="Min 8 unique characters"
+                                        placeholderTextColor="#94A3B8"
+                                        value={password}
+                                        onChangeText={setPassword}
+                                        secureTextEntry={!showPassword}
+                                    />
+                                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                                        <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={17} color="#94A3B8" />
+                                    </TouchableOpacity>
+                                </View>
                             </View>
-                        </View>
 
-                        {/* Sign Up Button */}
-                        <TouchableOpacity
-                            style={[styles.signUpButton, loading && { opacity: 0.6 }]}
-                            onPress={handleSignUp}
-                            disabled={loading}
-                            activeOpacity={0.88}
-                        >
-                            <LinearGradient
-                                colors={[C.navy, C.navyMid]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.signUpGradient}
+                            {/* Confirm Password */}
+                            <View style={styles.fieldGroup}>
+                                <Text style={styles.fieldLabel}>CONFIRM PASSWORD</Text>
+                                <View style={styles.inputRow}>
+                                    <Ionicons name="shield-checkmark" size={17} color="#94A3B8" />
+                                    <TextInput
+                                        style={styles.textInput}
+                                        placeholder="Re-enter password"
+                                        placeholderTextColor="#94A3B8"
+                                        value={confirmPassword}
+                                        onChangeText={setConfirmPassword}
+                                        secureTextEntry={!showConfirmPassword}
+                                    />
+                                    <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+                                        <Ionicons name={showConfirmPassword ? 'eye-off' : 'eye'} size={17} color="#94A3B8" />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            {/* Sign Up Button */}
+                            <TouchableOpacity
+                                style={[styles.signUpButton, loading && { opacity: 0.6 }]}
+                                onPress={handleSignUp}
+                                disabled={loading}
+                                activeOpacity={0.88}
                             >
-                                {loading ? (
-                                    <ActivityIndicator color={C.white} />
-                                ) : (
-                                    <>
-                                        <Text style={styles.signUpText}>Create Account</Text>
-                                        <Ionicons name="arrow-forward" size={16} color={C.white} />
-                                    </>
-                                )}
-                            </LinearGradient>
-                        </TouchableOpacity>
-
-                        {/* Footer */}
-                        <View style={styles.footer}>
-                            <Text style={styles.footerText}>Already have an account? </Text>
-                            <TouchableOpacity onPress={() => navigation.navigate('CitizenSignIn')}>
-                                <Text style={styles.signInLink}>Sign In</Text>
+                                <LinearGradient
+                                    colors={[C.navy, C.navyMid]}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={styles.signUpGradient}
+                                >
+                                    {loading ? (
+                                        <ActivityIndicator color={C.white} />
+                                    ) : (
+                                        <>
+                                            <Text style={styles.signUpText}>Submit Enrollment</Text>
+                                            <Ionicons name="chevron-forward" size={16} color={C.white} />
+                                        </>
+                                    )}
+                                </LinearGradient>
                             </TouchableOpacity>
+
+                            {/* Footer */}
+                            <View style={styles.footer}>
+                                <Text style={styles.footerText}>Found your badge? </Text>
+                                <TouchableOpacity onPress={() => navigation.navigate('CitizenSignIn')}>
+                                    <Text style={styles.signInLink}>Sign In Here</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
-                    </Animated.View>
+                        <Text style={styles.legalNotice}></Text>
+                    </View>
                 </ScrollView>
-            </KeyboardAvoidingView>
-        </MobileContainer>
+        </View>
     );
 }
 
@@ -374,54 +375,82 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
 
-    // Form
-    form: {
-        paddingHorizontal: 24,
-        paddingTop: 24,
+    // Form Container & Card
+    formContainer: {
+        marginTop: -32,
+        paddingHorizontal: 16,
         paddingBottom: 40,
     },
-    fieldGroup: { marginBottom: 14 },
+    authCard: {
+        backgroundColor: C.white,
+        borderRadius: 32,
+        padding: 24,
+        shadowColor: C.navy,
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.1,
+        shadowRadius: 24,
+        elevation: 8,
+    },
+    welcomeText: {
+        fontSize: 22,
+        fontFamily: 'Nunito-Bold',
+        color: C.navy,
+        textAlign: 'center',
+    },
+    subWelcomeText: {
+        fontSize: 14,
+        color: C.textSecondary,
+        fontFamily: 'Nunito-Medium',
+        textAlign: 'center',
+        marginTop: 4,
+        marginBottom: 32,
+    },
+
+    // Fields
+    fieldGroup: {
+        marginBottom: 20,
+    },
     fieldLabel: {
-        fontSize: 12,
-        fontFamily: 'Nunito-SemiBold',
-        color: C.navyMid,
-        marginBottom: 7,
-        letterSpacing: 0.2,
+        fontSize: 10,
+        fontFamily: 'Nunito-ExtraBold',
+        color: C.textTertiary,
+        marginBottom: 8,
+        letterSpacing: 1.2,
+        marginLeft: 4,
     },
     inputRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: C.surfaceInput,
-        borderRadius: 12,
-        paddingHorizontal: 13,
-        paddingVertical: 13,
-        gap: 9,
+        backgroundColor: C.offWhite,
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        gap: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
     },
     textInput: {
         flex: 1,
         fontSize: 15,
         color: C.textPrimary,
+        fontFamily: 'Nunito-SemiBold',
         padding: 0,
     },
 
     // Sign Up Button
     signUpButton: {
-        borderRadius: 14,
+        borderRadius: 16,
         overflow: 'hidden',
-        marginTop: 8,
-        marginBottom: 20,
-        shadowColor: C.navy,
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.22,
-        shadowRadius: 12,
-        elevation: 6,
+        marginTop: 12,
+        marginBottom: 24,
+        elevation: 4,
     },
     signUpGradient: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 8,
-        paddingVertical: 16,
+        gap: 10,
+        paddingVertical: 18,
     },
     signUpText: {
         fontSize: 16,
@@ -432,8 +461,23 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'center',
     },
-    footerText: { fontSize: 14, color: C.textSecondary },
-    signInLink: { fontSize: 14, fontFamily: 'Nunito-Bold', color: C.amber },
+    footerText: {
+        fontSize: 14,
+        color: C.textSecondary,
+        fontFamily: 'Nunito-Medium',
+    },
+    signInLink: {
+        fontSize: 14,
+        fontFamily: 'Nunito-Bold',
+        color: C.amberDark,
+    },
+    legalNotice: {
+        fontSize: 11,
+        color: '#94A3B8',
+        textAlign: 'center',
+        marginTop: 24,
+        fontFamily: 'Nunito-Medium',
+    },
 
     // Success Page
     successPage: {
@@ -448,123 +492,125 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     envelopeContainer: {
-        width: 110,
-        height: 110,
+        width: 120,
+        height: 120,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 8,
+        marginBottom: 16,
     },
     envelopeOuter: {
         width: 100,
         height: 100,
-        borderRadius: 28,
-        backgroundColor: C.primarySurface,
+        borderRadius: 32,
+        backgroundColor: C.white,
         justifyContent: 'center',
         alignItems: 'center',
+        shadowColor: C.navyMid,
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+        elevation: 6,
     },
     envelopeInner: {
         width: 72,
         height: 72,
         borderRadius: 20,
-        backgroundColor: 'rgba(27,58,107,0.08)',
+        backgroundColor: C.primarySurface,
         justifyContent: 'center',
         alignItems: 'center',
     },
     checkBadge: {
         position: 'absolute',
-        bottom: 0,
-        right: 0,
-        backgroundColor: C.surface,
-        borderRadius: 16,
+        bottom: 15,
+        right: 15,
+        backgroundColor: C.white,
+        borderRadius: 12,
         padding: 2,
         shadowColor: C.navyMid,
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+        shadowRadius: 8,
+        elevation: 4,
     },
     successTitle: {
-        fontSize: 24,
+        fontSize: 26,
         fontFamily: 'Nunito-Bold',
-        color: C.textPrimary,
+        color: C.navy,
         textAlign: 'center',
-        marginTop: 16,
-        letterSpacing: -0.4,
+        marginTop: 8,
+        letterSpacing: -0.5,
     },
     successDesc: {
-        fontSize: 14,
+        fontSize: 15,
         color: C.textSecondary,
         textAlign: 'center',
         marginTop: 6,
-        marginBottom: 14,
+        marginBottom: 16,
+        fontFamily: 'Nunito-Medium',
     },
     emailPill: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        gap: 8,
         backgroundColor: C.primarySurface,
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 20,
-        marginBottom: 24,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 24,
+        marginBottom: 32,
     },
     emailPillText: {
-        fontSize: 13,
-        fontFamily: 'Nunito-SemiBold',
+        fontSize: 14,
+        fontFamily: 'Nunito-Bold',
         color: C.navyMid,
     },
     stepsList: {
         alignSelf: 'stretch',
-        backgroundColor: C.surface,
-        borderRadius: 16,
-        padding: 16,
-        marginBottom: 24,
-        gap: 12,
+        backgroundColor: C.white,
+        borderRadius: 24,
+        padding: 20,
+        marginBottom: 32,
+        gap: 16,
         shadowColor: C.navyMid,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 2,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.05,
+        shadowRadius: 16,
+        elevation: 3,
     },
     stepRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 16,
     },
     stepNum: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         backgroundColor: C.primarySurface,
         justifyContent: 'center',
         alignItems: 'center',
     },
     stepNumText: {
-        fontSize: 13,
-        fontFamily: 'Nunito-Bold',
+        fontSize: 14,
+        fontFamily: 'Nunito-ExtraBold',
         color: C.navyMid,
     },
     stepText: {
-        fontSize: 14,
+        fontSize: 15,
         color: C.textPrimary,
-        fontFamily: 'Nunito-Medium',
+        fontFamily: 'Nunito-SemiBold',
     },
     successCTA: {
         alignSelf: 'stretch',
-        borderRadius: 14,
+        borderRadius: 16,
         overflow: 'hidden',
-        shadowColor: C.navy,
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.22,
-        shadowRadius: 10,
-        elevation: 6,
+        elevation: 4,
     },
     successCTAGradient: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 8,
-        paddingVertical: 16,
+        gap: 10,
+        paddingVertical: 18,
     },
     successCTAText: {
         fontSize: 16,
@@ -574,18 +620,19 @@ const styles = StyleSheet.create({
     resendRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        marginTop: 16,
+        gap: 8,
+        marginTop: 24,
     },
     resendText: {
-        fontSize: 13,
+        fontSize: 14,
         color: C.navyMid,
-        fontFamily: 'Nunito-Medium',
+        fontFamily: 'Nunito-Bold',
     },
     spamNote: {
-        fontSize: 11,
+        fontSize: 12,
         color: C.textTertiary,
         textAlign: 'center',
         marginTop: 8,
+        fontFamily: 'Nunito-Medium',
     },
 });

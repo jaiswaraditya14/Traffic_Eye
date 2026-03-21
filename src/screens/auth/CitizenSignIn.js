@@ -103,16 +103,12 @@ export default function CitizenSignIn({ navigation }) {
     };
 
     return (
-        <MobileContainer>
-            <StatusBar barStyle="light-content" backgroundColor={C.navyMid} />
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.container}
-            >
-                <ScrollView
+        <View style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FB" />
+            <ScrollView
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
-                    keyboardShouldPersistTaps="handled"
+                    keyboardShouldPersistTaps="always"
                 >
                     {/* ── Navy Header ── */}
                     <LinearGradient colors={[C.navy, C.navyMid]} style={styles.header}>
@@ -126,132 +122,139 @@ export default function CitizenSignIn({ navigation }) {
                             <View style={styles.logoMark}>
                                 <Ionicons name="shield-checkmark" size={32} color={C.amber} />
                             </View>
-                            <Text style={styles.headerTitle}>Welcome Back</Text>
-                            <Text style={styles.headerSubtitle}>Sign in as Citizen</Text>
+                            <Text style={styles.headerTitle}>Citizen Sign In</Text>
+                            <Text style={styles.headerSubtitle}>Report traffic violations</Text>
                         </View>
                     </LinearGradient>
 
-                    {/* ── Form Section ── */}
-                    <View style={styles.formSection}>
-                        {/* Email */}
-                        <View style={styles.fieldGroup}>
-                            <Text style={styles.fieldLabel}>Email Address</Text>
-                            <View style={[styles.inputRow, emailFocused && styles.inputRowFocused]}>
-                                <Ionicons
-                                    name="mail-outline"
-                                    size={18}
-                                    color={emailFocused ? C.navyMid : C.textTertiary}
-                                />
-                                <TextInput
-                                    style={styles.textInput}
-                                    placeholder="you@example.com"
-                                    placeholderTextColor={C.textTertiary}
-                                    value={email}
-                                    onChangeText={setEmail}
-                                    keyboardType="email-address"
-                                    autoCapitalize="none"
-                                    onFocus={() => setEmailFocused(true)}
-                                    onBlur={() => setEmailFocused(false)}
-                                />
-                            </View>
-                        </View>
+                    {/* ── Form Section — Auth Card ── */}
+                    <View style={styles.formContainer}>
+                        <View style={styles.authCard}>
+                            <Text style={styles.welcomeText}>Welcome Back</Text>
+                            <Text style={styles.subWelcomeText}>Sign in to continue</Text>
 
-                        {/* Password */}
-                        <View style={styles.fieldGroup}>
-                            <Text style={styles.fieldLabel}>Password</Text>
-                            <View style={[styles.inputRow, passwordFocused && styles.inputRowFocused]}>
-                                <Ionicons
-                                    name="lock-closed-outline"
-                                    size={18}
-                                    color={passwordFocused ? C.navyMid : C.textTertiary}
-                                />
-                                <TextInput
-                                    style={styles.textInput}
-                                    placeholder="Enter your password"
-                                    placeholderTextColor={C.textTertiary}
-                                    value={password}
-                                    onChangeText={setPassword}
-                                    secureTextEntry={!showPassword}
-                                    onFocus={() => setPasswordFocused(true)}
-                                    onBlur={() => setPasswordFocused(false)}
-                                />
-                                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                            {/* Email */}
+                            <View style={styles.fieldGroup}>
+                                <Text style={styles.fieldLabel}>EMAIL ADDRESS</Text>
+                                <View style={[styles.inputRow, emailFocused && styles.inputRowFocused]}>
                                     <Ionicons
-                                        name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                                        name="mail"
                                         size={18}
-                                        color={C.textTertiary}
+                                        color={emailFocused ? C.navyMid : '#94A3B8'}
                                     />
+                                    <TextInput
+                                        style={styles.textInput}
+                                        placeholder="johndoe@authority.com"
+                                        placeholderTextColor="#94A3B8"
+                                        value={email}
+                                        onChangeText={setEmail}
+                                        keyboardType="email-address"
+                                        autoCapitalize="none"
+                                        onFocus={() => setEmailFocused(true)}
+                                        onBlur={() => setEmailFocused(false)}
+                                    />
+                                </View>
+                            </View>
+
+                            {/* Password */}
+                            <View style={styles.fieldGroup}>
+                                <Text style={styles.fieldLabel}>PASSWORD</Text>
+                                <View style={[styles.inputRow, passwordFocused && styles.inputRowFocused]}>
+                                    <Ionicons
+                                        name="lock-closed"
+                                        size={18}
+                                        color={passwordFocused ? C.navyMid : '#94A3B8'}
+                                    />
+                                    <TextInput
+                                        style={styles.textInput}
+                                        placeholder="••••••••••••"
+                                        placeholderTextColor="#94A3B8"
+                                        value={password}
+                                        onChangeText={setPassword}
+                                        secureTextEntry={!showPassword}
+                                        onFocus={() => setPasswordFocused(true)}
+                                        onBlur={() => setPasswordFocused(false)}
+                                    />
+                                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                                        <Ionicons
+                                            name={showPassword ? 'eye-off' : 'eye'}
+                                            size={18}
+                                            color="#94A3B8"
+                                        />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            {/* Forgot Password */}
+                            <TouchableOpacity
+                                style={styles.forgotRow}
+                                onPress={() => navigation.navigate('ForgotPassword')}
+                            >
+                                <Text style={styles.forgotText}>Forgot Password?</Text>
+                            </TouchableOpacity>
+
+                            {/* Sign In Button */}
+                            <TouchableOpacity
+                                style={[styles.primaryButton, loading && styles.buttonDisabled]}
+                                onPress={handleSignIn}
+                                disabled={loading}
+                                activeOpacity={0.88}
+                            >
+                                <LinearGradient
+                                    colors={[C.navy, C.navyMid]}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={styles.primaryButtonGradient}
+                                >
+                                    {loading ? (
+                                        <ActivityIndicator color={C.white} />
+                                    ) : (
+                                        <>
+                                            <Text style={styles.primaryButtonText}>Sign In</Text>
+                                            <Ionicons name="log-in-outline" size={20} color={C.white} style={{ marginLeft: 6 }} />
+                                        </>
+                                    )}
+                                </LinearGradient>
+                            </TouchableOpacity>
+
+                            {/* Divider */}
+                            <View style={styles.divider}>
+                                <View style={styles.dividerLine} />
+                                <Text style={styles.dividerText}>OR SIGN IN WITH</Text>
+                                <View style={styles.dividerLine} />
+                            </View>
+
+                            {/* Google Sign In */}
+                            <TouchableOpacity
+                                style={[styles.googleButton, (loading || googleLoading) && styles.buttonDisabled]}
+                                onPress={handleGoogleSignIn}
+                                disabled={loading || googleLoading}
+                                activeOpacity={0.88}
+                            >
+                                {googleLoading ? (
+                                    <ActivityIndicator color={C.textPrimary} />
+                                ) : (
+                                    <>
+                                        <View style={styles.googleIconFrame}>
+                                            <Ionicons name="logo-google" size={18} color="#4285F4" />
+                                        </View>
+                                        <Text style={styles.googleButtonText}>Continue with Google</Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+
+                            {/* Footer */}
+                            <View style={styles.footer}>
+                                <Text style={styles.footerText}>Don't have an account? </Text>
+                                <TouchableOpacity onPress={() => navigation.navigate('CitizenSignUp')}>
+                                    <Text style={styles.signUpLink}>Sign Up</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
-
-                        {/* Forgot Password */}
-                        <TouchableOpacity
-                            style={styles.forgotRow}
-                            onPress={() => navigation.navigate('ForgotPassword')}
-                        >
-                            <Text style={styles.forgotText}>Forgot Password?</Text>
-                        </TouchableOpacity>
-
-                        {/* Sign In Button */}
-                        <TouchableOpacity
-                            style={[styles.primaryButton, loading && styles.buttonDisabled]}
-                            onPress={handleSignIn}
-                            disabled={loading}
-                            activeOpacity={0.88}
-                        >
-                            <LinearGradient
-                                colors={[C.navy, C.navyMid]}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.primaryButtonGradient}
-                            >
-                                {loading ? (
-                                    <ActivityIndicator color={C.white} />
-                                ) : (
-                                    <>
-                                        <Text style={styles.primaryButtonText}>Sign In</Text>
-                                        <Ionicons name="arrow-forward" size={16} color={C.white} />
-                                    </>
-                                )}
-                            </LinearGradient>
-                        </TouchableOpacity>
-
-                        {/* Divider */}
-                        <View style={styles.divider}>
-                            <View style={styles.dividerLine} />
-                            <Text style={styles.dividerText}>or continue with</Text>
-                            <View style={styles.dividerLine} />
-                        </View>
-
-                        {/* Google Sign In */}
-                        <TouchableOpacity
-                            style={[styles.googleButton, (loading || googleLoading) && styles.buttonDisabled]}
-                            onPress={handleGoogleSignIn}
-                            disabled={loading || googleLoading}
-                            activeOpacity={0.88}
-                        >
-                            {googleLoading ? (
-                                <ActivityIndicator color={C.textPrimary} />
-                            ) : (
-                                <>
-                                    <Ionicons name="logo-google" size={20} color="#4285F4" />
-                                    <Text style={styles.googleButtonText}>Continue with Google</Text>
-                                </>
-                            )}
-                        </TouchableOpacity>
-
-                        {/* Footer */}
-                        <View style={styles.footer}>
-                            <Text style={styles.footerText}>Don't have an account? </Text>
-                            <TouchableOpacity onPress={() => navigation.navigate('CitizenSignUp')}>
-                                <Text style={styles.signUpLink}>Sign Up</Text>
-                            </TouchableOpacity>
-                        </View>
+                        <Text style={styles.legalNotice}>Protected by Traffic Eye</Text>
                     </View>
                 </ScrollView>
-            </KeyboardAvoidingView>
-        </MobileContainer>
+        </View>
     );
 }
 
@@ -308,72 +311,97 @@ const styles = StyleSheet.create({
         fontFamily: 'Nunito-Medium',
     },
 
-    // ── Form ──
-    formSection: {
-        paddingHorizontal: 24,
-        paddingTop: 28,
+    // ── Form Container & Card ──
+    formContainer: {
+        marginTop: -32,
+        paddingHorizontal: 16,
         paddingBottom: 40,
+        zIndex: 1,
+        elevation: 1,
     },
+    authCard: {
+        backgroundColor: C.white,
+        borderRadius: 32,
+        padding: 24,
+        shadowColor: C.navy,
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.1,
+        shadowRadius: 24,
+        elevation: 8,
+    },
+    welcomeText: {
+        fontSize: 22,
+        fontFamily: 'Nunito-Bold',
+        color: C.navy,
+        textAlign: 'center',
+    },
+    subWelcomeText: {
+        fontSize: 14,
+        color: C.textSecondary,
+        fontFamily: 'Nunito-Medium',
+        textAlign: 'center',
+        marginTop: 4,
+        marginBottom: 32,
+    },
+
+    // Fields
     fieldGroup: {
-        marginBottom: 16,
+        marginBottom: 20,
     },
     fieldLabel: {
-        fontSize: 12,
-        fontFamily: 'Nunito-SemiBold',
-        color: C.navyMid,
+        fontSize: 10,
+        fontFamily: 'Nunito-ExtraBold',
+        color: C.textTertiary,
         marginBottom: 8,
-        letterSpacing: 0.2,
+        letterSpacing: 1.2,
+        marginLeft: 4,
     },
     inputRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: C.surfaceInput,
-        borderRadius: 12,
-        paddingHorizontal: 14,
-        paddingVertical: 13,
-        gap: 10,
-        borderBottomWidth: 2,
-        borderBottomColor: 'transparent',
+        backgroundColor: C.offWhite,
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        gap: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
     },
     inputRowFocused: {
-        borderBottomColor: C.navyMid,
-        backgroundColor: C.surface,
+        borderColor: C.navyMid,
+        backgroundColor: C.white,
     },
     textInput: {
         flex: 1,
         fontSize: 15,
         color: C.textPrimary,
+        fontFamily: 'Nunito-SemiBold',
         padding: 0,
     },
 
     // Forgot password
     forgotRow: {
         alignSelf: 'flex-end',
-        marginBottom: 20,
+        marginBottom: 24,
     },
     forgotText: {
         fontSize: 13,
         color: C.navyMid,
-        fontFamily: 'Nunito-SemiBold',
+        fontFamily: 'Nunito-Bold',
     },
 
     // Primary button
     primaryButton: {
-        borderRadius: 14,
+        borderRadius: 16,
         overflow: 'hidden',
-        marginBottom: 20,
-        shadowColor: C.navy,
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.25,
-        shadowRadius: 12,
-        elevation: 6,
+        marginBottom: 24,
+        elevation: 4,
     },
     primaryButtonGradient: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 8,
-        paddingVertical: 16,
+        paddingVertical: 18,
     },
     primaryButtonText: {
         fontSize: 16,
@@ -389,17 +417,18 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
-        marginBottom: 20,
+        marginBottom: 24,
     },
     dividerLine: {
         flex: 1,
         height: 1,
-        backgroundColor: C.border,
+        backgroundColor: '#E2E8F0',
     },
     dividerText: {
-        fontSize: 12,
-        color: C.textTertiary,
-        fontFamily: 'Nunito-Medium',
+        fontSize: 10,
+        color: '#94A3B8',
+        fontFamily: 'Nunito-ExtraBold',
+        letterSpacing: 1,
     },
 
     // Google button
@@ -407,17 +436,25 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 10,
-        backgroundColor: C.surface,
-        borderWidth: 1.5,
-        borderColor: C.border,
-        borderRadius: 14,
+        gap: 12,
+        backgroundColor: C.white,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        borderRadius: 16,
         paddingVertical: 14,
-        marginBottom: 28,
+        marginBottom: 24,
+    },
+    googleIconFrame: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        backgroundColor: '#F8FAFC',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     googleButtonText: {
         fontSize: 15,
-        fontFamily: 'Nunito-SemiBold',
+        fontFamily: 'Nunito-Bold',
         color: C.textPrimary,
     },
 
@@ -429,10 +466,18 @@ const styles = StyleSheet.create({
     footerText: {
         fontSize: 14,
         color: C.textSecondary,
+        fontFamily: 'Nunito-Medium',
     },
     signUpLink: {
         fontSize: 14,
         fontFamily: 'Nunito-Bold',
-        color: C.amber,
+        color: C.amberDark,
+    },
+    legalNotice: {
+        fontSize: 11,
+        color: '#94A3B8',
+        textAlign: 'center',
+        marginTop: 24,
+        fontFamily: 'Nunito-Medium',
     },
 });

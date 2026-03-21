@@ -39,7 +39,7 @@ export default function ReportDetail({ navigation, route }) {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor={C.navyMid} />
+            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FB" />
             <SafeAreaView style={styles.safeArea} edges={['top']}>
                 {/* ── Navy Header ── */}
                 <LinearGradient colors={[C.navy, C.navyMid]} style={styles.header}>

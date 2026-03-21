@@ -20,6 +20,9 @@ export { default as Notifications } from './citizen/Notifications';
 export { default as FineInformation } from './citizen/FineInformation';
 export { default as SafetyTips } from './citizen/SafetyTips';
 export { default as ContactUs } from './citizen/ContactUs';
+export { default as FineCalculator } from './citizen/FineCalculator';
+export { default as SpeedLimits } from './citizen/SpeedLimits';
+export { default as EmergencyContacts } from './citizen/EmergencyContacts';
 
 // Officer Screens
 export { default as OfficerDashboard } from './officer/OfficerDashboard';

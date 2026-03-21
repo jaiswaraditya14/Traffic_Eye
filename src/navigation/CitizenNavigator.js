@@ -23,7 +23,10 @@ import {
     FineInformation,
     PermissionsRequest,
     TrafficSigns,
-    SafetyTips
+    SafetyTips,
+    FineCalculator,
+    SpeedLimits,
+    EmergencyContacts
 } from '../screens';
 
 const Tab = createBottomTabNavigator();
@@ -87,6 +90,9 @@ export default function CitizenNavigator() {
             <Stack.Screen name="FineInformation" component={FineInformation} />
             <Stack.Screen name="TrafficSigns" component={TrafficSigns} />
             <Stack.Screen name="SafetyTips" component={SafetyTips} />
+            <Stack.Screen name="FineCalculator" component={FineCalculator} />
+            <Stack.Screen name="SpeedLimits" component={SpeedLimits} />
+            <Stack.Screen name="EmergencyContacts" component={EmergencyContacts} />
         </Stack.Navigator>
     );
 }

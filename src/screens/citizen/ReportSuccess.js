@@ -29,7 +29,7 @@ export default function ReportSuccess({ navigation }) {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor={C.navyMid} />
+            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FB" />
             <Animated.View style={[styles.content, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
                 {/* ── Checkmark Icon ── */}
                 <View style={styles.iconContainer}>

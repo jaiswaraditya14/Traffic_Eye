@@ -65,7 +65,7 @@ export default function OfficerProfile({ navigation }) {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor={C.navy} />
+            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FB" />
             
             {/* ── Navy Hero Header ── */}
             <LinearGradient colors={[C.navy, C.navyMid]} style={styles.heroSection}>

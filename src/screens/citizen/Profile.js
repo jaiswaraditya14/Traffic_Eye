@@ -98,7 +98,7 @@ export default function Profile({ navigation }) {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor={C.navyMid} />
+            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FB" />
             <SafeAreaView style={styles.safeArea} edges={['top']}>
                 <ScrollView showsVerticalScrollIndicator={false}>
                     {/* ── Navy Profile Hero ── */}
@@ -115,12 +115,8 @@ export default function Profile({ navigation }) {
                             <View style={styles.heroInfo}>
                                 <View style={styles.nameRow}>
                                     <Text style={styles.heroName}>{displayName}</Text>
-                                    <Ionicons name="checkmark-seal" size={18} color={C.amber} />
                                 </View>
                                 <Text style={styles.heroEmail}>{displayEmail}</Text>
-                                <View style={styles.memberBadge}>
-                                    <Text style={styles.memberBadgeText}>CIVIL SENTINEL</Text>
-                                </View>
                             </View>
                         </View>
 

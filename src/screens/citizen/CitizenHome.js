@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
-    Image, Animated, StatusBar,
+    Animated, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -70,6 +70,48 @@ export default function CitizenHome({ navigation }) {
     // Navigate to Reports tab within the bottom tab navigator
     const handleSeeAllReports = () => navigation.navigate('Reports');
 
+    // ── Traffic Info Cards Data (no images — code-driven) ──
+    const TRAFFIC_INFO = [
+        {
+            id: '1',
+            title: 'Offences & Fines',
+            sub: 'Know your penalties',
+            screen: 'FineInformation',
+            icon: 'document-text',
+            accent: '#F59E0B',
+            accentBg: '#FEF3C7',
+            stat: '96', statLabel: 'Offences listed',
+            gradColors: [C.navy, C.navyMid],
+        },
+        {
+            id: '2',
+            title: 'Traffic Signs',
+            sub: 'Visual guide & meanings',
+            screen: 'TrafficSigns',
+            icon: 'warning',
+            accent: '#DC2626',
+            accentBg: '#FEE2E2',
+            stat: '14+', statLabel: 'Signs explained',
+            gradColors: ['#1D4ED8', '#1E3A8A'],
+        },
+        {
+            id: '3',
+            title: 'Road Safety',
+            sub: 'Rules & best practices',
+            screen: 'SafetyTips',
+            icon: 'shield-checkmark',
+            accent: '#34D399',
+            accentBg: '#D1FAE5',
+            stat: '10+', statLabel: 'Safety tips',
+            gradColors: ['#065F46', '#059669'],
+        },
+    ];
+
+    const QUICK_SERVICES = [
+        { id: '5', title: 'Speed Limits', icon: 'speedometer', color: '#6366F1', bg: '#EDE9FE', screen: 'SpeedLimits' },
+        { id: '6', title: 'Emergency', icon: 'call', color: '#EF4444', bg: '#FEE2E2', screen: 'EmergencyContacts' },
+    ];
+
     const getTimeOfDay = () => {
         const h = new Date().getHours();
         if (h < 12) return 'Good Morning';
@@ -79,7 +121,7 @@ export default function CitizenHome({ navigation }) {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor={C.navyMid} />
+            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FB" />
             <SafeAreaView style={styles.safeArea} edges={['top']}>
                 <ScrollView showsVerticalScrollIndicator={false}>
 
@@ -90,7 +132,7 @@ export default function CitizenHome({ navigation }) {
                     >
                         <View style={styles.headerTop}>
                             <View style={styles.headerLeft}>
-                                <Text style={styles.greeting}>{getTimeOfDay()}, {firstName} 👋</Text>
+                                <Text style={styles.greeting}>{getTimeOfDay()}, {firstName}</Text>
                                 <View style={styles.locationRow}>
                                     <Ionicons name="location" size={12} color="rgba(255,255,255,0.6)" />
                                     <Text style={styles.locationText}>Mumbai, Maharashtra</Text>
@@ -159,13 +201,13 @@ export default function CitizenHome({ navigation }) {
                                             </View>
                                             <Text style={styles.heroTitle}>Report Violation</Text>
                                             <Text style={styles.heroSubtitle}>Ensure road safety with instant AI verification</Text>
-                                            
+
                                             <View style={styles.heroActionBtn}>
                                                 <Text style={styles.heroActionText}>Start Scan</Text>
                                                 <Ionicons name="camera" size={16} color={C.amberDark} />
                                             </View>
                                         </View>
-                                        
+
                                         {/* Stylized camera icon circle frame */}
                                         <View style={styles.heroIconFrame}>
                                             <Ionicons name="scan-outline" size={80} color="rgba(255,255,255,0.15)" />
@@ -175,65 +217,92 @@ export default function CitizenHome({ navigation }) {
                             </TouchableOpacity>
                         </Animated.View>
 
-                        {/* ── Quick Action Circle Frames ── */}
+                        {/* ── Traffic Info ── */}
                         <Animated.View
                             style={[
                                 styles.section,
                                 { opacity: fadeAnim, transform: [{ translateY: slideAnims[1] }] },
                             ]}
                         >
-                            <Text style={styles.sectionTitle}>Essential Resources</Text>
-                            <View style={styles.actionsGrid}>
-                                {/* Safety Tips */}
-                                <TouchableOpacity
-                                    style={styles.actionCard}
-                                    onPress={() =>
-                                        navigation.getParent()?.navigate('SafetyTips') ??
-                                        navigation.navigate('SafetyTips')
-                                    }
-                                    activeOpacity={0.8}
-                                >
-                                    <View style={[styles.actionIconFrame, { backgroundColor: '#E0E7FF' }]}>
-                                        <Image
-                                            source={require('../../../assets/images/helmet.png')}
-                                            style={styles.actionImage}
-                                            resizeMode="contain"
-                                        />
-                                    </View>
-                                    <Text style={styles.actionLabel}>Safety Tips</Text>
-                                </TouchableOpacity>
+                            <View style={styles.sectionHeader}>
+                                <Text style={styles.sectionTitle}>Traffic Information</Text>
+                            </View>
 
-                                {/* Traffic Signs */}
-                                <TouchableOpacity
-                                    style={styles.actionCard}
-                                    onPress={() =>
-                                        navigation.getParent()?.navigate('TrafficSigns') ??
-                                        navigation.navigate('TrafficSigns')
-                                    }
-                                    activeOpacity={0.8}
-                                >
-                                    <View style={[styles.actionIconFrame, { backgroundColor: '#FFEDD5' }]}>
-                                         <View style={styles.innerCircleFrame}>
-                                            <Ionicons name="warning" size={24} color={C.amberDark} />
-                                         </View>
-                                    </View>
-                                    <Text style={styles.actionLabel}>Signs Guide</Text>
-                                </TouchableOpacity>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trafficInfoScroll}>
+                                {TRAFFIC_INFO.map((item) => (
+                                    <TouchableOpacity
+                                        key={item.id}
+                                        activeOpacity={0.85}
+                                        onPress={() =>
+                                            navigation.getParent()?.navigate(item.screen) ??
+                                            navigation.navigate(item.screen)
+                                        }
+                                    >
+                                        <LinearGradient
+                                            colors={item.gradColors}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 1 }}
+                                            style={styles.infoCard}
+                                        >
+                                            {/* Top row: icon + stat */}
+                                            <View style={styles.infoCardTop}>
+                                                <View style={[styles.infoIconCircle, { backgroundColor: item.accent + '28' }]}>
+                                                    <Ionicons name={item.icon} size={22} color={item.accent} />
+                                                </View>
+                                                <View style={styles.infoStatBox}>
+                                                    <Text style={[styles.infoStatNum, { color: item.accent }]}>{item.stat}</Text>
+                                                    <Text style={styles.infoStatLabel}>{item.statLabel}</Text>
+                                                </View>
+                                            </View>
 
-                                {/* Fine Info */}
-                                <TouchableOpacity
-                                    style={styles.actionCard}
-                                    onPress={() =>
-                                        navigation.getParent()?.navigate('FineInformation') ??
-                                        navigation.navigate('FineInformation')
-                                    }
-                                    activeOpacity={0.8}
-                                >
-                                    <View style={[styles.actionIconFrame, { backgroundColor: '#FEE2E2' }]}>
-                                        <Ionicons name="receipt" size={24} color="#BA1A1A" />
-                                    </View>
-                                    <Text style={styles.actionLabel}>Fine Rates</Text>
-                                </TouchableOpacity>
+                                            {/* Decorative dots */}
+                                            <View style={styles.infoDots}>
+                                                <View style={[styles.infoDot, { backgroundColor: item.accent + '60' }]} />
+                                                <View style={[styles.infoDot, { width: 6, height: 6, backgroundColor: item.accent + '30' }]} />
+                                                <View style={[styles.infoDot, { width: 4, height: 4, backgroundColor: item.accent + '20' }]} />
+                                            </View>
+
+                                            {/* Bottom text */}
+                                            <Text style={styles.infoTitle}>{item.title}</Text>
+                                            <View style={styles.infoBottom}>
+                                                <Text style={styles.infoSub}>{item.sub}</Text>
+                                                <Ionicons name="arrow-forward" size={14} color="rgba(255,255,255,0.6)" />
+                                            </View>
+                                        </LinearGradient>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </Animated.View>
+
+                        {/* ── Quick Services ── */}
+                        <Animated.View
+                            style={[
+                                styles.section,
+                                { opacity: fadeAnim, transform: [{ translateY: slideAnims[2] }] },
+                            ]}
+                        >
+                            <View style={styles.sectionHeader}>
+                                <Text style={styles.sectionTitle}>Quick Services</Text>
+                            </View>
+
+                            <View style={styles.servicesGrid}>
+                                {QUICK_SERVICES.map((action) => (
+                                    <TouchableOpacity
+                                        key={action.id}
+                                        style={styles.serviceCard}
+                                        activeOpacity={0.75}
+                                        onPress={() =>
+                                            navigation.getParent()?.navigate(action.screen) ??
+                                            navigation.navigate(action.screen)
+                                        }
+                                    >
+                                        <View style={[styles.serviceIcon, { backgroundColor: action.bg }]}>
+                                            <Ionicons name={action.icon} size={22} color={action.color} />
+                                        </View>
+                                        <Text style={styles.serviceText}>{action.title}</Text>
+                                        <Ionicons name="chevron-forward" size={13} color="rgba(0,0,0,0.2)" style={{ marginTop: 2 }} />
+                                    </TouchableOpacity>
+                                ))}
                             </View>
                         </Animated.View>
 
@@ -241,7 +310,7 @@ export default function CitizenHome({ navigation }) {
                         <Animated.View
                             style={[
                                 styles.section,
-                                { opacity: fadeAnim, transform: [{ translateY: slideAnims[2] }], marginBottom: 32 },
+                                { opacity: fadeAnim, transform: [{ translateY: slideAnims[3] }], marginBottom: 32 },
                             ]}
                         >
                             <View style={styles.sectionHeader}>
@@ -484,69 +553,95 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 14,
+        marginBottom: 16,
     },
     sectionTitle: {
-        fontSize: 17,
+        fontSize: 18,
         fontFamily: 'Nunito-Bold',
         color: C.textPrimary,
-        letterSpacing: -0.2,
-        marginBottom: 14,
+        letterSpacing: -0.3,
     },
     seeAll: {
         fontSize: 13,
         color: C.amber,
-        fontFamily: 'Nunito-SemiBold',
+        fontFamily: 'Nunito-Bold',
     },
 
-    // Actions grid
-    actionsGrid: {
-        flexDirection: 'row',
-        gap: 12,
+    // ── Traffic Info Horizontal Scroll ──
+    trafficInfoScroll: {
+        paddingRight: 20,
+        gap: 14,
     },
-    actionCard: {
-        flex: 1,
-        backgroundColor: C.surface,
-        borderRadius: 20,
-        padding: 18,
-        alignItems: 'center',
-        shadowColor: C.navyMid,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-        elevation: 2,
-        borderWidth: 1,
-        borderColor: 'rgba(0,0,0,0.02)',
-    },
-    actionIconFrame: {
-        width: 56,
-        height: 56,
-        borderRadius: 28, // Perfect Circle Frame
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 12,
-        shadowColor: '#1B3A6B',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-    },
-    innerCircleFrame: {
-        width: 44,
-        height: 44,
+    infoCard: {
+        width: 200,
+        height: 170,
         borderRadius: 22,
-        backgroundColor: 'rgba(255,255,255,0.4)',
+        padding: 16,
+        justifyContent: 'space-between',
+        shadowColor: C.navy,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.18,
+        shadowRadius: 16,
+        elevation: 8,
+        overflow: 'hidden',
+    },
+    infoCardTop: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+    },
+    infoIconCircle: {
+        width: 40, height: 40, borderRadius: 12,
+        justifyContent: 'center', alignItems: 'center',
+    },
+    infoStatBox: { alignItems: 'flex-end' },
+    infoStatNum: { fontSize: 20, fontFamily: 'Nunito-Bold', lineHeight: 24 },
+    infoStatLabel: { fontSize: 9, fontFamily: 'Nunito-SemiBold', color: 'rgba(255,255,255,0.6)', marginTop: 1 },
+    infoDots: { flexDirection: 'row', gap: 4, alignItems: 'center' },
+    infoDot: { width: 8, height: 8, borderRadius: 4 },
+    infoTitle: {
+        fontSize: 15,
+        fontFamily: 'Nunito-Bold',
+        color: C.white,
+        letterSpacing: -0.2,
+    },
+    infoBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    infoSub: {
+        fontSize: 11,
+        fontFamily: 'Nunito-Medium',
+        color: 'rgba(255,255,255,0.7)',
+    },
+
+    // ── Quick Services Grid ──
+    servicesGrid: {
+        gap: 10,
+    },
+    serviceCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: C.white,
+        borderRadius: 16,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        gap: 14,
+        shadowColor: C.navy,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    serviceIcon: {
+        width: 46,
+        height: 46,
+        borderRadius: 13,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    actionImage: {
-        width: 30,
-        height: 30,
-    },
-    actionLabel: {
-        fontSize: 11,
-        fontFamily: 'Nunito-SemiBold',
+    serviceText: {
+        flex: 1,
+        fontSize: 14,
+        fontFamily: 'Nunito-Bold',
         color: C.textPrimary,
-        textAlign: 'center',
     },
 
     // Activity cards

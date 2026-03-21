@@ -84,7 +84,7 @@ export default function SplashScreen({ navigation }) {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor={C.navy} />
+            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FB" />
 
             {/* Background Layer */}
             <LinearGradient
@@ -99,7 +99,7 @@ export default function SplashScreen({ navigation }) {
 
             {/* ── Main Content Area ── */}
             <View style={styles.content}>
-                
+
                 {/* 1. The Sentinel Eye Logo Frame */}
                 <Animated.View
                     style={[
@@ -114,17 +114,17 @@ export default function SplashScreen({ navigation }) {
                             { transform: [{ scale: scanPulse }] },
                         ]}
                     />
-                    
+
                     {/* Circle Image Frame */}
                     <View style={styles.logoFrame}>
                         {/* THE EYE EMBLEM */}
                         <View style={styles.eyeInnerWrapper}>
                             <Ionicons name="eye" size={48} color={C.amber} />
-                            <Animated.View 
+                            <Animated.View
                                 style={[
-                                    styles.scanLine, 
+                                    styles.scanLine,
                                     { transform: [{ scaleY: scanPulse }] }
-                                ]} 
+                                ]}
                             />
                         </View>
                     </View>
@@ -135,8 +135,8 @@ export default function SplashScreen({ navigation }) {
 
                 {/* 2. Brand Identity */}
                 <Animated.View
-                    style={{ 
-                        opacity: titleOpacity, 
+                    style={{
+                        opacity: titleOpacity,
                         transform: [{ translateY: titleY }],
                         alignItems: 'center'
                     }}
@@ -144,9 +144,9 @@ export default function SplashScreen({ navigation }) {
                     <Text style={styles.appName}>
                         TRAFFIC<Text style={styles.appNameAccent}>EYE</Text>
                     </Text>
-                    
+
                     <Animated.Text style={[styles.vSubtitle, { opacity: subtitleOpacity }]}>
-                        2.0 | Civic Intelligence Platform
+                        1.0 | Civic Intelligence Platform
                     </Animated.Text>
                 </Animated.View>
 
