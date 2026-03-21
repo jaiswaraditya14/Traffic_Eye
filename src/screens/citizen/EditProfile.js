@@ -23,7 +23,6 @@ export default function EditProfile({ navigation }) {
         try {
             const { error } = await authService.updateProfile(user.id, {
                 full_name: fullName,
-                phone: phone,
                 updated_at: new Date(),
             });
 
@@ -70,13 +69,12 @@ export default function EditProfile({ navigation }) {
                             onChangeText={setFullName}
                         />
 
-                        <Input
-                            label="Phone Number"
-                            placeholder="Enter your phone number"
-                            value={phone}
-                            onChangeText={setPhone}
-                            keyboardType="phone-pad"
-                        />
+                        <View style={styles.readOnlyContainer}>
+                            <Text style={styles.readOnlyLabel}>Phone Number (Cannot be changed)</Text>
+                            <View style={styles.readOnlyInput}>
+                                <Text style={styles.readOnlyText}>{phone || 'Not set'}</Text>
+                            </View>
+                        </View>
 
                         <View style={styles.readOnlyContainer}>
                             <Text style={styles.readOnlyLabel}>Email (Cannot be changed)</Text>

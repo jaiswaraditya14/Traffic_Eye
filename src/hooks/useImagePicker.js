@@ -7,6 +7,7 @@ import { Alert } from 'react-native';
 
 export default function useImagePicker() {
     const [image, setImage] = useState(null);
+    const [exifData, setExifData] = useState(null);
     const [loading, setLoading] = useState(false);
 
     const pickFromGallery = async () => {
@@ -20,33 +21,16 @@ export default function useImagePicker() {
 
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: false, // Set to false to skip the crop screen entirely
+                allowsEditing: false,
                 quality: 0.8,
                 exif: true,
             });
 
             if (!result.canceled && result.assets?.length > 0) {
                 const asset = result.assets[0];
-                const uri = asset.uri;
-                setImage(uri);
-                
-                let location = null;
-                if (asset.exif && asset.exif.GPSLatitude !== undefined && asset.exif.GPSLongitude !== undefined) {
-                    // Extract coordinates
-                    let lat = asset.exif.GPSLatitude;
-                    let lng = asset.exif.GPSLongitude;
-                    
-                    // Handle iOS reference tags if they exist and lat/lng are positive
-                    if (asset.exif.GPSLatitudeRef === 'S' && lat > 0) lat = -lat;
-                    if (asset.exif.GPSLongitudeRef === 'W' && lng > 0) lng = -lng;
-                    
-                    // Ignore empty boilerplate coordinates (0,0)
-                    if (lat !== 0 || lng !== 0) {
-                        location = { latitude: lat, longitude: lng };
-                    }
-                }
-                
-                return { uri, location };
+                setImage(asset.uri);
+                setExifData(asset.exif || null);
+                return { uri: asset.uri, exif: asset.exif || null };
             }
             return { uri: null, location: null };
         } catch (error) {
@@ -68,31 +52,16 @@ export default function useImagePicker() {
             }
 
             const result = await ImagePicker.launchCameraAsync({
-                allowsEditing: false, // Set to false to skip the crop screen entirely
+                allowsEditing: false,
                 quality: 0.8,
                 exif: true,
             });
 
             if (!result.canceled && result.assets?.length > 0) {
                 const asset = result.assets[0];
-                const uri = asset.uri;
-                setImage(uri);
-                
-                let location = null;
-                if (asset.exif && asset.exif.GPSLatitude !== undefined && asset.exif.GPSLongitude !== undefined) {
-                    let lat = asset.exif.GPSLatitude;
-                    let lng = asset.exif.GPSLongitude;
-                    
-                    if (asset.exif.GPSLatitudeRef === 'S' && lat > 0) lat = -lat;
-                    if (asset.exif.GPSLongitudeRef === 'W' && lng > 0) lng = -lng;
-                    
-                    // Ignore empty boilerplate coordinates (0,0)
-                    if (lat !== 0 || lng !== 0) {
-                        location = { latitude: lat, longitude: lng };
-                    }
-                }
-                
-                return { uri, location };
+                setImage(asset.uri);
+                setExifData(asset.exif || null);
+                return { uri: asset.uri, exif: asset.exif || null };
             }
             return { uri: null, location: null };
         } catch (error) {
@@ -115,7 +84,7 @@ export default function useImagePicker() {
 
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-                allowsEditing: true,
+                allowsEditing: false,
                 quality: 0.8,
             });
 
@@ -144,7 +113,7 @@ export default function useImagePicker() {
 
             const result = await ImagePicker.launchCameraAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-                allowsEditing: true,
+                allowsEditing: false,
                 quality: 0.8,
             });
 
@@ -164,10 +133,12 @@ export default function useImagePicker() {
 
     const clearImage = () => {
         setImage(null);
+        setExifData(null);
     };
 
     return {
         image,
+        exifData,
         loading,
         pickFromGallery,
         captureFromCamera,
@@ -175,5 +146,6 @@ export default function useImagePicker() {
         captureVideoFromCamera,
         clearImage,
         setImage,
+        setExifData,
     };
 }

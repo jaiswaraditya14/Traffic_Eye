@@ -1,20 +1,26 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Linking from 'expo-linking';
+import * as AuthSession from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
 import { MobileContainer, Button, Input } from '../../components';
 import { useAuth } from '../../context';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, isValidEmail, validateRequiredFields } from '../../utils';
+import { supabase } from '../../services';
+import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, isValidEmail, validateRequiredFields } from '../../utils';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function CitizenSignIn({ navigation }) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [googleLoading, setGoogleLoading] = useState(false);
 
-    const { signIn } = useAuth();
+    const { signIn, signInWithGoogle } = useAuth();
 
     const handleSignIn = async () => {
-        // Use validation utility
         const validation = validateRequiredFields({ Email: email, Password: password });
         if (!validation.valid) {
             Alert.alert('Error', validation.errors[0]);
@@ -43,10 +49,70 @@ export default function CitizenSignIn({ navigation }) {
     };
 
     const handleGoogleSignIn = async () => {
-        Alert.alert(
-            'Coming Soon!',
-            'Google Sign-In will be available in the next update. It requires a native build to work properly.'
-        );
+        setGoogleLoading(true);
+        try {
+            const redirectUri = AuthSession.makeRedirectUri({
+                scheme: 'trafficeye',
+                path: 'auth/callback'
+            });
+
+            console.log('1. [OAuth] Initiating with redirect URI:', redirectUri);
+
+            const { data, error } = await signInWithGoogle(redirectUri);
+
+            if (error) {
+                console.log('2. [OAuth] Supabase Error:', error.message);
+                Alert.alert('Configuration Error', error.message);
+                throw error;
+            }
+
+            if (data?.url) {
+                console.log('3. [OAuth] Opening Browser at:', data.url);
+                const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
+                console.log('4. [OAuth] Browser Session Finished. Result Type:', result.type);
+
+                if (result.type === 'success' && result.url) {
+                    console.log('5. [OAuth] Success! URL received:', result.url);
+
+                    const getParam = (url, param) => {
+                        const regex = new RegExp(`[#|?|&]${param}=([^&]*)`);
+                        const match = url.match(regex);
+                        return match ? decodeURIComponent(match[1]) : null;
+                    };
+
+                    const access_token = getParam(result.url, 'access_token');
+                    const refresh_token = getParam(result.url, 'refresh_token');
+
+                    console.log('6. [OAuth] Tokens extracted:', !!access_token, !!refresh_token);
+
+                    if (access_token && refresh_token) {
+                        console.log('7. [OAuth] Setting session...');
+                        const { error: sessionError } = await supabase.auth.setSession({
+                            access_token,
+                            refresh_token,
+                        });
+
+                        if (sessionError) {
+                            console.error('8. [OAuth] Session Error:', sessionError);
+                            throw sessionError;
+                        }
+                        console.log('✅ Session set successfully');
+                    } else {
+                        throw new Error('No authentication tokens found in the redirect. Please try again.');
+                    }
+                } else if (result.type === 'cancel') {
+                    console.log('User cancelled the sign-in');
+                    Alert.alert('Cancelled', 'Sign in was cancelled');
+                } else {
+                    console.log('Unexpected result type:', result.type);
+                }
+            }
+        } catch (error) {
+            console.error('Google sign in error:', error);
+            Alert.alert('Error', error.message || 'Failed to sign in with Google');
+        } finally {
+            setGoogleLoading(false);
+        }
     };
 
     return (
@@ -55,19 +121,26 @@ export default function CitizenSignIn({ navigation }) {
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.container}
             >
-                <ScrollView contentContainerStyle={styles.scrollContent}>
+                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                    {/* Header */}
                     <View style={styles.header}>
                         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                            <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+                            <View style={styles.backButtonInner}>
+                                <Ionicons name="arrow-back" size={20} color={COLORS.textPrimary} />
+                            </View>
                         </TouchableOpacity>
-                        <Text style={styles.title}>Welcome Back</Text>
-                        <Text style={styles.subtitle}>Sign in to continue reporting violations</Text>
+
+                        <View style={styles.headerTextContainer}>
+                            <Text style={styles.title}>Welcome Back</Text>
+                            <Text style={styles.subtitle}>Sign in to continue reporting violations</Text>
+                        </View>
                     </View>
 
+                    {/* Form */}
                     <View style={styles.form}>
                         <Input
                             label="Email"
-                            placeholder="Enter your email"
+                            placeholder="you@example.com"
                             value={email}
                             onChangeText={setEmail}
                             keyboardType="email-address"
@@ -89,7 +162,7 @@ export default function CitizenSignIn({ navigation }) {
                                 <Ionicons
                                     name={showPassword ? 'eye-off' : 'eye'}
                                     size={20}
-                                    color={COLORS.gray500}
+                                    color={COLORS.textTertiary}
                                 />
                             </TouchableOpacity>
                         </View>
@@ -101,6 +174,7 @@ export default function CitizenSignIn({ navigation }) {
                         <Button
                             onPress={handleSignIn}
                             fullWidth
+                            size="lg"
                             style={styles.signInButton}
                             disabled={loading}
                         >
@@ -111,25 +185,33 @@ export default function CitizenSignIn({ navigation }) {
                             )}
                         </Button>
 
+                        {/* Divider */}
                         <View style={styles.divider}>
                             <View style={styles.dividerLine} />
                             <Text style={styles.dividerText}>OR</Text>
                             <View style={styles.dividerLine} />
                         </View>
 
+                        {/* Google Sign In */}
                         <Button
                             variant="secondary"
                             fullWidth
+                            size="lg"
                             style={styles.socialButton}
                             onPress={handleGoogleSignIn}
-                            disabled={loading}
+                            disabled={loading || googleLoading}
                         >
-                            <View style={styles.socialButtonContent}>
-                                <Ionicons name="logo-google" size={20} color={COLORS.textPrimary} />
-                                <Text style={styles.socialButtonText}>Continue with Google</Text>
-                            </View>
+                            {googleLoading ? (
+                                <ActivityIndicator color={COLORS.textPrimary} />
+                            ) : (
+                                <View style={styles.socialButtonContent}>
+                                    <Ionicons name="logo-google" size={20} color={COLORS.textPrimary} />
+                                    <Text style={styles.socialButtonText}>Continue with Google</Text>
+                                </View>
+                            )}
                         </Button>
 
+                        {/* Footer */}
                         <View style={styles.footer}>
                             <Text style={styles.footerText}>Don't have an account? </Text>
                             <TouchableOpacity onPress={() => navigation.navigate('CitizenSignUp')}>
@@ -152,54 +234,73 @@ const styles = StyleSheet.create({
         flexGrow: 1,
     },
     header: {
-        paddingHorizontal: SPACING.lg,
+        paddingHorizontal: SPACING.xl,
         paddingTop: SPACING.xl,
         paddingBottom: SPACING.lg,
     },
     backButton: {
-        marginBottom: SPACING.lg,
+        marginBottom: SPACING.xl,
+    },
+    backButtonInner: {
+        width: 40,
+        height: 40,
+        borderRadius: BORDER_RADIUS.lg,
+        backgroundColor: COLORS.surface,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    headerTextContainer: {
+        gap: SPACING.sm,
     },
     title: {
         fontSize: FONT_SIZES.xxxl,
         fontWeight: FONT_WEIGHTS.bold,
         color: COLORS.textPrimary,
-        marginBottom: SPACING.sm,
+        letterSpacing: -0.5,
     },
     subtitle: {
         fontSize: FONT_SIZES.md,
         color: COLORS.textSecondary,
+        lineHeight: 22,
     },
     form: {
-        paddingHorizontal: SPACING.lg,
+        paddingHorizontal: SPACING.xl,
+        paddingTop: SPACING.sm,
     },
     eyeIcon: {
         position: 'absolute',
-        right: SPACING.md,
-        top: 38,
+        right: SPACING.lg,
+        top: 40,
+        padding: SPACING.xs,
     },
     forgotPassword: {
         fontSize: FONT_SIZES.sm,
         color: COLORS.primary,
         textAlign: 'right',
         marginBottom: SPACING.lg,
+        fontWeight: FONT_WEIGHTS.semibold,
     },
     signInButton: {
-        marginTop: SPACING.md,
+        marginTop: SPACING.sm,
     },
     divider: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginVertical: SPACING.lg,
+        marginVertical: SPACING.xl,
     },
     dividerLine: {
         flex: 1,
         height: 1,
-        backgroundColor: COLORS.gray300,
+        backgroundColor: COLORS.border,
     },
     dividerText: {
-        marginHorizontal: SPACING.md,
-        color: COLORS.textSecondary,
-        fontSize: FONT_SIZES.sm,
+        marginHorizontal: SPACING.lg,
+        color: COLORS.textTertiary,
+        fontSize: FONT_SIZES.xs,
+        fontWeight: FONT_WEIGHTS.semibold,
+        letterSpacing: 1,
     },
     socialButton: {
         marginBottom: SPACING.md,
@@ -207,17 +308,18 @@ const styles = StyleSheet.create({
     socialButtonContent: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: SPACING.sm,
+        gap: SPACING.md,
     },
     socialButtonText: {
         fontSize: FONT_SIZES.md,
         color: COLORS.textPrimary,
-        fontWeight: FONT_WEIGHTS.medium,
+        fontWeight: FONT_WEIGHTS.semibold,
     },
     footer: {
         flexDirection: 'row',
         justifyContent: 'center',
-        marginTop: SPACING.lg,
+        marginTop: SPACING.xl,
+        paddingBottom: SPACING.xxl,
     },
     footerText: {
         fontSize: FONT_SIZES.sm,
@@ -226,6 +328,6 @@ const styles = StyleSheet.create({
     signUpLink: {
         fontSize: FONT_SIZES.sm,
         color: COLORS.primary,
-        fontWeight: FONT_WEIGHTS.semibold,
+        fontWeight: FONT_WEIGHTS.bold,
     },
 });

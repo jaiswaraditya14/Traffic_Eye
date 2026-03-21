@@ -21,15 +21,26 @@ import {
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
-    const { hasSeenOnboarding } = useAppContext();
+    const { hasSeenOnboarding, showSplash } = useAppContext();
     const { isAuthenticated, loading, profile } = useAuth();
 
-    // 1. Loading/Splash Screen
-    if (loading) {
+    // 1. Splash Screen — always shows first on app start for 8 seconds
+    if (showSplash) {
         return (
             <NavigationContainer>
                 <Stack.Navigator screenOptions={{ headerShown: false }}>
                     <Stack.Screen name="Splash" component={SplashScreen} />
+                </Stack.Navigator>
+            </NavigationContainer>
+        );
+    }
+
+    // 2. Loading (auth check)
+    if (loading) {
+        return (
+            <NavigationContainer>
+                <Stack.Navigator screenOptions={{ headerShown: false }}>
+                    <Stack.Screen name="Loading" component={SplashScreen} />
                 </Stack.Navigator>
             </NavigationContainer>
         );

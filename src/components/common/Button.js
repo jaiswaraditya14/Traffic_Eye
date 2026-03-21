@@ -1,6 +1,7 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS } from '../../utils/theme';
+import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, GRADIENTS } from '../../utils/theme';
 
 export const Button = ({
     children,
@@ -10,15 +11,23 @@ export const Button = ({
     fullWidth = false,
     disabled = false,
     loading = false,
+    icon,
+    iconPosition = 'left',
     style,
     textStyle,
 }) => {
+    const isPrimary = variant === 'primary';
+    const isGradient = isPrimary && !disabled;
+
     const buttonStyles = [
         styles.button,
-        styles[variant],
-        styles[size],
+        styles[`size_${size}`],
+        !isGradient && styles[variant],
         fullWidth && styles.fullWidth,
         disabled && styles.disabled,
+        isPrimary && !disabled && SHADOWS.primary,
+        variant === 'danger' && !disabled && SHADOWS.error,
+        variant === 'success' && !disabled && SHADOWS.success,
         style,
     ];
 
@@ -26,8 +35,47 @@ export const Button = ({
         styles.text,
         styles[`${variant}Text`],
         styles[`${size}Text`],
+        disabled && styles.disabledText,
         textStyle,
     ];
+
+    const renderContent = () => {
+        if (loading) {
+            return (
+                <ActivityIndicator
+                    color={isPrimary || variant === 'danger' || variant === 'success' ? '#FFFFFF' : COLORS.primary}
+                    size="small"
+                />
+            );
+        }
+
+        // If children is a string, render as Text; otherwise render as-is (for custom content like icons)
+        if (typeof children === 'string') {
+            return <Text style={textStyles}>{children}</Text>;
+        }
+
+        return children;
+    };
+
+    if (isGradient) {
+        return (
+            <TouchableOpacity
+                onPress={onPress}
+                disabled={disabled || loading}
+                activeOpacity={0.8}
+                style={[fullWidth && styles.fullWidth, isPrimary && !disabled && SHADOWS.primary, style]}
+            >
+                <LinearGradient
+                    colors={GRADIENTS.primary}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={[styles.button, styles[`size_${size}`], styles.gradientInner]}
+                >
+                    {renderContent()}
+                </LinearGradient>
+            </TouchableOpacity>
+        );
+    }
 
     return (
         <TouchableOpacity
@@ -36,11 +84,7 @@ export const Button = ({
             disabled={disabled || loading}
             activeOpacity={0.7}
         >
-            {loading ? (
-                <ActivityIndicator color={variant === 'primary' ? '#FFFFFF' : COLORS.primary} />
-            ) : (
-                <Text style={textStyles}>{children}</Text>
-            )}
+            {renderContent()}
         </TouchableOpacity>
     );
 };
@@ -50,21 +94,25 @@ const styles = StyleSheet.create({
         borderRadius: BORDER_RADIUS.lg,
         alignItems: 'center',
         justifyContent: 'center',
-        ...SHADOWS.sm,
+        flexDirection: 'row',
+        gap: SPACING.sm,
+    },
+    gradientInner: {
+        borderRadius: BORDER_RADIUS.lg,
     },
 
-    // Variants
+    // ── Variants ──
     primary: {
         backgroundColor: COLORS.primary,
     },
     secondary: {
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: '#D1D5DB',
+        backgroundColor: COLORS.surface,
+        borderWidth: 1.5,
+        borderColor: COLORS.border,
     },
     outline: {
         backgroundColor: 'transparent',
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: COLORS.primary,
     },
     ghost: {
@@ -76,19 +124,25 @@ const styles = StyleSheet.create({
     success: {
         backgroundColor: COLORS.success,
     },
+    soft: {
+        backgroundColor: COLORS.primarySurface,
+    },
 
-    // Sizes
-    sm: {
+    // ── Sizes ──
+    size_sm: {
         paddingVertical: SPACING.sm,
-        paddingHorizontal: SPACING.md,
-    },
-    md: {
-        paddingVertical: SPACING.md,
         paddingHorizontal: SPACING.lg,
+        minHeight: 36,
     },
-    lg: {
-        paddingVertical: SPACING.lg,
+    size_md: {
+        paddingVertical: SPACING.md,
         paddingHorizontal: SPACING.xl,
+        minHeight: 48,
+    },
+    size_lg: {
+        paddingVertical: SPACING.lg,
+        paddingHorizontal: SPACING.xxl,
+        minHeight: 56,
     },
 
     fullWidth: {
@@ -96,31 +150,45 @@ const styles = StyleSheet.create({
     },
 
     disabled: {
-        opacity: 0.5,
+        opacity: 0.45,
     },
 
-    // Text styles
+    disabledText: {
+        opacity: 0.7,
+    },
+
+    // ── Text styles ──
     text: {
         fontWeight: FONT_WEIGHTS.semibold,
+        letterSpacing: 0.2,
     },
-
     primaryText: {
         color: '#FFFFFF',
+        fontSize: FONT_SIZES.md,
     },
     secondaryText: {
-        color: '#111827',
+        color: COLORS.textPrimary,
+        fontSize: FONT_SIZES.md,
     },
     outlineText: {
         color: COLORS.primary,
+        fontSize: FONT_SIZES.md,
     },
     ghostText: {
         color: COLORS.primary,
+        fontSize: FONT_SIZES.md,
     },
     dangerText: {
         color: '#FFFFFF',
+        fontSize: FONT_SIZES.md,
     },
     successText: {
         color: '#FFFFFF',
+        fontSize: FONT_SIZES.md,
+    },
+    softText: {
+        color: COLORS.primary,
+        fontSize: FONT_SIZES.md,
     },
 
     smText: {

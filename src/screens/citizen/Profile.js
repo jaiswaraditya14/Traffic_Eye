@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MobileContainer } from '../../components';
 import { useAppContext, useAuth } from '../../context';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, formatPoints } from '../../utils';
+import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, GRADIENTS, formatPoints } from '../../utils';
 
 export default function Profile({ navigation }) {
     const { setIsAuthenticated, setUserRole } = useAppContext();
@@ -12,11 +13,11 @@ export default function Profile({ navigation }) {
     const [loggingOut, setLoggingOut] = useState(false);
 
     const menuItems = [
-        { icon: 'person', label: 'Edit Profile', screen: 'EditProfile' },
-        { icon: 'notifications', label: 'Notifications', screen: 'Notifications' },
-        { icon: 'help-circle', label: 'Help & FAQ', screen: 'Help' },
-        { icon: 'shield-checkmark', label: 'Privacy Policy', screen: 'Privacy' },
-        { icon: 'call', label: 'Contact Us', screen: 'ContactUs' },
+        { icon: 'person-outline', label: 'Edit Profile', screen: 'EditProfile', color: COLORS.primary },
+        { icon: 'notifications-outline', label: 'Notifications', screen: 'Notifications', color: COLORS.info },
+        { icon: 'help-circle-outline', label: 'Help & FAQ', screen: 'Help', color: COLORS.secondary },
+        { icon: 'shield-checkmark-outline', label: 'Privacy Policy', screen: 'Privacy', color: COLORS.warning },
+        { icon: 'call-outline', label: 'Contact Us', screen: 'ContactUs', color: COLORS.accent },
     ];
 
     const handleLogout = () => {
@@ -51,13 +52,23 @@ export default function Profile({ navigation }) {
     const displayPhone = profile?.phone || '';
     const displayPoints = profile?.points_balance ?? 0;
 
+    // Get initials for avatar
+    const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+
     return (
         <MobileContainer>
             <SafeAreaView style={styles.container} edges={['top']}>
-                <View style={styles.header}>
+                {/* Profile Header */}
+                <LinearGradient
+                    colors={GRADIENTS.heroIndigo}
+                    style={styles.headerGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                >
+                    <View style={styles.decorCircle} />
                     <View style={styles.profileInfo}>
                         <View style={styles.avatar}>
-                            <Ionicons name="person" size={40} color={COLORS.white} />
+                            <Text style={styles.avatarText}>{initials}</Text>
                         </View>
                         <View style={styles.userInfo}>
                             <Text style={styles.userName}>{displayName}</Text>
@@ -68,17 +79,19 @@ export default function Profile({ navigation }) {
                         </View>
                     </View>
                     <View style={styles.pointsBadge}>
-                        <Ionicons name="trophy" size={16} color={COLORS.warning} />
-                        <Text style={styles.pointsText}>{formatPoints(displayPoints)}</Text>
+                        <Ionicons name="trophy" size={16} color={COLORS.accent} />
+                        <Text style={styles.pointsText}>{formatPoints(displayPoints)} pts</Text>
                     </View>
-                </View>
+                </LinearGradient>
 
-                <ScrollView style={styles.content}>
+                <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
                     {/* Referral Code Section */}
                     {profile?.referral_code && (
                         <View style={styles.referralCard}>
                             <View style={styles.referralHeader}>
-                                <Ionicons name="gift" size={24} color={COLORS.primary} />
+                                <View style={styles.referralIconBg}>
+                                    <Ionicons name="gift" size={20} color={COLORS.primary} />
+                                </View>
                                 <Text style={styles.referralTitle}>Your Referral Code</Text>
                             </View>
                             <Text style={styles.referralCode}>{profile.referral_code}</Text>
@@ -86,27 +99,37 @@ export default function Profile({ navigation }) {
                         </View>
                     )}
 
-                    {menuItems.map((item, index) => (
-                        <TouchableOpacity
-                            key={index}
-                            style={styles.menuItem}
-                            onPress={() => navigation.navigate(item.screen)}
-                        >
-                            <Ionicons name={item.icon} size={24} color={COLORS.primary} />
-                            <Text style={styles.menuLabel}>{item.label}</Text>
-                            <Ionicons name="chevron-forward" size={24} color={COLORS.gray400} />
-                        </TouchableOpacity>
-                    ))}
+                    {/* Menu Items */}
+                    <View style={styles.menuSection}>
+                        {menuItems.map((item, index) => (
+                            <TouchableOpacity
+                                key={index}
+                                style={styles.menuItem}
+                                onPress={() => navigation.getParent()?.navigate(item.screen) ?? navigation.navigate(item.screen)}
+                                activeOpacity={0.7}
+                            >
+                                <View style={[styles.menuIconBg, { backgroundColor: `${item.color}12` }]}>
+                                    <Ionicons name={item.icon} size={20} color={item.color} />
+                                </View>
+                                <Text style={styles.menuLabel}>{item.label}</Text>
+                                <Ionicons name="chevron-forward" size={18} color={COLORS.textTertiary} />
+                            </TouchableOpacity>
+                        ))}
+                    </View>
 
+                    {/* Logout */}
                     <TouchableOpacity
                         style={styles.logoutButton}
                         onPress={handleLogout}
                         disabled={loggingOut}
+                        activeOpacity={0.7}
                     >
                         {loggingOut ? (
                             <ActivityIndicator size="small" color={COLORS.error} />
                         ) : (
-                            <Ionicons name="log-out" size={24} color={COLORS.error} />
+                            <View style={[styles.menuIconBg, { backgroundColor: COLORS.errorSurface }]}>
+                                <Ionicons name="log-out-outline" size={20} color={COLORS.error} />
+                            </View>
                         )}
                         <Text style={styles.logoutText}>
                             {loggingOut ? 'Logging out...' : 'Logout'}
@@ -119,49 +142,182 @@ export default function Profile({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: COLORS.background },
-    header: { paddingHorizontal: SPACING.lg, paddingVertical: SPACING.xl, backgroundColor: COLORS.primary },
-    profileInfo: { flexDirection: 'row', alignItems: 'center' },
-    avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: COLORS.primaryDark, justifyContent: 'center', alignItems: 'center', marginRight: SPACING.md },
-    userInfo: { flex: 1 },
-    userName: { fontSize: FONT_SIZES.xl, fontWeight: FONT_WEIGHTS.bold, color: COLORS.white, marginBottom: SPACING.xs },
-    userEmail: { fontSize: FONT_SIZES.sm, color: COLORS.white, opacity: 0.9 },
-    userPhone: { fontSize: FONT_SIZES.xs, color: COLORS.white, opacity: 0.7, marginTop: 2 },
+    container: {
+        flex: 1,
+        backgroundColor: COLORS.background,
+    },
+    // ── Header ──
+    headerGradient: {
+        paddingHorizontal: SPACING.xl,
+        paddingTop: SPACING.xl,
+        paddingBottom: SPACING.xxl,
+        overflow: 'hidden',
+    },
+    decorCircle: {
+        position: 'absolute',
+        width: 180,
+        height: 180,
+        borderRadius: 90,
+        backgroundColor: 'rgba(255,255,255,0.04)',
+        top: -40,
+        right: -40,
+    },
+    profileInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    avatar: {
+        width: 72,
+        height: 72,
+        borderRadius: BORDER_RADIUS.xxl,
+        backgroundColor: 'rgba(255,255,255,0.18)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: SPACING.lg,
+        borderWidth: 2,
+        borderColor: 'rgba(255,255,255,0.25)',
+    },
+    avatarText: {
+        fontSize: FONT_SIZES.xxl,
+        fontWeight: FONT_WEIGHTS.bold,
+        color: '#FFFFFF',
+        letterSpacing: 1,
+    },
+    userInfo: {
+        flex: 1,
+    },
+    userName: {
+        fontSize: FONT_SIZES.xl,
+        fontWeight: FONT_WEIGHTS.bold,
+        color: '#FFFFFF',
+        marginBottom: SPACING.xxs,
+        letterSpacing: -0.2,
+    },
+    userEmail: {
+        fontSize: FONT_SIZES.sm,
+        color: 'rgba(255,255,255,0.8)',
+    },
+    userPhone: {
+        fontSize: FONT_SIZES.xs,
+        color: 'rgba(255,255,255,0.6)',
+        marginTop: 2,
+    },
     pointsBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        paddingHorizontal: SPACING.md,
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        paddingHorizontal: SPACING.lg,
         paddingVertical: SPACING.sm,
         borderRadius: BORDER_RADIUS.full,
-        marginTop: SPACING.md,
+        marginTop: SPACING.lg,
         alignSelf: 'flex-start',
-        gap: SPACING.xs,
-    },
-    pointsText: { fontSize: FONT_SIZES.sm, fontWeight: FONT_WEIGHTS.bold, color: COLORS.white },
-    content: { flex: 1, paddingHorizontal: SPACING.lg, paddingTop: SPACING.lg },
-    referralCard: {
-        backgroundColor: COLORS.white,
-        borderRadius: BORDER_RADIUS.lg,
-        padding: SPACING.lg,
-        marginBottom: SPACING.lg,
-        ...SHADOWS.sm,
+        gap: SPACING.sm,
         borderWidth: 1,
-        borderColor: COLORS.primaryLight || '#e6f2ff',
+        borderColor: 'rgba(255,255,255,0.15)',
     },
-    referralHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.sm },
-    referralTitle: { fontSize: FONT_SIZES.md, fontWeight: FONT_WEIGHTS.semibold, color: COLORS.textPrimary },
+    pointsText: {
+        fontSize: FONT_SIZES.sm,
+        fontWeight: FONT_WEIGHTS.bold,
+        color: '#FFFFFF',
+    },
+
+    // ── Content ──
+    content: {
+        flex: 1,
+        paddingHorizontal: SPACING.xl,
+        paddingTop: SPACING.xl,
+    },
+
+    // ── Referral Card ──
+    referralCard: {
+        backgroundColor: COLORS.surface,
+        borderRadius: BORDER_RADIUS.xl,
+        padding: SPACING.xl,
+        marginBottom: SPACING.xl,
+        borderWidth: 1,
+        borderColor: COLORS.primaryBorder,
+        ...SHADOWS.sm,
+    },
+    referralHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: SPACING.md,
+        marginBottom: SPACING.md,
+    },
+    referralIconBg: {
+        width: 36,
+        height: 36,
+        borderRadius: BORDER_RADIUS.md,
+        backgroundColor: COLORS.primarySurface,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    referralTitle: {
+        fontSize: FONT_SIZES.md,
+        fontWeight: FONT_WEIGHTS.semibold,
+        color: COLORS.textPrimary,
+    },
     referralCode: {
         fontSize: FONT_SIZES.xxl,
         fontWeight: FONT_WEIGHTS.bold,
         color: COLORS.primary,
         textAlign: 'center',
-        letterSpacing: 2,
-        marginVertical: SPACING.sm,
+        letterSpacing: 3,
+        marginVertical: SPACING.md,
     },
-    referralInfo: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, textAlign: 'center' },
-    menuItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.lg, padding: SPACING.md, marginBottom: SPACING.sm, ...SHADOWS.sm },
-    menuLabel: { flex: 1, fontSize: FONT_SIZES.md, color: COLORS.textPrimary, marginLeft: SPACING.md },
-    logoutButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.lg, padding: SPACING.md, marginTop: SPACING.lg, marginBottom: SPACING.xl, ...SHADOWS.sm },
-    logoutText: { flex: 1, fontSize: FONT_SIZES.md, color: COLORS.error, marginLeft: SPACING.md, fontWeight: FONT_WEIGHTS.semibold },
+    referralInfo: {
+        fontSize: FONT_SIZES.xs,
+        color: COLORS.textSecondary,
+        textAlign: 'center',
+    },
+
+    // ── Menu ──
+    menuSection: {
+        gap: SPACING.sm,
+    },
+    menuItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.surface,
+        borderRadius: BORDER_RADIUS.xl,
+        padding: SPACING.lg,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        ...SHADOWS.xs,
+    },
+    menuIconBg: {
+        width: 40,
+        height: 40,
+        borderRadius: BORDER_RADIUS.lg,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    menuLabel: {
+        flex: 1,
+        fontSize: FONT_SIZES.md,
+        color: COLORS.textPrimary,
+        marginLeft: SPACING.md,
+        fontWeight: FONT_WEIGHTS.medium,
+    },
+
+    // ── Logout ──
+    logoutButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.surface,
+        borderRadius: BORDER_RADIUS.xl,
+        padding: SPACING.lg,
+        marginTop: SPACING.xl,
+        marginBottom: SPACING.xxl,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        ...SHADOWS.xs,
+    },
+    logoutText: {
+        flex: 1,
+        fontSize: FONT_SIZES.md,
+        color: COLORS.error,
+        marginLeft: SPACING.md,
+        fontWeight: FONT_WEIGHTS.semibold,
+    },
 });

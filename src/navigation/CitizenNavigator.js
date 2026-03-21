@@ -1,8 +1,9 @@
 import React from 'react';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../utils';
+import { COLORS, BORDER_RADIUS, SHADOWS, FONT_SIZES, FONT_WEIGHTS, SPACING } from '../utils';
 
 // Import Screens from barrel
 import {
@@ -19,27 +20,37 @@ import {
     Notifications,
     ContactUs,
     FineInformation,
-    PermissionsRequest
+    PermissionsRequest,
+    TrafficSigns,
+    SafetyTips
 } from '../screens';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
+const TAB_CONFIG = {
+    Home: { icon: 'home', label: 'Home' },
+    Reports: { icon: 'document-text', label: 'Reports' },
+    Rewards: { icon: 'trophy', label: 'Rewards' },
+    ProfileTab: { icon: 'person', label: 'Profile' },
+};
+
 function CitizenTabNavigator() {
     return (
         <Tab.Navigator
             screenOptions={({ route }) => ({
-                tabBarIcon: ({ focused, color, size }) => {
-                    let iconName;
-                    if (route.name === 'Home') iconName = focused ? 'home' : 'home-outline';
-                    else if (route.name === 'Reports') iconName = focused ? 'document-text' : 'document-text-outline';
-                    else if (route.name === 'Rewards') iconName = focused ? 'trophy' : 'trophy-outline';
-                    else if (route.name === 'ProfileTab') iconName = focused ? 'person' : 'person-outline';
-                    return <Ionicons name={iconName} size={size} color={color} />;
+                tabBarIcon: ({ focused, color }) => {
+                    const config = TAB_CONFIG[route.name];
+                    const iconName = focused ? config.icon : `${config.icon}-outline`;
+                    return (
+                        <Ionicons name={iconName} size={24} color={color} />
+                    );
                 },
                 tabBarActiveTintColor: COLORS.primary,
-                tabBarInactiveTintColor: COLORS.gray500,
+                tabBarInactiveTintColor: COLORS.textTertiary,
                 headerShown: false,
+                tabBarStyle: styles.tabBar,
+                tabBarLabelStyle: styles.tabLabel,
             })}
         >
             <Tab.Screen name="Home" component={CitizenHome} />
@@ -64,6 +75,26 @@ export default function CitizenNavigator() {
             <Stack.Screen name="EditProfile" component={EditProfile} />
             <Stack.Screen name="ContactUs" component={ContactUs} />
             <Stack.Screen name="FineInformation" component={FineInformation} />
+            <Stack.Screen name="TrafficSigns" component={TrafficSigns} />
+            <Stack.Screen name="SafetyTips" component={SafetyTips} />
         </Stack.Navigator>
     );
 }
+
+const styles = StyleSheet.create({
+    tabBar: {
+        backgroundColor: COLORS.surface,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.border,
+        elevation: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 4,
+    },
+    tabLabel: {
+        fontSize: 11,
+        fontWeight: '600',
+        marginBottom: Platform.OS === 'ios' ? 0 : 4,
+    },
+});

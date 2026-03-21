@@ -77,6 +77,12 @@ export default function AIResultsVerification({ navigation, route }) {
                                 <Text style={styles.confidenceBadgeText}>{confidence}% Confidence</Text>
                             </View>
                         </View>
+                        {aiResults?.description && (
+                            <View style={styles.descriptionBox}>
+                                <Ionicons name="information-circle" size={16} color={COLORS.primary} />
+                                <Text style={styles.descriptionText}>{aiResults.description}</Text>
+                            </View>
+                        )}
                         <Text style={styles.aiSubtitle}>
                             Please review and correct the information below if needed
                         </Text>
@@ -217,6 +223,23 @@ const styles = StyleSheet.create({
     sectionTitle: { fontSize: FONT_SIZES.md, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary, flex: 1 },
     confidenceBadge: { paddingHorizontal: SPACING.sm, paddingVertical: 2, borderRadius: BORDER_RADIUS.md },
     confidenceBadgeText: { color: COLORS.white, fontSize: FONT_SIZES.xs, fontWeight: FONT_WEIGHTS.bold },
+    descriptionBox: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: SPACING.xs,
+        backgroundColor: COLORS.gray50,
+        padding: SPACING.sm,
+        borderRadius: BORDER_RADIUS.md,
+        marginVertical: SPACING.sm,
+        borderLeftWidth: 3,
+        borderLeftColor: COLORS.primary
+    },
+    descriptionText: {
+        flex: 1,
+        fontSize: FONT_SIZES.xs,
+        color: COLORS.textSecondary,
+        lineHeight: 16
+    },
     aiSubtitle: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary },
     formSection: { marginBottom: SPACING.xl },
     inputWrapper: { marginBottom: SPACING.lg },
