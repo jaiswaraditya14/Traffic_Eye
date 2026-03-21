@@ -1,27 +1,59 @@
-// ReportDetail.js
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import {
+    View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, StatusBar,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MobileContainer } from '../../components';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, GRADIENTS } from '../../utils/theme';
+
+const C = {
+    navy: '#002452',
+    navyMid: '#1B3A6B',
+    amber: '#F59E0B',
+    white: '#FFFFFF',
+    offWhite: '#F8F9FB',
+    surface: '#FFFFFF',
+    textPrimary: '#191C1E',
+    textSecondary: '#44474F',
+    textTertiary: '#747780',
+    border: '#C4C6D0',
+    success: '#059669',
+    successSurface: '#D1FAE5',
+    warning: '#D97706',
+    warningSurface: '#FEF3C7',
+    error: '#BA1A1A',
+    errorSurface: '#FFDAD6',
+};
 
 export default function ReportDetail({ navigation, route }) {
+    // Usually we would fetch report via route.params.reportId
+    const isOfficerMode = route.params?.isOfficerMode;
+
+    const getStatusConfig = (status) => ({
+        verified: { icon: 'checkmark-circle', color: C.success, bg: C.successSurface, label: 'Verified' },
+        pending: { icon: 'time', color: C.warning, bg: C.warningSurface, label: 'Pending Review' },
+        rejected: { icon: 'close-circle', color: C.error, bg: C.errorSurface, label: 'Rejected' },
+    }[status] || { icon: 'information-circle', color: C.navyMid, bg: '#F2F4F6', label: 'Unknown' });
+
+    const statusConfig = getStatusConfig('verified');
+
     return (
-        <MobileContainer>
-            <SafeAreaView style={styles.container} edges={['top']}>
-                {/* Header */}
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                        <Ionicons name="arrow-back" size={20} color={COLORS.textPrimary} />
+        <View style={styles.container}>
+            <StatusBar barStyle="light-content" backgroundColor={C.navyMid} />
+            <SafeAreaView style={styles.safeArea} edges={['top']}>
+                {/* ── Navy Header ── */}
+                <LinearGradient colors={[C.navy, C.navyMid]} style={styles.header}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                        <Ionicons name="arrow-back" size={20} color={C.white} />
                     </TouchableOpacity>
-                    <Text style={styles.title}>Report Details</Text>
-                    <View style={{ width: 40 }} />
-                </View>
+                    <Text style={styles.headerTitle}>Report Details</Text>
+                    <TouchableOpacity style={styles.backButton}>
+                        <Ionicons name="share-social-outline" size={20} color={C.white} />
+                    </TouchableOpacity>
+                </LinearGradient>
 
                 <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-                    {/* Evidence Image */}
+                    {/* ── Evidence Image ── */}
                     <View style={styles.imageContainer}>
                         <Image
                             source={require('../../../assets/images/traffic_violation.jpg')}
@@ -29,113 +61,113 @@ export default function ReportDetail({ navigation, route }) {
                             resizeMode="cover"
                         />
                         <LinearGradient
-                            colors={['transparent', 'rgba(0,0,0,0.4)']}
+                            colors={['transparent', 'rgba(0,0,0,0.7)']}
                             style={styles.imageOverlay}
                         >
                             <View style={styles.imageTag}>
-                                <Ionicons name="camera" size={14} color={COLORS.white} />
-                                <Text style={styles.imageTagText}>Evidence Photo</Text>
+                                <Ionicons name="camera" size={12} color={C.navy} />
+                                <Text style={styles.imageTagText}>AI Verified Evidence</Text>
                             </View>
+                            <Text style={styles.imageDate}>Jan 20, 2024 at 14:30 PM</Text>
                         </LinearGradient>
                     </View>
 
-                    {/* Status Card */}
-                    <View style={styles.statusCard}>
-                        <View style={styles.statusRow}>
-                            <Text style={styles.statusLabel}>Status</Text>
-                            <View style={[styles.statusBadge, { backgroundColor: COLORS.successSurface }]}>
-                                <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
-                                <Text style={[styles.statusText, { color: COLORS.success }]}>Verified</Text>
-                            </View>
+                    {/* ── Status Row ── */}
+                    <View style={styles.statusSection}>
+                        <Text style={styles.statusLabel}>Current Status</Text>
+                        <View style={[styles.statusBadge, { backgroundColor: statusConfig.bg }]}>
+                            <Ionicons name={statusConfig.icon} size={16} color={statusConfig.color} />
+                            <Text style={[styles.statusText, { color: statusConfig.color }]}>
+                                {statusConfig.label}
+                            </Text>
                         </View>
                     </View>
 
-                    {/* Details Card */}
+                    {/* ── Details Card ── */}
                     <View style={styles.detailCard}>
-                        <Text style={styles.cardTitle}>Violation Details</Text>
+                        <View style={styles.detailCardHeader}>
+                            <Ionicons name="document-text-outline" size={18} color={C.navyMid} />
+                            <Text style={styles.detailCardTitle}>Violation Record</Text>
+                        </View>
+
                         <View style={styles.detailRow}>
-                            <View style={styles.detailLeft}>
-                                <Ionicons name="alert-circle" size={18} color={COLORS.textTertiary} />
-                                <Text style={styles.detailLabel}>Type</Text>
-                            </View>
+                            <Text style={styles.detailLabel}>Violation Type</Text>
                             <Text style={styles.detailValue}>Speeding</Text>
                         </View>
                         <View style={styles.detailRow}>
-                            <View style={styles.detailLeft}>
-                                <Ionicons name="location" size={18} color={COLORS.textTertiary} />
-                                <Text style={styles.detailLabel}>Location</Text>
-                            </View>
+                            <Text style={styles.detailLabel}>Location</Text>
                             <Text style={styles.detailValue}>Main St & 5th Ave</Text>
                         </View>
                         <View style={styles.detailRow}>
-                            <View style={styles.detailLeft}>
-                                <Ionicons name="calendar" size={18} color={COLORS.textTertiary} />
-                                <Text style={styles.detailLabel}>Date</Text>
-                            </View>
-                            <Text style={styles.detailValue}>Jan 20, 2024</Text>
+                            <Text style={styles.detailLabel}>Vehicle Reg.</Text>
+                            <Text style={styles.vehiclePlate}>MH12AB1234</Text>
                         </View>
-                        <View style={[styles.detailRow, { borderBottomWidth: 0 }]}>
-                            <View style={styles.detailLeft}>
-                                <Ionicons name="trophy" size={18} color={COLORS.accent} />
+                        {!isOfficerMode && (
+                            <View style={[styles.detailRow, { borderBottomWidth: 0 }]}>
                                 <Text style={styles.detailLabel}>Points Earned</Text>
+                                <View style={styles.pointsBadge}>
+                                    <Ionicons name="trophy" size={12} color={C.amberDark} />
+                                    <Text style={styles.pointsValue}>+10 pts</Text>
+                                </View>
                             </View>
-                            <View style={styles.pointsBadge}>
-                                <Text style={styles.pointsValue}>+10</Text>
-                            </View>
-                        </View>
+                        )}
                     </View>
 
-                    <View style={{ height: SPACING.xxl }} />
+                    <View style={{ height: 40 }} />
                 </ScrollView>
             </SafeAreaView>
-        </MobileContainer>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: COLORS.background,
-    },
+    container: { flex: 1, backgroundColor: C.offWhite },
+    safeArea: { flex: 1 },
+
+    // Header
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: SPACING.xl,
-        paddingVertical: SPACING.lg,
-        backgroundColor: COLORS.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        paddingBottom: 24,
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
     },
-    backBtn: {
-        width: 40,
-        height: 40,
-        borderRadius: BORDER_RADIUS.lg,
-        backgroundColor: COLORS.background,
-        borderWidth: 1,
-        borderColor: COLORS.border,
+    backButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.12)',
         justifyContent: 'center',
         alignItems: 'center',
     },
-    title: {
-        fontSize: FONT_SIZES.lg,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
-        letterSpacing: -0.2,
+    headerTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: C.white,
+        letterSpacing: -0.3,
     },
+
     content: {
         flex: 1,
-        paddingHorizontal: SPACING.xl,
-        paddingTop: SPACING.lg,
+        paddingHorizontal: 20,
+        paddingTop: 16,
     },
-    // ── Image ──
+
+    // Image
     imageContainer: {
         width: '100%',
-        height: 240,
-        borderRadius: BORDER_RADIUS.xl,
+        height: 260,
+        borderRadius: 20,
         overflow: 'hidden',
-        marginBottom: SPACING.lg,
-        ...SHADOWS.md,
+        marginBottom: 20,
+        shadowColor: C.navyMid,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
+        elevation: 6,
     },
     evidenceImage: {
         width: '100%',
@@ -146,102 +178,131 @@ const styles = StyleSheet.create({
         bottom: 0,
         left: 0,
         right: 0,
-        padding: SPACING.lg,
-        flexDirection: 'row',
+        paddingTop: 40,
+        paddingBottom: 16,
+        paddingHorizontal: 16,
     },
     imageTag: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: SPACING.xs,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        paddingHorizontal: SPACING.md,
-        paddingVertical: SPACING.xs,
-        borderRadius: BORDER_RADIUS.full,
+        gap: 6,
+        backgroundColor: C.amber,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+        alignSelf: 'flex-start',
+        marginBottom: 8,
     },
     imageTagText: {
-        fontSize: FONT_SIZES.xs,
-        color: COLORS.white,
-        fontWeight: FONT_WEIGHTS.medium,
+        fontSize: 11,
+        color: C.navy,
+        fontWeight: '700',
+        letterSpacing: 0.2,
     },
-    // ── Status ──
-    statusCard: {
-        backgroundColor: COLORS.surface,
-        borderRadius: BORDER_RADIUS.xl,
-        padding: SPACING.lg,
-        marginBottom: SPACING.md,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        ...SHADOWS.xs,
+    imageDate: {
+        fontSize: 13,
+        color: 'rgba(255,255,255,0.9)',
+        fontWeight: '500',
     },
-    statusRow: {
+
+    // Status
+    statusSection: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        backgroundColor: C.surface,
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 16,
+        shadowColor: C.navyMid,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 2,
     },
     statusLabel: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.textSecondary,
-        fontWeight: FONT_WEIGHTS.medium,
+        fontSize: 15,
+        fontWeight: '600',
+        color: C.textPrimary,
     },
     statusBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: SPACING.xs,
-        paddingHorizontal: SPACING.md,
-        paddingVertical: SPACING.sm,
-        borderRadius: BORDER_RADIUS.full,
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
     },
     statusText: {
-        fontSize: FONT_SIZES.sm,
-        fontWeight: FONT_WEIGHTS.semibold,
+        fontSize: 13,
+        fontWeight: '700',
     },
-    // ── Details ──
+
+    // Details Card
     detailCard: {
-        backgroundColor: COLORS.surface,
-        borderRadius: BORDER_RADIUS.xl,
-        padding: SPACING.xl,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        ...SHADOWS.xs,
+        backgroundColor: C.surface,
+        borderRadius: 16,
+        padding: 20,
+        shadowColor: C.navyMid,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 2,
     },
-    cardTitle: {
-        fontSize: FONT_SIZES.md,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
-        marginBottom: SPACING.lg,
-        letterSpacing: -0.1,
+    detailCardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 16,
+        paddingBottom: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F2F4F6',
+    },
+    detailCardTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: C.navyMid,
     },
     detailRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: SPACING.md,
+        paddingVertical: 12,
         borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
-    },
-    detailLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: SPACING.sm,
+        borderBottomColor: '#F2F4F6',
     },
     detailLabel: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.textSecondary,
+        fontSize: 14,
+        color: C.textSecondary,
+        fontWeight: '500',
     },
     detailValue: {
-        fontSize: FONT_SIZES.sm,
-        fontWeight: FONT_WEIGHTS.semibold,
-        color: COLORS.textPrimary,
+        fontSize: 14,
+        fontWeight: '600',
+        color: C.textPrimary,
+    },
+    vehiclePlate: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: C.navyMid,
+        letterSpacing: 0.5,
+        backgroundColor: '#F2F4F6',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
     },
     pointsBadge: {
-        backgroundColor: COLORS.accentSurface,
-        paddingHorizontal: SPACING.md,
-        paddingVertical: SPACING.xs,
-        borderRadius: BORDER_RADIUS.full,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#FEF3C7',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 10,
     },
     pointsValue: {
-        fontSize: FONT_SIZES.sm,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.accent,
+        fontSize: 13,
+        fontWeight: '700',
+        color: C.amberDark,
     },
 });

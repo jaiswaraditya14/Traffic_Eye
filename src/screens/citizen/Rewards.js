@@ -1,211 +1,432 @@
-// Rewards.js
 import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Animated } from 'react-native';
+import {
+    View, Text, StyleSheet, ScrollView, TouchableOpacity,
+    Animated, StatusBar,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MobileContainer } from '../../components';
 import { useAuth } from '../../context';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, GRADIENTS } from '../../utils/theme';
+
+// ── Design Tokens ──
+const C = {
+    navy: '#002452',
+    navyMid: '#1B3A6B',
+    amber: '#F59E0B',
+    amberDark: '#D97706',
+    amberSurface: '#FEF3C7',
+    white: '#FFFFFF',
+    offWhite: '#F8F9FB',
+    surface: '#FFFFFF',
+    surfaceLow: '#F2F4F6',
+    textPrimary: '#191C1E',
+    textSecondary: '#44474F',
+    textTertiary: '#747780',
+    success: '#059669',
+    successSurface: '#D1FAE5',
+    primarySurface: '#D7E2FF',
+};
 
 export default function Rewards() {
     const { profile } = useAuth();
     const userPoints = profile?.points_balance || 0;
     const fadeAnim = useRef(new Animated.Value(0)).current;
+    const heroScale = useRef(new Animated.Value(0.9)).current;
 
     useEffect(() => {
-        Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 400,
-            useNativeDriver: true,
-        }).start();
+        Animated.parallel([
+            Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+            Animated.spring(heroScale, { toValue: 1, tension: 60, friction: 8, useNativeDriver: true }),
+        ]).start();
     }, []);
 
-    const rewards = [
-        { id: 1, title: 'Coffee Voucher', points: 50, icon: 'cafe', available: true, color: COLORS.accent },
-        { id: 2, title: 'Movie Ticket', points: 100, icon: 'film', available: true, color: COLORS.primary },
-        { id: 3, title: 'Gas Card $10', points: 150, icon: 'car', available: false, color: COLORS.secondary },
-        { id: 4, title: 'Restaurant Voucher', points: 200, icon: 'restaurant', available: false, color: COLORS.error },
+    const level = userPoints >= 1000 ? 'Guardian' : userPoints >= 500 ? 'Volunteer' : 'Newcomer';
+    const nextLevelPoints = userPoints >= 1000 ? 2000 : userPoints >= 500 ? 1000 : 500;
+    const progress = Math.min(userPoints / nextLevelPoints, 1);
+
+    const badges = [
+        { icon: 'star', label: 'First Report', color: C.amber, earned: true },
+        { icon: 'shield-checkmark', label: 'Verified 5×', color: C.navyMid, earned: true },
+        { icon: 'ribbon', label: 'Guardian', color: C.success, earned: true },
+        { icon: 'trophy', label: 'Top Reporter', color: C.textTertiary, earned: false },
+    ];
+
+    const history = [
+        { icon: 'camera', label: 'Report Submitted', points: '+10', time: 'Today' },
+        { icon: 'checkmark-circle', label: 'Report Verified', points: '+50', time: 'Yesterday' },
+        { icon: 'camera', label: 'Report Submitted', points: '+10', time: 'Jan 18' },
+    ];
+
+    const redemptions = [
+        { title: 'Certificate of Civic Duty', pts: 100, icon: 'ribbon', available: true },
+        { title: 'Priority Support Access', pts: 250, icon: 'headset', available: userPoints >= 250 },
+        { title: 'Featured Reporter Badge', pts: 500, icon: 'medal', available: userPoints >= 500 },
     ];
 
     return (
-        <MobileContainer>
-            <SafeAreaView style={styles.container} edges={['top']}>
-                <Animated.View style={[styles.headerContainer, { opacity: fadeAnim }]}>
-                    <Text style={styles.title}>Rewards</Text>
-                </Animated.View>
-                <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-                    {/* Points Card */}
-                    <LinearGradient
-                        colors={GRADIENTS.accent}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.pointsCard}
-                    >
-                        <View style={styles.pointsCardContent}>
-                            <View style={styles.trophyCircle}>
-                                <Ionicons name="trophy" size={32} color={COLORS.white} />
+        <View style={styles.container}>
+            <StatusBar barStyle="light-content" backgroundColor={C.navyMid} />
+            <SafeAreaView style={styles.safeArea} edges={['top']}>
+                <ScrollView showsVerticalScrollIndicator={false}>
+
+                    {/* ── Navy Header ── */}
+                    <LinearGradient colors={[C.navy, C.navyMid]} style={styles.header}>
+                        <Text style={styles.headerTitle}>My Rewards</Text>
+                        <Text style={styles.headerSubtitle}>Keep reporting to earn more!</Text>
+
+                        {/* Points Hero card */}
+                        <Animated.View
+                            style={[
+                                styles.pointsCard,
+                                { transform: [{ scale: heroScale }] },
+                            ]}
+                        >
+                            <View style={styles.pointsCardLeft}>
+                                <View style={styles.trophyBg}>
+                                    <Ionicons name="trophy" size={28} color={C.amberDark} />
+                                </View>
+                                <View>
+                                    <Text style={styles.pointsLabel}>TOTAL POINTS</Text>
+                                    <Text style={styles.pointsValue}>{userPoints.toLocaleString()}</Text>
+                                </View>
                             </View>
-                            <View>
-                                <Text style={styles.pointsLabel}>YOUR POINTS</Text>
-                                <Text style={styles.pointsValue}>{userPoints}</Text>
+                            <View style={styles.levelRight}>
+                                <View style={styles.levelBadge}>
+                                    <Text style={styles.levelBadgeText}>Level: {level}</Text>
+                                </View>
+                                <Text style={styles.progressLabel}>{nextLevelPoints - userPoints} pts to next</Text>
+                                <View style={styles.progressTrack}>
+                                    <Animated.View
+                                        style={[styles.progressFill, { width: `${progress * 100}%` }]}
+                                    />
+                                </View>
                             </View>
-                        </View>
+                        </Animated.View>
                     </LinearGradient>
 
-                    {/* Rewards List */}
-                    <Text style={styles.sectionTitle}>Available Rewards</Text>
-                    {rewards.map((reward) => (
-                        <TouchableOpacity
-                            key={reward.id}
-                            style={[styles.rewardCard, !reward.available && styles.disabledCard]}
-                            activeOpacity={reward.available ? 0.7 : 1}
+                    {/* ── Badges ── */}
+                    <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
+                        <Text style={styles.sectionTitle}>Achievements</Text>
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.badgesScroll}
                         >
-                            <View style={[styles.rewardIcon, { backgroundColor: reward.available ? `${reward.color}15` : COLORS.gray100 }]}>
-                                <Ionicons name={reward.icon} size={26} color={reward.available ? reward.color : COLORS.textTertiary} />
-                            </View>
-                            <View style={styles.rewardInfo}>
-                                <Text style={[styles.rewardTitle, !reward.available && { color: COLORS.textTertiary }]}>
-                                    {reward.title}
-                                </Text>
-                                <View style={styles.rewardPoints}>
-                                    <Ionicons name="trophy" size={14} color={reward.available ? COLORS.accent : COLORS.textTertiary} />
-                                    <Text style={[styles.rewardPointsText, !reward.available && { color: COLORS.textTertiary }]}>
-                                        {reward.points} points
+                            {badges.map((badge, idx) => (
+                                <View
+                                    key={idx}
+                                    style={[styles.badgeCard, !badge.earned && styles.badgeCardLocked]}
+                                >
+                                    <View
+                                        style={[
+                                            styles.badgeIconBg,
+                                            { backgroundColor: badge.earned ? `${badge.color}18` : C.surfaceLow },
+                                        ]}
+                                    >
+                                        {badge.earned ? (
+                                            <Ionicons name={badge.icon} size={24} color={badge.color} />
+                                        ) : (
+                                            <Ionicons name="lock-closed" size={20} color={C.textTertiary} />
+                                        )}
+                                    </View>
+                                    <Text style={[styles.badgeLabel, !badge.earned && { color: C.textTertiary }]}>
+                                        {badge.label}
                                     </Text>
                                 </View>
+                            ))}
+                        </ScrollView>
+                    </Animated.View>
+
+                    {/* ── Recent Earnings ── */}
+                    <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
+                        <Text style={styles.sectionTitle}>Points History</Text>
+                        {history.map((h, idx) => (
+                            <View key={idx} style={styles.historyItem}>
+                                <View style={[styles.historyIcon, { backgroundColor: C.primarySurface }]}>
+                                    <Ionicons name={h.icon} size={16} color={C.navyMid} />
+                                </View>
+                                <View style={styles.historyContent}>
+                                    <Text style={styles.historyLabel}>{h.label}</Text>
+                                    <Text style={styles.historyTime}>{h.time}</Text>
+                                </View>
+                                <Text style={styles.historyPoints}>{h.points} pts</Text>
                             </View>
-                            {reward.available ? (
-                                <View style={styles.redeemBtn}>
-                                    <Text style={styles.redeemText}>Redeem</Text>
-                                    <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
+                        ))}
+                    </Animated.View>
+
+                    {/* ── Redemption ── */}
+                    <Animated.View style={[styles.section, { opacity: fadeAnim, marginBottom: 40 }]}>
+                        <Text style={styles.sectionTitle}>Redeem Points</Text>
+                        {redemptions.map((r, idx) => (
+                            <TouchableOpacity
+                                key={idx}
+                                style={[styles.redeemCard, !r.available && styles.redeemCardLocked]}
+                                activeOpacity={r.available ? 0.8 : 1}
+                            >
+                                <View style={[styles.redeemIcon, { backgroundColor: r.available ? C.primarySurface : C.surfaceLow }]}>
+                                    <Ionicons name={r.icon} size={20} color={r.available ? C.navyMid : C.textTertiary} />
                                 </View>
-                            ) : (
-                                <View style={styles.lockedBadge}>
-                                    <Ionicons name="lock-closed" size={16} color={COLORS.textTertiary} />
+                                <View style={styles.redeemContent}>
+                                    <Text style={[styles.redeemTitle, !r.available && { color: C.textTertiary }]}>
+                                        {r.title}
+                                    </Text>
+                                    <View style={styles.redeemPtsRow}>
+                                        <Ionicons name="trophy" size={12} color={r.available ? C.amberDark : C.textTertiary} />
+                                        <Text style={[styles.redeemPts, !r.available && { color: C.textTertiary }]}>
+                                            {r.pts} points
+                                        </Text>
+                                    </View>
                                 </View>
-                            )}
-                        </TouchableOpacity>
-                    ))}
-                    <View style={{ height: SPACING.xxl }} />
+                                {r.available ? (
+                                    <View style={styles.redeemBtn}>
+                                        <Text style={styles.redeemBtnText}>Redeem</Text>
+                                    </View>
+                                ) : (
+                                    <Ionicons name="lock-closed" size={16} color={C.textTertiary} />
+                                )}
+                            </TouchableOpacity>
+                        ))}
+                    </Animated.View>
                 </ScrollView>
             </SafeAreaView>
-        </MobileContainer>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: COLORS.background,
-    },
+    container: { flex: 1, backgroundColor: C.offWhite },
+    safeArea: { flex: 1 },
+
+    // Header
     header: {
-        paddingHorizontal: SPACING.xl,
-        paddingVertical: SPACING.lg,
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        paddingBottom: 28,
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28,
     },
-    title: {
-        fontSize: FONT_SIZES.xxl,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
-        letterSpacing: -0.3,
+    headerTitle: {
+        fontSize: 22,
+        fontWeight: '700',
+        color: C.white,
+        letterSpacing: -0.4,
     },
-    content: {
-        flex: 1,
-        paddingHorizontal: SPACING.xl,
+    headerSubtitle: {
+        fontSize: 13,
+        color: 'rgba(255,255,255,0.6)',
+        marginTop: 3,
+        marginBottom: 20,
     },
-    // ── Points Card ──
+
+    // Points card
     pointsCard: {
-        borderRadius: BORDER_RADIUS.xl,
-        padding: SPACING.xl,
-        marginBottom: SPACING.xl,
-        ...SHADOWS.lg,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderRadius: 18,
+        padding: 16,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.15)',
     },
-    pointsCardContent: {
+    pointsCardLeft: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: SPACING.xl,
+        gap: 12,
     },
-    trophyCircle: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
-        backgroundColor: 'rgba(255,255,255,0.2)',
+    trophyBg: {
+        width: 52,
+        height: 52,
+        borderRadius: 14,
+        backgroundColor: C.amberSurface,
         justifyContent: 'center',
         alignItems: 'center',
     },
     pointsLabel: {
-        fontSize: FONT_SIZES.xxs,
-        color: 'rgba(255,255,255,0.8)',
-        fontWeight: FONT_WEIGHTS.bold,
+        fontSize: 9,
+        fontWeight: '700',
+        color: 'rgba(255,255,255,0.6)',
         letterSpacing: 1.5,
-        marginBottom: SPACING.xxs,
+        marginBottom: 3,
     },
     pointsValue: {
-        fontSize: 40,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: '#FFFFFF',
+        fontSize: 30,
+        fontWeight: '800',
+        color: C.amber,
+        letterSpacing: -1,
     },
-    // ── Section ──
+    levelRight: {
+        alignItems: 'flex-end',
+        gap: 6,
+    },
+    levelBadge: {
+        backgroundColor: C.amber,
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+    },
+    levelBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: C.navy,
+    },
+    progressLabel: {
+        fontSize: 10,
+        color: 'rgba(255,255,255,0.55)',
+    },
+    progressTrack: {
+        width: 100,
+        height: 5,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        borderRadius: 3,
+    },
+    progressFill: {
+        height: '100%',
+        backgroundColor: C.amber,
+        borderRadius: 3,
+    },
+
+    // Sections
+    section: {
+        paddingHorizontal: 20,
+        paddingTop: 24,
+    },
     sectionTitle: {
-        fontSize: FONT_SIZES.lg,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
-        marginBottom: SPACING.lg,
+        fontSize: 17,
+        fontWeight: '700',
+        color: C.textPrimary,
         letterSpacing: -0.2,
+        marginBottom: 14,
     },
-    // ── Reward Cards ──
-    rewardCard: {
-        flexDirection: 'row',
+
+    // Badges
+    badgesScroll: {
+        gap: 10,
+        paddingBottom: 4,
+    },
+    badgeCard: {
+        backgroundColor: C.surface,
+        borderRadius: 14,
+        padding: 14,
         alignItems: 'center',
-        backgroundColor: COLORS.surface,
-        borderRadius: BORDER_RADIUS.xl,
-        padding: SPACING.lg,
-        marginBottom: SPACING.md,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        ...SHADOWS.xs,
+        width: 90,
+        shadowColor: C.navyMid,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 6,
+        elevation: 2,
     },
-    disabledCard: {
+    badgeCardLocked: {
         opacity: 0.55,
     },
-    rewardIcon: {
-        width: 52,
-        height: 52,
-        borderRadius: BORDER_RADIUS.lg,
+    badgeIconBg: {
+        width: 46,
+        height: 46,
+        borderRadius: 13,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: SPACING.lg,
+        marginBottom: 8,
     },
-    rewardInfo: {
+    badgeLabel: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: C.textPrimary,
+        textAlign: 'center',
+    },
+
+    // History
+    historyItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: C.surface,
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 8,
+        gap: 12,
+        shadowColor: C.navyMid,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 4,
+        elevation: 1,
+    },
+    historyIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    historyContent: {
         flex: 1,
     },
-    rewardTitle: {
-        fontSize: FONT_SIZES.md,
-        fontWeight: FONT_WEIGHTS.semibold,
-        color: COLORS.textPrimary,
+    historyLabel: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: C.textPrimary,
+    },
+    historyTime: {
+        fontSize: 11,
+        color: C.textTertiary,
+        marginTop: 2,
+    },
+    historyPoints: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: C.success,
+    },
+
+    // Redemption
+    redeemCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: C.surface,
+        borderRadius: 14,
+        padding: 14,
+        marginBottom: 10,
+        gap: 12,
+        shadowColor: C.navyMid,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    redeemCardLocked: { opacity: 0.5 },
+    redeemIcon: {
+        width: 46,
+        height: 46,
+        borderRadius: 13,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    redeemContent: { flex: 1 },
+    redeemTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: C.textPrimary,
         marginBottom: 4,
     },
-    rewardPoints: {
+    redeemPtsRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
     },
-    rewardPointsText: {
-        fontSize: FONT_SIZES.sm,
-        fontWeight: FONT_WEIGHTS.medium,
-        color: COLORS.textSecondary,
+    redeemPts: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: C.amberDark,
     },
     redeemBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 2,
+        backgroundColor: C.primarySurface,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
     },
-    redeemText: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.primary,
-        fontWeight: FONT_WEIGHTS.semibold,
+    redeemBtnText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: C.navyMid,
     },
-    lockedBadge: {
-        padding: SPACING.sm,
-    },
+
+    headerContainer: {},
 });

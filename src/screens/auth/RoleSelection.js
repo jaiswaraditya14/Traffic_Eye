@@ -1,37 +1,52 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated } from 'react-native';
+import {
+    View, Text, StyleSheet, TouchableOpacity, ScrollView,
+    Animated, StatusBar, Dimensions,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MobileContainer } from '../../components';
 import { useAppContext } from '../../context';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, GRADIENTS, ROLES } from '../../utils';
+import { ROLES } from '../../utils';
+
+const { width } = Dimensions.get('window');
+
+const C = {
+    navy: '#002452',
+    navyMid: '#1B3A6B',
+    navyLight: '#2C4E80',
+    amber: '#F59E0B',
+    amberDark: '#D97706',
+    white: '#FFFFFF',
+    offWhite: '#F8F9FB',
+    surface: '#FFFFFF',
+    surfaceLow: '#F2F4F6',
+    textPrimary: '#191C1E',
+    textSecondary: '#44474F',
+    textTertiary: '#747780',
+    success: '#059669',
+    successSurface: '#D1FAE5',
+    primarySurface: '#D7E2FF',
+    amberSurface: '#FEF3C7',
+};
 
 export default function RoleSelection({ navigation }) {
     const { setUserRole } = useAppContext();
+
     const fadeAnim = useRef(new Animated.Value(0)).current;
-    const slideAnim1 = useRef(new Animated.Value(40)).current;
-    const slideAnim2 = useRef(new Animated.Value(40)).current;
+    const headerSlide = useRef(new Animated.Value(-30)).current;
+    const card1Slide = useRef(new Animated.Value(40)).current;
+    const card2Slide = useRef(new Animated.Value(40)).current;
 
     useEffect(() => {
         Animated.sequence([
-            Animated.timing(fadeAnim, {
-                toValue: 1,
-                duration: 400,
-                useNativeDriver: true,
-            }),
-            Animated.stagger(150, [
-                Animated.spring(slideAnim1, {
-                    toValue: 0,
-                    tension: 80,
-                    friction: 10,
-                    useNativeDriver: true,
-                }),
-                Animated.spring(slideAnim2, {
-                    toValue: 0,
-                    tension: 80,
-                    friction: 10,
-                    useNativeDriver: true,
-                }),
+            Animated.parallel([
+                Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+                Animated.timing(headerSlide, { toValue: 0, duration: 400, useNativeDriver: true }),
+            ]),
+            Animated.stagger(120, [
+                Animated.spring(card1Slide, { toValue: 0, tension: 70, friction: 10, useNativeDriver: true }),
+                Animated.spring(card2Slide, { toValue: 0, tension: 70, friction: 10, useNativeDriver: true }),
             ]),
         ]).start();
     }, []);
@@ -47,94 +62,127 @@ export default function RoleSelection({ navigation }) {
 
     return (
         <MobileContainer>
+            <StatusBar barStyle="light-content" backgroundColor={C.navyMid} />
             <ScrollView
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Header */}
-                <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
-                    <View style={styles.logoBadge}>
-                        <Text style={styles.logoEmoji}>🚦</Text>
-                    </View>
-                    <Text style={styles.title}>Welcome to TrafficEye</Text>
-                    <Text style={styles.subtitle}>
-                        Select how you'd like to use the platform
-                    </Text>
-                </Animated.View>
-
-                <View style={styles.content}>
-                    {/* Citizen Card */}
-                    <TouchableOpacity
-                        style={styles.card}
-                        onPress={() => handleRoleSelect(ROLES.CITIZEN)}
-                        activeOpacity={0.85}
+                {/* ── Navy Header ── */}
+                <LinearGradient
+                    colors={[C.navy, C.navyMid]}
+                    style={styles.header}
+                >
+                    <Animated.View
+                        style={{
+                            opacity: fadeAnim,
+                            transform: [{ translateY: headerSlide }],
+                            alignItems: 'center',
+                        }}
                     >
-                        <View style={styles.cardHeader}>
-                            <LinearGradient
-                                colors={GRADIENTS.primary}
-                                style={styles.iconContainer}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                            >
-                                <Ionicons name="person" size={28} color="#FFFFFF" />
-                            </LinearGradient>
-                            <View style={styles.cardHeaderText}>
-                                <Text style={styles.cardTitle}>Citizen</Text>
-                                <Text style={styles.cardBadge}>REPORTER</Text>
-                            </View>
-                            <Ionicons name="chevron-forward" size={22} color={COLORS.textTertiary} />
+                        {/* Shield icon */}
+                        <View style={styles.shieldContainer}>
+                            <Ionicons name="shield-checkmark" size={44} color={C.amber} />
                         </View>
-                        <Text style={styles.cardDescription}>
-                            Report traffic violations and earn rewards for making your community safer
+                        <Text style={styles.headerTitle}>Welcome to TrafficEye</Text>
+                        <Text style={styles.headerSubtitle}>
+                            Choose how you'd like to use the platform
                         </Text>
-                        <View style={styles.features}>
-                            {['Report violations', 'Earn rewards', 'Track reports'].map((text, i) => (
-                                <View key={i} style={styles.feature}>
-                                    <View style={styles.featureCheck}>
-                                        <Ionicons name="checkmark" size={12} color={COLORS.success} />
-                                    </View>
-                                    <Text style={styles.featureText}>{text}</Text>
+                    </Animated.View>
+                </LinearGradient>
+
+                {/* ── Role Cards ── */}
+                <View style={styles.cardsSection}>
+
+                    {/* Citizen Card */}
+                    <Animated.View style={{ transform: [{ translateY: card1Slide }], opacity: fadeAnim }}>
+                        <TouchableOpacity
+                            style={styles.card}
+                            onPress={() => handleRoleSelect(ROLES.CITIZEN)}
+                            activeOpacity={0.82}
+                        >
+                            {/* Left accent bar */}
+                            <View style={[styles.cardAccentBar, { backgroundColor: C.navyMid }]} />
+                            <View style={styles.cardContent}>
+                                {/* Icon */}
+                                <View style={[styles.iconCircle, { backgroundColor: C.primarySurface }]}>
+                                    <Ionicons name="person" size={26} color={C.navyMid} />
                                 </View>
-                            ))}
-                        </View>
-                    </TouchableOpacity>
+                                {/* Text */}
+                                <View style={styles.cardText}>
+                                    <View style={styles.cardTitleRow}>
+                                        <Text style={styles.cardTitle}>Citizen</Text>
+                                        <View style={[styles.roleBadge, { backgroundColor: C.primarySurface }]}>
+                                            <Text style={[styles.roleBadgeText, { color: C.navyMid }]}>REPORTER</Text>
+                                        </View>
+                                    </View>
+                                    <Text style={styles.cardDescription}>
+                                        Report traffic violations and earn rewards for making your community safer
+                                    </Text>
+                                    {/* Feature list */}
+                                    <View style={styles.featureList}>
+                                        {['Report violations with AI', 'Track your reports', 'Earn reward points'].map((f, i) => (
+                                            <View key={i} style={styles.featureItem}>
+                                                <View style={[styles.featureDot, { backgroundColor: C.success }]} />
+                                                <Text style={styles.featureText}>{f}</Text>
+                                            </View>
+                                        ))}
+                                    </View>
+                                </View>
+                                {/* Arrow */}
+                                <Ionicons name="chevron-forward" size={20} color={C.textTertiary} />
+                            </View>
+                        </TouchableOpacity>
+                    </Animated.View>
 
                     {/* Officer Card */}
-                    <TouchableOpacity
-                        style={styles.card}
-                        onPress={() => handleRoleSelect(ROLES.OFFICER)}
-                        activeOpacity={0.85}
-                    >
-                        <View style={styles.cardHeader}>
-                            <LinearGradient
-                                colors={GRADIENTS.secondary}
-                                style={styles.iconContainer}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                            >
-                                <Ionicons name="shield-checkmark" size={28} color="#FFFFFF" />
-                            </LinearGradient>
-                            <View style={styles.cardHeaderText}>
-                                <Text style={styles.cardTitle}>Traffic Officer</Text>
-                                <Text style={[styles.cardBadge, styles.cardBadgeSecondary]}>AUTHORITY</Text>
-                            </View>
-                            <Ionicons name="chevron-forward" size={22} color={COLORS.textTertiary} />
-                        </View>
-                        <Text style={styles.cardDescription}>
-                            Verify reports, manage violations, and maintain traffic safety
-                        </Text>
-                        <View style={styles.features}>
-                            {['Verify reports', 'View analytics', 'Manage queue'].map((text, i) => (
-                                <View key={i} style={styles.feature}>
-                                    <View style={[styles.featureCheck, { backgroundColor: COLORS.secondarySurface }]}>
-                                        <Ionicons name="checkmark" size={12} color={COLORS.secondary} />
-                                    </View>
-                                    <Text style={styles.featureText}>{text}</Text>
+                    <Animated.View style={{ transform: [{ translateY: card2Slide }], opacity: fadeAnim }}>
+                        <TouchableOpacity
+                            style={styles.card}
+                            onPress={() => handleRoleSelect(ROLES.OFFICER)}
+                            activeOpacity={0.82}
+                        >
+                            {/* Left accent bar — amber for authority */}
+                            <View style={[styles.cardAccentBar, { backgroundColor: C.amber }]} />
+                            <View style={styles.cardContent}>
+                                {/* Icon */}
+                                <View style={[styles.iconCircle, { backgroundColor: C.amberSurface }]}>
+                                    <Ionicons name="shield-checkmark" size={26} color={C.amberDark} />
                                 </View>
-                            ))}
-                        </View>
-                    </TouchableOpacity>
+                                {/* Text */}
+                                <View style={styles.cardText}>
+                                    <View style={styles.cardTitleRow}>
+                                        <Text style={styles.cardTitle}>Traffic Officer</Text>
+                                        <View style={[styles.roleBadge, { backgroundColor: C.amberSurface }]}>
+                                            <Text style={[styles.roleBadgeText, { color: C.amberDark }]}>AUTHORITY</Text>
+                                        </View>
+                                    </View>
+                                    <Text style={styles.cardDescription}>
+                                        Verify citizen reports, manage the violation queue, and maintain road safety
+                                    </Text>
+                                    {/* Feature list */}
+                                    <View style={styles.featureList}>
+                                        {['Verify & approve reports', 'Manage pending queue', 'Track enforcement stats'].map((f, i) => (
+                                            <View key={i} style={styles.featureItem}>
+                                                <View style={[styles.featureDot, { backgroundColor: C.amber }]} />
+                                                <Text style={styles.featureText}>{f}</Text>
+                                            </View>
+                                        ))}
+                                    </View>
+                                </View>
+                                {/* Arrow */}
+                                <Ionicons name="chevron-forward" size={20} color={C.textTertiary} />
+                            </View>
+                        </TouchableOpacity>
+                    </Animated.View>
+
+                    {/* Footer note */}
+                    <Animated.View style={[styles.footerNote, { opacity: fadeAnim }]}>
+                        <Ionicons name="information-circle-outline" size={14} color={C.textTertiary} />
+                        <Text style={styles.footerNoteText}>
+                            Officer access requires registration by the Traffic Authority
+                        </Text>
+                    </Animated.View>
                 </View>
             </ScrollView>
         </MobileContainer>
@@ -144,112 +192,144 @@ export default function RoleSelection({ navigation }) {
 const styles = StyleSheet.create({
     scrollView: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: C.offWhite,
     },
     scrollContent: {
-        paddingBottom: SPACING.xxl,
-    },
-    header: {
-        paddingHorizontal: SPACING.xl,
-        paddingTop: SPACING.xxxl,
-        paddingBottom: SPACING.xl,
-        alignItems: 'center',
-    },
-    logoBadge: {
-        width: 64,
-        height: 64,
-        borderRadius: BORDER_RADIUS.xl,
-        backgroundColor: COLORS.primarySurface,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: SPACING.lg,
-    },
-    logoEmoji: {
-        fontSize: 32,
+        paddingBottom: 40,
     },
 
-    title: {
-        fontSize: FONT_SIZES.xxl,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
-        marginBottom: SPACING.sm,
-        letterSpacing: -0.3,
-        textAlign: 'center',
-    },
-    subtitle: {
-        fontSize: FONT_SIZES.md,
-        color: COLORS.textSecondary,
-        textAlign: 'center',
-    },
-    content: {
-        paddingHorizontal: SPACING.lg,
-        gap: SPACING.md,
-    },
-    card: {
-        backgroundColor: COLORS.surface,
-        borderRadius: BORDER_RADIUS.xl,
-        padding: SPACING.xl,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        ...SHADOWS.sm,
-    },
-    cardHeader: {
-        flexDirection: 'row',
+    // ── Header ──
+    header: {
+        paddingTop: 60,
+        paddingBottom: 36,
+        paddingHorizontal: 28,
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28,
         alignItems: 'center',
-        marginBottom: SPACING.md,
     },
-    iconContainer: {
-        width: 52,
-        height: 52,
-        borderRadius: BORDER_RADIUS.lg,
+    shieldContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: 22,
+        backgroundColor: 'rgba(255,255,255,0.1)',
         justifyContent: 'center',
         alignItems: 'center',
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.15)',
     },
-    cardHeaderText: {
-        flex: 1,
-        marginLeft: SPACING.md,
+    headerTitle: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: C.white,
+        letterSpacing: -0.5,
+        textAlign: 'center',
+        marginBottom: 8,
     },
-    cardTitle: {
-        fontSize: FONT_SIZES.lg,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
-        letterSpacing: -0.2,
-    },
-    cardBadge: {
-        fontSize: FONT_SIZES.xxs,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.primary,
-        letterSpacing: 1.5,
-        marginTop: 2,
-    },
-    cardBadgeSecondary: {
-        color: COLORS.secondary,
-    },
-    cardDescription: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.textSecondary,
-        marginBottom: SPACING.lg,
+    headerSubtitle: {
+        fontSize: 14,
+        color: 'rgba(255,255,255,0.65)',
+        textAlign: 'center',
         lineHeight: 20,
     },
-    features: {
-        gap: SPACING.md,
+
+    // ── Cards Section ──
+    cardsSection: {
+        paddingHorizontal: 20,
+        paddingTop: 24,
+        gap: 16,
     },
-    feature: {
+    card: {
+        backgroundColor: C.surface,
+        borderRadius: 20,
         flexDirection: 'row',
-        alignItems: 'center',
-        gap: SPACING.md,
+        overflow: 'hidden',
+        shadowColor: '#1B3A6B',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 16,
+        elevation: 3,
     },
-    featureCheck: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: COLORS.successSurface,
+    cardAccentBar: {
+        width: 5,
+    },
+    cardContent: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        padding: 20,
+        gap: 14,
+    },
+    iconCircle: {
+        width: 52,
+        height: 52,
+        borderRadius: 16,
         justifyContent: 'center',
         alignItems: 'center',
+        flexShrink: 0,
+    },
+    cardText: {
+        flex: 1,
+    },
+    cardTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        marginBottom: 6,
+        flexWrap: 'wrap',
+    },
+    cardTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: C.textPrimary,
+        letterSpacing: -0.3,
+    },
+    roleBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 20,
+    },
+    roleBadgeText: {
+        fontSize: 9,
+        fontWeight: '700',
+        letterSpacing: 1.2,
+    },
+    cardDescription: {
+        fontSize: 13,
+        color: C.textSecondary,
+        lineHeight: 19,
+        marginBottom: 14,
+    },
+    featureList: {
+        gap: 7,
+    },
+    featureItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    featureDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
     },
     featureText: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.textPrimary,
-        fontWeight: FONT_WEIGHTS.medium,
+        fontSize: 12,
+        color: C.textPrimary,
+        fontWeight: '500',
+    },
+
+    // Footer note
+    footerNote: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        marginTop: 8,
+    },
+    footerNoteText: {
+        fontSize: 11,
+        color: C.textTertiary,
+        textAlign: 'center',
     },
 });

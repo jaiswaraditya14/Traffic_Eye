@@ -1,182 +1,306 @@
-// PendingQueue.js
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import {
+    View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, StatusBar,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MobileContainer } from '../../components';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS } from '../../utils/theme';
+
+// ── Design Tokens (Civic Authority — Officer Side) ──
+const C = {
+    navy: '#002452',
+    navyMid: '#1B3A6B',
+    amber: '#F59E0B',
+    amberDark: '#D97706',
+    amberSurface: '#FEF3C7',
+    white: '#FFFFFF',
+    offWhite: '#F8F9FB',
+    surface: '#FFFFFF',
+    surfaceLow: '#F2F4F6',
+    textPrimary: '#191C1E',
+    textSecondary: '#44474F',
+    textTertiary: '#747780',
+    border: '#C4C6D0',
+    success: '#059669',
+    successSurface: '#D1FAE5',
+    warning: '#D97706',
+    warningSurface: '#FEF3C7',
+    error: '#BA1A1A',
+    errorSurface: '#FFDAD6',
+    critical: '#DC2626',
+};
 
 export default function PendingQueue({ navigation }) {
     const pendingReports = [
-        { id: 1, type: 'Speeding', location: 'Main St & 5th Ave', time: '2h ago', priority: 'high' },
-        { id: 2, type: 'Red Light', location: 'Oak Rd & Elm St', time: '3h ago', priority: 'medium' },
-        { id: 3, type: 'Parking', location: 'Park Ave', time: '5h ago', priority: 'low' },
+        { id: 1, type: 'Speeding', vehicle: 'MH12AB1234', location: 'Main St & 5th Ave', time: '2h ago', priority: 'critical' },
+        { id: 2, type: 'Red Light Violation', vehicle: 'MH01CD5678', location: 'Oak Rd & Elm St', time: '3h ago', priority: 'high' },
+        { id: 3, type: 'Wrong Parking', vehicle: 'MH08EF9012', location: 'Park Avenue', time: '5h ago', priority: 'medium' },
+        { id: 4, type: 'No Helmet', vehicle: 'MH05GH3456', location: 'Ring Road', time: '6h ago', priority: 'medium' },
+        { id: 5, type: 'Overloading', vehicle: 'MH02IJ7890', location: 'Highway 8', time: '8h ago', priority: 'low' },
     ];
 
     const getPriorityConfig = (priority) => ({
-        high: { color: COLORS.error, bg: COLORS.errorSurface, label: 'HIGH' },
-        medium: { color: COLORS.warning, bg: COLORS.warningSurface, label: 'MED' },
-        low: { color: COLORS.textTertiary, bg: COLORS.gray100, label: 'LOW' },
+        critical: { color: C.critical, bg: '#FFDAD6', label: 'CRITICAL', barColor: C.critical },
+        high: { color: C.error, bg: '#FFE4E4', label: 'HIGH', barColor: C.error },
+        medium: { color: C.warning, bg: C.warningSurface, label: 'MEDIUM', barColor: C.amber },
+        low: { color: C.textTertiary, bg: C.surfaceLow, label: 'LOW', barColor: C.border },
     }[priority]);
 
     return (
-        <MobileContainer>
-            <SafeAreaView style={styles.container} edges={['top']}>
-                <View style={styles.header}>
-                    <Text style={styles.title}>Pending Queue</Text>
-                    <View style={styles.badge}>
-                        <Text style={styles.badgeText}>{pendingReports.length}</Text>
+        <View style={styles.container}>
+            <StatusBar barStyle="light-content" backgroundColor={C.navyMid} />
+            <SafeAreaView style={styles.safeArea} edges={['top']}>
+                {/* Navy Header */}
+                <LinearGradient colors={[C.navy, C.navyMid]} style={styles.header}>
+                    <View style={styles.headerRow}>
+                        <View>
+                            <Text style={styles.headerTitle}>Pending Queue</Text>
+                            <Text style={styles.headerSubtitle}>Reports awaiting review</Text>
+                        </View>
+                        <View style={styles.countBadge}>
+                            <Text style={styles.countBadgeText}>{pendingReports.length}</Text>
+                        </View>
                     </View>
-                </View>
-                <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+
+                    {/* Priority summary */}
+                    <View style={styles.prioritySummary}>
+                        {[
+                            { label: 'Critical', count: pendingReports.filter(r => r.priority === 'critical').length, color: C.critical },
+                            { label: 'High', count: pendingReports.filter(r => r.priority === 'high').length, color: C.error },
+                            { label: 'Medium', count: pendingReports.filter(r => r.priority === 'medium').length, color: C.amber },
+                            { label: 'Low', count: pendingReports.filter(r => r.priority === 'low').length, color: 'rgba(255,255,255,0.4)' },
+                        ].map((p, idx) => (
+                            <View key={idx} style={styles.priorityStat}>
+                                <View style={[styles.priorityDot, { backgroundColor: p.color }]} />
+                                <Text style={styles.priorityStatCount}>{p.count}</Text>
+                                <Text style={styles.priorityStatLabel}>{p.label}</Text>
+                            </View>
+                        ))}
+                    </View>
+                </LinearGradient>
+
+                {/* Report list */}
+                <ScrollView
+                    style={styles.list}
+                    contentContainerStyle={styles.listContent}
+                    showsVerticalScrollIndicator={false}
+                >
                     {pendingReports.map((report) => {
                         const config = getPriorityConfig(report.priority);
                         return (
                             <TouchableOpacity
                                 key={report.id}
-                                style={styles.card}
-                                onPress={() => navigation.getParent()?.navigate('ReportVerification', { reportId: report.id }) ?? navigation.navigate('ReportVerification', { reportId: report.id })}
-                                activeOpacity={0.7}
+                                style={styles.reportCard}
+                                onPress={() =>
+                                    navigation.getParent()?.navigate('ReportVerification', { reportId: report.id }) ??
+                                    navigation.navigate('ReportVerification', { reportId: report.id })
+                                }
+                                activeOpacity={0.8}
                             >
+                                {/* Priority left bar */}
+                                <View style={[styles.cardBar, { backgroundColor: config.barColor }]} />
+
+                                {/* Thumbnail */}
                                 <Image
                                     source={require('../../../assets/images/traffic_violation.jpg')}
                                     style={styles.thumbnail}
                                     resizeMode="cover"
                                 />
-                                <View style={styles.cardBody}>
-                                    <View style={styles.cardHeader}>
+
+                                {/* Content */}
+                                <View style={styles.cardContent}>
+                                    <View style={styles.cardTopRow}>
                                         <Text style={styles.reportType}>{report.type}</Text>
-                                        <View style={[styles.priorityBadge, { backgroundColor: config.bg }]}>
-                                            <Text style={[styles.priorityText, { color: config.color }]}>
+                                        <View style={[styles.priorityChip, { backgroundColor: config.bg }]}>
+                                            <Text style={[styles.priorityChipText, { color: config.color }]}>
                                                 {config.label}
                                             </Text>
                                         </View>
                                     </View>
-                                    <View style={styles.cardContent}>
-                                        <View style={styles.infoRow}>
-                                            <Ionicons name="location" size={14} color={COLORS.textTertiary} />
-                                            <Text style={styles.infoText}>{report.location}</Text>
-                                        </View>
-                                        <View style={styles.infoRow}>
-                                            <Ionicons name="time" size={14} color={COLORS.textTertiary} />
-                                            <Text style={styles.infoText}>{report.time}</Text>
-                                        </View>
+
+                                    <View style={styles.vehicleRow}>
+                                        <Ionicons name="car-outline" size={12} color={C.navyMid} />
+                                        <Text style={styles.vehicleText}>{report.vehicle}</Text>
                                     </View>
-                                    <View style={styles.cardFooter}>
-                                        <View style={styles.reviewBtn}>
-                                            <Text style={styles.reviewText}>Review</Text>
-                                            <Ionicons name="chevron-forward" size={16} color={COLORS.secondary} />
-                                        </View>
+
+                                    <View style={styles.metaRow}>
+                                        <Ionicons name="location-outline" size={12} color={C.textTertiary} />
+                                        <Text style={styles.metaText}>{report.location}</Text>
                                     </View>
+                                    <View style={styles.metaRow}>
+                                        <Ionicons name="time-outline" size={12} color={C.textTertiary} />
+                                        <Text style={styles.metaText}>{report.time}</Text>
+                                    </View>
+                                </View>
+
+                                {/* Review arrow */}
+                                <View style={styles.reviewArrow}>
+                                    <Ionicons name="chevron-forward" size={16} color={C.navyMid} />
                                 </View>
                             </TouchableOpacity>
                         );
                     })}
-                    <View style={{ height: SPACING.xxl }} />
+                    <View style={{ height: 40 }} />
                 </ScrollView>
             </SafeAreaView>
-        </MobileContainer>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: COLORS.background,
-    },
+    container: { flex: 1, backgroundColor: C.offWhite },
+    safeArea: { flex: 1 },
+
+    // Header
     header: {
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        paddingBottom: 20,
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
+    },
+    headerRow: {
         flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 16,
+    },
+    headerTitle: {
+        fontSize: 22,
+        fontWeight: '700',
+        color: C.white,
+        letterSpacing: -0.4,
+    },
+    headerSubtitle: {
+        fontSize: 12,
+        color: 'rgba(255,255,255,0.6)',
+        marginTop: 3,
+    },
+    countBadge: {
+        backgroundColor: C.amber,
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        minWidth: 36,
         alignItems: 'center',
-        paddingHorizontal: SPACING.xl,
-        paddingVertical: SPACING.lg,
-        gap: SPACING.md,
     },
-    title: {
-        fontSize: FONT_SIZES.xxl,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
-        letterSpacing: -0.3,
+    countBadgeText: {
+        fontSize: 15,
+        fontWeight: '800',
+        color: C.navy,
     },
-    badge: {
-        backgroundColor: COLORS.warning,
-        borderRadius: BORDER_RADIUS.full,
-        paddingHorizontal: SPACING.md,
-        paddingVertical: SPACING.xxs,
-    },
-    badgeText: {
-        color: COLORS.white,
-        fontSize: FONT_SIZES.xs,
-        fontWeight: FONT_WEIGHTS.bold,
-    },
-    content: {
-        flex: 1,
-        paddingHorizontal: SPACING.xl,
-    },
-    card: {
+    prioritySummary: {
         flexDirection: 'row',
-        backgroundColor: COLORS.surface,
-        borderRadius: BORDER_RADIUS.xl,
-        marginBottom: SPACING.md,
-        borderWidth: 1,
-        borderColor: COLORS.border,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderRadius: 12,
+        padding: 12,
+        gap: 8,
+    },
+    priorityStat: {
+        flex: 1,
+        alignItems: 'center',
+        gap: 3,
+    },
+    priorityDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    priorityStatCount: {
+        fontSize: 16,
+        fontWeight: '800',
+        color: C.white,
+    },
+    priorityStatLabel: {
+        fontSize: 9,
+        color: 'rgba(255,255,255,0.55)',
+        fontWeight: '600',
+    },
+
+    // List
+    list: { flex: 1 },
+    listContent: {
+        paddingHorizontal: 20,
+        paddingTop: 14,
+    },
+    reportCard: {
+        flexDirection: 'row',
+        backgroundColor: C.surface,
+        borderRadius: 16,
+        marginBottom: 10,
         overflow: 'hidden',
-        ...SHADOWS.xs,
+        alignItems: 'center',
+        shadowColor: C.navyMid,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    cardBar: {
+        width: 4,
+        alignSelf: 'stretch',
     },
     thumbnail: {
-        width: 80,
-        height: '100%',
-        minHeight: 110,
+        width: 72,
+        height: 90,
     },
-    cardBody: {
+    cardContent: {
         flex: 1,
-        padding: SPACING.lg,
+        padding: 12,
     },
-    cardHeader: {
+    cardTopRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: SPACING.sm,
+        marginBottom: 5,
     },
     reportType: {
-        fontSize: FONT_SIZES.md,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
+        fontSize: 14,
+        fontWeight: '700',
+        color: C.textPrimary,
+        flex: 1,
+        marginRight: 6,
     },
-    priorityBadge: {
-        paddingHorizontal: SPACING.sm,
+    priorityChip: {
+        paddingHorizontal: 7,
         paddingVertical: 3,
-        borderRadius: BORDER_RADIUS.sm,
+        borderRadius: 6,
     },
-    priorityText: {
-        fontSize: FONT_SIZES.xxs,
-        fontWeight: FONT_WEIGHTS.bold,
+    priorityChipText: {
+        fontSize: 9,
+        fontWeight: '700',
         letterSpacing: 0.5,
     },
-    cardContent: {
-        gap: SPACING.xs,
-        marginBottom: SPACING.sm,
-    },
-    infoRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: SPACING.xs,
-    },
-    infoText: {
-        fontSize: FONT_SIZES.xs,
-        color: COLORS.textSecondary,
-    },
-    cardFooter: {
-        flexDirection: 'row',
-        justifyContent: 'flex-end',
-    },
-    reviewBtn: {
+    vehicleRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
+        marginBottom: 4,
     },
-    reviewText: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.secondary,
-        fontWeight: FONT_WEIGHTS.semibold,
+    vehicleText: {
+        fontSize: 12,
+        color: C.navyMid,
+        fontWeight: '700',
+        letterSpacing: 0.5,
+    },
+    metaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        marginBottom: 2,
+    },
+    metaText: {
+        fontSize: 11,
+        color: C.textSecondary,
+    },
+    reviewArrow: {
+        width: 32,
+        height: 32,
+        borderRadius: 10,
+        backgroundColor: C.offWhite,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
     },
 });

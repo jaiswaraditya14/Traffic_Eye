@@ -2,113 +2,112 @@ import { StyleSheet, Dimensions, Platform } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
-// ─────────────────────────────────────────────
-// Enterprise Color Palette — "Indigo Authority"
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+// TRAFFIC EYE 1.1 — "Civic Authority" Design System
+// North Star: "The Digital Sentinel"
+// Professional government-grade civic app aesthetic
+// Navy Blue (#1B3A6B) + Amber (#F59E0B) + Off-White (#F8F9FB)
+// ─────────────────────────────────────────────────────────
 
-const LIGHT_COLORS = {
-    // Primary — Deep Indigo
-    primary: '#4F46E5',
-    primaryLight: '#6366F1',
-    primaryDark: '#3730A3',
-    primarySurface: '#EEF2FF',       // Very light indigo tint for surfaces
-    primaryBorder: '#C7D2FE',
+export const COLORS = {
+    // ── Primary: Deep Navy (Authority & Trust) ──
+    primary: '#1B3A6B',
+    primaryDark: '#002452',
+    primaryLight: '#2C4E80',
+    primarySurface: '#D7E2FF',     // Light navy tint for backgrounds
+    primaryBorder: '#ACC7FF',
 
-    // Secondary — Teal
-    secondary: '#0D9488',
-    secondaryLight: '#14B8A6',
-    secondaryDark: '#0F766E',
-    secondarySurface: '#F0FDFA',
+    // ── Secondary / Accent: Amber (Action & Alert) ──
+    secondary: '#F59E0B',
+    secondaryDark: '#D97706',
+    secondaryLight: '#FCD34D',
+    secondarySurface: '#FFF8E7',   // Light amber tint
+    secondaryBorder: '#FDE68A',
 
-    // Accent — Amber
-    accent: '#F59E0B',
-    accentLight: '#FBBF24',
-    accentDark: '#D97706',
-    accentSurface: '#FFFBEB',
-
-    // Status
+    // ── Status Colors ──
     success: '#059669',
     successLight: '#10B981',
-    successSurface: '#ECFDF5',
+    successSurface: '#D1FAE5',
     warning: '#D97706',
     warningLight: '#F59E0B',
-    warningSurface: '#FFFBEB',
-    error: '#DC2626',
-    errorLight: '#EF4444',
-    errorSurface: '#FEF2F2',
-    info: '#2563EB',
-    infoLight: '#3B82F6',
-    infoSurface: '#EFF6FF',
+    warningSurface: '#FEF3C7',
+    error: '#BA1A1A',
+    errorLight: '#DC2626',
+    errorSurface: '#FFDAD6',
+    info: '#1B3A6B',
+    infoLight: '#2C4E80',
+    infoSurface: '#D7E2FF',
     danger: '#DC2626',
 
-    // Neutrals — Cool Gray
+    // ── Surfaces: "Layered Paper" depth model ──
+    background: '#F8F9FB',          // Base canvas — off-white
+    backgroundSecondary: '#F2F4F6', // Section layer
+    surface: '#FFFFFF',             // Elevated cards
+    surfaceElevated: '#FFFFFF',
+    surfaceContainerLow: '#F2F4F6', // Secondary content zones
+    surfaceContainer: '#EDEEF0',    // Standard containers
+    surfaceContainerHigh: '#E7E8EA',
+    surfaceContainerHighest: '#E1E2E4',
+
+    // ── Text ──
+    textPrimary: '#191C1E',         // NOT pure black — editorial ink feel
+    textSecondary: '#44474F',
+    textTertiary: '#747780',
+    textInverse: '#FFFFFF',
+    textAccent: '#1B3A6B',
+
+    // ── Borders / Outline ──
+    border: '#C4C6D0',
+    borderLight: '#E1E2E4',
+    borderFocus: '#1B3A6B',
+
+    // ── Neutrals ──
     white: '#FFFFFF',
     black: '#000000',
-    gray50: '#F8FAFC',
-    gray100: '#F1F5F9',
-    gray200: '#E2E8F0',
-    gray300: '#CBD5E1',
-    gray400: '#94A3B8',
-    gray500: '#64748B',
-    gray600: '#475569',
-    gray700: '#334155',
-    gray800: '#1E293B',
-    gray900: '#0F172A',
+    gray50: '#F8F9FB',
+    gray100: '#F2F4F6',
+    gray200: '#E1E2E4',
+    gray300: '#C4C6D0',
+    gray400: '#747780',
+    gray500: '#44474F',
+    gray600: '#2E3132',
+    gray700: '#191C1E',
+    gray800: '#0D0F10',
+    gray900: '#000000',
 
-    // Background
-    background: '#F8FAFC',
-    backgroundSecondary: '#F1F5F9',
-    surface: '#FFFFFF',
-    surfaceElevated: '#FFFFFF',
-
-    // Text
-    textPrimary: '#0F172A',
-    textSecondary: '#475569',
-    textTertiary: '#94A3B8',
-    textInverse: '#FFFFFF',
-    textAccent: '#4F46E5',
-
-    // Borders
-    border: '#E2E8F0',
-    borderLight: '#F1F5F9',
-    borderFocus: '#4F46E5',
-
-    // Overlay
-    overlay: 'rgba(15, 23, 42, 0.5)',
-    overlayLight: 'rgba(15, 23, 42, 0.08)',
+    // ── Overlay ──
+    overlay: 'rgba(25, 28, 30, 0.5)',
+    overlayLight: 'rgba(25, 28, 30, 0.08)',
 };
 
-const DARK_COLORS = {
-    primary: '#6366F1',
-    primaryLight: '#818CF8',
-    primaryDark: '#4F46E5',
-    primarySurface: '#1E1B4B',
-    primaryBorder: '#4338CA',
-
-    secondary: '#14B8A6',
-    secondaryLight: '#2DD4BF',
-    secondaryDark: '#0D9488',
-    secondarySurface: '#042F2E',
-
-    accent: '#FBBF24',
-    accentLight: '#FCD34D',
+// Legacy dark colors (kept for backward compat with any remaining usage)
+export const DARK_COLORS = {
+    primary: '#90ABFF',
+    primaryLight: '#B8CBFF',
+    primaryDark: '#6B8FE0',
+    primarySurface: '#1E3A6B',
+    primaryBorder: '#4F7AC8',
+    secondary: '#F59E0B',
+    secondaryLight: '#FCD34D',
+    secondaryDark: '#D97706',
+    secondarySurface: '#451A03',
+    accent: '#FCD34D',
+    accentLight: '#FDE68A',
     accentDark: '#F59E0B',
     accentSurface: '#451A03',
-
-    success: '#10B981',
-    successLight: '#34D399',
+    success: '#34D399',
+    successLight: '#6EE7B7',
     successSurface: '#064E3B',
-    warning: '#F59E0B',
-    warningLight: '#FBBF24',
+    warning: '#FBBF24',
+    warningLight: '#FCD34D',
     warningSurface: '#451A03',
-    error: '#EF4444',
-    errorLight: '#F87171',
+    error: '#F87171',
+    errorLight: '#FCA5A5',
     errorSurface: '#450A0A',
-    info: '#3B82F6',
-    infoLight: '#60A5FA',
+    info: '#60A5FA',
+    infoLight: '#93C5FD',
     infoSurface: '#1E3A5F',
-    danger: '#EF4444',
-
+    danger: '#F87171',
     white: '#FFFFFF',
     black: '#000000',
     gray50: '#0F172A',
@@ -121,34 +120,28 @@ const DARK_COLORS = {
     gray700: '#E2E8F0',
     gray800: '#F1F5F9',
     gray900: '#F8FAFC',
-
     background: '#0F172A',
     backgroundSecondary: '#1E293B',
     surface: '#1E293B',
     surfaceElevated: '#334155',
-
     textPrimary: '#F8FAFC',
     textSecondary: '#CBD5E1',
     textTertiary: '#64748B',
     textInverse: '#0F172A',
     textAccent: '#818CF8',
-
     border: '#334155',
     borderLight: '#1E293B',
     borderFocus: '#6366F1',
-
     overlay: 'rgba(0, 0, 0, 0.6)',
     overlayLight: 'rgba(255, 255, 255, 0.06)',
 };
 
 export const getColors = (isDarkMode = false) => {
-    return isDarkMode ? DARK_COLORS : LIGHT_COLORS;
+    return isDarkMode ? DARK_COLORS : COLORS;
 };
 
-export const COLORS = LIGHT_COLORS;
-
 // ─────────────────────────────────────
-// Spacing — 4px base, refined scale
+// Spacing — 4px base
 // ─────────────────────────────────────
 
 export const SPACING = {
@@ -164,7 +157,7 @@ export const SPACING = {
 };
 
 // ─────────────────────────────────────
-// Typography — Inter-inspired scale
+// Typography — Inter scale
 // ─────────────────────────────────────
 
 export const FONT_SIZES = {
@@ -210,108 +203,123 @@ export const BORDER_RADIUS = {
     lg: 12,
     xl: 16,
     xxl: 20,
-    xxxl: 28,
+    xxxl: 24,
     full: 9999,
 };
 
 // ─────────────────────────────────────
-// Shadows — Platform-aware, premium
+// Shadows — "Ambient Navy" tonal shadows
+// No harsh black shadows — use navy-tinted ambient light
 // ─────────────────────────────────────
 
 export const SHADOWS = {
     xs: Platform.select({
         ios: {
-            shadowColor: '#0F172A',
+            shadowColor: '#1B3A6B',
             shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.04,
-            shadowRadius: 2,
+            shadowOpacity: 0.06,
+            shadowRadius: 3,
         },
         android: { elevation: 1 },
     }),
     sm: Platform.select({
         ios: {
-            shadowColor: '#0F172A',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.06,
-            shadowRadius: 3,
+            shadowColor: '#1B3A6B',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.08,
+            shadowRadius: 6,
         },
         android: { elevation: 2 },
     }),
     md: Platform.select({
         ios: {
-            shadowColor: '#0F172A',
+            shadowColor: '#1B3A6B',
             shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.08,
-            shadowRadius: 6,
+            shadowOpacity: 0.10,
+            shadowRadius: 12,
         },
         android: { elevation: 4 },
     }),
     lg: Platform.select({
         ios: {
-            shadowColor: '#0F172A',
+            shadowColor: '#1B3A6B',
             shadowOffset: { width: 0, height: 8 },
             shadowOpacity: 0.12,
-            shadowRadius: 16,
+            shadowRadius: 24,
         },
         android: { elevation: 8 },
     }),
     xl: Platform.select({
         ios: {
-            shadowColor: '#0F172A',
+            shadowColor: '#1B3A6B',
             shadowOffset: { width: 0, height: 12 },
-            shadowOpacity: 0.16,
-            shadowRadius: 24,
+            shadowOpacity: 0.15,
+            shadowRadius: 32,
         },
         android: { elevation: 12 },
     }),
-    // Colored shadows for CTA buttons
+    // Amber glow shadow for primary CTAs
     primary: Platform.select({
         ios: {
-            shadowColor: '#4F46E5',
+            shadowColor: '#F59E0B',
             shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.3,
-            shadowRadius: 8,
+            shadowOpacity: 0.25,
+            shadowRadius: 12,
         },
         android: { elevation: 6 },
+    }),
+    // Navy shadow for cards
+    navy: Platform.select({
+        ios: {
+            shadowColor: '#002452',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.12,
+            shadowRadius: 16,
+        },
+        android: { elevation: 4 },
     }),
     success: Platform.select({
         ios: {
             shadowColor: '#059669',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.3,
-            shadowRadius: 8,
-        },
-        android: { elevation: 6 },
-    }),
-    error: Platform.select({
-        ios: {
-            shadowColor: '#DC2626',
             shadowOffset: { width: 0, height: 4 },
             shadowOpacity: 0.25,
             shadowRadius: 8,
         },
         android: { elevation: 6 },
     }),
+    error: Platform.select({
+        ios: {
+            shadowColor: '#BA1A1A',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.2,
+            shadowRadius: 8,
+        },
+        android: { elevation: 6 },
+    }),
 };
 
 // ─────────────────────────────────────
-// Gradients — for LinearGradient usage
+// Gradients
 // ─────────────────────────────────────
 
 export const GRADIENTS = {
-    primary: ['#4F46E5', '#6366F1'],
-    primaryDark: ['#3730A3', '#4F46E5'],
+    // Primary navy gradient for headers & CTAs
+    primary: ['#002452', '#1B3A6B'],
+    primaryLight: ['#1B3A6B', '#2C4E80'],
+    // Amber gradient for CTA buttons
+    amber: ['#D97706', '#F59E0B'],
+    amberLight: ['#F59E0B', '#FCD34D'],
+    // Secondary/teal
     secondary: ['#0D9488', '#14B8A6'],
-    accent: ['#D97706', '#F59E0B'],
+    // Status gradients
     success: ['#059669', '#10B981'],
-    danger: ['#DC2626', '#EF4444'],
+    danger: ['#BA1A1A', '#DC2626'],
     warning: ['#D97706', '#F59E0B'],
-    info: ['#2563EB', '#3B82F6'],
-    dark: ['#0F172A', '#1E293B'],
-    // Premium hero gradients
-    heroIndigo: ['#312E81', '#4F46E5', '#6366F1'],
-    heroDark: ['#0F172A', '#1E293B', '#334155'],
-    cardShine: ['rgba(255,255,255,0)', 'rgba(255,255,255,0.06)', 'rgba(255,255,255,0)'],
+    // Dark navy hero
+    hero: ['#002452', '#1B3A6B', '#2C4E80'],
+    heroDark: ['#001535', '#002452', '#1B3A6B'],
+    // Card shine
+    cardShine: ['rgba(255,255,255,0)', 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0)'],
 };
 
 // ─────────────────────────────────────
@@ -349,13 +357,11 @@ export const globalStyles = StyleSheet.create({
         alignItems: 'center',
     },
     shadow: SHADOWS.md,
-    // Card base style
+    // Card base — "Civic Sentinel" style
     card: {
         backgroundColor: COLORS.surface,
         borderRadius: BORDER_RADIUS.xl,
         padding: SPACING.lg,
-        borderWidth: 1,
-        borderColor: COLORS.border,
         ...SHADOWS.sm,
     },
     // Section title
@@ -363,13 +369,21 @@ export const globalStyles = StyleSheet.create({
         fontSize: FONT_SIZES.lg,
         fontWeight: FONT_WEIGHTS.bold,
         color: COLORS.textPrimary,
-        letterSpacing: -0.3,
+        letterSpacing: -0.2,
     },
-    // Badge style
+    // Badge/chip style
     badge: {
         paddingHorizontal: SPACING.sm,
         paddingVertical: SPACING.xxs,
         borderRadius: BORDER_RADIUS.full,
         alignSelf: 'flex-start',
+    },
+    // Navy header style
+    navyHeader: {
+        backgroundColor: COLORS.primary,
+        paddingHorizontal: SPACING.xl,
+        paddingBottom: SPACING.xl,
+        borderBottomLeftRadius: BORDER_RADIUS.xxxl,
+        borderBottomRightRadius: BORDER_RADIUS.xxxl,
     },
 });

@@ -1,126 +1,157 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, ImageBackground, Dimensions } from 'react-native';
+import {
+    View, Text, StyleSheet, Animated, Dimensions, StatusBar
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
-import { COLORS, FONT_SIZES, FONT_WEIGHTS, SPACING } from '../../utils/theme';
 
 const { width, height } = Dimensions.get('window');
 
+// ─── Design Tokens (Civic Authority) ───
+const C = {
+    navy: '#002452',
+    navyMid: '#1B3A6B',
+    navyLight: '#2C4E80',
+    amber: '#F59E0B',
+    amberDark: '#D97706',
+    white: '#FFFFFF',
+    offWhite: '#D7E2FF',
+};
+
 export default function SplashScreen({ navigation }) {
     const { setShowSplash } = useAppContext();
-    const logoScale = useRef(new Animated.Value(0.5)).current;
+
+    // ── Animations ──
+    const logoScale = useRef(new Animated.Value(0.4)).current;
     const logoOpacity = useRef(new Animated.Value(0)).current;
-    const textOpacity = useRef(new Animated.Value(0)).current;
+    const titleOpacity = useRef(new Animated.Value(0)).current;
+    const titleY = useRef(new Animated.Value(24)).current;
     const subtitleOpacity = useRef(new Animated.Value(0)).current;
-    const bgOpacity = useRef(new Animated.Value(0)).current;
-    const shimmer = useRef(new Animated.Value(0)).current;
+    const barWidth = useRef(new Animated.Value(0)).current;
+    const amberPulse = useRef(new Animated.Value(1)).current;
 
     useEffect(() => {
-        // Background fade in first
-        Animated.timing(bgOpacity, {
-            toValue: 1,
-            duration: 600,
-            useNativeDriver: true,
-        }).start();
-
-        // Entrance animations
+        // 1. Logo entrance
         Animated.sequence([
-            Animated.delay(300),
+            Animated.delay(200),
             Animated.parallel([
                 Animated.spring(logoScale, {
                     toValue: 1,
-                    tension: 50,
+                    tension: 55,
                     friction: 7,
                     useNativeDriver: true,
                 }),
                 Animated.timing(logoOpacity, {
                     toValue: 1,
-                    duration: 400,
+                    duration: 500,
                     useNativeDriver: true,
                 }),
             ]),
-            Animated.timing(textOpacity, {
+            // 2. Title slide-up
+            Animated.parallel([
+                Animated.timing(titleOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
+                Animated.timing(titleY, { toValue: 0, duration: 350, useNativeDriver: true }),
+            ]),
+            // 3. Subtitle
+            Animated.timing(subtitleOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
+            // 4. Loading bar
+            Animated.timing(barWidth, {
                 toValue: 1,
-                duration: 300,
-                useNativeDriver: true,
-            }),
-            Animated.timing(subtitleOpacity, {
-                toValue: 1,
-                duration: 200,
-                useNativeDriver: true,
+                duration: 2800,
+                useNativeDriver: false,
             }),
         ]).start();
 
-        // Shimmer loop
+        // Amber pulse on shield
         Animated.loop(
             Animated.sequence([
-                Animated.timing(shimmer, {
-                    toValue: 1,
-                    duration: 1000,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(shimmer, {
-                    toValue: 0,
-                    duration: 1000,
-                    useNativeDriver: true,
-                }),
+                Animated.timing(amberPulse, { toValue: 1.15, duration: 900, useNativeDriver: true }),
+                Animated.timing(amberPulse, { toValue: 1, duration: 900, useNativeDriver: true }),
             ])
         ).start();
 
-        const timer = setTimeout(() => {
-            setShowSplash(false);
-        }, 8000);
-
+        const timer = setTimeout(() => setShowSplash(false), 4200);
         return () => clearTimeout(timer);
     }, []);
 
+    const barInterpolated = barWidth.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0%', '100%'],
+    });
+
     return (
         <View style={styles.container}>
-            {/* Background image — 2.jpg traffic signal */}
-            <Animated.View style={[styles.bgImageContainer, { opacity: bgOpacity }]}>
-                <ImageBackground
-                    source={require('../../../assets/images/2.jpg')}
-                    style={styles.bgImage}
-                    resizeMode="cover"
-                >
-                    {/* Dark gradient overlay for readability */}
-                    <LinearGradient
-                        colors={[
-                            'rgba(8, 28, 36, 0.75)',
-                            'rgba(8, 28, 36, 0.6)',
-                            'rgba(8, 28, 36, 0.85)',
-                            'rgba(8, 28, 36, 0.95)',
-                        ]}
-                        locations={[0, 0.3, 0.7, 1]}
-                        style={styles.overlay}
-                    />
-                </ImageBackground>
-            </Animated.View>
+            <StatusBar barStyle="light-content" backgroundColor={C.navy} />
 
-            {/* Decorative glowing circles matching traffic light colors */}
-            <Animated.View style={[styles.glowRed, { opacity: shimmer }]} />
-            <View style={styles.glowGreen} />
+            {/* Background gradient */}
+            <LinearGradient
+                colors={[C.navy, C.navyMid, C.navyLight]}
+                locations={[0, 0.55, 1]}
+                style={StyleSheet.absoluteFill}
+            />
 
+            {/* Subtle geometric accent circles */}
+            <View style={styles.circleTopRight} />
+            <View style={styles.circleBottomLeft} />
+
+            {/* ── Center Logo Block ── */}
             <View style={styles.content}>
+                {/* Shield + Eye icon */}
+                <Animated.View
+                    style={[
+                        styles.logoContainer,
+                        { opacity: logoOpacity, transform: [{ scale: logoScale }] },
+                    ]}
+                >
+                    {/* Outer amber pulse ring */}
+                    <Animated.View
+                        style={[
+                            styles.pulseRing,
+                            { transform: [{ scale: amberPulse }] },
+                        ]}
+                    />
+                    {/* Shield background */}
+                    <View style={styles.shieldBg}>
+                        <Ionicons name="shield-checkmark" size={64} color={C.amber} />
+                    </View>
+
+                    {/* Government seal ring */}
+                    <View style={styles.sealRing} />
+                </Animated.View>
+
                 {/* App Name */}
-                <Animated.Text style={[styles.title, { opacity: textOpacity }]}>
-                    Traffic<Text style={styles.titleAccent}>Eye</Text>
-                </Animated.Text>
+                <Animated.View
+                    style={{ opacity: titleOpacity, transform: [{ translateY: titleY }] }}
+                >
+                    <Text style={styles.appName}>
+                        Traffic<Text style={styles.appNameAccent}>Eye</Text>
+                    </Text>
+                </Animated.View>
 
                 {/* Tagline */}
-                <Animated.Text style={[styles.subtitle, { opacity: subtitleOpacity }]}>
-                    Smart Violation Reporting
+                <Animated.Text style={[styles.tagline, { opacity: subtitleOpacity }]}>
+                    Smart Civic Traffic Enforcement
                 </Animated.Text>
 
                 {/* Divider line */}
                 <Animated.View style={[styles.divider, { opacity: subtitleOpacity }]} />
 
-                {/* Version badge */}
-                <Animated.View style={[styles.versionBadge, { opacity: subtitleOpacity }]}>
-                    <Ionicons name="shield-checkmark" size={12} color="#2DD4BF" />
-                    <Text style={styles.versionText}>AI-Powered • Secure</Text>
+                {/* Authority badge */}
+                <Animated.View style={[styles.authorityBadge, { opacity: subtitleOpacity }]}>
+                    <Ionicons name="ribbon" size={13} color={C.amber} />
+                    <Text style={styles.authorityText}>AI-Powered  •  Government Grade  •  Secure</Text>
                 </Animated.View>
+            </View>
+
+            {/* ── Loading Bar ── */}
+            <View style={styles.loadingSection}>
+                <Text style={styles.loadingLabel}>Initializing...</Text>
+                <View style={styles.loadingTrack}>
+                    <Animated.View
+                        style={[styles.loadingBar, { width: barInterpolated }]}
+                    />
+                </View>
             </View>
         </View>
     );
@@ -129,115 +160,140 @@ export default function SplashScreen({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#081C24',
+        backgroundColor: C.navy,
     },
-    bgImageContainer: {
+    // Geometric accent circles (subtle background texture)
+    circleTopRight: {
         position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
+        width: 300,
+        height: 300,
+        borderRadius: 150,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
+        top: -80,
+        right: -60,
     },
-    bgImage: {
-        flex: 1,
-        width: '100%',
-        height: '100%',
-    },
-    overlay: {
-        flex: 1,
-    },
-    // Traffic-light inspired glowing decorations
-    glowRed: {
+    circleBottomLeft: {
         position: 'absolute',
-        width: 200,
-        height: 200,
-        borderRadius: 100,
-        backgroundColor: 'rgba(239, 68, 68, 0.08)',
-        top: height * 0.1,
-        right: -40,
+        width: 250,
+        height: 250,
+        borderRadius: 125,
+        borderWidth: 1,
+        borderColor: 'rgba(245,158,11,0.08)',
+        bottom: -60,
+        left: -70,
     },
-    glowGreen: {
-        position: 'absolute',
-        width: 160,
-        height: 160,
-        borderRadius: 80,
-        backgroundColor: 'rgba(45, 212, 191, 0.06)',
-        bottom: height * 0.15,
-        left: -30,
-    },
+
+    // ── Center Content ──
     content: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        paddingHorizontal: SPACING.xl,
+        paddingHorizontal: 32,
     },
-    iconContainer: {
-        marginBottom: SPACING.xxl,
+    logoContainer: {
+        width: 140,
+        height: 140,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 32,
     },
-    iconOuter: {
+    pulseRing: {
+        position: 'absolute',
         width: 130,
         height: 130,
-        borderRadius: 36,
-        backgroundColor: 'rgba(45, 212, 191, 0.12)',
+        borderRadius: 65,
+        borderWidth: 1.5,
+        borderColor: 'rgba(245,158,11,0.25)',
+    },
+    sealRing: {
+        position: 'absolute',
+        width: 110,
+        height: 110,
+        borderRadius: 55,
         borderWidth: 1,
-        borderColor: 'rgba(45, 212, 191, 0.2)',
+        borderColor: 'rgba(255,255,255,0.12)',
+    },
+    shieldBg: {
+        width: 90,
+        height: 90,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.08)',
         justifyContent: 'center',
         alignItems: 'center',
     },
-    iconInner: {
-        width: 100,
-        height: 100,
-        borderRadius: 28,
-        backgroundColor: 'rgba(255, 255, 255, 0.08)',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-        justifyContent: 'center',
-        alignItems: 'center',
+
+    // ── Typography ──
+    appName: {
+        fontSize: 44,
+        fontWeight: '800',
+        color: C.white,
+        letterSpacing: -1.5,
+        textAlign: 'center',
     },
-    icon: {
-        fontSize: 52,
+    appNameAccent: {
+        color: C.amber,
     },
-    title: {
-        fontSize: 40,
-        fontWeight: FONT_WEIGHTS.extrabold,
-        color: '#FFFFFF',
-        marginBottom: SPACING.sm,
-        letterSpacing: -1,
-    },
-    titleAccent: {
-        color: '#2DD4BF',
-    },
-    subtitle: {
-        fontSize: FONT_SIZES.sm,
-        color: 'rgba(255, 255, 255, 0.6)',
-        fontWeight: FONT_WEIGHTS.medium,
-        letterSpacing: 3,
+    tagline: {
+        fontSize: 13,
+        color: 'rgba(255,255,255,0.55)',
+        fontWeight: '500',
+        letterSpacing: 0.5,
         textTransform: 'uppercase',
+        marginTop: 8,
+        textAlign: 'center',
     },
     divider: {
-        width: 50,
-        height: 3,
-        backgroundColor: '#2DD4BF',
+        width: 40,
+        height: 2,
+        backgroundColor: C.amber,
         borderRadius: 2,
-        marginTop: SPACING.xl,
-        opacity: 0.6,
+        marginTop: 20,
+        opacity: 0.7,
     },
-    versionBadge: {
+    authorityBadge: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        marginTop: SPACING.lg,
-        paddingHorizontal: SPACING.md,
-        paddingVertical: SPACING.xs + 2,
+        marginTop: 16,
+        paddingHorizontal: 14,
+        paddingVertical: 6,
         borderRadius: 20,
-        backgroundColor: 'rgba(45, 212, 191, 0.08)',
+        backgroundColor: 'rgba(245,158,11,0.1)',
         borderWidth: 1,
-        borderColor: 'rgba(45, 212, 191, 0.15)',
+        borderColor: 'rgba(245,158,11,0.2)',
     },
-    versionText: {
-        fontSize: FONT_SIZES.xxs,
-        color: 'rgba(255, 255, 255, 0.5)',
-        fontWeight: FONT_WEIGHTS.medium,
-        letterSpacing: 0.5,
+    authorityText: {
+        fontSize: 11,
+        color: 'rgba(255,255,255,0.55)',
+        fontWeight: '500',
+        letterSpacing: 0.3,
+    },
+
+    // ── Loading Bar ──
+    loadingSection: {
+        paddingHorizontal: 40,
+        paddingBottom: 60,
+        alignItems: 'center',
+    },
+    loadingLabel: {
+        fontSize: 11,
+        color: 'rgba(255,255,255,0.35)',
+        fontWeight: '500',
+        letterSpacing: 1.5,
+        textTransform: 'uppercase',
+        marginBottom: 10,
+    },
+    loadingTrack: {
+        width: '100%',
+        height: 3,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderRadius: 2,
+        overflow: 'hidden',
+    },
+    loadingBar: {
+        height: '100%',
+        backgroundColor: C.amber,
+        borderRadius: 2,
     },
 });

@@ -1,15 +1,36 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator, Animated } from 'react-native';
+import React, { useState } from 'react';
+import {
+    View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView,
+    Platform, ScrollView, Alert, ActivityIndicator, StatusBar, TextInput,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Linking from 'expo-linking';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
-import { MobileContainer, Button, Input } from '../../components';
+import { MobileContainer } from '../../components';
 import { useAuth } from '../../context';
 import { supabase } from '../../services';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, isValidEmail, validateRequiredFields } from '../../utils';
+import { isValidEmail, validateRequiredFields } from '../../utils';
 
 WebBrowser.maybeCompleteAuthSession();
+
+// ── Design Tokens ──
+const C = {
+    navy: '#002452',
+    navyMid: '#1B3A6B',
+    amber: '#F59E0B',
+    amberDark: '#D97706',
+    white: '#FFFFFF',
+    offWhite: '#F8F9FB',
+    surface: '#FFFFFF',
+    surfaceLow: '#F2F4F6',
+    surfaceInput: '#F2F4F6',
+    textPrimary: '#191C1E',
+    textSecondary: '#44474F',
+    textTertiary: '#747780',
+    border: '#C4C6D0',
+    error: '#BA1A1A',
+};
 
 export default function CitizenSignIn({ navigation }) {
     const [email, setEmail] = useState('');
@@ -17,33 +38,23 @@ export default function CitizenSignIn({ navigation }) {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [googleLoading, setGoogleLoading] = useState(false);
+    const [emailFocused, setEmailFocused] = useState(false);
+    const [passwordFocused, setPasswordFocused] = useState(false);
 
+    // ── BACKEND INTACT — all original auth logic preserved ──
     const { signIn, signInWithGoogle } = useAuth();
 
     const handleSignIn = async () => {
         const validation = validateRequiredFields({ Email: email, Password: password });
-        if (!validation.valid) {
-            Alert.alert('Error', validation.errors[0]);
-            return;
-        }
-
-        if (!isValidEmail(email.trim())) {
-            Alert.alert('Error', 'Please enter a valid email address');
-            return;
-        }
+        if (!validation.valid) { Alert.alert('Error', validation.errors[0]); return; }
+        if (!isValidEmail(email.trim())) { Alert.alert('Error', 'Please enter a valid email address'); return; }
 
         setLoading(true);
         try {
             const { error } = await signIn(email.trim(), password);
-
             if (error) {
-                // Check if email is not confirmed
                 if (error.message?.toLowerCase().includes('email not confirmed')) {
-                    Alert.alert(
-                        'Email Not Verified',
-                        'Please check your email and click the verification link before signing in.',
-                        [{ text: 'OK' }]
-                    );
+                    Alert.alert('Email Not Verified', 'Please check your email and click the verification link before signing in.', [{ text: 'OK' }]);
                 } else {
                     Alert.alert('Sign In Failed', error.message || 'Invalid email or password');
                 }
@@ -60,64 +71,31 @@ export default function CitizenSignIn({ navigation }) {
     const handleGoogleSignIn = async () => {
         setGoogleLoading(true);
         try {
-            const redirectUri = AuthSession.makeRedirectUri({
-                scheme: 'trafficeye',
-                path: 'auth/callback'
-            });
-
-            console.log('1. [OAuth] Initiating with redirect URI:', redirectUri);
-
+            const redirectUri = AuthSession.makeRedirectUri({ scheme: 'trafficeye', path: 'auth/callback' });
             const { data, error } = await signInWithGoogle(redirectUri);
-
-            if (error) {
-                console.log('2. [OAuth] Supabase Error:', error.message);
-                Alert.alert('Configuration Error', error.message);
-                throw error;
-            }
+            if (error) { Alert.alert('Configuration Error', error.message); throw error; }
 
             if (data?.url) {
-                console.log('3. [OAuth] Opening Browser at:', data.url);
                 const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
-                console.log('4. [OAuth] Browser Session Finished. Result Type:', result.type);
-
                 if (result.type === 'success' && result.url) {
-                    console.log('5. [OAuth] Success! URL received:', result.url);
-
                     const getParam = (url, param) => {
                         const regex = new RegExp(`[#|?|&]${param}=([^&]*)`);
                         const match = url.match(regex);
                         return match ? decodeURIComponent(match[1]) : null;
                     };
-
                     const access_token = getParam(result.url, 'access_token');
                     const refresh_token = getParam(result.url, 'refresh_token');
-
-                    console.log('6. [OAuth] Tokens extracted:', !!access_token, !!refresh_token);
-
                     if (access_token && refresh_token) {
-                        console.log('7. [OAuth] Setting session...');
-                        const { error: sessionError } = await supabase.auth.setSession({
-                            access_token,
-                            refresh_token,
-                        });
-
-                        if (sessionError) {
-                            console.error('8. [OAuth] Session Error:', sessionError);
-                            throw sessionError;
-                        }
-                        console.log('✅ Session set successfully');
+                        const { error: sessionError } = await supabase.auth.setSession({ access_token, refresh_token });
+                        if (sessionError) throw sessionError;
                     } else {
-                        throw new Error('No authentication tokens found in the redirect. Please try again.');
+                        throw new Error('No authentication tokens found. Please try again.');
                     }
                 } else if (result.type === 'cancel') {
-                    console.log('User cancelled the sign-in');
                     Alert.alert('Cancelled', 'Sign in was cancelled');
-                } else {
-                    console.log('Unexpected result type:', result.type);
                 }
             }
         } catch (error) {
-            console.error('Google sign in error:', error);
             Alert.alert('Error', error.message || 'Failed to sign in with Google');
         } finally {
             setGoogleLoading(false);
@@ -126,99 +104,142 @@ export default function CitizenSignIn({ navigation }) {
 
     return (
         <MobileContainer>
+            <StatusBar barStyle="light-content" backgroundColor={C.navyMid} />
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.container}
             >
-                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                    {/* Header */}
-                    <View style={styles.header}>
-                        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                            <View style={styles.backButtonInner}>
-                                <Ionicons name="arrow-back" size={20} color={COLORS.textPrimary} />
-                            </View>
-                        </TouchableOpacity>
-
-                        <View style={styles.headerTextContainer}>
-                            <Text style={styles.title}>Welcome Back</Text>
-                            <Text style={styles.subtitle}>Sign in to continue reporting violations</Text>
-                        </View>
-                    </View>
-
-                    {/* Form */}
-                    <View style={styles.form}>
-                        <Input
-                            label="Email"
-                            placeholder="you@example.com"
-                            value={email}
-                            onChangeText={setEmail}
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                        />
-
-                        <View style={styles.passwordWrapper}>
-                            <Input
-                                label="Password"
-                                placeholder="Enter your password"
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry={!showPassword}
-                            />
-                            <TouchableOpacity
-                                style={styles.eyeIcon}
-                                onPress={() => setShowPassword(!showPassword)}
-                            >
-                                <Ionicons
-                                    name={showPassword ? 'eye-off' : 'eye'}
-                                    size={20}
-                                    color={COLORS.textTertiary}
-                                />
-                            </TouchableOpacity>
-                        </View>
-
-                        <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
-                            <Text style={styles.forgotPassword}>Forgot Password?</Text>
-                        </TouchableOpacity>
-
-                        <Button
-                            onPress={handleSignIn}
-                            fullWidth
-                            size="lg"
-                            style={styles.signInButton}
-                            disabled={loading}
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    {/* ── Navy Header ── */}
+                    <LinearGradient colors={[C.navy, C.navyMid]} style={styles.header}>
+                        <TouchableOpacity
+                            onPress={() => navigation.goBack()}
+                            style={styles.backButton}
                         >
-                            {loading ? (
-                                <ActivityIndicator color={COLORS.white} />
-                            ) : (
-                                'Sign In'
-                            )}
-                        </Button>
+                            <Ionicons name="arrow-back" size={20} color={C.white} />
+                        </TouchableOpacity>
+                        <View style={styles.headerContent}>
+                            <View style={styles.logoMark}>
+                                <Ionicons name="shield-checkmark" size={32} color={C.amber} />
+                            </View>
+                            <Text style={styles.headerTitle}>Welcome Back</Text>
+                            <Text style={styles.headerSubtitle}>Sign in as Citizen</Text>
+                        </View>
+                    </LinearGradient>
+
+                    {/* ── Form Section ── */}
+                    <View style={styles.formSection}>
+                        {/* Email */}
+                        <View style={styles.fieldGroup}>
+                            <Text style={styles.fieldLabel}>Email Address</Text>
+                            <View style={[styles.inputRow, emailFocused && styles.inputRowFocused]}>
+                                <Ionicons
+                                    name="mail-outline"
+                                    size={18}
+                                    color={emailFocused ? C.navyMid : C.textTertiary}
+                                />
+                                <TextInput
+                                    style={styles.textInput}
+                                    placeholder="you@example.com"
+                                    placeholderTextColor={C.textTertiary}
+                                    value={email}
+                                    onChangeText={setEmail}
+                                    keyboardType="email-address"
+                                    autoCapitalize="none"
+                                    onFocus={() => setEmailFocused(true)}
+                                    onBlur={() => setEmailFocused(false)}
+                                />
+                            </View>
+                        </View>
+
+                        {/* Password */}
+                        <View style={styles.fieldGroup}>
+                            <Text style={styles.fieldLabel}>Password</Text>
+                            <View style={[styles.inputRow, passwordFocused && styles.inputRowFocused]}>
+                                <Ionicons
+                                    name="lock-closed-outline"
+                                    size={18}
+                                    color={passwordFocused ? C.navyMid : C.textTertiary}
+                                />
+                                <TextInput
+                                    style={styles.textInput}
+                                    placeholder="Enter your password"
+                                    placeholderTextColor={C.textTertiary}
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    secureTextEntry={!showPassword}
+                                    onFocus={() => setPasswordFocused(true)}
+                                    onBlur={() => setPasswordFocused(false)}
+                                />
+                                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                                    <Ionicons
+                                        name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                                        size={18}
+                                        color={C.textTertiary}
+                                    />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        {/* Forgot Password */}
+                        <TouchableOpacity
+                            style={styles.forgotRow}
+                            onPress={() => navigation.navigate('ForgotPassword')}
+                        >
+                            <Text style={styles.forgotText}>Forgot Password?</Text>
+                        </TouchableOpacity>
+
+                        {/* Sign In Button */}
+                        <TouchableOpacity
+                            style={[styles.primaryButton, loading && styles.buttonDisabled]}
+                            onPress={handleSignIn}
+                            disabled={loading}
+                            activeOpacity={0.88}
+                        >
+                            <LinearGradient
+                                colors={[C.navy, C.navyMid]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={styles.primaryButtonGradient}
+                            >
+                                {loading ? (
+                                    <ActivityIndicator color={C.white} />
+                                ) : (
+                                    <>
+                                        <Text style={styles.primaryButtonText}>Sign In</Text>
+                                        <Ionicons name="arrow-forward" size={16} color={C.white} />
+                                    </>
+                                )}
+                            </LinearGradient>
+                        </TouchableOpacity>
 
                         {/* Divider */}
                         <View style={styles.divider}>
                             <View style={styles.dividerLine} />
-                            <Text style={styles.dividerText}>OR</Text>
+                            <Text style={styles.dividerText}>or continue with</Text>
                             <View style={styles.dividerLine} />
                         </View>
 
                         {/* Google Sign In */}
-                        <Button
-                            variant="secondary"
-                            fullWidth
-                            size="lg"
-                            style={styles.socialButton}
+                        <TouchableOpacity
+                            style={[styles.googleButton, (loading || googleLoading) && styles.buttonDisabled]}
                             onPress={handleGoogleSignIn}
                             disabled={loading || googleLoading}
+                            activeOpacity={0.88}
                         >
                             {googleLoading ? (
-                                <ActivityIndicator color={COLORS.textPrimary} />
+                                <ActivityIndicator color={C.textPrimary} />
                             ) : (
-                                <View style={styles.socialButtonContent}>
-                                    <Ionicons name="logo-google" size={20} color={COLORS.textPrimary} />
-                                    <Text style={styles.socialButtonText}>Continue with Google</Text>
-                                </View>
+                                <>
+                                    <Ionicons name="logo-google" size={20} color="#4285F4" />
+                                    <Text style={styles.googleButtonText}>Continue with Google</Text>
+                                </>
                             )}
-                        </Button>
+                        </TouchableOpacity>
 
                         {/* Footer */}
                         <View style={styles.footer}>
@@ -237,106 +258,181 @@ export default function CitizenSignIn({ navigation }) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: C.offWhite,
     },
     scrollContent: {
         flexGrow: 1,
     },
+
+    // ── Header ──
     header: {
-        paddingHorizontal: SPACING.xl,
-        paddingTop: SPACING.xl,
-        paddingBottom: SPACING.lg,
+        paddingTop: 52,
+        paddingBottom: 32,
+        paddingHorizontal: 24,
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28,
     },
     backButton: {
-        marginBottom: SPACING.xl,
-    },
-    backButtonInner: {
-        width: 40,
-        height: 40,
-        borderRadius: BORDER_RADIUS.lg,
-        backgroundColor: COLORS.surface,
-        borderWidth: 1,
-        borderColor: COLORS.border,
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.12)',
         justifyContent: 'center',
         alignItems: 'center',
+        marginBottom: 20,
     },
-    headerTextContainer: {
-        gap: SPACING.sm,
+    headerContent: {
+        alignItems: 'center',
     },
-    title: {
-        fontSize: FONT_SIZES.xxxl,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
+    logoMark: {
+        width: 68,
+        height: 68,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.15)',
+    },
+    headerTitle: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: C.white,
         letterSpacing: -0.5,
+        marginBottom: 4,
     },
-    subtitle: {
-        fontSize: FONT_SIZES.md,
-        color: COLORS.textSecondary,
-        lineHeight: 22,
+    headerSubtitle: {
+        fontSize: 13,
+        color: 'rgba(255,255,255,0.6)',
+        fontWeight: '500',
     },
-    form: {
-        paddingHorizontal: SPACING.xl,
-        paddingTop: SPACING.sm,
+
+    // ── Form ──
+    formSection: {
+        paddingHorizontal: 24,
+        paddingTop: 28,
+        paddingBottom: 40,
     },
-    eyeIcon: {
-        position: 'absolute',
-        right: SPACING.lg,
-        top: 40,
-        padding: SPACING.xs,
+    fieldGroup: {
+        marginBottom: 16,
     },
-    forgotPassword: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.primary,
-        textAlign: 'right',
-        marginBottom: SPACING.lg,
-        fontWeight: FONT_WEIGHTS.semibold,
+    fieldLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: C.navyMid,
+        marginBottom: 8,
+        letterSpacing: 0.2,
     },
-    signInButton: {
-        marginTop: SPACING.sm,
+    inputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: C.surfaceInput,
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 13,
+        gap: 10,
+        borderBottomWidth: 2,
+        borderBottomColor: 'transparent',
     },
+    inputRowFocused: {
+        borderBottomColor: C.navyMid,
+        backgroundColor: C.surface,
+    },
+    textInput: {
+        flex: 1,
+        fontSize: 15,
+        color: C.textPrimary,
+        padding: 0,
+    },
+
+    // Forgot password
+    forgotRow: {
+        alignSelf: 'flex-end',
+        marginBottom: 20,
+    },
+    forgotText: {
+        fontSize: 13,
+        color: C.navyMid,
+        fontWeight: '600',
+    },
+
+    // Primary button
+    primaryButton: {
+        borderRadius: 14,
+        overflow: 'hidden',
+        marginBottom: 20,
+        shadowColor: C.navy,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.25,
+        shadowRadius: 12,
+        elevation: 6,
+    },
+    primaryButtonGradient: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 16,
+    },
+    primaryButtonText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: C.white,
+    },
+    buttonDisabled: {
+        opacity: 0.6,
+    },
+
+    // Divider
     divider: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginVertical: SPACING.xl,
+        gap: 12,
+        marginBottom: 20,
     },
     dividerLine: {
         flex: 1,
         height: 1,
-        backgroundColor: COLORS.border,
+        backgroundColor: C.border,
     },
     dividerText: {
-        marginHorizontal: SPACING.lg,
-        color: COLORS.textTertiary,
-        fontSize: FONT_SIZES.xs,
-        fontWeight: FONT_WEIGHTS.semibold,
-        letterSpacing: 1,
+        fontSize: 12,
+        color: C.textTertiary,
+        fontWeight: '500',
     },
-    socialButton: {
-        marginBottom: SPACING.md,
-    },
-    socialButtonContent: {
+
+    // Google button
+    googleButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: SPACING.md,
+        justifyContent: 'center',
+        gap: 10,
+        backgroundColor: C.surface,
+        borderWidth: 1.5,
+        borderColor: C.border,
+        borderRadius: 14,
+        paddingVertical: 14,
+        marginBottom: 28,
     },
-    socialButtonText: {
-        fontSize: FONT_SIZES.md,
-        color: COLORS.textPrimary,
-        fontWeight: FONT_WEIGHTS.semibold,
+    googleButtonText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: C.textPrimary,
     },
+
+    // Footer
     footer: {
         flexDirection: 'row',
         justifyContent: 'center',
-        marginTop: SPACING.xl,
-        paddingBottom: SPACING.xxl,
     },
     footerText: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.textSecondary,
+        fontSize: 14,
+        color: C.textSecondary,
     },
     signUpLink: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.primary,
-        fontWeight: FONT_WEIGHTS.bold,
+        fontSize: 14,
+        fontWeight: '700',
+        color: C.amber,
     },
 });
