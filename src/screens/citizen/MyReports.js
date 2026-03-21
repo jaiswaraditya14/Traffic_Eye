@@ -110,12 +110,17 @@ export default function MyReports({ navigation }) {
                                 {/* Colored left bar */}
                                 <View style={[styles.cardBar, { backgroundColor: config.barColor }]} />
 
-                                {/* Thumbnail */}
-                                <Image
-                                    source={require('../../../assets/images/traffic_violation.jpg')}
-                                    style={styles.thumbnail}
-                                    resizeMode="cover"
-                                />
+                                {/* 16:9 Framed Thumbnail */}
+                                <View style={styles.thumbnailFrame}>
+                                    <Image
+                                        source={require('../../../assets/images/traffic_violation.jpg')}
+                                        style={styles.thumbnail}
+                                        resizeMode="cover"
+                                    />
+                                    <View style={styles.thumbnailOverlay}>
+                                        <Ionicons name="eye" size={12} color="rgba(255,255,255,0.8)" />
+                                    </View>
+                                </View>
 
                                 {/* Content */}
                                 <View style={styles.cardBody}>
@@ -131,24 +136,28 @@ export default function MyReports({ navigation }) {
 
                                     <Text style={styles.vehicleText}>{report.vehicle}</Text>
 
-                                    <View style={styles.metaRow}>
-                                        <Ionicons name="location-outline" size={12} color={C.textTertiary} />
-                                        <Text style={styles.metaText}>{report.location}</Text>
-                                    </View>
-                                    <View style={styles.metaRow}>
-                                        <Ionicons name="calendar-outline" size={12} color={C.textTertiary} />
-                                        <Text style={styles.metaText}>{report.date}</Text>
+                                    <View style={styles.rowMeta}>
+                                        <View style={styles.metaRow}>
+                                            <Ionicons name="location" size={11} color={C.textTertiary} />
+                                            <Text style={styles.metaText} numberOfLines={1}>{report.location}</Text>
+                                        </View>
+                                        <View style={styles.metaRow}>
+                                            <Ionicons name="time" size={11} color={C.textTertiary} />
+                                            <Text style={styles.metaText}>{report.date}</Text>
+                                        </View>
                                     </View>
 
                                     {report.points > 0 && (
-                                        <View style={styles.pointsRow}>
-                                            <Ionicons name="trophy" size={12} color={C.amberDark} />
-                                            <Text style={styles.pointsText}>+{report.points} pts earned</Text>
+                                        <View style={styles.pointsBadge}>
+                                            <Ionicons name="trophy" size={10} color={C.amberDark} />
+                                            <Text style={styles.pointsText}>+{report.points} Verification Points</Text>
                                         </View>
                                     )}
                                 </View>
 
-                                <Ionicons name="chevron-forward" size={16} color={C.textTertiary} style={{ marginRight: 12 }} />
+                                <View style={styles.entryArrow}>
+                                    <Ionicons name="chevron-forward" size={16} color={C.navyMid} />
+                                </View>
                             </TouchableOpacity>
                         );
                     })}
@@ -253,85 +262,128 @@ const styles = StyleSheet.create({
     list: { flex: 1 },
     listContent: {
         paddingHorizontal: 20,
-        paddingTop: 4,
+        paddingTop: 10,
     },
     reportCard: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: C.surface,
-        borderRadius: 16,
-        marginBottom: 10,
+        borderRadius: 20,
+        marginBottom: 14,
         overflow: 'hidden',
         shadowColor: C.navyMid,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.04,
+        shadowRadius: 12,
         elevation: 2,
     },
     cardBar: {
         width: 4,
         alignSelf: 'stretch',
     },
+    thumbnailFrame: {
+        width: 76,
+        height: 76,
+        borderRadius: 12,
+        margin: 12,
+        backgroundColor: C.surfaceLow,
+        overflow: 'hidden',
+        position: 'relative',
+    },
     thumbnail: {
-        width: 68,
-        height: 84,
+        width: '100%',
+        height: '100%',
+    },
+    thumbnailOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,36,82,0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     cardBody: {
         flex: 1,
-        padding: 12,
+        paddingVertical: 12,
+        paddingRight: 8,
     },
     cardTopRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 3,
+        marginBottom: 6,
     },
     reportType: {
-        fontSize: 14,
+        fontSize: 15,
         fontFamily: 'Nunito-Bold',
         color: C.textPrimary,
         flex: 1,
-        marginRight: 8,
+        marginRight: 6,
     },
     statusPill: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 3,
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 20,
+        gap: 4,
+        paddingHorizontal: 9,
+        paddingVertical: 4,
+        borderRadius: 100,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.03)',
     },
     statusPillText: {
         fontSize: 10,
-        fontFamily: 'Nunito-Bold',
+        fontFamily: 'Nunito-ExtraBold',
+        textTransform: 'uppercase',
+        letterSpacing: 0.3,
     },
     vehicleText: {
-        fontSize: 12,
+        fontSize: 14,
         color: C.navyMid,
-        fontFamily: 'Nunito-SemiBold',
-        letterSpacing: 0.3,
-        marginBottom: 4,
+        fontFamily: 'Nunito-Bold',
+        letterSpacing: 0.5,
+        marginBottom: 6,
+    },
+    rowMeta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginBottom: 8,
     },
     metaRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
-        marginBottom: 2,
     },
     metaText: {
         fontSize: 11,
         color: C.textSecondary,
+        fontFamily: 'Nunito-Medium',
     },
-    pointsRow: {
+    pointsBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
-        marginTop: 3,
+        gap: 5,
+        backgroundColor: '#FFFBEB',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
+        alignSelf: 'flex-start',
     },
     pointsText: {
         fontSize: 11,
         color: C.amberDark,
         fontFamily: 'Nunito-Bold',
+    },
+    entryArrow: {
+        width: 28,
+        height: 28,
+        borderRadius: 8,
+        backgroundColor: C.primarySurface,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 14,
     },
 
     // FAB
@@ -342,14 +394,14 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         overflow: 'hidden',
         shadowColor: C.amber,
-        shadowOffset: { width: 0, height: 6 },
+        shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.4,
-        shadowRadius: 12,
+        shadowRadius: 16,
         elevation: 8,
     },
     fabGradient: {
-        width: 56,
-        height: 56,
+        width: 60,
+        height: 60,
         justifyContent: 'center',
         alignItems: 'center',
     },

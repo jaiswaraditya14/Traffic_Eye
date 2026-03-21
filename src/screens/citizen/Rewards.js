@@ -72,32 +72,49 @@ export default function Rewards() {
 
                     {/* ── Navy Header ── */}
                     <LinearGradient colors={[C.navy, C.navyMid]} style={styles.header}>
-                        <Text style={styles.headerTitle}>My Rewards</Text>
-                        <Text style={styles.headerSubtitle}>Keep reporting to earn more!</Text>
+                        <View style={styles.headerTop}>
+                            <View>
+                                <Text style={styles.headerTitle}>Sentinel Rewards</Text>
+                                <Text style={styles.headerSubtitle}>Status: {level} Citizen</Text>
+                            </View>
+                            <View style={styles.authorityShield}>
+                                <Ionicons name="shield-checkmark" size={24} color={C.amber} />
+                            </View>
+                        </View>
 
-                        {/* Points Hero card */}
+                        {/* Points Hero card - 32px Rounding */}
                         <Animated.View
                             style={[
                                 styles.pointsCard,
                                 { transform: [{ scale: heroScale }] },
                             ]}
                         >
-                            <View style={styles.pointsCardLeft}>
-                                <View style={styles.trophyBg}>
-                                    <Ionicons name="trophy" size={28} color={C.amberDark} />
+                            <View style={styles.pointsCardMain}>
+                                <View style={styles.trophyFrame}>
+                                    <View style={styles.trophyCircle}>
+                                        <Ionicons name="trophy" size={28} color={C.amberDark} />
+                                    </View>
                                 </View>
-                                <View>
-                                    <Text style={styles.pointsLabel}>TOTAL POINTS</Text>
+                                <View style={styles.pointsCol}>
+                                    <Text style={styles.pointsLabel}>REWARD BALANCE</Text>
                                     <Text style={styles.pointsValue}>{userPoints.toLocaleString()}</Text>
+                                    <View style={styles.pointsBadgeRow}>
+                                        <Ionicons name="star" size={12} color={C.amber} />
+                                        <Text style={styles.badgeText}>Top 5% Contributor</Text>
+                                    </View>
                                 </View>
                             </View>
-                            <View style={styles.levelRight}>
-                                <View style={styles.levelBadge}>
-                                    <Text style={styles.levelBadgeText}>Level: {level}</Text>
+
+                            <View style={styles.progressSection}>
+                                <View style={styles.progressHeader}>
+                                    <Text style={styles.progressInfo}>Next level in {nextLevelPoints - userPoints} pts</Text>
+                                    <Text style={styles.progressPercent}>{Math.round(progress * 100)}%</Text>
                                 </View>
-                                <Text style={styles.progressLabel}>{nextLevelPoints - userPoints} pts to next</Text>
-                                <View style={styles.progressTrack}>
-                                    <Animated.View
+                                <View style={styles.progressTrackOuter}>
+                                    <LinearGradient
+                                        colors={[C.amberDark, C.amber]}
+                                        start={{x: 0, y: 0}}
+                                        end={{x: 1, y: 0}}
                                         style={[styles.progressFill, { width: `${progress * 100}%` }]}
                                     />
                                 </View>
@@ -105,9 +122,9 @@ export default function Rewards() {
                         </Animated.View>
                     </LinearGradient>
 
-                    {/* ── Badges ── */}
+                    {/* ── Achievements (Circular Badges) ── */}
                     <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
-                        <Text style={styles.sectionTitle}>Achievements</Text>
+                        <Text style={styles.sectionTitle}>Authority Badges</Text>
                         <ScrollView
                             horizontal
                             showsHorizontalScrollIndicator={false}
@@ -116,21 +133,28 @@ export default function Rewards() {
                             {badges.map((badge, idx) => (
                                 <View
                                     key={idx}
-                                    style={[styles.badgeCard, !badge.earned && styles.badgeCardLocked]}
+                                    style={[styles.badgeFrame]}
                                 >
-                                    <View
-                                        style={[
-                                            styles.badgeIconBg,
-                                            { backgroundColor: badge.earned ? `${badge.color}18` : C.surfaceLow },
-                                        ]}
-                                    >
-                                        {badge.earned ? (
-                                            <Ionicons name={badge.icon} size={24} color={badge.color} />
-                                        ) : (
-                                            <Ionicons name="lock-closed" size={20} color={C.textTertiary} />
+                                    <View style={[styles.badgeOuterCircle, !badge.earned && styles.badgeLocked]}>
+                                        <View
+                                            style={[
+                                                styles.badgeInnerCircle,
+                                                { backgroundColor: badge.earned ? `${badge.color}10` : '#F1F5F9' },
+                                            ]}
+                                        >
+                                            <Ionicons 
+                                                name={badge.earned ? badge.icon : 'lock-closed'} 
+                                                size={28} 
+                                                color={badge.earned ? badge.color : '#94A3B8'} 
+                                            />
+                                        </View>
+                                        {badge.earned && (
+                                            <View style={styles.earnedDot}>
+                                                <Ionicons name="checkmark" size={10} color={C.white} />
+                                            </View>
                                         )}
                                     </View>
-                                    <Text style={[styles.badgeLabel, !badge.earned && { color: C.textTertiary }]}>
+                                    <Text style={[styles.badgeLabel, !badge.earned && { color: '#94A3B8' }]}>
                                         {badge.label}
                                     </Text>
                                 </View>
@@ -138,53 +162,57 @@ export default function Rewards() {
                         </ScrollView>
                     </Animated.View>
 
-                    {/* ── Recent Earnings ── */}
+                    {/* ── Points History ── */}
                     <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
-                        <Text style={styles.sectionTitle}>Points History</Text>
-                        {history.map((h, idx) => (
-                            <View key={idx} style={styles.historyItem}>
-                                <View style={[styles.historyIcon, { backgroundColor: C.primarySurface }]}>
-                                    <Ionicons name={h.icon} size={16} color={C.navyMid} />
+                        <Text style={styles.sectionTitle}>Sentinel Activity</Text>
+                        <View style={styles.historyContainer}>
+                            {history.map((h, idx) => (
+                                <View key={idx} style={styles.historyItem}>
+                                    <View style={styles.historyIconFrame}>
+                                        <Ionicons name={h.icon} size={18} color={C.navyMid} />
+                                    </View>
+                                    <View style={styles.historyContent}>
+                                        <Text style={styles.historyLabel}>{h.label}</Text>
+                                        <Text style={styles.historyTime}>{h.time}</Text>
+                                    </View>
+                                    <View style={styles.pointRewardPill}>
+                                        <Text style={styles.historyPoints}>{h.points}</Text>
+                                    </View>
                                 </View>
-                                <View style={styles.historyContent}>
-                                    <Text style={styles.historyLabel}>{h.label}</Text>
-                                    <Text style={styles.historyTime}>{h.time}</Text>
-                                </View>
-                                <Text style={styles.historyPoints}>{h.points} pts</Text>
-                            </View>
-                        ))}
+                            ))}
+                        </View>
                     </Animated.View>
 
-                    {/* ── Redemption ── */}
+                    {/* ── Redemption (Authority Cards) ── */}
                     <Animated.View style={[styles.section, { opacity: fadeAnim, marginBottom: 40 }]}>
-                        <Text style={styles.sectionTitle}>Redeem Points</Text>
+                        <Text style={styles.sectionTitle}>Civic Privileges</Text>
                         {redemptions.map((r, idx) => (
                             <TouchableOpacity
                                 key={idx}
                                 style={[styles.redeemCard, !r.available && styles.redeemCardLocked]}
-                                activeOpacity={r.available ? 0.8 : 1}
+                                activeOpacity={r.available ? 0.85 : 1}
                             >
-                                <View style={[styles.redeemIcon, { backgroundColor: r.available ? C.primarySurface : C.surfaceLow }]}>
-                                    <Ionicons name={r.icon} size={20} color={r.available ? C.navyMid : C.textTertiary} />
+                                <View style={styles.redeemIconFrame}>
+                                    <Ionicons name={r.icon} size={24} color={r.available ? C.navyMid : '#94A3B8'} />
                                 </View>
                                 <View style={styles.redeemContent}>
-                                    <Text style={[styles.redeemTitle, !r.available && { color: C.textTertiary }]}>
+                                    <Text style={[styles.redeemTitle, !r.available && { color: '#94A3B8' }]}>
                                         {r.title}
                                     </Text>
                                     <View style={styles.redeemPtsRow}>
-                                        <Ionicons name="trophy" size={12} color={r.available ? C.amberDark : C.textTertiary} />
-                                        <Text style={[styles.redeemPts, !r.available && { color: C.textTertiary }]}>
-                                            {r.pts} points
+                                        <Ionicons name="diamond-outline" size={12} color={r.available ? C.amberDark : '#94A3B8'} />
+                                        <Text style={[styles.redeemPts, !r.available && { color: '#94A3B8' }]}>
+                                            {r.pts} Verification Points
                                         </Text>
                                     </View>
                                 </View>
-                                {r.available ? (
-                                    <View style={styles.redeemBtn}>
-                                        <Text style={styles.redeemBtnText}>Redeem</Text>
-                                    </View>
-                                ) : (
-                                    <Ionicons name="lock-closed" size={16} color={C.textTertiary} />
-                                )}
+                                <View style={[styles.redeemAction, !r.available && styles.redeemActionLocked]}>
+                                    <Ionicons 
+                                        name={r.available ? "arrow-forward" : "lock-closed"} 
+                                        size={18} 
+                                        color={r.available ? C.navyMid : '#94A3B8'} 
+                                    />
+                                </View>
                             </TouchableOpacity>
                         ))}
                     </Animated.View>
@@ -202,158 +230,228 @@ const styles = StyleSheet.create({
     header: {
         paddingHorizontal: 20,
         paddingTop: 16,
-        paddingBottom: 28,
-        borderBottomLeftRadius: 28,
-        borderBottomRightRadius: 28,
+        paddingBottom: 32,
+        borderBottomLeftRadius: 32,
+        borderBottomRightRadius: 32,
+        shadowColor: C.navy,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    headerTop: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 24,
     },
     headerTitle: {
-        fontSize: 22,
+        fontSize: 24,
         fontFamily: 'Nunito-Bold',
         color: C.white,
-        letterSpacing: -0.4,
+        letterSpacing: -0.5,
     },
     headerSubtitle: {
-        fontSize: 13,
-        color: 'rgba(255,255,255,0.6)',
-        marginTop: 3,
-        marginBottom: 20,
+        fontSize: 14,
+        color: 'rgba(255,255,255,0.7)',
+        fontFamily: 'Nunito-Medium',
+        marginTop: 2,
+    },
+    authorityShield: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.2)',
     },
 
     // Points card
     pointsCard: {
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        borderRadius: 18,
-        padding: 16,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.15)',
+        backgroundColor: C.white,
+        borderRadius: 28,
+        padding: 24,
+        shadowColor: C.navy,
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.15,
+        shadowRadius: 24,
+        elevation: 8,
     },
-    pointsCardLeft: {
+    pointsCardMain: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 20,
+        marginBottom: 20,
     },
-    trophyBg: {
-        width: 52,
-        height: 52,
-        borderRadius: 14,
+    trophyFrame: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        backgroundColor: '#FFFBEB',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#FEF3C7',
+    },
+    trophyCircle: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
         backgroundColor: C.amberSurface,
         justifyContent: 'center',
         alignItems: 'center',
     },
+    pointsCol: {
+        flex: 1,
+    },
     pointsLabel: {
-        fontSize: 9,
-        fontFamily: 'Nunito-Bold',
-        color: 'rgba(255,255,255,0.6)',
-        letterSpacing: 1.5,
-        marginBottom: 3,
+        fontSize: 10,
+        fontFamily: 'Nunito-ExtraBold',
+        color: C.textTertiary,
+        letterSpacing: 1.2,
+        marginBottom: 4,
     },
     pointsValue: {
-        fontSize: 30,
-        fontFamily: 'Nunito-Bold',
-        color: C.amber,
-        letterSpacing: -1,
-    },
-    levelRight: {
-        alignItems: 'flex-end',
-        gap: 6,
-    },
-    levelBadge: {
-        backgroundColor: C.amber,
-        borderRadius: 10,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-    },
-    levelBadgeText: {
-        fontSize: 11,
+        fontSize: 36,
         fontFamily: 'Nunito-Bold',
         color: C.navy,
+        letterSpacing: -1,
     },
-    progressLabel: {
-        fontSize: 10,
-        color: 'rgba(255,255,255,0.55)',
+    pointsBadgeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 4,
     },
-    progressTrack: {
-        width: 100,
-        height: 5,
-        backgroundColor: 'rgba(255,255,255,0.15)',
-        borderRadius: 3,
+    badgeText: {
+        fontSize: 11,
+        fontFamily: 'Nunito-Bold',
+        color: C.success,
+    },
+
+    // Progress Section
+    progressSection: {
+        marginTop: 4,
+    },
+    progressHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    progressInfo: {
+        fontSize: 12,
+        color: C.textSecondary,
+        fontFamily: 'Nunito-Medium',
+    },
+    progressPercent: {
+        fontSize: 12,
+        color: C.navyMid,
+        fontFamily: 'Nunito-Bold',
+    },
+    progressTrackOuter: {
+        height: 10,
+        backgroundColor: C.surfaceLow,
+        borderRadius: 5,
+        overflow: 'hidden',
     },
     progressFill: {
         height: '100%',
-        backgroundColor: C.amber,
-        borderRadius: 3,
+        borderRadius: 5,
     },
 
     // Sections
     section: {
         paddingHorizontal: 20,
-        paddingTop: 24,
+        paddingTop: 32,
     },
     sectionTitle: {
-        fontSize: 17,
+        fontSize: 18,
         fontFamily: 'Nunito-Bold',
         color: C.textPrimary,
-        letterSpacing: -0.2,
-        marginBottom: 14,
+        letterSpacing: -0.3,
+        marginBottom: 16,
     },
 
-    // Badges
+    // Badges (Circular)
     badgesScroll: {
-        gap: 10,
-        paddingBottom: 4,
+        gap: 16,
+        paddingBottom: 8,
     },
-    badgeCard: {
-        backgroundColor: C.surface,
-        borderRadius: 14,
-        padding: 14,
+    badgeFrame: {
         alignItems: 'center',
-        width: 90,
-        shadowColor: C.navyMid,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 6,
-        elevation: 2,
+        width: 100,
     },
-    badgeCardLocked: {
-        opacity: 0.55,
-    },
-    badgeIconBg: {
-        width: 46,
-        height: 46,
-        borderRadius: 13,
+    badgeOuterCircle: {
+        width: 84,
+        height: 84,
+        borderRadius: 42,
+        backgroundColor: C.white,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 8,
+        shadowColor: C.navyMid,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.08,
+        shadowRadius: 10,
+        elevation: 3,
+        marginBottom: 12,
+        position: 'relative',
+    },
+    badgeInnerCircle: {
+        width: 70,
+        height: 70,
+        borderRadius: 35,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    badgeLocked: {
+        opacity: 0.6,
+        backgroundColor: '#F8FAFC',
+    },
+    earnedDot: {
+        position: 'absolute',
+        top: 4,
+        right: 4,
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        backgroundColor: C.success,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: C.white,
     },
     badgeLabel: {
-        fontSize: 10,
-        fontFamily: 'Nunito-SemiBold',
+        fontSize: 12,
+        fontFamily: 'Nunito-Bold',
         color: C.textPrimary,
         textAlign: 'center',
     },
 
-    // History
+    // Points History
+    historyContainer: {
+        backgroundColor: C.white,
+        borderRadius: 24,
+        padding: 4,
+        shadowColor: C.navyMid,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.04,
+        shadowRadius: 12,
+        elevation: 2,
+    },
     historyItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: C.surface,
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 8,
-        gap: 12,
-        shadowColor: C.navyMid,
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.04,
-        shadowRadius: 4,
-        elevation: 1,
+        padding: 16,
+        gap: 16,
     },
-    historyIcon: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
+    historyIconFrame: {
+        width: 44,
+        height: 44,
+        borderRadius: 14,
+        backgroundColor: C.offWhite,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -361,14 +459,21 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     historyLabel: {
-        fontSize: 13,
+        fontSize: 15,
         fontFamily: 'Nunito-SemiBold',
         color: C.textPrimary,
     },
     historyTime: {
-        fontSize: 11,
+        fontSize: 12,
         color: C.textTertiary,
         marginTop: 2,
+        fontFamily: 'Nunito-Medium',
+    },
+    pointRewardPill: {
+        backgroundColor: C.successSurface,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
     },
     historyPoints: {
         fontSize: 13,
@@ -380,53 +485,57 @@ const styles = StyleSheet.create({
     redeemCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: C.surface,
-        borderRadius: 14,
-        padding: 14,
-        marginBottom: 10,
-        gap: 12,
+        backgroundColor: C.white,
+        borderRadius: 24,
+        padding: 18,
+        marginBottom: 12,
+        gap: 16,
         shadowColor: C.navyMid,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 2,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.05,
+        shadowRadius: 12,
+        elevation: 3,
     },
-    redeemCardLocked: { opacity: 0.5 },
-    redeemIcon: {
-        width: 46,
-        height: 46,
-        borderRadius: 13,
+    redeemCardLocked: {
+        opacity: 0.7,
+        backgroundColor: '#F8FAFC',
+    },
+    redeemIconFrame: {
+        width: 52,
+        height: 52,
+        borderRadius: 16,
+        backgroundColor: C.offWhite,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    redeemContent: { flex: 1 },
+    redeemContent: {
+        flex: 1,
+    },
     redeemTitle: {
-        fontSize: 14,
-        fontFamily: 'Nunito-SemiBold',
+        fontSize: 16,
+        fontFamily: 'Nunito-Bold',
         color: C.textPrimary,
         marginBottom: 4,
     },
     redeemPtsRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
+        gap: 6,
     },
     redeemPts: {
         fontSize: 12,
         fontFamily: 'Nunito-Medium',
         color: C.amberDark,
     },
-    redeemBtn: {
+    redeemAction: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
         backgroundColor: C.primarySurface,
-        borderRadius: 10,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
-    redeemBtnText: {
-        fontSize: 12,
-        fontFamily: 'Nunito-Bold',
-        color: C.navyMid,
+    redeemActionLocked: {
+        backgroundColor: '#F1F5F9',
     },
-
-    headerContainer: {},
 });

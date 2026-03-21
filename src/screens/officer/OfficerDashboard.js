@@ -208,12 +208,17 @@ export default function OfficerDashboard({ navigation }) {
                                     {/* Priority left bar */}
                                     <View style={[styles.reportBar, { backgroundColor: config.barColor }]} />
 
-                                    {/* Thumbnail */}
-                                    <Image
-                                        source={require('../../../assets/images/traffic_violation.jpg')}
-                                        style={styles.reportThumbnail}
-                                        resizeMode="cover"
-                                    />
+                                    {/* Thumbnail Frame (16:9 ish) */}
+                                    <View style={styles.thumbnailFrame}>
+                                        <Image
+                                            source={require('../../../assets/images/traffic_violation.jpg')}
+                                            style={styles.reportThumbnail}
+                                            resizeMode="cover"
+                                        />
+                                        <View style={styles.thumbnailOverlay}>
+                                            <Ionicons name="scan" size={14} color={C.white} />
+                                        </View>
+                                    </View>
 
                                     {/* Content */}
                                     <View style={styles.reportContent}>
@@ -225,19 +230,23 @@ export default function OfficerDashboard({ navigation }) {
                                                 </Text>
                                             </View>
                                         </View>
+                                        
                                         <Text style={styles.reportVehicle}>{report.vehicle}</Text>
-                                        <View style={styles.reportMeta}>
-                                            <Ionicons name="location-outline" size={12} color={C.textTertiary} />
-                                            <Text style={styles.reportMetaText}>{report.location}</Text>
-                                        </View>
-                                        <View style={styles.reportMeta}>
-                                            <Ionicons name="time-outline" size={12} color={C.textTertiary} />
-                                            <Text style={styles.reportMetaText}>{report.time}</Text>
+                                        
+                                        <View style={styles.metaRow}>
+                                            <View style={styles.reportMeta}>
+                                                <Ionicons name="location" size={11} color={C.textTertiary} />
+                                                <Text style={styles.reportMetaText} numberOfLines={1}>{report.location}</Text>
+                                            </View>
+                                            <View style={styles.reportMeta}>
+                                                <Ionicons name="time" size={11} color={C.textTertiary} />
+                                                <Text style={styles.reportMetaText}>{report.time}</Text>
+                                            </View>
                                         </View>
                                     </View>
 
-                                    {/* Review arrow */}
-                                    <View style={styles.reviewArrow}>
+                                    {/* Review Action */}
+                                    <View style={styles.actionArrow}>
                                         <Ionicons name="chevron-forward" size={18} color={C.navyMid} />
                                     </View>
                                 </TouchableOpacity>
@@ -489,27 +498,47 @@ const styles = StyleSheet.create({
     reportCard: {
         flexDirection: 'row',
         backgroundColor: C.surface,
-        borderRadius: 16,
-        marginBottom: 10,
+        borderRadius: 20,
+        marginBottom: 12,
         overflow: 'hidden',
         shadowColor: C.navyMid,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
         elevation: 2,
         alignItems: 'center',
+        paddingRight: 12,
     },
     reportBar: {
         width: 4,
         alignSelf: 'stretch',
     },
+    thumbnailFrame: {
+        width: 82,
+        height: 82,
+        borderRadius: 14,
+        margin: 12,
+        overflow: 'hidden',
+        backgroundColor: C.surfaceLow,
+        position: 'relative',
+    },
     reportThumbnail: {
-        width: 72,
-        height: 80,
+        width: '100%',
+        height: '100%',
+    },
+    thumbnailOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,36,82,0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     reportContent: {
         flex: 1,
-        padding: 12,
+        paddingVertical: 12,
     },
     reportTopRow: {
         flexDirection: 'row',
@@ -518,45 +547,49 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     reportType: {
-        fontSize: 14,
+        fontSize: 15,
         fontFamily: 'Nunito-Bold',
         color: C.textPrimary,
     },
     priorityChip: {
-        paddingHorizontal: 7,
+        paddingHorizontal: 8,
         paddingVertical: 3,
         borderRadius: 6,
     },
     priorityChipText: {
         fontSize: 9,
-        fontFamily: 'Nunito-Bold',
+        fontFamily: 'Nunito-ExtraBold',
         letterSpacing: 0.5,
     },
     reportVehicle: {
-        fontSize: 12,
+        fontSize: 14,
         color: C.navyMid,
-        fontFamily: 'Nunito-SemiBold',
-        letterSpacing: 0.3,
-        marginBottom: 4,
-        fontFamily: Platform?.OS === 'ios' ? 'Courier' : 'monospace',
+        fontFamily: 'Nunito-Bold',
+        letterSpacing: 0.8,
+        marginBottom: 6,
+        textTransform: 'uppercase',
+    },
+    metaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
     },
     reportMeta: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
-        marginBottom: 2,
     },
     reportMetaText: {
         fontSize: 11,
         color: C.textSecondary,
+        fontFamily: 'Nunito-Medium',
     },
-    reviewArrow: {
+    actionArrow: {
         width: 32,
         height: 32,
         borderRadius: 10,
         backgroundColor: C.primarySurface,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 12,
     },
 });
