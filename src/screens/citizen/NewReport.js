@@ -224,20 +224,25 @@ export default function NewReport({ navigation }) {
                     </View>
                     <Text style={styles.stepHeader}>Step 1: Capture Evidence</Text>
 
-                    {/* ── Media Preview ── */}
+                    {/* ── Media Preview with Sentinel Frame ── */}
                     <View style={styles.imageContainer}>
                         {image ? (
                             <Image source={{ uri: image }} style={styles.mediaImage} />
                         ) : video ? (
                             <View style={styles.videoPlaceholder}>
-                                <Ionicons name="videocam" size={48} color={C.navyMid} />
+                                <Ionicons name="videocam" size={48} color="#BA1A1A" />
                                 <Text style={styles.videoText}>Video Selected</Text>
                             </View>
                         ) : (
                             <View style={styles.cameraPlaceholder}>
                                 <Ionicons name="camera-outline" size={48} color={C.textTertiary} />
-                                <Text style={styles.placeholderText}>Capture or select evidence</Text>
-                                <Text style={styles.placeholderSub}>Up to 15s video or clear photo</Text>
+                                <Text style={styles.placeholderText}>Capture Evidence</Text>
+                                <Text style={styles.placeholderSub}>AI will auto-detect plate & violation</Text>
+                                
+                                {/* Guide lines */}
+                                <View style={styles.scannerOverlay}>
+                                    <View style={styles.scannerCorners} />
+                                </View>
                             </View>
                         )}
                     </View>
@@ -418,52 +423,118 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontFamily: 'Nunito-Bold',
         color: C.navyMid,
-        marginBottom: 12,
-        letterSpacing: -0.2,
     },
-
     imageContainer: {
         width: '100%',
-        height: 220,
-        backgroundColor: C.surfaceInput,
-        borderRadius: 16,
-        borderWidth: 2,
-        borderColor: '#E5E7EB',
-        borderStyle: 'dashed',
+        height: 240,
+        backgroundColor: '#E5E7EB',
+        borderRadius: 24, // High rounding
         overflow: 'hidden',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: 20,
+        position: 'relative',
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.05)',
     },
     mediaImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-    cameraPlaceholder: { alignItems: 'center' },
-    placeholderText: { fontSize: 14, fontFamily: 'Nunito-SemiBold', color: C.textSecondary, marginTop: 10 },
-    placeholderSub: { fontSize: 12, color: C.textTertiary, marginTop: 4 },
-    videoPlaceholder: { alignItems: 'center' },
-    videoText: { fontSize: 14, fontFamily: 'Nunito-Bold', color: C.navyMid, marginTop: 8 },
+    scannerOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        justifyContent: 'space-between',
+        padding: 20,
+    },
+    scannerCorners: {
+        flex: 1,
+        borderWidth: 2,
+        borderColor: 'rgba(255,255,255,0.4)',
+        borderRadius: 12,
+        borderStyle: 'dashed',
+    },
+    cameraPlaceholder: { alignItems: 'center', padding: 32 },
+    placeholderText: { fontSize: 15, fontFamily: 'Nunito-Bold', color: C.textSecondary, marginTop: 12 },
+    placeholderSub: { fontSize: 13, color: C.textTertiary, marginTop: 6, textAlign: 'center' },
+    
+    videoPlaceholder: { alignItems: 'center', flex: 1, width: '100%', justifyContent: 'center', backgroundColor: '#FEE2E2' },
+    videoText: { fontSize: 15, fontFamily: 'Nunito-Bold', color: '#BA1A1A', marginTop: 10 },
 
-    mediaBtnRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
-    mediaBtn: { flex: 1, borderRadius: 12, overflow: 'hidden' },
-    mediaBtnGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12 },
-    mediaBtnText: { fontSize: 14, fontFamily: 'Nunito-Bold', color: C.white },
-    mediaBtnOutline: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: '#C4C6D0', backgroundColor: C.surface },
-    mediaBtnOutlineText: { fontSize: 14, fontFamily: 'Nunito-Bold', color: C.navyMid },
+    mediaBtnRow: { flexDirection: 'row', gap: 14, marginBottom: 14 },
+    mediaBtn: { flex: 1, borderRadius: 16, overflow: 'hidden' },
+    mediaBtnGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
+    mediaBtnText: { fontSize: 15, fontFamily: 'Nunito-Bold', color: C.white },
+    mediaBtnOutline: { 
+        flex: 1, 
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        gap: 8, 
+        paddingVertical: 14, 
+        borderRadius: 16, 
+        borderWidth: 1.5, 
+        borderColor: '#C4C6D0', 
+        backgroundColor: C.surface 
+    },
+    mediaBtnOutlineText: { fontSize: 15, fontFamily: 'Nunito-Bold', color: C.navyMid },
 
-    banner: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, backgroundColor: C.primarySurface, borderRadius: 12, borderWidth: 1, borderColor: C.navyMid + '40', marginBottom: 20 },
-    bannerText: { fontSize: 13, fontFamily: 'Nunito-SemiBold' },
+    banner: { 
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        gap: 12, 
+        padding: 14, 
+        backgroundColor: '#E0E7FF', 
+        borderRadius: 16, 
+        borderWidth: 1, 
+        borderColor: 'rgba(27,58,107,0.1)', 
+        marginBottom: 24 
+    },
+    bannerText: { fontSize: 13, fontFamily: 'Nunito-Bold' },
 
-    fieldLabel: { fontSize: 12, fontFamily: 'Nunito-SemiBold', color: C.navyMid, marginBottom: 8, marginTop: 10 },
-    addressBox: { flexDirection: 'row', backgroundColor: C.surfaceInput, borderRadius: 12, paddingLeft: 14, paddingRight: 6, paddingVertical: 6, alignItems: 'center' },
-    addressInput: { flex: 1, fontSize: 14, color: C.textPrimary, paddingRight: 10, paddingVertical: 8 },
-    addressBtns: { flexDirection: 'row', gap: 6 },
-    addrBtn: { width: 38, height: 38, borderRadius: 10, backgroundColor: C.navyMid, justifyContent: 'center', alignItems: 'center' },
+    fieldLabel: { fontSize: 13, fontFamily: 'Nunito-Bold', color: C.navy, marginBottom: 10, marginTop: 12 },
+    addressBox: { 
+        flexDirection: 'row', 
+        backgroundColor: C.surface, 
+        borderRadius: 16, 
+        paddingLeft: 16, 
+        paddingRight: 8, 
+        paddingVertical: 8, 
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.08)',
+        shadowColor: '#1B3A6B',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+    },
+    addressInput: { flex: 1, fontSize: 14, color: C.textPrimary, paddingRight: 10, fontFamily: 'Nunito-Medium' },
+    addressBtns: { flexDirection: 'row', gap: 8 },
+    addrBtn: { width: 42, height: 42, borderRadius: 12, backgroundColor: C.navyMid, justifyContent: 'center', alignItems: 'center' },
 
-    descBox: { backgroundColor: C.surfaceInput, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 2, borderColor: 'transparent', marginBottom: 24 },
-    descInput: { fontSize: 14, color: C.textPrimary, textAlignVertical: 'top', height: 80 },
+    descBox: { 
+        backgroundColor: C.surface, 
+        borderRadius: 16, 
+        paddingHorizontal: 16, 
+        paddingVertical: 12, 
+        borderWidth: 1, 
+        borderColor: 'rgba(0,0,0,0.08)', 
+        marginBottom: 32,
+        shadowColor: '#1B3A6B',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
+    },
+    descInput: { fontSize: 14, color: C.textPrimary, textAlignVertical: 'top', height: 90, fontFamily: 'Nunito-Medium' },
 
-    submitBtn: { borderRadius: 14, overflow: 'hidden', shadowColor: C.amberDark, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 6 },
-    submitGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 },
-    submitText: { fontSize: 16, fontFamily: 'Nunito-Bold', color: C.navy },
+    submitBtn: { 
+        borderRadius: 18, 
+        overflow: 'hidden', 
+        shadowColor: C.amberDark, 
+        shadowOffset: { width: 0, height: 8 }, 
+        shadowOpacity: 0.4, 
+        shadowRadius: 12, 
+        elevation: 8,
+        marginBottom: 20,
+    },
+    submitGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 18 },
+    submitText: { fontSize: 17, fontFamily: 'Nunito-ExtraBold', color: C.navy, letterSpacing: 0.5 },
 
     mapContainer: { flex: 1, backgroundColor: C.offWhite },
     map: { flex: 1 },

@@ -129,7 +129,7 @@ export default function CitizenHome({ navigation }) {
                     {/* ── Content Area ── */}
                     <View style={styles.content}>
 
-                        {/* Report Violation CTA Banner */}
+                        {/* ── Dashboard Hero: Report Violation ── */}
                         <Animated.View
                             style={{
                                 opacity: fadeAnim,
@@ -142,35 +142,47 @@ export default function CitizenHome({ navigation }) {
                                     navigation.getParent()?.navigate('NewReport') ??
                                     navigation.navigate('NewReport')
                                 }
+                                style={styles.heroOuter}
                             >
                                 <LinearGradient
                                     colors={[C.amberDark, C.amber]}
                                     start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 0 }}
-                                    style={styles.reportCTA}
+                                    end={{ x: 1, y: 1 }}
+                                    style={styles.reportHero}
                                 >
-                                    <View style={styles.reportCTALeft}>
-                                        <View style={styles.reportCTAIconBg}>
-                                            <Ionicons name="camera" size={26} color={C.navyMid} />
+                                    {/* Glassy overlay effect */}
+                                    <View style={styles.heroOverlay}>
+                                        <View style={styles.heroContent}>
+                                            <View style={styles.heroBadge}>
+                                                <Ionicons name="flash" size={10} color={C.white} />
+                                                <Text style={styles.heroBadgeText}>AI-POWERED</Text>
+                                            </View>
+                                            <Text style={styles.heroTitle}>Report Violation</Text>
+                                            <Text style={styles.heroSubtitle}>Ensure road safety with instant AI verification</Text>
+                                            
+                                            <View style={styles.heroActionBtn}>
+                                                <Text style={styles.heroActionText}>Start Scan</Text>
+                                                <Ionicons name="camera" size={16} color={C.amberDark} />
+                                            </View>
                                         </View>
-                                        <View>
-                                            <Text style={styles.reportCTATitle}>Report a Violation</Text>
-                                            <Text style={styles.reportCTASubtitle}>Capture photo evidence • AI analysis</Text>
+                                        
+                                        {/* Stylized camera icon circle frame */}
+                                        <View style={styles.heroIconFrame}>
+                                            <Ionicons name="scan-outline" size={80} color="rgba(255,255,255,0.15)" />
                                         </View>
                                     </View>
-                                    <Ionicons name="arrow-forward-circle" size={28} color="rgba(255,255,255,0.9)" />
                                 </LinearGradient>
                             </TouchableOpacity>
                         </Animated.View>
 
-                        {/* ── Quick Actions ── */}
+                        {/* ── Quick Action Circle Frames ── */}
                         <Animated.View
                             style={[
                                 styles.section,
                                 { opacity: fadeAnim, transform: [{ translateY: slideAnims[1] }] },
                             ]}
                         >
-                            <Text style={styles.sectionTitle}>Quick Actions</Text>
+                            <Text style={styles.sectionTitle}>Essential Resources</Text>
                             <View style={styles.actionsGrid}>
                                 {/* Safety Tips */}
                                 <TouchableOpacity
@@ -181,7 +193,7 @@ export default function CitizenHome({ navigation }) {
                                     }
                                     activeOpacity={0.8}
                                 >
-                                    <View style={[styles.actionIconBg, { backgroundColor: C.primarySurface }]}>
+                                    <View style={[styles.actionIconFrame, { backgroundColor: '#E0E7FF' }]}>
                                         <Image
                                             source={require('../../../assets/images/helmet.png')}
                                             style={styles.actionImage}
@@ -200,14 +212,12 @@ export default function CitizenHome({ navigation }) {
                                     }
                                     activeOpacity={0.8}
                                 >
-                                    <View style={[styles.actionIconBg, { backgroundColor: C.errorSurface }]}>
-                                        <Image
-                                            source={require('../../../assets/images/crosspath.png')}
-                                            style={styles.actionImage}
-                                            resizeMode="contain"
-                                        />
+                                    <View style={[styles.actionIconFrame, { backgroundColor: '#FFEDD5' }]}>
+                                         <View style={styles.innerCircleFrame}>
+                                            <Ionicons name="warning" size={24} color={C.amberDark} />
+                                         </View>
                                     </View>
-                                    <Text style={styles.actionLabel}>Traffic Signs</Text>
+                                    <Text style={styles.actionLabel}>Signs Guide</Text>
                                 </TouchableOpacity>
 
                                 {/* Fine Info */}
@@ -219,14 +229,10 @@ export default function CitizenHome({ navigation }) {
                                     }
                                     activeOpacity={0.8}
                                 >
-                                    <View style={[styles.actionIconBg, { backgroundColor: C.amberSurface }]}>
-                                        <Image
-                                            source={require('../../../assets/images/image.png')}
-                                            style={styles.actionImage}
-                                            resizeMode="contain"
-                                        />
+                                    <View style={[styles.actionIconFrame, { backgroundColor: '#FEE2E2' }]}>
+                                        <Ionicons name="receipt" size={24} color="#BA1A1A" />
                                     </View>
-                                    <Text style={styles.actionLabel}>Fine Info</Text>
+                                    <Text style={styles.actionLabel}>Fine Rates</Text>
                                 </TouchableOpacity>
                             </View>
                         </Animated.View>
@@ -394,44 +400,80 @@ const styles = StyleSheet.create({
         paddingTop: 20,
     },
 
-    // Report CTA
-    reportCTA: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        borderRadius: 18,
-        padding: 18,
-        marginBottom: 24,
+    // Hero
+    heroOuter: {
+        marginBottom: 28,
         shadowColor: C.amber,
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.3,
-        shadowRadius: 12,
-        elevation: 6,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.25,
+        shadowRadius: 20,
+        elevation: 8,
     },
-    reportCTALeft: {
+    reportHero: {
+        borderRadius: 24,
+        overflow: 'hidden',
+        height: 180, // 16:9 ish
+    },
+    heroOverlay: {
+        flex: 1,
+        padding: 24,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    heroContent: {
+        flex: 1,
+        justifyContent: 'center',
+    },
+    heroBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 14,
-        flex: 1,
+        gap: 4,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+        alignSelf: 'flex-start',
+        marginBottom: 10,
     },
-    reportCTAIconBg: {
-        width: 50,
-        height: 50,
-        borderRadius: 14,
-        backgroundColor: 'rgba(255,255,255,0.25)',
-        justifyContent: 'center',
-        alignItems: 'center',
+    heroBadgeText: {
+        fontSize: 9,
+        fontFamily: 'Nunito-ExtraBold',
+        color: C.white,
+        letterSpacing: 0.5,
     },
-    reportCTATitle: {
-        fontSize: 16,
+    heroTitle: {
+        fontSize: 24,
         fontFamily: 'Nunito-Bold',
         color: C.white,
-        letterSpacing: -0.3,
+        letterSpacing: -0.5,
     },
-    reportCTASubtitle: {
-        fontSize: 12,
-        color: 'rgba(255,255,255,0.8)',
-        marginTop: 2,
+    heroSubtitle: {
+        fontSize: 13,
+        color: 'rgba(255,255,255,0.85)',
+        marginTop: 4,
+        lineHeight: 18,
+        maxWidth: '80%',
+    },
+    heroActionBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: C.white,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 12,
+        alignSelf: 'flex-start',
+        marginTop: 16,
+    },
+    heroActionText: {
+        fontSize: 14,
+        fontFamily: 'Nunito-Bold',
+        color: C.amberDark,
+    },
+    heroIconFrame: {
+        position: 'absolute',
+        right: -20,
+        bottom: -20,
     },
 
     // Section
@@ -465,22 +507,36 @@ const styles = StyleSheet.create({
     actionCard: {
         flex: 1,
         backgroundColor: C.surface,
-        borderRadius: 16,
-        padding: 14,
+        borderRadius: 20,
+        padding: 18,
         alignItems: 'center',
         shadowColor: C.navyMid,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
         elevation: 2,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.02)',
     },
-    actionIconBg: {
-        width: 52,
-        height: 52,
-        borderRadius: 14,
+    actionIconFrame: {
+        width: 56,
+        height: 56,
+        borderRadius: 28, // Perfect Circle Frame
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 8,
+        marginBottom: 12,
+        shadowColor: '#1B3A6B',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+    },
+    innerCircleFrame: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(255,255,255,0.4)',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     actionImage: {
         width: 30,
