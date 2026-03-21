@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
-    Image, Animated, StatusBar,
+    Image, Animated, StatusBar, Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
