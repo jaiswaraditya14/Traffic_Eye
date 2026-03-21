@@ -1,74 +1,68 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList, Image } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MobileContainer } from '../../components';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS } from '../../utils';
+import { LinearGradient } from 'expo-linear-gradient';
+
+const C = {
+    navy: '#002452',
+    navyMid: '#1B3A6B',
+    amber: '#F59E0B',
+    white: '#FFFFFF',
+    offWhite: '#F8F9FB',
+    surface: '#FFFFFF',
+    textPrimary: '#191C1E',
+    redAlert: '#DC2626',
+    border: '#E5E7EB',
+};
 
 export default function TrafficSigns({ navigation }) {
     const signs = [
-        { id: '1', title: 'No Parking', icon: 'remove-circle', color: '#ff4444' },
-        { id: '2', title: 'No Entry', icon: 'close-circle', color: '#ff4444' },
-        { id: '3', title: 'No Horn', icon: 'volume-mute', color: '#666' },
-        { id: '4', title: 'Speed Limit 50', icon: 'speedometer', color: '#333', value: '50' },
-        { id: '5', title: 'Speed Limit 30', icon: 'speedometer', color: '#333', value: '30' },
-        { id: '6', title: 'No Left', icon: 'arrow-back-circle', color: '#ff4444' },
-        { id: '7', title: 'No Right', icon: 'arrow-forward-circle', color: '#ff4444' },
-        { id: '8', title: 'No Halting', icon: 'hand-palsm', color: '#ff4444' }, // Hand sign with slash
-        { id: '9', title: 'One Way Left', icon: 'arrow-back', color: '#333' },
-        { id: '10', title: 'One Way Right', icon: 'arrow-forward', color: '#333' },
-        { id: '11', title: 'No Both Side', icon: 'swap-horizontal', color: '#ff4444' },
-        { id: '12', title: 'Cycle Prohibited', icon: 'bicycle', color: '#ff4444' },
-        { id: '13', title: 'Handcart Prohibited', icon: 'cart', color: '#ff4444' },
-        { id: '14', title: 'No U Turn', icon: 'refresh-circle', color: '#ff4444' },
-        { id: '15', title: 'Overtaking Prohibited', icon: 'car-sport', color: '#ff4444' },
-        { id: '16', title: 'Pedestrian Prohibited', icon: 'walk', color: '#ff4444' },
-        { id: '17', title: 'Truck Prohibited', icon: 'bus', color: '#ff4444' },
-        { id: '18', title: 'Stop', icon: 'stop-circle', color: '#ff4444' },
-        { id: '19', title: 'No Stopping', icon: 'hand-right', color: '#ff4444' },
-        { id: '20', title: 'Narrow Road', icon: 'resize', color: '#333' },
-        { id: '21', title: 'Traffic Light', icon: 'traffic-light', color: '#333' },
+        { id: '1', title: 'No Parking', icon: 'remove-circle', color: C.redAlert },
+        { id: '2', title: 'No Entry', icon: 'close-circle', color: C.redAlert },
+        { id: '3', title: 'No Horn', icon: 'volume-mute', color: '#111827' },
+        { id: '4', title: 'Speed Lmt 50', icon: 'speedometer', color: '#111827', value: '50' },
+        { id: '5', title: 'Speed Lmt 30', icon: 'speedometer', color: '#111827', value: '30' },
+        { id: '6', title: 'No Left', icon: 'arrow-back-circle', color: C.redAlert },
+        { id: '7', title: 'No Right', icon: 'arrow-forward-circle', color: C.redAlert },
+        { id: '8', title: 'No Halting', icon: 'stop-circle', color: C.redAlert },
+        { id: '9', title: 'One Way Left', icon: 'arrow-back', color: '#111827' },
+        { id: '10', title: 'One Way Right', icon: 'arrow-forward', color: '#111827' },
+        { id: '11', title: 'No Both Side', icon: 'swap-horizontal', color: C.redAlert },
+        { id: '12', title: 'Cycle Stop', icon: 'bicycle', color: C.redAlert },
+        { id: '13', title: 'Handcart Stop', icon: 'cart', color: C.redAlert },
+        { id: '14', title: 'No U Turn', icon: 'refresh-circle', color: C.redAlert },
+        { id: '15', title: 'No Overtake', icon: 'car-sport', color: C.redAlert },
     ];
 
     const renderSign = ({ item }) => (
         <View style={styles.signCard}>
             <View style={styles.iconContainer}>
-                {item.id === '21' ? (
-                    // Traffic light representation
-                    <View style={styles.trafficLightContainer}>
-                        <View style={[styles.trafficLight, { backgroundColor: '#FFD700', borderWidth: 3, borderColor: '#000' }]}>
-                            <View style={[styles.light, { backgroundColor: '#ff4444' }]} />
-                            <View style={[styles.light, { backgroundColor: '#ffbb33', marginVertical: 2 }]} />
-                            <View style={[styles.light, { backgroundColor: '#00C851' }]} />
-                        </View>
-                    </View>
-                ) : (
-                    <View style={styles.circleBorder}>
-                        {item.value ? (
-                            <Text style={styles.speedValue}>{item.value}</Text>
-                        ) : (
-                            <Ionicons name={item.icon === 'hand-palsm' ? 'hand-right' : item.icon} size={32} color={item.color} />
-                        )}
-                        {(item.color === '#ff4444' || item.id === '8') && (
-                            <View style={styles.slashLine} />
-                        )}
-                    </View>
-                )}
+                <View style={[styles.circleBorder, { borderColor: item.color === C.redAlert ? C.redAlert : C.navyMid }]}>
+                    {item.value ? (
+                        <Text style={styles.speedValue}>{item.value}</Text>
+                    ) : (
+                        <Ionicons name={item.icon} size={28} color={item.color} />
+                    )}
+                    {(item.color === C.redAlert) && <View style={styles.slashLine} />}
+                </View>
             </View>
-            <Text style={styles.signTitle}>{item.title}</Text>
+            <Text style={styles.signTitle} numberOfLines={2} adjustsFontSizeToFit>{item.title}</Text>
         </View>
     );
 
     return (
-        <MobileContainer>
-            <SafeAreaView style={styles.container} edges={['top']}>
-                <View style={styles.header}>
+        <View style={styles.container}>
+            <StatusBar barStyle="light-content" backgroundColor={C.navyMid} />
+            <SafeAreaView style={styles.safeArea} edges={['top']}>
+                {/* ── Header ── */}
+                <LinearGradient colors={[C.navy, C.navyMid]} style={styles.header}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                        <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+                        <Ionicons name="arrow-back" size={20} color={C.white} />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>Traffic Signs</Text>
-                    <View style={{ width: 40 }} />
-                </View>
+                    <View style={{ width: 36 }} />
+                </LinearGradient>
 
                 <FlatList
                     data={signs}
@@ -79,85 +73,42 @@ export default function TrafficSigns({ navigation }) {
                     showsVerticalScrollIndicator={false}
                 />
             </SafeAreaView>
-        </MobileContainer>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: COLORS.background },
+    container: { flex: 1, backgroundColor: C.offWhite },
+    safeArea: { flex: 1 },
+
+    // Header
     header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: SPACING.md,
-        paddingVertical: SPACING.md,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.gray100
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+        paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24,
+        borderBottomLeftRadius: 24, borderBottomRightRadius: 24,
+        marginBottom: 8,
     },
-    backButton: { padding: SPACING.xs },
-    headerTitle: { fontSize: FONT_SIZES.lg, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary },
-    listContainer: { padding: SPACING.sm },
+    backButton: {
+        width: 36, height: 36, borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        justifyContent: 'center', alignItems: 'center',
+    },
+    headerTitle: { fontSize: 20, fontWeight: '700', color: C.white },
+
+    listContainer: { padding: 12, paddingBottom: 40 },
     signCard: {
-        flex: 1,
-        backgroundColor: COLORS.white,
-        borderRadius: BORDER_RADIUS.md,
-        padding: SPACING.sm,
-        margin: 4,
-        alignItems: 'center',
-        justifyContent: 'center',
-        ...SHADOWS.sm,
-        height: 120
+        flex: 1, backgroundColor: C.surface, borderRadius: 16, padding: 12, margin: 6,
+        alignItems: 'center', justifyContent: 'center', height: 124,
+        borderWidth: 1, borderColor: C.border,
+        shadowColor: C.navyMid, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
     },
-    iconContainer: {
-        width: 60,
-        height: 60,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: SPACING.xs
-    },
+    iconContainer: { height: 56, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
     circleBorder: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        borderWidth: 3,
-        borderColor: '#ff4444',
-        justifyContent: 'center',
-        alignItems: 'center',
-        position: 'relative'
+        width: 52, height: 52, borderRadius: 26, borderWidth: 3.5,
+        justifyContent: 'center', alignItems: 'center', position: 'relative',
+        backgroundColor: C.white,
     },
-    signTitle: {
-        fontSize: 10,
-        fontWeight: FONT_WEIGHTS.semibold,
-        color: COLORS.textPrimary,
-        textAlign: 'center',
-        marginTop: 4
-    },
-    speedValue: { fontSize: 18, fontWeight: 'bold', color: '#333' },
-    slashLine: {
-        position: 'absolute',
-        width: '120%',
-        height: 3,
-        backgroundColor: '#ff4444',
-        transform: [{ rotate: '-45deg' }]
-    },
-    trafficLightContainer: {
-        width: 60,
-        height: 60,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    trafficLight: {
-        width: 30,
-        padding: 4,
-        borderRadius: 8,
-        alignItems: 'center',
-        justifyContent: 'space-between'
-    },
-    light: {
-        width: 12,
-        height: 12,
-        borderRadius: 6,
-        borderWidth: 1,
-        borderColor: '#333'
-    }
+    speedValue: { fontSize: 18, fontWeight: '900', color: '#111827' },
+    slashLine: { position: 'absolute', width: '120%', height: 3.5, backgroundColor: C.redAlert, transform: [{ rotate: '-45deg' }] },
+    signTitle: { fontSize: 11, fontWeight: '700', color: C.textPrimary, textAlign: 'center', lineHeight: 14 },
 });

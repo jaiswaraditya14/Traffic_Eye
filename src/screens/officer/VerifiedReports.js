@@ -1,154 +1,134 @@
-// VerifiedReports.js
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, StatusBar, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MobileContainer } from '../../components';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS } from '../../utils/theme';
+import { LinearGradient } from 'expo-linear-gradient';
 
-export default function VerifiedReports() {
+const C = {
+    navy: '#002452',
+    navyMid: '#1B3A6B',
+    amber: '#F59E0B',
+    white: '#FFFFFF',
+    offWhite: '#F8F9FB',
+    surface: '#FFFFFF',
+    textPrimary: '#191C1E',
+    textSecondary: '#44474F',
+    textTertiary: '#747780',
+    success: '#059669',
+    successSurface: '#D1FAE5',
+};
+
+export default function VerifiedReports({ navigation }) {
     const verifiedReports = [
-        { id: 1, type: 'Speeding', location: 'Main St & 5th Ave', date: '2024-01-20', officer: 'Badge #1234' },
-        { id: 2, type: 'Red Light', location: 'Oak Rd & Elm St', date: '2024-01-19', officer: 'Badge #1234' },
-        { id: 3, type: 'Parking', location: 'Park Ave', date: '2024-01-18', officer: 'Badge #5678' },
+        { id: 1, type: 'Speeding', location: 'Main St & 5th Ave', date: '2024-01-20', officer: 'Badge #1234', plate: 'MH12AB1234' },
+        { id: 2, type: 'Red Light', location: 'Oak Rd & Elm St', date: '2024-01-19', officer: 'Badge #1234', plate: 'MH01CD5678' },
+        { id: 3, type: 'Parking', location: 'Park Ave', date: '2024-01-18', officer: 'Badge #5678', plate: 'MH08EF9012' },
     ];
 
     return (
-        <MobileContainer>
-            <SafeAreaView style={styles.container} edges={['top']}>
-                <View style={styles.header}>
-                    <Text style={styles.title}>Verified Reports</Text>
+        <View style={styles.container}>
+            <StatusBar barStyle="light-content" backgroundColor={C.navyMid} />
+            <SafeAreaView style={styles.safeArea} edges={['top']}>
+                {/* ── Header ── */}
+                <LinearGradient colors={[C.navy, C.navyMid]} style={styles.header}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                        <Ionicons name="arrow-back" size={20} color={C.white} />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Verified Queue</Text>
                     <View style={styles.badge}>
                         <Text style={styles.badgeText}>{verifiedReports.length}</Text>
                     </View>
-                </View>
-                <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                </LinearGradient>
+
+                <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                     {verifiedReports.map((report) => (
-                        <View key={report.id} style={styles.card}>
+                        <View key={report.id} style={styles.reportCard}>
+                            {/* Success Left Bar */}
+                            <View style={styles.cardBar} />
+
+                            {/* Thumbnail */}
                             <Image
                                 source={require('../../../assets/images/traffic_violation.jpg')}
                                 style={styles.thumbnail}
                                 resizeMode="cover"
                             />
-                            <View style={styles.cardBody}>
-                                <View style={styles.cardHeader}>
+
+                            <View style={styles.cardContent}>
+                                <View style={styles.cardTopRow}>
                                     <Text style={styles.reportType}>{report.type}</Text>
-                                    <View style={styles.statusBadge}>
-                                        <Ionicons name="checkmark-circle" size={14} color={COLORS.success} />
-                                        <Text style={styles.statusText}>Verified</Text>
-                                    </View>
+                                    <Ionicons name="checkmark-circle" size={16} color={C.success} />
                                 </View>
-                                <View style={styles.cardContent}>
-                                    <View style={styles.infoRow}>
-                                        <Ionicons name="location" size={14} color={COLORS.textTertiary} />
-                                        <Text style={styles.infoText}>{report.location}</Text>
+
+                                <View style={styles.vehicleRow}>
+                                    <Ionicons name="car-outline" size={12} color={C.navyMid} />
+                                    <Text style={styles.vehicleText}>{report.plate}</Text>
+                                </View>
+
+                                <View style={styles.metaRow}>
+                                    <Ionicons name="location-outline" size={12} color={C.textTertiary} />
+                                    <Text style={styles.metaText}>{report.location}</Text>
+                                </View>
+                                
+                                <View style={styles.bottomRow}>
+                                    <View style={styles.metaRow}>
+                                        <Ionicons name="calendar-outline" size={12} color={C.textTertiary} />
+                                        <Text style={styles.metaText}>{report.date}</Text>
                                     </View>
-                                    <View style={styles.infoRow}>
-                                        <Ionicons name="calendar" size={14} color={COLORS.textTertiary} />
-                                        <Text style={styles.infoText}>{report.date}</Text>
-                                    </View>
-                                    <View style={styles.infoRow}>
-                                        <Ionicons name="shield-checkmark" size={14} color={COLORS.secondary} />
-                                        <Text style={[styles.infoText, { color: COLORS.secondary }]}>{report.officer}</Text>
+                                    <View style={styles.officerBadge}>
+                                        <Ionicons name="shield-checkmark" size={10} color={C.success} />
+                                        <Text style={styles.officerText}>{report.officer}</Text>
                                     </View>
                                 </View>
                             </View>
                         </View>
                     ))}
-                    <View style={{ height: SPACING.xxl }} />
                 </ScrollView>
             </SafeAreaView>
-        </MobileContainer>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: COLORS.background,
-    },
+    container: { flex: 1, backgroundColor: C.offWhite },
+    safeArea: { flex: 1 },
+
+    // Header
     header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: SPACING.xl,
-        paddingVertical: SPACING.lg,
-        gap: SPACING.md,
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+        paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24,
+        borderBottomLeftRadius: 24, borderBottomRightRadius: 24,
     },
-    title: {
-        fontSize: FONT_SIZES.xxl,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
-        letterSpacing: -0.3,
+    backButton: {
+        width: 36, height: 36, borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        justifyContent: 'center', alignItems: 'center',
     },
-    badge: {
-        backgroundColor: COLORS.successSurface,
-        borderRadius: BORDER_RADIUS.full,
-        paddingHorizontal: SPACING.md,
-        paddingVertical: SPACING.xxs,
+    headerTitle: { fontSize: 20, fontWeight: '700', color: C.white },
+    badge: { backgroundColor: C.successSurface, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 4, minWidth: 36, alignItems: 'center' },
+    badgeText: { fontSize: 14, fontWeight: '800', color: C.success },
+
+    content: { flex: 1 },
+    scrollContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 },
+
+    // Card
+    reportCard: {
+        flexDirection: 'row', backgroundColor: C.surface, borderRadius: 16, marginBottom: 12, overflow: 'hidden', alignItems: 'center',
+        shadowColor: C.navyMid, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
     },
-    badgeText: {
-        color: COLORS.success,
-        fontSize: FONT_SIZES.xs,
-        fontWeight: FONT_WEIGHTS.bold,
-    },
-    content: {
-        flex: 1,
-        paddingHorizontal: SPACING.xl,
-    },
-    card: {
-        flexDirection: 'row',
-        backgroundColor: COLORS.surface,
-        borderRadius: BORDER_RADIUS.xl,
-        marginBottom: SPACING.md,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        overflow: 'hidden',
-        ...SHADOWS.xs,
-    },
-    thumbnail: {
-        width: 80,
-        height: '100%',
-        minHeight: 100,
-    },
-    cardBody: {
-        flex: 1,
-        padding: SPACING.lg,
-    },
-    cardHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: SPACING.sm,
-    },
-    reportType: {
-        fontSize: FONT_SIZES.md,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
-    },
-    statusBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        backgroundColor: COLORS.successSurface,
-        paddingHorizontal: SPACING.sm,
-        paddingVertical: 4,
-        borderRadius: BORDER_RADIUS.full,
-    },
-    statusText: {
-        fontSize: FONT_SIZES.xxs,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.success,
-    },
-    cardContent: {
-        gap: SPACING.xs,
-    },
-    infoRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: SPACING.xs,
-    },
-    infoText: {
-        fontSize: FONT_SIZES.xs,
-        color: COLORS.textSecondary,
-    },
+    cardBar: { width: 4, alignSelf: 'stretch', backgroundColor: C.success },
+    thumbnail: { width: 72, height: 96 },
+    cardContent: { flex: 1, padding: 12 },
+    
+    cardTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+    reportType: { fontSize: 14, fontWeight: '700', color: C.textPrimary, flex: 1 },
+    
+    vehicleRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
+    vehicleText: { fontSize: 12, color: C.navyMid, fontWeight: '700', letterSpacing: 0.5 },
+    
+    metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
+    metaText: { fontSize: 11, color: C.textSecondary },
+
+    bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
+    officerBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.successSurface, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+    officerText: { fontSize: 10, fontWeight: '700', color: C.success },
 });
