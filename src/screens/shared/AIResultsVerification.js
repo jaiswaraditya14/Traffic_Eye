@@ -1,34 +1,37 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Modal, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Modal, Alert, TextInput, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MobileContainer, Button, Input } from '../../components';
-import { useAppContext } from '../../context';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS } from '../../utils';
+import { useAppContext } from '../../context/AppContext';
+import { LinearGradient } from 'expo-linear-gradient';
+
+const C = {
+    navy: '#002452',
+    navyMid: '#1B3A6B',
+    amber: '#F59E0B',
+    white: '#FFFFFF',
+    offWhite: '#F8F9FB',
+    surface: '#FFFFFF',
+    textPrimary: '#191C1E',
+    textSecondary: '#44474F',
+    border: '#E5E7EB',
+    error: '#BA1A1A',
+    success: '#059669',
+    successSurface: '#D1FAE5',
+    warning: '#D97706',
+};
 
 export default function AIResultsVerification({ navigation, route }) {
     const { currentReport } = useAppContext();
     const { aiResults } = route.params || {};
 
-    // Editable fields with AI-detected values
     const [vehicleNumber, setVehicleNumber] = useState(aiResults?.vehicleNumber || '');
     const [violationType, setViolationType] = useState(aiResults?.violationType || '');
-    const [confidence, setConfidence] = useState(aiResults?.confidence?.toString() || '0');
+    const [confidence] = useState(aiResults?.confidence?.toString() || '0');
     const [imageModalVisible, setImageModalVisible] = useState(false);
 
     const severity = aiResults?.severity || 'Unknown';
-    const allViolations = aiResults?.allViolations || [];
     const violationDetected = aiResults?.violationDetected !== false;
-
-    const getSeverityColor = (sev) => {
-        switch (sev) {
-            case 'Critical': return '#dc2626';
-            case 'High': return '#ea580c';
-            case 'Medium': return '#eab308';
-            case 'Low': return '#22c55e';
-            default: return COLORS.textSecondary;
-        }
-    };
 
     const handleSubmit = () => {
         if (!vehicleNumber.trim()) {
@@ -40,13 +43,11 @@ export default function AIResultsVerification({ navigation, route }) {
             return;
         }
 
-        // Navigate to success screen with verified data
         navigation.navigate('ReportSuccess', {
             verifiedData: {
                 vehicleNumber,
                 violationType,
                 severity,
-                allViolations,
                 confidence: `${confidence}%`,
                 ...currentReport
             }
@@ -54,263 +55,154 @@ export default function AIResultsVerification({ navigation, route }) {
     };
 
     return (
-        <MobileContainer>
-            <SafeAreaView style={styles.container} edges={['top']}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()}>
-                        <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+        <View style={styles.container}>
+            <StatusBar barStyle="light-content" backgroundColor={C.navyMid} />
+            <SafeAreaView style={styles.safeArea} edges={['top']}>
+                {/* ── Header ── */}
+                <LinearGradient colors={[C.navy, C.navyMid]} style={styles.header}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                        <Ionicons name="arrow-back" size={20} color={C.white} />
                     </TouchableOpacity>
-                    <Text style={styles.title}>Verify AI Results</Text>
-                    <View style={{ width: 24 }} />
-                </View>
+                    <Text style={styles.headerTitle}>Review AI Results</Text>
+                    <View style={{ width: 36 }} />
+                </LinearGradient>
 
-                <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                    
                     {/* Media Preview */}
                     <View style={styles.mediaContainer}>
                         {currentReport?.image ? (
-                            <TouchableOpacity
-                                onPress={() => setImageModalVisible(true)}
-                                activeOpacity={0.9}
-                            >
-                                <Image source={{ uri: currentReport.image }} style={styles.mediaPreview} />
-                                <View style={styles.zoomIndicator}>
-                                    <Ionicons name="expand" size={20} color={COLORS.white} />
-                                </View>
+                            <TouchableOpacity onPress={() => setImageModalVisible(true)} activeOpacity={0.9}>
+                                <Image source={{ uri: currentReport.image }} style={styles.mediaPreview} resizeMode="cover" />
+                                <View style={styles.zoomBtn}><Ionicons name="expand" size={16} color={C.navyMid} /></View>
                             </TouchableOpacity>
                         ) : (
-                            <View style={styles.placeholder}>
-                                <Ionicons name="image" size={64} color={COLORS.gray400} />
-                            </View>
+                            <View style={styles.placeholder}><Ionicons name="image" size={48} color={C.border} /></View>
                         )}
                     </View>
 
-                    {/* AI Results Card */}
-                    <View style={styles.card}>
+                    {/* AI Insights Card */}
+                    <View style={styles.aiCard}>
                         <View style={styles.aiHeader}>
-                            <Ionicons name="sparkles" size={24} color={COLORS.secondary} />
-                            <Text style={styles.sectionTitle}>AI Detection Results</Text>
-                            <View style={[styles.confidenceBadge, { backgroundColor: parseInt(confidence) >= 80 ? COLORS.success : COLORS.warning }]}>
-                                <Text style={styles.confidenceBadgeText}>{confidence}% Confidence</Text>
+                            <Ionicons name="sparkles" size={18} color={violationDetected ? C.success : C.warning} />
+                            <Text style={[styles.aiTitle, { color: violationDetected ? C.success : C.warning }]}>AI Detection</Text>
+                            <View style={styles.confidenceBadge}>
+                                <Text style={styles.confidenceText}>{confidence}% Match</Text>
                             </View>
                         </View>
-
-                        {/* Severity Badge */}
-                        {violationDetected && (
-                            <View style={[styles.severityBadge, { backgroundColor: getSeverityColor(severity) + '20', borderColor: getSeverityColor(severity) }]}>
-                                <Ionicons name="alert-circle" size={16} color={getSeverityColor(severity)} />
-                                <Text style={[styles.severityText, { color: getSeverityColor(severity) }]}>
-                                    Severity: {severity}
-                                </Text>
+                        {violationDetected ? (
+                            <View style={styles.aiAlertBox}>
+                                <Text style={styles.aiAlertText}>A potential <Text style={{fontWeight:'700'}}>{violationType}</Text> violation has been detected. Please verify the accuracy of the extracted details below.</Text>
+                            </View>
+                        ) : (
+                            <View style={styles.aiAlertBox}>
+                                <Text style={styles.aiAlertText}>No clear violations detected automatically. You may still submit the report manually by filling out the details.</Text>
                             </View>
                         )}
-
-                        {/* All Violations List (when multiple) */}
-                        {allViolations.length > 1 && (
-                            <View style={styles.allViolationsBox}>
-                                <Text style={styles.allViolationsTitle}>All Violations Detected ({allViolations.length}):</Text>
-                                {allViolations.map((v, i) => (
-                                    <Text key={i} style={styles.allViolationItem}>
-                                        {i === 0 ? '🔴' : '🟡'} {v} {i === 0 ? '(Most Severe)' : ''}
-                                    </Text>
-                                ))}
-                            </View>
-                        )}
-
-                        {aiResults?.description && (
-                            <View style={styles.descriptionBox}>
-                                <Ionicons name="information-circle" size={16} color={COLORS.primary} />
-                                <Text style={styles.descriptionText}>{aiResults.description}</Text>
-                            </View>
-                        )}
-                        <Text style={styles.aiSubtitle}>
-                            Please review and correct the information below if needed
-                        </Text>
                     </View>
 
-                    {/* Editable Fields */}
-                    <View style={styles.formSection}>
-                        <Text style={styles.sectionTitle}>Detected Information</Text>
-
-                        {/* Vehicle Number Plate */}
-                        <View style={styles.inputWrapper}>
-                            <View style={styles.inputHeader}>
-                                <Ionicons name="car-sport" size={20} color={COLORS.primary} />
-                                <Text style={styles.inputLabel}>Vehicle Number Plate</Text>
-                            </View>
-                            <Input
-                                placeholder="Enter vehicle number"
-                                value={vehicleNumber}
-                                onChangeText={setVehicleNumber}
-                                autoCapitalize="characters"
-                            />
-                        </View>
-
-                        {/* Violation Type */}
-                        <View style={styles.inputWrapper}>
-                            <View style={styles.inputHeader}>
-                                <Ionicons name="warning" size={20} color={COLORS.warning} />
-                                <Text style={styles.inputLabel}>Violation Type</Text>
-                            </View>
-                            <Input
-                                placeholder="Enter violation type"
-                                value={violationType}
-                                onChangeText={setViolationType}
-                            />
-                            {/* Common Violation Types */}
-                            <View style={styles.quickOptions}>
-                                {['Speeding', 'Red Light', 'No Helmet'].map(type => (
-                                    <TouchableOpacity
-                                        key={type}
-                                        style={styles.quickOption}
-                                        onPress={() => setViolationType(type)}
-                                    >
-                                        <Text style={styles.quickOptionText}>{type}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        </View>
-
-                        {/* AI Confidence (Locked) */}
-                        <View style={styles.inputWrapper}>
-                            <View style={styles.inputHeader}>
-                                <Ionicons name="analytics" size={20} color={COLORS.success} />
-                                <Text style={styles.inputLabel}>AI Confidence Level</Text>
-                                <View style={styles.lockBadge}>
-                                    <Ionicons name="lock-closed" size={12} color={COLORS.textSecondary} />
-                                    <Text style={styles.lockText}>Read-only</Text>
-                                </View>
-                            </View>
-                            <View style={styles.confidenceContainer}>
-                                <Input
-                                    value={confidence}
-                                    editable={false}
-                                    style={styles.readOnlyInput}
-                                />
-                                <Text style={styles.percentSymbol}>%</Text>
-                            </View>
-                            <View style={styles.confidenceBar}>
-                                <View
-                                    style={[
-                                        styles.confidenceFill,
-                                        {
-                                            width: `${confidence}%`,
-                                            backgroundColor: parseInt(confidence) >= 80 ? COLORS.success :
-                                                parseInt(confidence) >= 50 ? COLORS.warning :
-                                                    COLORS.error
-                                        }
-                                    ]}
-                                />
-                            </View>
-                        </View>
-                    </View>
-                </ScrollView>
-
-                {/* Footer Buttons */}
-                <View style={styles.footer}>
-                    <Button
-                        onPress={() => navigation.goBack()}
-                        variant="secondary"
-                        style={styles.footerButton}
-                    >
-                        Back
-                    </Button>
-                    <Button
-                        onPress={handleSubmit}
-                        style={styles.footerButton}
-                    >
-                        Submit Report
-                    </Button>
-                </View>
-
-                {/* Image Zoom Modal */}
-                <Modal
-                    visible={imageModalVisible}
-                    transparent={true}
-                    animationType="fade"
-                    onRequestClose={() => setImageModalVisible(false)}
-                >
-                    <View style={styles.modalContainer}>
-                        <TouchableOpacity
-                            style={styles.closeButton}
-                            onPress={() => setImageModalVisible(false)}
-                        >
-                            <Ionicons name="close" size={32} color={COLORS.white} />
-                        </TouchableOpacity>
-                        <Image
-                            source={{ uri: currentReport?.image }}
-                            style={styles.modalImage}
-                            resizeMode="contain"
+                    {/* Input Forms */}
+                    <Text style={styles.sectionHeader}>Detected Details</Text>
+                    
+                    <View style={styles.inputBox}>
+                        <Text style={styles.inputLabel}>Vehicle Registration Plate</Text>
+                        <TextInput
+                            style={styles.textInput}
+                            placeholder="e.g. MH12AB1234"
+                            value={vehicleNumber}
+                            onChangeText={setVehicleNumber}
+                            autoCapitalize="characters"
+                            placeholderTextColor={C.textTertiary}
                         />
                     </View>
-                </Modal>
+
+                    <View style={styles.inputBox}>
+                        <Text style={styles.inputLabel}>Violation Type</Text>
+                        <TextInput
+                            style={styles.textInput}
+                            placeholder="e.g. Red Light Running"
+                            value={violationType}
+                            onChangeText={setViolationType}
+                            placeholderTextColor={C.textTertiary}
+                        />
+                        <View style={styles.chipsRow}>
+                            {['Speeding', 'Red Light', 'No Helmet', 'Wrong Way'].map(type => (
+                                <TouchableOpacity key={type} style={styles.chip} onPress={() => setViolationType(type)}>
+                                    <Text style={styles.chipText}>{type}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </View>
+
+                </ScrollView>
+
+                {/* Footer Action */}
+                <View style={styles.footer}>
+                    <TouchableOpacity style={styles.primaryBtn} onPress={handleSubmit} activeOpacity={0.88}>
+                        <LinearGradient colors={[C.navy, C.navyMid]} style={styles.primaryBtnGradient} start={{x:0,y:0}} end={{x:1,y:0}}>
+                            <Text style={styles.primaryBtnText}>Confirm & Submit</Text>
+                            <Ionicons name="checkmark-circle" size={18} color={C.white} />
+                        </LinearGradient>
+                    </TouchableOpacity>
+                </View>
+
             </SafeAreaView>
-        </MobileContainer>
+
+            {/* Modal */}
+            <Modal visible={imageModalVisible} transparent={true} animationType="fade" onRequestClose={() => setImageModalVisible(false)}>
+                <View style={styles.modalBg}>
+                    <TouchableOpacity style={styles.modalClose} onPress={() => setImageModalVisible(false)}>
+                        <Ionicons name="close" size={28} color={C.white} />
+                    </TouchableOpacity>
+                    <Image source={{ uri: currentReport?.image }} style={styles.modalImg} resizeMode="contain" />
+                </View>
+            </Modal>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1 },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md },
-    title: { fontSize: FONT_SIZES.lg, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary },
-    content: { flex: 1, paddingHorizontal: SPACING.lg },
-    mediaContainer: { width: '100%', height: 200, borderRadius: BORDER_RADIUS.xl, overflow: 'hidden', marginBottom: SPACING.lg, ...SHADOWS.md },
+    container: { flex: 1, backgroundColor: C.offWhite },
+    safeArea: { flex: 1 },
+
+    // Header
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+    backButton: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)', justifyContent: 'center', alignItems: 'center' },
+    headerTitle: { fontSize: 20, fontWeight: '700', color: C.white },
+
+    content: { flex: 1 },
+    scrollContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
+
+    // Media
+    mediaContainer: { width: '100%', height: 220, borderRadius: 16, overflow: 'hidden', backgroundColor: C.surface, marginBottom: 20, shadowColor: C.navyMid, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 4 },
     mediaPreview: { width: '100%', height: '100%' },
-    zoomIndicator: { position: 'absolute', bottom: SPACING.sm, right: SPACING.sm, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: BORDER_RADIUS.md, padding: 4 },
-    placeholder: { flex: 1, backgroundColor: COLORS.gray100, justifyContent: 'center', alignItems: 'center' },
-    card: { backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.lg, padding: SPACING.md, marginBottom: SPACING.lg, ...SHADOWS.sm, borderWidth: 1, borderColor: COLORS.gray100 },
-    aiHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.sm },
-    sectionTitle: { fontSize: FONT_SIZES.md, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary, flex: 1 },
-    confidenceBadge: { paddingHorizontal: SPACING.sm, paddingVertical: 2, borderRadius: BORDER_RADIUS.md },
-    confidenceBadgeText: { color: COLORS.white, fontSize: FONT_SIZES.xs, fontWeight: FONT_WEIGHTS.bold },
-    descriptionBox: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        gap: SPACING.xs,
-        backgroundColor: COLORS.gray50,
-        padding: SPACING.sm,
-        borderRadius: BORDER_RADIUS.md,
-        marginVertical: SPACING.sm,
-        borderLeftWidth: 3,
-        borderLeftColor: COLORS.primary
-    },
-    descriptionText: {
-        flex: 1,
-        fontSize: FONT_SIZES.xs,
-        color: COLORS.textSecondary,
-        lineHeight: 16
-    },
-    aiSubtitle: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary },
-    formSection: { marginBottom: SPACING.xl },
-    inputWrapper: { marginBottom: SPACING.lg },
-    inputHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, marginBottom: SPACING.xs },
-    inputLabel: { fontSize: FONT_SIZES.sm, fontWeight: FONT_WEIGHTS.semibold, color: COLORS.textPrimary },
-    quickOptions: { flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.sm },
-    quickOption: { backgroundColor: COLORS.gray100, paddingHorizontal: SPACING.md, paddingVertical: 6, borderRadius: BORDER_RADIUS.md },
-    quickOptionText: { fontSize: FONT_SIZES.xs, color: COLORS.textPrimary, fontWeight: FONT_WEIGHTS.medium },
-    lockBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.gray100, paddingHorizontal: 6, paddingVertical: 2, borderRadius: BORDER_RADIUS.sm, marginLeft: 'auto' },
-    lockText: { fontSize: 10, color: COLORS.textSecondary, fontWeight: FONT_WEIGHTS.medium },
-    confidenceContainer: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-    readOnlyInput: { flex: 1, backgroundColor: COLORS.gray100, opacity: 0.8 },
-    percentSymbol: { fontSize: FONT_SIZES.lg, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary },
-    confidenceBar: { height: 6, backgroundColor: COLORS.gray200, borderRadius: BORDER_RADIUS.sm, marginTop: SPACING.sm, overflow: 'hidden' },
-    confidenceFill: { height: '100%', borderRadius: BORDER_RADIUS.sm },
-    severityBadge: {
-        flexDirection: 'row', alignItems: 'center', gap: SPACING.xs,
-        paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs,
-        borderRadius: BORDER_RADIUS.md, borderWidth: 1.5,
-        marginBottom: SPACING.sm, alignSelf: 'flex-start',
-    },
-    severityText: { fontSize: FONT_SIZES.sm, fontWeight: FONT_WEIGHTS.bold },
-    allViolationsBox: {
-        backgroundColor: COLORS.gray50, borderRadius: BORDER_RADIUS.md,
-        padding: SPACING.sm, marginBottom: SPACING.sm,
-        borderLeftWidth: 3, borderLeftColor: COLORS.warning,
-    },
-    allViolationsTitle: { fontSize: FONT_SIZES.xs, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary, marginBottom: SPACING.xs },
-    allViolationItem: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: 2 },
-    footer: { flexDirection: 'row', gap: SPACING.md, padding: SPACING.lg, borderTopWidth: 1, borderTopColor: COLORS.gray200 },
-    footerButton: { flex: 1 },
-    modalContainer: { flex: 1, backgroundColor: 'black', justifyContent: 'center', alignItems: 'center' },
-    closeButton: { position: 'absolute', top: 50, right: 20, zIndex: 1 },
-    modalImage: { width: '100%', height: '80%' }
+    placeholder: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    zoomBtn: { position: 'absolute', bottom: 12, right: 12, backgroundColor: 'rgba(255,255,255,0.9)', padding: 8, borderRadius: 12 },
+
+    // AI Card
+    aiCard: { backgroundColor: '#F0FDF4', borderRadius: 16, padding: 16, marginBottom: 24, borderWidth: 1, borderColor: '#BBF7D0' },
+    aiHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+    aiTitle: { fontSize: 15, fontWeight: '800', marginLeft: 6, flex: 1 },
+    confidenceBadge: { backgroundColor: C.success, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+    confidenceText: { fontSize: 11, fontWeight: '800', color: C.white },
+    aiAlertBox: { marginTop: 4 },
+    aiAlertText: { fontSize: 14, color: '#166534', lineHeight: 20 },
+
+    sectionHeader: { fontSize: 16, fontWeight: '800', color: C.navyMid, marginBottom: 16, letterSpacing: -0.2 },
+
+    inputBox: { marginBottom: 20 },
+    inputLabel: { fontSize: 13, fontWeight: '700', color: C.textSecondary, marginBottom: 8, marginLeft: 4 },
+    textInput: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: C.textPrimary, shadowColor: C.navyMid, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.02, shadowRadius: 6, elevation: 1 },
+    chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+    chip: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 100 },
+    chipText: { fontSize: 13, fontWeight: '600', color: C.navyMid },
+
+    footer: { padding: 20, paddingBottom: 32, backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: '#F2F4F6' },
+    primaryBtn: { borderRadius: 14, overflow: 'hidden', shadowColor: C.navy, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 4 },
+    primaryBtnGradient: { flexDirection: 'row', paddingVertical: 16, alignItems: 'center', justifyContent: 'center', gap: 8 },
+    primaryBtnText: { fontSize: 16, fontWeight: '700', color: C.white },
+
+    modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
+    modalClose: { position: 'absolute', top: 50, right: 20, zIndex: 10, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
+    modalImg: { width: '100%', height: '80%' },
 });
