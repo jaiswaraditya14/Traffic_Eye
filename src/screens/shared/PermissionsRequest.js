@@ -89,21 +89,21 @@ const styles = StyleSheet.create({
     content: { padding: 24, alignItems: 'center', paddingTop: 60 },
     
     iconBox: { width: 88, height: 88, borderRadius: 24, backgroundColor: C.navyMid, justifyContent: 'center', alignItems: 'center', marginBottom: 24, shadowColor: C.navyMid, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 8 },
-    title: { fontSize: 26, fontFamily: 'DMSans-Bold', color: C.navy, marginBottom: 12, letterSpacing: -0.5 },
+    title: { fontSize: 26, fontFamily: 'Nunito-Bold', color: C.navy, marginBottom: 12, letterSpacing: -0.5 },
     subtitle: { fontSize: 15, color: C.textSecondary, textAlign: 'center', lineHeight: 22, marginBottom: 40, paddingHorizontal: 10 },
 
     card: { width: '100%', backgroundColor: C.surface, borderRadius: 20, padding: 8, shadowColor: C.navyMid, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2, borderWidth: 1, borderColor: C.border },
     row: { flexDirection: 'row', alignItems: 'center', padding: 16 },
     iconBg: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
     textCol: { flex: 1 },
-    rowTitle: { fontSize: 16, fontFamily: 'DMSans-Bold', color: C.textPrimary, marginBottom: 2 },
+    rowTitle: { fontSize: 16, fontFamily: 'Nunito-Bold', color: C.textPrimary, marginBottom: 2 },
     rowDesc: { fontSize: 13, color: C.textSecondary },
     divider: { height: 1, backgroundColor: '#F2F4F6', marginLeft: 76 },
 
     footer: { padding: 24, paddingBottom: 32 },
     primaryBtn: { borderRadius: 14, overflow: 'hidden', marginBottom: 16, shadowColor: C.navy, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 6 },
     primaryBtnGradient: { paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
-    primaryBtnText: { fontSize: 16, fontFamily: 'DMSans-Bold', color: C.white },
+    primaryBtnText: { fontSize: 16, fontFamily: 'Nunito-Bold', color: C.white },
     ghostBtn: { paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
-    ghostBtnText: { fontSize: 15, fontFamily: 'DMSans-SemiBold', color: C.textSecondary },
+    ghostBtnText: { fontSize: 15, fontFamily: 'Nunito-SemiBold', color: C.textSecondary },
 });

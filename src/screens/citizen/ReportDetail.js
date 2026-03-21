@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 20,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.white,
         letterSpacing: -0.3,
     },
@@ -196,13 +196,13 @@ const styles = StyleSheet.create({
     imageTagText: {
         fontSize: 11,
         color: C.navy,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         letterSpacing: 0.2,
     },
     imageDate: {
         fontSize: 13,
         color: 'rgba(255,255,255,0.9)',
-        fontFamily: 'DMSans-Medium',
+        fontFamily: 'Nunito-Medium',
     },
 
     // Status
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
     },
     statusLabel: {
         fontSize: 15,
-        fontFamily: 'DMSans-SemiBold',
+        fontFamily: 'Nunito-SemiBold',
         color: C.textPrimary,
     },
     statusBadge: {
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
     },
     statusText: {
         fontSize: 13,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
     },
 
     // Details Card
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     },
     detailCardTitle: {
         fontSize: 16,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.navyMid,
     },
     detailRow: {
@@ -274,16 +274,16 @@ const styles = StyleSheet.create({
     detailLabel: {
         fontSize: 14,
         color: C.textSecondary,
-        fontFamily: 'DMSans-Medium',
+        fontFamily: 'Nunito-Medium',
     },
     detailValue: {
         fontSize: 14,
-        fontFamily: 'DMSans-SemiBold',
+        fontFamily: 'Nunito-SemiBold',
         color: C.textPrimary,
     },
     vehiclePlate: {
         fontSize: 13,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.navyMid,
         letterSpacing: 0.5,
         backgroundColor: '#F2F4F6',
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
     },
     pointsValue: {
         fontSize: 13,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.amberDark,
     },
 });

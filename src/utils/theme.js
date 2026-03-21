@@ -161,12 +161,12 @@ export const SPACING = {
 // ─────────────────────────────────────
 
 export const FONT_FAMILIES = {
-    regular: 'DMSans-Regular',
-    regularItalic: 'DMSans-RegularItalic',
-    medium: 'DMSans-Medium',
-    semibold: 'DMSans-SemiBold',
-    bold: 'DMSans-Bold',
-    boldItalic: 'DMSans-BoldItalic',
+    regular: 'Nunito-Regular',
+    regularItalic: 'Nunito-RegularItalic',
+    medium: 'Nunito-Medium',
+    semibold: 'Nunito-SemiBold',
+    bold: 'Nunito-Bold',
+    boldItalic: 'Nunito-BoldItalic',
 };
 
 export const FONT_SIZES = {
@@ -375,7 +375,7 @@ export const globalStyles = StyleSheet.create({
     },
     // Section title
     sectionTitle: {
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         fontSize: FONT_SIZES.lg,
         color: COLORS.textPrimary,
         letterSpacing: -0.2,

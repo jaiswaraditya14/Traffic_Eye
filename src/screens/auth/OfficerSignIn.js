@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
     secureText: {
         fontSize: 10,
         color: '#34D399',
-        fontFamily: 'DMSans-SemiBold',
+        fontFamily: 'Nunito-SemiBold',
     },
     badgeIconContainer: {
         width: 100,
@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
     },
     heroTitle: {
         fontSize: 22,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.white,
         letterSpacing: -0.4,
         textAlign: 'center',
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: 'rgba(255,255,255,0.55)',
         fontStyle: 'italic',
-        fontFamily: 'DMSans-Medium',
+        fontFamily: 'Nunito-Medium',
         marginTop: 5,
     },
     diagonalAccent: {
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
     },
     fieldLabel: {
         fontSize: 12,
-        fontFamily: 'DMSans-SemiBold',
+        fontFamily: 'Nunito-SemiBold',
         color: C.navyMid,
         marginBottom: 8,
         letterSpacing: 0.2,
@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
     },
     signInText: {
         fontSize: 16,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.white,
     },
     buttonDisabled: {
@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
     contactText: {
         fontSize: 14,
         color: C.navyMid,
-        fontFamily: 'DMSans-SemiBold',
+        fontFamily: 'Nunito-SemiBold',
     },
 
     // Notice box

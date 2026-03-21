@@ -92,7 +92,7 @@ export default function AIResultsVerification({ navigation, route }) {
                         </View>
                         {violationDetected ? (
                             <View style={styles.aiAlertBox}>
-                                <Text style={styles.aiAlertText}>A potential <Text style={{fontFamily: 'DMSans-Bold'}}>{violationType}</Text> violation has been detected. Please verify the accuracy of the extracted details below.</Text>
+                                <Text style={styles.aiAlertText}>A potential <Text style={{fontFamily: 'Nunito-Bold'}}>{violationType}</Text> violation has been detected. Please verify the accuracy of the extracted details below.</Text>
                             </View>
                         ) : (
                             <View style={styles.aiAlertBox}>
@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
     // Header
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
     backButton: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)', justifyContent: 'center', alignItems: 'center' },
-    headerTitle: { fontSize: 20, fontFamily: 'DMSans-Bold', color: C.white },
+    headerTitle: { fontSize: 20, fontFamily: 'Nunito-Bold', color: C.white },
 
     content: { flex: 1 },
     scrollContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
@@ -182,25 +182,25 @@ const styles = StyleSheet.create({
     // AI Card
     aiCard: { backgroundColor: '#F0FDF4', borderRadius: 16, padding: 16, marginBottom: 24, borderWidth: 1, borderColor: '#BBF7D0' },
     aiHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-    aiTitle: { fontSize: 15, fontFamily: 'DMSans-Bold', marginLeft: 6, flex: 1 },
+    aiTitle: { fontSize: 15, fontFamily: 'Nunito-Bold', marginLeft: 6, flex: 1 },
     confidenceBadge: { backgroundColor: C.success, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-    confidenceText: { fontSize: 11, fontFamily: 'DMSans-Bold', color: C.white },
+    confidenceText: { fontSize: 11, fontFamily: 'Nunito-Bold', color: C.white },
     aiAlertBox: { marginTop: 4 },
     aiAlertText: { fontSize: 14, color: '#166534', lineHeight: 20 },
 
-    sectionHeader: { fontSize: 16, fontFamily: 'DMSans-Bold', color: C.navyMid, marginBottom: 16, letterSpacing: -0.2 },
+    sectionHeader: { fontSize: 16, fontFamily: 'Nunito-Bold', color: C.navyMid, marginBottom: 16, letterSpacing: -0.2 },
 
     inputBox: { marginBottom: 20 },
-    inputLabel: { fontSize: 13, fontFamily: 'DMSans-Bold', color: C.textSecondary, marginBottom: 8, marginLeft: 4 },
+    inputLabel: { fontSize: 13, fontFamily: 'Nunito-Bold', color: C.textSecondary, marginBottom: 8, marginLeft: 4 },
     textInput: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: C.textPrimary, shadowColor: C.navyMid, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.02, shadowRadius: 6, elevation: 1 },
     chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
     chip: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 100 },
-    chipText: { fontSize: 13, fontFamily: 'DMSans-SemiBold', color: C.navyMid },
+    chipText: { fontSize: 13, fontFamily: 'Nunito-SemiBold', color: C.navyMid },
 
     footer: { padding: 20, paddingBottom: 32, backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: '#F2F4F6' },
     primaryBtn: { borderRadius: 14, overflow: 'hidden', shadowColor: C.navy, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 4 },
     primaryBtnGradient: { flexDirection: 'row', paddingVertical: 16, alignItems: 'center', justifyContent: 'center', gap: 8 },
-    primaryBtnText: { fontSize: 16, fontFamily: 'DMSans-Bold', color: C.white },
+    primaryBtnText: { fontSize: 16, fontFamily: 'Nunito-Bold', color: C.white },
 
     modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
     modalClose: { position: 'absolute', top: 50, right: 20, zIndex: 10, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },

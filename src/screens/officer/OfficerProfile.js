@@ -168,17 +168,17 @@ const styles = StyleSheet.create({
     heroSection: { borderBottomLeftRadius: 32, borderBottomRightRadius: 32, paddingBottom: 32, shadowColor: C.navyMid, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 8 },
     heroSafeTop: { paddingHorizontal: 24, paddingTop: 16, alignItems: 'center' },
     heroTopRow: { flexDirection: 'row', width: '100%', justifyContent: 'center', alignItems: 'center', marginBottom: 24, position: 'relative' },
-    heroTitle: { fontSize: 18, fontFamily: 'DMSans-Bold', color: C.white },
+    heroTitle: { fontSize: 18, fontFamily: 'Nunito-Bold', color: C.white },
     headsetBtn: { position: 'absolute', right: 0, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
     
     avatarWrapper: { position: 'relative', marginBottom: 16 },
     avatarBg: { width: 88, height: 88, borderRadius: 44, backgroundColor: C.amber, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: C.white },
-    avatarInitials: { fontSize: 32, fontFamily: 'DMSans-Bold', color: C.navy, letterSpacing: 1 },
+    avatarInitials: { fontSize: 32, fontFamily: 'Nunito-Bold', color: C.navy, letterSpacing: 1 },
     badgeShield: { position: 'absolute', bottom: -2, right: -2, width: 28, height: 28, borderRadius: 14, backgroundColor: '#059669', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: C.white },
     
-    heroName: { fontSize: 24, fontFamily: 'DMSans-Bold', color: C.white, marginBottom: 6, letterSpacing: -0.5 },
+    heroName: { fontSize: 24, fontFamily: 'Nunito-Bold', color: C.white, marginBottom: 6, letterSpacing: -0.5 },
     badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
-    heroBadge: { fontSize: 14, fontFamily: 'DMSans-SemiBold', color: C.white },
+    heroBadge: { fontSize: 14, fontFamily: 'Nunito-SemiBold', color: C.white },
 
     content: { flex: 1 },
     scrollContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
@@ -188,17 +188,17 @@ const styles = StyleSheet.create({
     statBox: { flex: 1, alignItems: 'center' },
     statDivider: { width: 1, backgroundColor: '#F2F4F6', marginVertical: 4 },
     statIconBg: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
-    statValue: { fontSize: 20, fontFamily: 'DMSans-Bold', color: C.textPrimary, marginBottom: 2 },
-    statLabel: { fontSize: 12, fontFamily: 'DMSans-SemiBold', color: C.textTertiary, textTransform: 'uppercase' },
+    statValue: { fontSize: 20, fontFamily: 'Nunito-Bold', color: C.textPrimary, marginBottom: 2 },
+    statLabel: { fontSize: 12, fontFamily: 'Nunito-SemiBold', color: C.textTertiary, textTransform: 'uppercase' },
 
     // Menu
-    sectionHeader: { fontSize: 14, fontFamily: 'DMSans-Bold', color: C.textSecondary, marginBottom: 8, marginLeft: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+    sectionHeader: { fontSize: 14, fontFamily: 'Nunito-Bold', color: C.textSecondary, marginBottom: 8, marginLeft: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
     menuGroup: { backgroundColor: C.surface, borderRadius: 20, marginBottom: 24, shadowColor: C.navyMid, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: '#F2F4F6' },
     menuItem: { flexDirection: 'row', alignItems: 'center', padding: 16 },
     menuDivider: { height: 1, backgroundColor: '#F2F4F6', marginLeft: 64 },
     menuIconBg: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F8F9FB', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
-    menuItemText: { flex: 1, fontSize: 16, fontFamily: 'DMSans-SemiBold', color: C.textPrimary },
+    menuItemText: { flex: 1, fontSize: 16, fontFamily: 'Nunito-SemiBold', color: C.textPrimary },
 
     footerVersion: { alignItems: 'center', marginTop: 10 },
-    versionText: { fontSize: 12, color: C.textTertiary, fontFamily: 'DMSans-Medium', marginTop: 4 },
+    versionText: { fontSize: 12, color: C.textTertiary, fontFamily: 'Nunito-Medium', marginTop: 4 },
 });

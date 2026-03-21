@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
         backgroundColor: C.offWhite,
     },
     title: {
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         fontSize: 26,
         color: C.navy,
         marginTop: 24,
@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     subtitle: {
-        fontFamily: 'DMSans-Regular',
+        fontFamily: 'Nunito-Regular',
         fontSize: 16,
         color: C.textSecondary,
         textAlign: 'center',
@@ -89,6 +89,6 @@ const styles = StyleSheet.create({
     buttonText: {
         color: C.white,
         fontSize: 16,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
     }
 });

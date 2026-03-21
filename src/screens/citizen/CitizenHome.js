@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
     headerLeft: {},
     greeting: {
         fontSize: 20,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.white,
         letterSpacing: -0.3,
     },
@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
     locationText: {
         fontSize: 12,
         color: 'rgba(255,255,255,0.6)',
-        fontFamily: 'DMSans-Medium',
+        fontFamily: 'Nunito-Medium',
     },
     notifButton: {
         width: 40,
@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
     notifBadgeText: {
         fontSize: 9,
         color: C.navy,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
     },
 
     // Stats bar
@@ -372,14 +372,14 @@ const styles = StyleSheet.create({
     },
     statValue: {
         fontSize: 22,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.white,
         letterSpacing: -0.5,
     },
     statLabel: {
         fontSize: 11,
         color: 'rgba(255,255,255,0.6)',
-        fontFamily: 'DMSans-Medium',
+        fontFamily: 'Nunito-Medium',
         marginTop: 2,
     },
     statDivider: {
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
     },
     reportCTATitle: {
         fontSize: 16,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.white,
         letterSpacing: -0.3,
     },
@@ -446,7 +446,7 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 17,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.textPrimary,
         letterSpacing: -0.2,
         marginBottom: 14,
@@ -454,7 +454,7 @@ const styles = StyleSheet.create({
     seeAll: {
         fontSize: 13,
         color: C.amber,
-        fontFamily: 'DMSans-SemiBold',
+        fontFamily: 'Nunito-SemiBold',
     },
 
     // Actions grid
@@ -488,7 +488,7 @@ const styles = StyleSheet.create({
     },
     actionLabel: {
         fontSize: 11,
-        fontFamily: 'DMSans-SemiBold',
+        fontFamily: 'Nunito-SemiBold',
         color: C.textPrimary,
         textAlign: 'center',
     },
@@ -525,7 +525,7 @@ const styles = StyleSheet.create({
     },
     activityType: {
         fontSize: 14,
-        fontFamily: 'DMSans-SemiBold',
+        fontFamily: 'Nunito-SemiBold',
         color: C.textPrimary,
     },
     activityDesc: {
@@ -537,7 +537,7 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: C.textTertiary,
         marginTop: 3,
-        fontFamily: 'DMSans-Medium',
+        fontFamily: 'Nunito-Medium',
     },
     statusChip: {
         paddingHorizontal: 10,
@@ -547,6 +547,6 @@ const styles = StyleSheet.create({
     },
     statusChipText: {
         fontSize: 11,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
     },
 });

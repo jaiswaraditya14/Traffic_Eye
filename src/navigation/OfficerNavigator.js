@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
     },
     tabLabel: {
         fontSize: 11,
-        fontFamily: 'DMSans-SemiBold',
+        fontFamily: 'Nunito-SemiBold',
         marginBottom: Platform.OS === 'ios' ? 0 : 4,
     },
 });

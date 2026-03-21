@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 24,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.white,
         letterSpacing: -0.5,
         marginBottom: 4,
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
     headerSubtitle: {
         fontSize: 13,
         color: 'rgba(255,255,255,0.6)',
-        fontFamily: 'DMSans-Medium',
+        fontFamily: 'Nunito-Medium',
     },
 
     // ── Form ──
@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
     },
     fieldLabel: {
         fontSize: 12,
-        fontFamily: 'DMSans-SemiBold',
+        fontFamily: 'Nunito-SemiBold',
         color: C.navyMid,
         marginBottom: 8,
         letterSpacing: 0.2,
@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
     forgotText: {
         fontSize: 13,
         color: C.navyMid,
-        fontFamily: 'DMSans-SemiBold',
+        fontFamily: 'Nunito-SemiBold',
     },
 
     // Primary button
@@ -377,7 +377,7 @@ const styles = StyleSheet.create({
     },
     primaryButtonText: {
         fontSize: 16,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.white,
     },
     buttonDisabled: {
@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
     dividerText: {
         fontSize: 12,
         color: C.textTertiary,
-        fontFamily: 'DMSans-Medium',
+        fontFamily: 'Nunito-Medium',
     },
 
     // Google button
@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
     },
     googleButtonText: {
         fontSize: 15,
-        fontFamily: 'DMSans-SemiBold',
+        fontFamily: 'Nunito-SemiBold',
         color: C.textPrimary,
     },
 
@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
     },
     signUpLink: {
         fontSize: 14,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.amber,
     },
 });

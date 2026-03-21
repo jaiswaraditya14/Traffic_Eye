@@ -364,7 +364,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 22,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.white,
         letterSpacing: -0.4,
     },
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
     fieldGroup: { marginBottom: 14 },
     fieldLabel: {
         fontSize: 12,
-        fontFamily: 'DMSans-SemiBold',
+        fontFamily: 'Nunito-SemiBold',
         color: C.navyMid,
         marginBottom: 7,
         letterSpacing: 0.2,
@@ -425,7 +425,7 @@ const styles = StyleSheet.create({
     },
     signUpText: {
         fontSize: 16,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.white,
     },
     footer: {
@@ -433,7 +433,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     footerText: { fontSize: 14, color: C.textSecondary },
-    signInLink: { fontSize: 14, fontFamily: 'DMSans-Bold', color: C.amber },
+    signInLink: { fontSize: 14, fontFamily: 'Nunito-Bold', color: C.amber },
 
     // Success Page
     successPage: {
@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
     },
     successTitle: {
         fontSize: 24,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.textPrimary,
         textAlign: 'center',
         marginTop: 16,
@@ -510,7 +510,7 @@ const styles = StyleSheet.create({
     },
     emailPillText: {
         fontSize: 13,
-        fontFamily: 'DMSans-SemiBold',
+        fontFamily: 'Nunito-SemiBold',
         color: C.navyMid,
     },
     stepsList: {
@@ -541,13 +541,13 @@ const styles = StyleSheet.create({
     },
     stepNumText: {
         fontSize: 13,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.navyMid,
     },
     stepText: {
         fontSize: 14,
         color: C.textPrimary,
-        fontFamily: 'DMSans-Medium',
+        fontFamily: 'Nunito-Medium',
     },
     successCTA: {
         alignSelf: 'stretch',
@@ -568,7 +568,7 @@ const styles = StyleSheet.create({
     },
     successCTAText: {
         fontSize: 16,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.white,
     },
     resendRow: {
@@ -580,7 +580,7 @@ const styles = StyleSheet.create({
     resendText: {
         fontSize: 13,
         color: C.navyMid,
-        fontFamily: 'DMSans-Medium',
+        fontFamily: 'Nunito-Medium',
     },
     spamNote: {
         fontSize: 11,

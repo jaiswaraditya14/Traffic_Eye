@@ -290,14 +290,14 @@ const styles = StyleSheet.create({
     },
     officerName: {
         fontSize: 16,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.white,
         letterSpacing: -0.3,
     },
     officerZone: {
         fontSize: 11,
         color: 'rgba(255,255,255,0.6)',
-        fontFamily: 'DMSans-Medium',
+        fontFamily: 'Nunito-Medium',
         marginTop: 2,
     },
     headerRight: {
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
     },
     alertTitle: {
         fontSize: 14,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.amberDark,
     },
     alertSubtitle: {
@@ -366,7 +366,7 @@ const styles = StyleSheet.create({
     },
     alertButtonText: {
         fontSize: 12,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.navy,
     },
 
@@ -400,14 +400,14 @@ const styles = StyleSheet.create({
     },
     statValue: {
         fontSize: 20,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.textPrimary,
         letterSpacing: -0.5,
     },
     statLabel: {
         fontSize: 10,
         color: C.textTertiary,
-        fontFamily: 'DMSans-SemiBold',
+        fontFamily: 'Nunito-SemiBold',
         letterSpacing: 0.3,
         marginTop: 2,
         textTransform: 'uppercase',
@@ -426,7 +426,7 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 17,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.textPrimary,
         letterSpacing: -0.2,
         marginBottom: 14,
@@ -434,7 +434,7 @@ const styles = StyleSheet.create({
     seeAll: {
         fontSize: 13,
         color: C.amber,
-        fontFamily: 'DMSans-SemiBold',
+        fontFamily: 'Nunito-SemiBold',
     },
 
     // Action cards
@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
     },
     actionCardTitle: {
         fontSize: 15,
-        fontFamily: 'DMSans-SemiBold',
+        fontFamily: 'Nunito-SemiBold',
         color: C.textPrimary,
         letterSpacing: -0.2,
     },
@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
     },
     amberCountText: {
         fontSize: 13,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.amberDark,
     },
 
@@ -519,7 +519,7 @@ const styles = StyleSheet.create({
     },
     reportType: {
         fontSize: 14,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.textPrimary,
     },
     priorityChip: {
@@ -529,13 +529,13 @@ const styles = StyleSheet.create({
     },
     priorityChipText: {
         fontSize: 9,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         letterSpacing: 0.5,
     },
     reportVehicle: {
         fontSize: 12,
         color: C.navyMid,
-        fontFamily: 'DMSans-SemiBold',
+        fontFamily: 'Nunito-SemiBold',
         letterSpacing: 0.3,
         marginBottom: 4,
         fontFamily: Platform?.OS === 'ios' ? 'Courier' : 'monospace',

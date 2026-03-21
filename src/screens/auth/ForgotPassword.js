@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 22,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.white,
         letterSpacing: -0.4,
         marginBottom: 8,
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
     },
     fieldLabel: {
         fontSize: 12,
-        fontFamily: 'DMSans-SemiBold',
+        fontFamily: 'Nunito-SemiBold',
         color: C.navyMid,
         marginBottom: 8,
         letterSpacing: 0.2,
@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
     },
     resetText: {
         fontSize: 16,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.white,
     },
     backLink: {
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
     backLinkText: {
         fontSize: 14,
         color: C.navyMid,
-        fontFamily: 'DMSans-Medium',
+        fontFamily: 'Nunito-Medium',
     },
 
     // Success state
@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
     },
     successTitle: {
         fontSize: 22,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.textPrimary,
         marginBottom: 10,
         letterSpacing: -0.4,
@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
     },
     emailHighlight: {
         color: C.navyMid,
-        fontFamily: 'DMSans-SemiBold',
+        fontFamily: 'Nunito-SemiBold',
     },
     successInstruction: {
         fontSize: 12,
@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
     },
     successCTAText: {
         fontSize: 16,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.white,
     },
     tryAgainRow: {
@@ -410,6 +410,6 @@ const styles = StyleSheet.create({
     tryAgainText: {
         fontSize: 13,
         color: C.navyMid,
-        fontFamily: 'DMSans-Medium',
+        fontFamily: 'Nunito-Medium',
     },
 });

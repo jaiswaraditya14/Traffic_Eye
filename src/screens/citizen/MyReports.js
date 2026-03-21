@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 22,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.white,
         letterSpacing: -0.4,
     },
@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
     },
     countBadgeText: {
         fontSize: 13,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.navy,
     },
 
@@ -233,12 +233,12 @@ const styles = StyleSheet.create({
     },
     filterChipText: {
         fontSize: 13,
-        fontFamily: 'DMSans-Medium',
+        fontFamily: 'Nunito-Medium',
         color: C.textTertiary,
     },
     filterChipTextActive: {
         color: C.navyMid,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
     },
     showingText: {
         fontSize: 12,
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingTop: 10,
         paddingBottom: 6,
-        fontFamily: 'DMSans-Medium',
+        fontFamily: 'Nunito-Medium',
     },
 
     // Report list
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     },
     reportType: {
         fontSize: 14,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.textPrimary,
         flex: 1,
         marginRight: 8,
@@ -303,12 +303,12 @@ const styles = StyleSheet.create({
     },
     statusPillText: {
         fontSize: 10,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
     },
     vehicleText: {
         fontSize: 12,
         color: C.navyMid,
-        fontFamily: 'DMSans-SemiBold',
+        fontFamily: 'Nunito-SemiBold',
         letterSpacing: 0.3,
         marginBottom: 4,
     },
@@ -331,7 +331,7 @@ const styles = StyleSheet.create({
     pointsText: {
         fontSize: 11,
         color: C.amberDark,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
     },
 
     // FAB

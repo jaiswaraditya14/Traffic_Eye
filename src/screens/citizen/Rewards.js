@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 22,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.white,
         letterSpacing: -0.4,
     },
@@ -245,14 +245,14 @@ const styles = StyleSheet.create({
     },
     pointsLabel: {
         fontSize: 9,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: 'rgba(255,255,255,0.6)',
         letterSpacing: 1.5,
         marginBottom: 3,
     },
     pointsValue: {
         fontSize: 30,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.amber,
         letterSpacing: -1,
     },
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     },
     levelBadgeText: {
         fontSize: 11,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.navy,
     },
     progressLabel: {
@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 17,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.textPrimary,
         letterSpacing: -0.2,
         marginBottom: 14,
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     },
     badgeLabel: {
         fontSize: 10,
-        fontFamily: 'DMSans-SemiBold',
+        fontFamily: 'Nunito-SemiBold',
         color: C.textPrimary,
         textAlign: 'center',
     },
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
     },
     historyLabel: {
         fontSize: 13,
-        fontFamily: 'DMSans-SemiBold',
+        fontFamily: 'Nunito-SemiBold',
         color: C.textPrimary,
     },
     historyTime: {
@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
     },
     historyPoints: {
         fontSize: 13,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.success,
     },
 
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
     redeemContent: { flex: 1 },
     redeemTitle: {
         fontSize: 14,
-        fontFamily: 'DMSans-SemiBold',
+        fontFamily: 'Nunito-SemiBold',
         color: C.textPrimary,
         marginBottom: 4,
     },
@@ -413,7 +413,7 @@ const styles = StyleSheet.create({
     },
     redeemPts: {
         fontSize: 12,
-        fontFamily: 'DMSans-Medium',
+        fontFamily: 'Nunito-Medium',
         color: C.amberDark,
     },
     redeemBtn: {
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
     },
     redeemBtnText: {
         fontSize: 12,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.navyMid,
     },
 

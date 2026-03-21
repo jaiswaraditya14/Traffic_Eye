@@ -123,12 +123,12 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.12)',
         justifyContent: 'center', alignItems: 'center',
     },
-    headerTitle: { fontSize: 20, fontFamily: 'DMSans-Bold', color: C.white },
+    headerTitle: { fontSize: 20, fontFamily: 'Nunito-Bold', color: C.white },
 
     content: { flex: 1 },
     scrollContent: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 },
 
-    sectionTitle: { fontSize: 13, fontFamily: 'DMSans-Bold', color: C.textSecondary, marginBottom: 8, marginLeft: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+    sectionTitle: { fontSize: 13, fontFamily: 'Nunito-Bold', color: C.textSecondary, marginBottom: 8, marginLeft: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
     cardGroup: { backgroundColor: C.surface, borderRadius: 20, marginBottom: 24, shadowColor: C.navyMid, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: '#F2F4F6', paddingVertical: 4 },
     
     settingRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
@@ -137,14 +137,14 @@ const styles = StyleSheet.create({
     
     iconBox: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F8F9FB', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
     textCol: { flex: 1 },
-    label: { fontSize: 16, fontFamily: 'DMSans-SemiBold', color: C.textPrimary, marginBottom: 2 },
+    label: { fontSize: 16, fontFamily: 'Nunito-SemiBold', color: C.textPrimary, marginBottom: 2 },
     description: { fontSize: 13, color: C.textSecondary },
 
     infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16 },
-    infoLabel: { fontSize: 15, fontFamily: 'DMSans-SemiBold', color: C.textPrimary },
-    infoValue: { fontSize: 14, color: C.textSecondary, fontFamily: 'DMSans-Medium' },
+    infoLabel: { fontSize: 15, fontFamily: 'Nunito-SemiBold', color: C.textPrimary },
+    infoValue: { fontSize: 14, color: C.textSecondary, fontFamily: 'Nunito-Medium' },
     secureBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#D1FAE5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-    secureText: { fontSize: 12, fontFamily: 'DMSans-Bold', color: '#059669' },
+    secureText: { fontSize: 12, fontFamily: 'Nunito-Bold', color: '#059669' },
 
     footer: { alignItems: 'center', marginTop: 12 },
     copyrightText: { fontSize: 12, color: C.textTertiary, textAlign: 'center' },

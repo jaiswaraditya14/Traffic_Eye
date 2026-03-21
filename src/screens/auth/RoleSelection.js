@@ -104,15 +104,15 @@ export default function RoleSelection({ navigation }) {
                             {/* Left accent bar */}
                             <View style={[styles.cardAccentBar, { backgroundColor: C.navyMid }]} />
                             <View style={styles.cardContent}>
-                                {/* Icon */}
-                                <View style={[styles.iconCircle, { backgroundColor: C.primarySurface }]}>
-                                    <Ionicons name="person" size={26} color={C.navyMid} />
+                                {/* Circle Frame Icon */}
+                                <View style={styles.iconFrame}>
+                                    <Ionicons name="person" size={28} color={C.navyMid} />
                                 </View>
-                                {/* Text */}
+                                {/* Text Content */}
                                 <View style={styles.cardText}>
                                     <View style={styles.cardTitleRow}>
                                         <Text style={styles.cardTitle}>Citizen</Text>
-                                        <View style={[styles.roleBadge, { backgroundColor: C.primarySurface }]}>
+                                        <View style={[styles.roleBadge, { backgroundColor: C.primarySurface, borderColor: C.navyMid + '20' }]}>
                                             <Text style={[styles.roleBadgeText, { color: C.navyMid }]}>REPORTER</Text>
                                         </View>
                                     </View>
@@ -130,7 +130,7 @@ export default function RoleSelection({ navigation }) {
                                     </View>
                                 </View>
                                 {/* Arrow */}
-                                <Ionicons name="chevron-forward" size={20} color={C.textTertiary} />
+                                <Ionicons name="chevron-forward" size={20} color={C.textTertiary} style={{ marginTop: 4 }} />
                             </View>
                         </TouchableOpacity>
                     </Animated.View>
@@ -142,18 +142,18 @@ export default function RoleSelection({ navigation }) {
                             onPress={() => handleRoleSelect(ROLES.OFFICER)}
                             activeOpacity={0.82}
                         >
-                            {/* Left accent bar — amber for authority */}
+                            {/* Left accent bar */}
                             <View style={[styles.cardAccentBar, { backgroundColor: C.amber }]} />
                             <View style={styles.cardContent}>
-                                {/* Icon */}
-                                <View style={[styles.iconCircle, { backgroundColor: C.amberSurface }]}>
-                                    <Ionicons name="shield-checkmark" size={26} color={C.amberDark} />
+                                {/* Circle Frame Icon */}
+                                <View style={styles.iconFrame}>
+                                    <Ionicons name="shield-checkmark" size={28} color={C.amberDark} />
                                 </View>
-                                {/* Text */}
+                                {/* Text Content */}
                                 <View style={styles.cardText}>
                                     <View style={styles.cardTitleRow}>
                                         <Text style={styles.cardTitle}>Traffic Officer</Text>
-                                        <View style={[styles.roleBadge, { backgroundColor: C.amberSurface }]}>
+                                        <View style={[styles.roleBadge, { backgroundColor: C.amberSurface, borderColor: C.amber + '40' }]}>
                                             <Text style={[styles.roleBadgeText, { color: C.amberDark }]}>AUTHORITY</Text>
                                         </View>
                                     </View>
@@ -171,7 +171,7 @@ export default function RoleSelection({ navigation }) {
                                     </View>
                                 </View>
                                 {/* Arrow */}
-                                <Ionicons name="chevron-forward" size={20} color={C.textTertiary} />
+                                <Ionicons name="chevron-forward" size={20} color={C.textTertiary} style={{ marginTop: 4 }} />
                             </View>
                         </TouchableOpacity>
                     </Animated.View>
@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255,255,255,0.15)',
     },
     headerTitle: {
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         fontSize: 24,
         color: C.white,
         letterSpacing: -0.5,
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     headerSubtitle: {
-        fontFamily: 'DMSans-Regular',
+        fontFamily: 'Nunito-Regular',
         fontSize: 14,
         color: 'rgba(255,255,255,0.65)',
         textAlign: 'center',
@@ -236,38 +236,46 @@ const styles = StyleSheet.create({
 
     // ── Cards Section ──
     cardsSection: {
-        paddingHorizontal: 20,
-        paddingTop: 24,
-        gap: 16,
+        paddingHorizontal: 22,
+        paddingTop: 32,
+        gap: 20,
     },
     card: {
         backgroundColor: C.surface,
-        borderRadius: 20,
+        borderRadius: 24,
         flexDirection: 'row',
         overflow: 'hidden',
         shadowColor: '#1B3A6B',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 16,
-        elevation: 3,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+        elevation: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.03)',
     },
     cardAccentBar: {
-        width: 5,
+        width: 6,
     },
     cardContent: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'flex-start',
-        padding: 20,
-        gap: 14,
+        padding: 24,
+        gap: 16,
     },
-    iconCircle: {
-        width: 52,
-        height: 52,
-        borderRadius: 16,
+    iconFrame: {
+        width: 60,
+        height: 60,
+        borderRadius: 30, // Circle Frame for roles
         justifyContent: 'center',
         alignItems: 'center',
         flexShrink: 0,
+        backgroundColor: '#FFFFFF',
+        shadowColor: '#1B3A6B',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        elevation: 2,
     },
     cardText: {
         flex: 1,
@@ -275,49 +283,50 @@ const styles = StyleSheet.create({
     cardTitleRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
-        marginBottom: 6,
+        gap: 12,
+        marginBottom: 8,
         flexWrap: 'wrap',
     },
     cardTitle: {
-        fontFamily: 'DMSans-Bold',
-        fontSize: 18,
+        fontFamily: 'Nunito-Bold',
+        fontSize: 19,
         color: C.textPrimary,
         letterSpacing: -0.3,
     },
     roleBadge: {
-        paddingHorizontal: 8,
-        paddingVertical: 3,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
         borderRadius: 20,
+        borderWidth: 1,
     },
     roleBadgeText: {
-        fontFamily: 'DMSans-Bold',
-        fontSize: 9,
+        fontFamily: 'Nunito-ExtraBold',
+        fontSize: 10,
         letterSpacing: 1.2,
     },
     cardDescription: {
-        fontFamily: 'DMSans-Regular',
-        fontSize: 13,
+        fontFamily: 'Nunito-Regular',
+        fontSize: 14,
         color: C.textSecondary,
-        lineHeight: 19,
-        marginBottom: 14,
+        lineHeight: 21,
+        marginBottom: 16,
     },
     featureList: {
-        gap: 7,
+        gap: 8,
     },
     featureItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: 10,
     },
     featureDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
+        width: 7,
+        height: 7,
+        borderRadius: 3.5,
     },
     featureText: {
-        fontFamily: 'DMSans-Medium',
-        fontSize: 12,
+        fontFamily: 'Nunito-SemiBold',
+        fontSize: 13,
         color: C.textPrimary,
     },
 
@@ -326,12 +335,13 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 6,
-        marginTop: 8,
+        gap: 8,
+        marginTop: 12,
+        paddingBottom: 20,
     },
     footerNoteText: {
-        fontFamily: 'DMSans-Regular',
-        fontSize: 11,
+        fontFamily: 'Nunito-Regular',
+        fontSize: 12,
         color: C.textTertiary,
         textAlign: 'center',
     },

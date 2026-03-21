@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 20,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.white,
         letterSpacing: -0.3,
     },
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
     readOnlyContainer: { marginBottom: 12 },
     readOnlyLabel: {
         fontSize: 12,
-        fontFamily: 'DMSans-SemiBold',
+        fontFamily: 'Nunito-SemiBold',
         color: C.navyMid,
         marginBottom: 8,
     },
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
         flex: 1,
         color: C.textSecondary,
         fontSize: 15,
-        fontFamily: 'DMSans-Medium',
+        fontFamily: 'Nunito-Medium',
     },
     lockIcon: { marginLeft: 'auto' },
     readOnlyHelp: {
@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
     },
     saveText: {
         fontSize: 16,
-        fontFamily: 'DMSans-Bold',
+        fontFamily: 'Nunito-Bold',
         color: C.white,
     },
 });
