@@ -6,7 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MobileContainer } from '../../components';
-import { useAppContext } from '../../context';
+import { useAppContext, useAuth } from '../../context';
 import { ROLES } from '../../utils';
 
 const { width } = Dimensions.get('window');
@@ -30,8 +30,9 @@ const C = {
     amberSurface: '#FEF3C7',
 };
 
-export default function RoleSelection({ navigation }) {
+export default function RoleSelection({ navigation, onConfirm }) {
     const { setUserRole } = useAppContext();
+    const { isAuthenticated, profile, signOut } = useAuth();
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const headerSlide = useRef(new Animated.Value(-30)).current;
@@ -51,12 +52,29 @@ export default function RoleSelection({ navigation }) {
         ]).start();
     }, []);
 
-    const handleRoleSelect = (role) => {
+    const handleRoleSelect = async (role) => {
         setUserRole(role);
-        if (role === ROLES.CITIZEN) {
-            navigation.navigate('CitizenSignIn');
-        } else {
-            navigation.navigate('OfficerSignIn');
+        
+        // Security logic: If already authenticated but choosing a different role, sign out
+        if (isAuthenticated && profile && profile.role !== role) {
+            console.log("Role mismatch in session, signing out for security.");
+            await signOut();
+            // After sign out, we stay in RoleSelection (via AppNavigator)
+            // But we can proceed to sign in as the new role
+        }
+
+        // Call onConfirm to let AppNavigator know the user has interacted with selection
+        if (onConfirm) onConfirm();
+
+        // If the user was already authenticated with the SAME role, AppNavigator will
+        // automatically switch to the Citizen/Officer stack now that onConfirm() fired.
+        // We only forcefully navigate to SignIn screens if they actually need to sign in.
+        if (!isAuthenticated || (profile && profile.role !== role)) {
+            if (role === ROLES.CITIZEN) {
+                navigation.navigate('CitizenSignIn');
+            } else {
+                navigation.navigate('OfficerSignIn');
+            }
         }
     };
 

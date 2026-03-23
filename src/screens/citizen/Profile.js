@@ -142,7 +142,7 @@ export default function Profile({ navigation }) {
                     <View style={styles.menuArea}>
                         {/* Referral Code with Premium Framing */}
                         {profile?.referral_code && (
-                            <TouchableOpacity style={styles.referralCard} activeOpacity={0.9}>
+                            <TouchableOpacity style={styles.referralCard} activeOpacity={0.9} onPress={() => navigation.navigate('ReferralProgram')}>
                                 <LinearGradient colors={['#FEF3C7', '#FFFBEB']} style={styles.referralGradient}>
                                     <View style={styles.referralHeader}>
                                         <View style={styles.giftIconFrame}>

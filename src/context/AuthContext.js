@@ -11,7 +11,14 @@ export function AuthProvider({ children }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        checkSession();
+        // Enterprise Security Requirement: Clear any cached session on app launch
+        // to strictly enforce the "Sign In -> User Dashboard" flow every time.
+        const enforceStrictAuth = async () => {
+            await supabase.auth.signOut();
+            setLoading(false);
+        };
+        
+        enforceStrictAuth();
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {

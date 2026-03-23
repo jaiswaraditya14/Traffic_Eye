@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Modal, Alert, TextInput, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Modal, Alert, TextInput, StatusBar, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppContext } from '../../context/AppContext';
 import { LinearGradient } from 'expo-linear-gradient';
+import { supabase } from '../../services';
+import * as FileSystem from 'expo-file-system/legacy';
+const { EncodingType } = FileSystem;
+import { decode } from 'base64-arraybuffer';
 
 const C = {
     navy: '#002452',
@@ -27,13 +31,15 @@ export default function AIResultsVerification({ navigation, route }) {
 
     const [vehicleNumber, setVehicleNumber] = useState(aiResults?.vehicleNumber || '');
     const [violationType, setViolationType] = useState(aiResults?.violationType || '');
+    const [address, setAddress] = useState(currentReport?.address || '');
     const [confidence] = useState(aiResults?.confidence?.toString() || '0');
     const [imageModalVisible, setImageModalVisible] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
 
     const severity = aiResults?.severity || 'Unknown';
     const violationDetected = aiResults?.violationDetected !== false;
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (!vehicleNumber.trim()) {
             Alert.alert('Error', 'Please enter a vehicle number');
             return;
@@ -43,15 +49,88 @@ export default function AIResultsVerification({ navigation, route }) {
             return;
         }
 
-        navigation.navigate('ReportSuccess', {
-            verifiedData: {
-                vehicleNumber,
-                violationType,
-                severity,
-                confidence: `${confidence}%`,
-                ...currentReport
+        setSubmitting(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('User not authenticated');
+
+            // 1. Upload image to Storage
+            let publicUrl = null;
+            let storagePath = null;
+
+            if (currentReport?.image) {
+                const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+                storagePath = `${user.id}/${fileName}`;
+
+                // Convert URI to Base64 and then to ArrayBuffer
+                const base64 = await FileSystem.readAsStringAsync(currentReport.image, {
+                    encoding: EncodingType?.Base64 || 'base64',
+                });
+
+                const { error: uploadError } = await supabase.storage
+                    .from('verification-images')
+                    .upload(storagePath, decode(base64), {
+                        contentType: 'image/jpeg',
+                        upsert: true
+                    });
+
+                if (uploadError) throw uploadError;
+
+                const { data: { publicUrl: url } } = supabase.storage
+                    .from('verification-images')
+                    .getPublicUrl(storagePath);
+                
+                publicUrl = url;
             }
-        });
+
+            // 2. Insert into verification_reports
+            const { data: report, error: reportError } = await supabase
+                .from('verification_reports')
+                .insert({
+                    user_id: user.id,
+                    status: 'pending',
+                    ai_result: aiResults,
+                    ai_verdict: violationType,
+                    ai_confidence_score: parseFloat(confidence) / 100,
+                })
+                .select()
+                .single();
+
+            if (reportError) throw reportError;
+
+            // 3. Insert into verification_images
+            if (storagePath) {
+                const { error: imgError } = await supabase
+                    .from('verification_images')
+                    .insert({
+                        report_id: report.id,
+                        user_id: user.id,
+                        storage_path: storagePath,
+                        public_url: publicUrl,
+                        file_name: storagePath.split('/').pop(),
+                        mime_type: 'image/jpeg',
+                    });
+
+                if (imgError) throw imgError;
+            }
+
+            navigation.navigate('ReportSuccess', {
+                verifiedData: {
+                    vehicleNumber,
+                    violationType,
+                    severity,
+                    confidence: `${confidence}%`,
+                    ...currentReport,
+                    address, // Use edited address
+                    reportId: report.id
+                }
+            });
+        } catch (error) {
+            console.error('Error saving report:', error);
+            Alert.alert('Submission Failed', error.message || 'Could not save report. Please try again.');
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     return (
@@ -134,14 +213,38 @@ export default function AIResultsVerification({ navigation, route }) {
                         </View>
                     </View>
 
+                    <View style={styles.inputBox}>
+                        <Text style={styles.inputLabel}>Incident Location Address</Text>
+                        <TextInput
+                            style={[styles.textInput, styles.addressInput]}
+                            placeholder="Location details..."
+                            value={address}
+                            onChangeText={setAddress}
+                            multiline
+                            numberOfLines={4}
+                            placeholderTextColor={C.textTertiary}
+                        />
+                    </View>
+
                 </ScrollView>
 
                 {/* Footer Action */}
                 <View style={styles.footer}>
-                    <TouchableOpacity style={styles.primaryBtn} onPress={handleSubmit} activeOpacity={0.88}>
+                    <TouchableOpacity 
+                        style={[styles.primaryBtn, (submitting || !violationDetected) && { opacity: 0.7 }]} 
+                        onPress={handleSubmit} 
+                        disabled={submitting}
+                        activeOpacity={0.88}
+                    >
                         <LinearGradient colors={[C.navy, C.navyMid]} style={styles.primaryBtnGradient} start={{x:0,y:0}} end={{x:1,y:0}}>
-                            <Text style={styles.primaryBtnText}>Confirm & Submit</Text>
-                            <Ionicons name="checkmark-circle" size={18} color={C.white} />
+                            {submitting ? (
+                                <ActivityIndicator color={C.white} size="small" />
+                            ) : (
+                                <>
+                                    <Text style={styles.primaryBtnText}>Confirm & Submit</Text>
+                                    <Ionicons name="checkmark-circle" size={18} color={C.white} />
+                                </>
+                            )}
                         </LinearGradient>
                     </TouchableOpacity>
                 </View>
@@ -260,6 +363,11 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 2 }, 
         shadowOpacity: 0.02, 
         shadowRadius: 6, 
+    },
+    addressInput: {
+        minHeight: 120,
+        textAlignVertical: 'top',
+        paddingTop: 14,
     },
     chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 14 },
     chip: { 

@@ -248,8 +248,8 @@ export default function ImageCropModal({ visible, imageUri, onCropDone, onCancel
                                 <ActivityIndicator size="small" color={COLORS.white} />
                             ) : (
                                 <>
-                                    <Ionicons name="crop" size={18} color={COLORS.white} />
-                                    <Text style={styles.confirmText}>Crop & Use</Text>
+                                    <Ionicons name="checkmark-done-circle" size={18} color={COLORS.white} />
+                                    <Text style={styles.confirmText}>Done</Text>
                                 </>
                             )}
                         </LinearGradient>

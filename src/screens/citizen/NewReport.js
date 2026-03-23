@@ -305,7 +305,7 @@ export default function NewReport({ navigation }) {
                             value={address}
                             onChangeText={setAddress}
                             multiline
-                            numberOfLines={2}
+                            numberOfLines={4}
                         />
                         <View style={styles.addressBtns}>
                             <TouchableOpacity style={styles.addrBtn} onPress={() => setIsMapVisible(true)}>
@@ -491,21 +491,22 @@ const styles = StyleSheet.create({
     fieldLabel: { fontSize: 13, fontFamily: 'Nunito-Bold', color: C.navy, marginBottom: 10, marginTop: 12 },
     addressBox: { 
         flexDirection: 'row', 
-        backgroundColor: C.surface, 
-        borderRadius: 16, 
-        paddingLeft: 16, 
-        paddingRight: 8, 
-        paddingVertical: 8, 
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(0,0,0,0.08)',
+        backgroundColor: '#F1F5F9', // Subtle distinct color 
+        borderRadius: 20, 
+        paddingLeft: 18, 
+        paddingRight: 10, 
+        paddingVertical: 14, 
+        minHeight: 150, // Massive box
+        alignItems: 'flex-start',
+        borderWidth: 1.5,
+        borderColor: '#E2E8F0',
         shadowColor: '#1B3A6B',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
-        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 10,
     },
-    addressInput: { flex: 1, fontSize: 14, color: C.textPrimary, paddingRight: 10, fontFamily: 'Nunito-Medium' },
-    addressBtns: { flexDirection: 'row', gap: 8 },
+    addressInput: { flex: 1, fontSize: 14, color: C.textPrimary, paddingRight: 10, fontFamily: 'Nunito-Medium', textAlignVertical: 'top', height: '100%', paddingTop: 4 },
+    addressBtns: { flexDirection: 'row', gap: 8, alignSelf: 'flex-end', paddingTop: 20 },
     addrBtn: { width: 42, height: 42, borderRadius: 12, backgroundColor: C.navyMid, justifyContent: 'center', alignItems: 'center' },
 
     descBox: { 

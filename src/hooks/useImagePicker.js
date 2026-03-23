@@ -21,7 +21,7 @@ export default function useImagePicker() {
 
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: false,
+                allowsEditing: true,
                 quality: 0.8,
                 exif: true,
             });
@@ -52,7 +52,7 @@ export default function useImagePicker() {
             }
 
             const result = await ImagePicker.launchCameraAsync({
-                allowsEditing: false,
+                allowsEditing: true,
                 quality: 0.8,
                 exif: true,
             });

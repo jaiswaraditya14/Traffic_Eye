@@ -26,16 +26,36 @@ const C = {
 };
 
 export default function ReportDetail({ navigation, route }) {
-    // Usually we would fetch report via route.params.reportId
+    const report = route.params?.report || {};
     const isOfficerMode = route.params?.isOfficerMode;
 
     const getStatusConfig = (status) => ({
-        verified: { icon: 'checkmark-circle', color: C.success, bg: C.successSurface, label: 'Verified' },
+        completed: { icon: 'checkmark-circle', color: C.success, bg: C.successSurface, label: 'Verified' },
         pending: { icon: 'time', color: C.warning, bg: C.warningSurface, label: 'Pending Review' },
-        rejected: { icon: 'close-circle', color: C.error, bg: C.errorSurface, label: 'Rejected' },
+        processing: { icon: 'sync', color: '#3B82F6', bg: '#EFF6FF', label: 'Processing' },
+        failed: { icon: 'close-circle', color: C.error, bg: C.errorSurface, label: 'Rejected' },
     }[status] || { icon: 'information-circle', color: C.navyMid, bg: '#F2F4F6', label: 'Unknown' });
 
-    const statusConfig = getStatusConfig('verified');
+    const statusConfig = getStatusConfig(report.status || 'pending');
+
+    // Dynamic data
+    const violationType = report.ai_verdict || 'Unknown';
+    const confidence = report.ai_confidence_score ? `${Math.round(report.ai_confidence_score * 100)}% Confidence` : 'AI Analyzed';
+    const submittedAt = report.submitted_at 
+        ? new Date(report.submitted_at).toLocaleString('en-IN', {
+            day: '2-digit', month: 'short', year: 'numeric',
+            hour: '2-digit', minute: '2-digit',
+          })
+        : 'Just now';
+    
+    let locationStr = 'Unknown Location';
+    if (report.ai_result?.location) locationStr = report.ai_result.location;
+    if (report.location_lat && report.location_lng) {
+        locationStr = `${report.location_lat.toFixed(4)}, ${report.location_lng.toFixed(4)}`;
+    }
+
+    const hasImage = report.images && report.images.length > 0 && report.images[0].public_url;
+    const imageUrl = hasImage ? { uri: report.images[0].public_url } : require('../../../assets/images/traffic_violation.jpg');
 
     return (
         <View style={styles.container}>
@@ -56,19 +76,19 @@ export default function ReportDetail({ navigation, route }) {
                     {/* ── Evidence Image ── */}
                     <View style={styles.imageContainer}>
                         <Image
-                            source={require('../../../assets/images/traffic_violation.jpg')}
+                            source={imageUrl}
                             style={styles.evidenceImage}
                             resizeMode="cover"
                         />
                         <LinearGradient
-                            colors={['transparent', 'rgba(0,0,0,0.7)']}
+                            colors={['transparent', 'rgba(0,0,0,0.85)']}
                             style={styles.imageOverlay}
                         >
                             <View style={styles.imageTag}>
                                 <Ionicons name="camera" size={12} color={C.navy} />
-                                <Text style={styles.imageTagText}>AI Verified Evidence</Text>
+                                <Text style={styles.imageTagText}>{confidence}</Text>
                             </View>
-                            <Text style={styles.imageDate}>Jan 20, 2024 at 14:30 PM</Text>
+                            <Text style={styles.imageDate}>{submittedAt}</Text>
                         </LinearGradient>
                     </View>
 
@@ -92,26 +112,38 @@ export default function ReportDetail({ navigation, route }) {
 
                         <View style={styles.detailRow}>
                             <Text style={styles.detailLabel}>Violation Type</Text>
-                            <Text style={styles.detailValue}>Speeding</Text>
+                            <Text style={styles.detailValue}>{violationType}</Text>
                         </View>
                         <View style={styles.detailRow}>
                             <Text style={styles.detailLabel}>Location</Text>
-                            <Text style={styles.detailValue}>Main St & 5th Ave</Text>
+                            <Text style={styles.detailValue}>{locationStr}</Text>
                         </View>
                         <View style={styles.detailRow}>
                             <Text style={styles.detailLabel}>Vehicle Reg.</Text>
-                            <Text style={styles.vehiclePlate}>MH12AB1234</Text>
+                            <Text style={styles.vehiclePlate}>{report.ai_result?.vehicle_number || report.ai_result?.vehicleNumber || 'N/A'}</Text>
                         </View>
                         {!isOfficerMode && (
                             <View style={[styles.detailRow, { borderBottomWidth: 0 }]}>
                                 <Text style={styles.detailLabel}>Points Earned</Text>
                                 <View style={styles.pointsBadge}>
                                     <Ionicons name="trophy" size={12} color={C.amberDark} />
-                                    <Text style={styles.pointsValue}>+10 pts</Text>
+                                    <Text style={styles.pointsValue}>{report.status === 'completed' ? '+50 pts' : 'Pending'}</Text>
                                 </View>
                             </View>
                         )}
                     </View>
+                    
+                    {report.ai_result && report.status === 'completed' && (
+                        <View style={[styles.detailCard, { marginTop: 16 }]}>
+                            <View style={styles.detailCardHeader}>
+                                <Ionicons name="analytics" size={18} color={C.navyMid} />
+                                <Text style={styles.detailCardTitle}>AI Confidence Analysis</Text>
+                            </View>
+                            <Text style={{ fontSize: 13, color: C.textSecondary, fontFamily: 'Nunito-Medium', lineHeight: 22 }}>
+                                {typeof report.ai_result === 'string' ? report.ai_result : JSON.stringify(report.ai_result, null, 2)}
+                            </Text>
+                        </View>
+                    )}
 
                     <View style={{ height: 40 }} />
                 </ScrollView>

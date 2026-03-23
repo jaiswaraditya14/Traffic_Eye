@@ -71,7 +71,11 @@ export default function CitizenSignIn({ navigation }) {
     const handleGoogleSignIn = async () => {
         setGoogleLoading(true);
         try {
-            const redirectUri = AuthSession.makeRedirectUri({ scheme: 'trafficeye', path: 'auth/callback' });
+            const redirectUri = AuthSession.makeRedirectUri({ useProxy: true });
+            console.log('\n\n======================================================');
+            console.log('🚀 EXACT REDIRECT URL TO PASTE INTO SUPABASE DASHBOARD:');
+            console.log(redirectUri);
+            console.log('======================================================\n\n');
             const { data, error } = await signInWithGoogle(redirectUri);
             if (error) { Alert.alert('Configuration Error', error.message); throw error; }
 

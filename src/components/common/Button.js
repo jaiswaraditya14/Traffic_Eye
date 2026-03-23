@@ -129,9 +129,7 @@ const styles = StyleSheet.create({
     soft: {
         backgroundColor: COLORS.primarySurface,
     },
-    soft: {
-        backgroundColor: COLORS.primarySurface,
-    },
+
 
     // ── Sizes ──
     size_sm: {

@@ -18,7 +18,9 @@ import {
     CitizenSignUp,
     SignUpSuccess,
     OfficerSignIn,
-    ForgotPassword
+    ForgotPassword,
+    OtpVerification,
+    NewPassword,
 } from '../screens';
 
 const Stack = createNativeStackNavigator();
@@ -30,6 +32,7 @@ const linking = {
     config: {
         screens: {
             SignUpSuccess: 'signup-success',
+            OtpVerification: 'auth/callback',
         }
     }
 };
@@ -42,7 +45,14 @@ const ProfileLoadingScreen = () => (
 
 export default function AppNavigator() {
     const { hasSeenOnboarding, showSplash } = useAppContext();
-    const { isAuthenticated, loading, profile } = useAuth();
+    const { isAuthenticated, loading, profile, signOut } = useAuth();
+    const [hasConfirmedRole, setHasConfirmedRole] = React.useState(false);
+
+    // We enforce a strict funnel on every launch. User must flow through:
+    // Splash -> Onboarding -> Role Selection -> Login OR User Dashboard.
+    // hasSeenOnboarding is always false on app start now (AppContext modification).
+    // hasConfirmedRole is always false until they click a role on the RoleSelection screen.
+    // If they click the correct role, and have an active session, they see the Dashboard.
 
     return (
         <NavigationContainer linking={linking}>
@@ -53,32 +63,33 @@ export default function AppNavigator() {
                     animationDuration: 250,
                 }}
             >
-                {/* 1. Initial App Splash */}
+                {/* 1. Initial App Splash (Mandatory) */}
                 {showSplash ? (
                     <Stack.Screen name="Splash" component={SplashScreen} />
                 ) : loading ? (
                     /* 2. Authentication Loading State */
                     <Stack.Screen name="AuthLoading" component={SplashScreen} />
                 ) : !hasSeenOnboarding ? (
-                    /* 3. Onboarding Flow */
+                    /* 3. Onboarding Flow (Must see first time) */
                     <Stack.Screen 
                         name="Onboarding" 
                         component={OnboardingCarousel}
                         options={{ animation: 'fade' }}
                     />
-                ) : !isAuthenticated ? (
-                    /* 4. Auth Stack */
+                ) : (!isAuthenticated || !hasConfirmedRole) ? (
+                    /* 4. Auth Stack Gate (Must pass Role Selection) */
                     <>
                         <Stack.Screen
                             name="RoleSelection"
-                            component={RoleSelection}
-                            options={{ animation: 'fade' }}
-                        />
+                        >
+                            {(props) => <RoleSelection {...props} onConfirm={() => setHasConfirmedRole(true)} />}
+                        </Stack.Screen>
                         <Stack.Screen name="CitizenSignIn" component={CitizenSignIn} />
                         <Stack.Screen name="CitizenSignUp" component={CitizenSignUp} />
                         <Stack.Screen name="SignUpSuccess" component={SignUpSuccess} />
                         <Stack.Screen name="OfficerSignIn" component={OfficerSignIn} />
                         <Stack.Screen name="ForgotPassword" component={ForgotPassword} />
+                        <Stack.Screen name="OtpVerification" component={OtpVerification} />
                     </>
                 ) : !profile ? (
                     /* 5. Profile Loading State */
@@ -98,6 +109,9 @@ export default function AppNavigator() {
                         options={{ animation: 'fade' }}
                     />
                 )}
+
+                {/* ── New Password Screen (Accessible during auth / deep linking) ── */}
+                <Stack.Screen name="NewPassword" component={NewPassword} />
             </Stack.Navigator>
         </NavigationContainer>
     );

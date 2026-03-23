@@ -26,7 +26,9 @@ import {
     SafetyTips,
     FineCalculator,
     SpeedLimits,
-    EmergencyContacts
+    EmergencyContacts,
+    VerificationReports,
+    ReferralProgram,
 } from '../screens';
 
 const Tab = createBottomTabNavigator();
@@ -61,7 +63,7 @@ function CitizenTabNavigator() {
             })}
         >
             <Tab.Screen name="Home" component={CitizenHome} />
-            <Tab.Screen name="Reports" component={MyReports} />
+            <Tab.Screen name="Reports" component={VerificationReports} />
             <Tab.Screen name="Rewards" component={Rewards} />
             <Tab.Screen name="ProfileTab" component={Profile} options={{ title: 'Profile' }} />
         </Tab.Navigator>
@@ -93,6 +95,8 @@ export default function CitizenNavigator() {
             <Stack.Screen name="FineCalculator" component={FineCalculator} />
             <Stack.Screen name="SpeedLimits" component={SpeedLimits} />
             <Stack.Screen name="EmergencyContacts" component={EmergencyContacts} />
+            <Stack.Screen name="VerificationReports" component={VerificationReports} />
+            <Stack.Screen name="ReferralProgram" component={ReferralProgram} />
         </Stack.Navigator>
     );
 }
