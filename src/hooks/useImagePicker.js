@@ -5,6 +5,8 @@ import { useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
 
+const VIDEO_SIZE_LIMIT_BYTES = 5 * 1024 * 1024; // 5 MB
+
 export default function useImagePicker() {
     const [image, setImage] = useState(null);
     const [exifData, setExifData] = useState(null);
@@ -86,11 +88,19 @@ export default function useImagePicker() {
                 mediaTypes: ImagePicker.MediaTypeOptions.Videos,
                 allowsEditing: false,
                 quality: 0.8,
+                exif: true,
             });
 
             if (!result.canceled && result.assets?.length > 0) {
-                const uri = result.assets[0].uri;
-                return uri;
+                const asset = result.assets[0];
+                if (asset.fileSize && asset.fileSize > VIDEO_SIZE_LIMIT_BYTES) {
+                    Alert.alert(
+                        'Video Too Large',
+                        `Please select a video under 5 MB. This video is ${(asset.fileSize / (1024 * 1024)).toFixed(1)} MB.`
+                    );
+                    return null;
+                }
+                return { uri: asset.uri, exif: asset.exif || null };
             }
             return null;
         } catch (error) {
@@ -115,11 +125,19 @@ export default function useImagePicker() {
                 mediaTypes: ImagePicker.MediaTypeOptions.Videos,
                 allowsEditing: false,
                 quality: 0.8,
+                exif: true,
             });
 
             if (!result.canceled && result.assets?.length > 0) {
-                const uri = result.assets[0].uri;
-                return uri;
+                const asset = result.assets[0];
+                if (asset.fileSize && asset.fileSize > VIDEO_SIZE_LIMIT_BYTES) {
+                    Alert.alert(
+                        'Video Too Large',
+                        `The recorded video exceeds 5 MB (${(asset.fileSize / (1024 * 1024)).toFixed(1)} MB). Please record a shorter clip.`
+                    );
+                    return null;
+                }
+                return { uri: asset.uri, exif: asset.exif || null };
             }
             return null;
         } catch (error) {

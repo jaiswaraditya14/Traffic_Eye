@@ -63,6 +63,7 @@ export default function NewReport({ navigation }) {
     const [showCropModal, setShowCropModal] = useState(false);
     const [pendingCropUri, setPendingCropUri] = useState(null);
     const [pendingExif, setPendingExif] = useState(null);
+    const [pendingMediaSource, setPendingMediaSource] = useState(null);
 
     const [autoFillStatus, setAutoFillStatus] = useState(null);
     const bannerAnim = useRef(new Animated.Value(0)).current;
@@ -101,26 +102,24 @@ export default function NewReport({ navigation }) {
 
     useEffect(() => { return () => { if (bannerTimer.current) clearTimeout(bannerTimer.current); }; }, []);
 
-    const extractAddressFromExif = useCallback(async (exif) => {
-        const lat = exif?.GPSLatitude;
-        const lng = exif?.GPSLongitude;
-
-        if (lat && lng && lat !== 0 && lng !== 0) {
-            showBanner('extracting');
-            const result = await reverseGeocodeFromCoords(lat, lng);
-            if (result) {
-                showBanner('success'); hideBanner(4000);
-            } else {
-                showBanner('fallback-gps');
-                const gpsResult = await detectLocation();
-                if (gpsResult) { showBanner('success'); hideBanner(4000); }
-                else { showBanner('no-gps'); hideBanner(3000); }
-            }
-        } else {
+    const handleLocationExtraction = useCallback(async (exif, source) => {
+        if (source === 'camera') {
             showBanner('fallback-gps');
             const gpsResult = await detectLocation();
             if (gpsResult) { showBanner('success'); hideBanner(4000); }
             else { showBanner('no-gps'); hideBanner(3000); }
+        } else {
+            const lat = exif?.GPSLatitude;
+            const lng = exif?.GPSLongitude;
+            if (lat && lng && lat !== 0 && lng !== 0) {
+                showBanner('extracting');
+                const result = await reverseGeocodeFromCoords(lat, lng);
+                if (result) { showBanner('success'); hideBanner(4000); }
+                else { showBanner('no-gps'); hideBanner(3000); }
+            } else {
+                // For gallery images with no location, do not auto-detect. User can choose manually.
+                setAutoFillStatus(null);
+            }
         }
     }, [reverseGeocodeFromCoords, detectLocation, showBanner, hideBanner]);
 
@@ -129,6 +128,7 @@ export default function NewReport({ navigation }) {
         if (result) {
             setVideo(null); setMediaType('image');
             setPendingCropUri(result.uri); setPendingExif(result.exif || null);
+            setPendingMediaSource('camera');
             setShowCropModal(true);
         }
     };
@@ -138,36 +138,38 @@ export default function NewReport({ navigation }) {
         if (result) {
             setVideo(null); setMediaType('image');
             setPendingCropUri(result.uri); setPendingExif(result.exif || null);
+            setPendingMediaSource('gallery');
             setShowCropModal(true);
         }
     };
 
     const handleCropDone = async (croppedUri) => {
         setShowCropModal(false); setImage(croppedUri); setPendingCropUri(null);
-        await extractAddressFromExif(pendingExif); setPendingExif(null);
+        await handleLocationExtraction(pendingExif, pendingMediaSource);
+        setPendingExif(null); setPendingMediaSource(null);
     };
 
     const handleCropCancel = async () => {
         setShowCropModal(false);
         if (pendingCropUri) setImage(pendingCropUri);
         setPendingCropUri(null);
-        await extractAddressFromExif(pendingExif); setPendingExif(null);
+        await handleLocationExtraction(pendingExif, pendingMediaSource);
+        setPendingExif(null); setPendingMediaSource(null);
     };
 
     const handleRecordVideo = async () => {
-        const uri = await captureVideoFromCamera();
-        if (uri) {
-            setImage(null); setVideo(uri); setMediaType('video');
-            setTrustLevel('Verified Location'); detectLocation();
+        const result = await captureVideoFromCamera();
+        if (result?.uri) {
+            setImage(null); setVideo(result.uri); setMediaType('video');
+            await handleLocationExtraction(result.exif, 'camera');
         }
     };
 
     const handlePickVideo = async () => {
-        const uri = await pickVideoFromGallery();
-        if (uri) {
-            setImage(null); setVideo(uri); setMediaType('video');
-            setTrustLevel('Needs Verification / Manual Location');
-            Alert.alert('Notice', 'Please use the GPS button or enter the location manually.');
+        const result = await pickVideoFromGallery();
+        if (result?.uri) {
+            setImage(null); setVideo(result.uri); setMediaType('video');
+            await handleLocationExtraction(result.exif, 'gallery');
         }
     };
 
@@ -308,11 +310,13 @@ export default function NewReport({ navigation }) {
                             numberOfLines={4}
                         />
                         <View style={styles.addressBtns}>
-                            <TouchableOpacity style={styles.addrBtn} onPress={() => setIsMapVisible(true)}>
-                                <Ionicons name="map" size={18} color={C.white} />
+                            <TouchableOpacity style={styles.addrBtnWithText} onPress={() => setIsMapVisible(true)}>
+                                <Ionicons name="map" size={16} color={C.white} />
+                                <Text style={styles.addrBtnText}>Map</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={[styles.addrBtn, { backgroundColor: C.amber }]} onPress={handleDetectLocation}>
-                                {loadingLocation ? <ActivityIndicator size="small" color={C.navy} /> : <Ionicons name="location" size={18} color={C.navy} />}
+                            <TouchableOpacity style={[styles.addrBtnWithText, { backgroundColor: C.amber }]} onPress={handleDetectLocation}>
+                                {loadingLocation ? <ActivityIndicator size="small" color={C.navy} /> : <Ionicons name="location" size={16} color={C.navy} />}
+                                <Text style={[styles.addrBtnText, { color: C.navy }]}>Detect</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -507,7 +511,8 @@ const styles = StyleSheet.create({
     },
     addressInput: { flex: 1, fontSize: 14, color: C.textPrimary, paddingRight: 10, fontFamily: 'Nunito-Medium', textAlignVertical: 'top', height: '100%', paddingTop: 4 },
     addressBtns: { flexDirection: 'row', gap: 8, alignSelf: 'flex-end', paddingTop: 20 },
-    addrBtn: { width: 42, height: 42, borderRadius: 12, backgroundColor: C.navyMid, justifyContent: 'center', alignItems: 'center' },
+    addrBtnWithText: { flexDirection: 'row', gap: 6, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, backgroundColor: C.navyMid, justifyContent: 'center', alignItems: 'center' },
+    addrBtnText: { color: C.white, fontSize: 13, fontFamily: 'Nunito-Bold' },
 
     descBox: { 
         backgroundColor: C.surface, 
