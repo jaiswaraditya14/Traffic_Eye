@@ -131,6 +131,7 @@ export default function AIResultsVerification({ navigation, route }) {
                     <View style={styles.formSection}>
                         <Text style={styles.sectionTitle}>Detected Information</Text>
 
+<<<<<<< Updated upstream
                         {/* Vehicle Number Plate */}
                         <View style={styles.inputWrapper}>
                             <View style={styles.inputHeader}>
@@ -201,6 +202,23 @@ export default function AIResultsVerification({ navigation, route }) {
                                     ]}
                                 />
                             </View>
+=======
+                    <View style={styles.inputBox}>
+                        <Text style={styles.inputLabel}>Violation Type</Text>
+                        <TextInput
+                            style={styles.textInput}
+                            placeholder="e.g. Red Light Running"
+                            value={violationType}
+                            onChangeText={setViolationType}
+                            placeholderTextColor={C.textTertiary}
+                        />
+                        <View style={styles.chipsRow}>
+                            {['Over speeding', 'Jumping Red Signal', 'Riding without Helmet', 'Wrong Side driving'].map(type => (
+                                <TouchableOpacity key={type} style={styles.chip} onPress={() => setViolationType(type)}>
+                                    <Text style={styles.chipText}>{type}</Text>
+                                </TouchableOpacity>
+                            ))}
+>>>>>>> Stashed changes
                         </View>
                     </View>
                 </ScrollView>

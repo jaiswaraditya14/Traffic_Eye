@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MobileContainer } from '../../components';
 import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS } from '../../utils/theme';
 
+<<<<<<< Updated upstream
 export default function MyReports({ navigation }) {
     const reports = [
         { id: 1, type: 'Speeding', status: 'verified', location: 'Main St & 5th Ave', date: '2024-01-20', points: 10 },
@@ -13,6 +14,15 @@ export default function MyReports({ navigation }) {
         { id: 3, type: 'Parking', status: 'rejected', location: 'Park Ave', date: '2024-01-18', points: 0 },
     ];
 
+=======
+import { useAppContext } from '../../context';
+
+export default function MyReports({ navigation }) {
+    const { reports } = useAppContext();
+    const filters = ['All', 'Pending', 'Verified', 'Rejected'];
+    const [active, setActive] = React.useState('All');
+
+>>>>>>> Stashed changes
     const getStatusConfig = (status) => ({
         verified: { icon: 'checkmark-circle', color: COLORS.success, bg: COLORS.successSurface, label: 'Verified' },
         pending: { icon: 'time', color: COLORS.warning, bg: COLORS.warningSurface, label: 'Pending' },
@@ -28,10 +38,32 @@ export default function MyReports({ navigation }) {
                         <Text style={styles.headerBadgeText}>{reports.length}</Text>
                     </View>
                 </View>
+<<<<<<< Updated upstream
                 <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
                     {reports.map((report) => {
                         const config = getStatusConfig(report.status);
                         return (
+=======
+
+                {/* Report count */}
+                <Text style={styles.showingText}>Showing {filtered.length} reports</Text>
+
+                {/* Report list */}
+                {filtered.length === 0 ? (
+                    <View style={styles.emptyContainer}>
+                        <Ionicons name="document-text-outline" size={48} color={C.border} />
+                        <Text style={styles.emptyText}>No reports found</Text>
+                    </View>
+                ) : (
+                    <ScrollView
+                        style={styles.list}
+                        contentContainerStyle={styles.listContent}
+                        showsVerticalScrollIndicator={false}
+                    >
+                        {filtered.map((report) => {
+                            const config = getStatusConfig(report.status);
+                            return (
+>>>>>>> Stashed changes
                             <TouchableOpacity
                                 key={report.id}
                                 style={styles.reportCard}
@@ -77,6 +109,27 @@ export default function MyReports({ navigation }) {
                     })}
                     <View style={{ height: SPACING.xxl }} />
                 </ScrollView>
+<<<<<<< Updated upstream
+=======
+                )}
+
+                {/* FAB */}
+                <TouchableOpacity
+                    style={styles.fab}
+                    onPress={() =>
+                        navigation.getParent()?.navigate('NewReport') ??
+                        navigation.navigate('NewReport')
+                    }
+                    activeOpacity={0.85}
+                >
+                    <LinearGradient
+                        colors={[C.amberDark, C.amber]}
+                        style={styles.fabGradient}
+                    >
+                        <Ionicons name="add" size={28} color={C.navy} />
+                    </LinearGradient>
+                </TouchableOpacity>
+>>>>>>> Stashed changes
             </SafeAreaView>
         </MobileContainer>
     );
@@ -111,9 +164,68 @@ const styles = StyleSheet.create({
         fontWeight: FONT_WEIGHTS.bold,
         color: COLORS.primary,
     },
+<<<<<<< Updated upstream
     content: {
         flex: 1,
         paddingHorizontal: SPACING.xl,
+=======
+
+    // Filters
+    filterRow: {
+        paddingTop: 14,
+    },
+    filterScroll: {
+        paddingHorizontal: 20,
+        gap: 8,
+    },
+    filterChip: {
+        paddingHorizontal: 14,
+        paddingVertical: 7,
+        borderRadius: 20,
+        backgroundColor: C.surfaceLow,
+        borderWidth: 1.5,
+        borderColor: 'transparent',
+    },
+    filterChipActive: {
+        backgroundColor: C.primarySurface,
+        borderColor: C.navyMid,
+    },
+    filterChipText: {
+        fontSize: 13,
+        fontFamily: 'Nunito-Medium',
+        color: C.textTertiary,
+    },
+    filterChipTextActive: {
+        color: C.navyMid,
+        fontFamily: 'Nunito-Bold',
+    },
+    showingText: {
+        fontSize: 12,
+        color: C.textTertiary,
+        paddingHorizontal: 20,
+        paddingTop: 10,
+        paddingBottom: 6,
+        fontFamily: 'Nunito-Medium',
+    },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 40,
+    },
+    emptyText: {
+        marginTop: 12,
+        fontSize: 15,
+        fontFamily: 'Nunito-Medium',
+        color: C.textTertiary,
+    },
+
+    // Report list
+    list: { flex: 1 },
+    listContent: {
+        paddingHorizontal: 20,
+        paddingTop: 10,
+>>>>>>> Stashed changes
     },
     reportCard: {
         flexDirection: 'row',

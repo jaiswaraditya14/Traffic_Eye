@@ -6,12 +6,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MobileContainer } from '../../components';
 import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS } from '../../utils/theme';
 
+import { useAppContext } from '../../context';
+
 export default function PendingQueue({ navigation }) {
+<<<<<<< Updated upstream
     const pendingReports = [
         { id: 1, type: 'Speeding', location: 'Main St & 5th Ave', time: '2h ago', priority: 'high' },
         { id: 2, type: 'Red Light', location: 'Oak Rd & Elm St', time: '3h ago', priority: 'medium' },
         { id: 3, type: 'Parking', location: 'Park Ave', time: '5h ago', priority: 'low' },
     ];
+=======
+    const { reports } = useAppContext();
+    const pendingReports = reports?.filter(r => r.status === 'pending') || [];
+>>>>>>> Stashed changes
 
     const getPriorityConfig = (priority) => ({
         high: { color: COLORS.error, bg: COLORS.errorSurface, label: 'HIGH' },
@@ -27,11 +34,48 @@ export default function PendingQueue({ navigation }) {
                     <View style={styles.badge}>
                         <Text style={styles.badgeText}>{pendingReports.length}</Text>
                     </View>
+<<<<<<< Updated upstream
                 </View>
                 <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
                     {pendingReports.map((report) => {
                         const config = getPriorityConfig(report.priority);
                         return (
+=======
+
+                    {/* Priority summary */}
+                    <View style={styles.prioritySummary}>
+                        {[
+                            { label: 'Critical', count: pendingReports.filter(r => r.priority === 'critical').length, color: C.critical },
+                            { label: 'High', count: pendingReports.filter(r => r.priority === 'high').length, color: C.error },
+                            { label: 'Medium', count: pendingReports.filter(r => r.priority === 'medium').length, color: C.amber },
+                            { label: 'Low', count: pendingReports.filter(r => r.priority === 'low').length, color: 'rgba(255,255,255,0.4)' },
+                        ].map((p, idx) => (
+                            <View key={idx} style={styles.priorityStat}>
+                                <View style={[styles.priorityDot, { backgroundColor: p.color }]} />
+                                <Text style={styles.priorityStatCount}>{p.count}</Text>
+                                <Text style={styles.priorityStatLabel}>{p.label}</Text>
+                            </View>
+                        ))}
+                    </View>
+                </LinearGradient>
+
+                {/* Report list */}
+                {pendingReports.length === 0 ? (
+                    <View style={styles.emptyContainer}>
+                        <Ionicons name="checkmark-done-circle-outline" size={48} color={C.success} />
+                        <Text style={styles.emptyText}>All caught up!</Text>
+                        <Text style={styles.emptySubText}>No pending reports to review.</Text>
+                    </View>
+                ) : (
+                    <ScrollView
+                        style={styles.list}
+                        contentContainerStyle={styles.listContent}
+                        showsVerticalScrollIndicator={false}
+                    >
+                        {pendingReports.map((report) => {
+                            const config = getPriorityConfig(report.priority);
+                            return (
+>>>>>>> Stashed changes
                             <TouchableOpacity
                                 key={report.id}
                                 style={styles.card}
@@ -74,6 +118,7 @@ export default function PendingQueue({ navigation }) {
                     })}
                     <View style={{ height: SPACING.xxl }} />
                 </ScrollView>
+                )}
             </SafeAreaView>
         </MobileContainer>
     );
@@ -84,7 +129,51 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: COLORS.background,
     },
+<<<<<<< Updated upstream
     header: {
+=======
+    priorityDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    priorityStatCount: {
+        fontSize: 16,
+        fontFamily: 'Nunito-Bold',
+        color: C.white,
+    },
+    priorityStatLabel: {
+        fontSize: 9,
+        color: 'rgba(255,255,255,0.55)',
+        fontFamily: 'Nunito-SemiBold',
+    },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 60,
+    },
+    emptyText: {
+        marginTop: 12,
+        fontSize: 18,
+        fontFamily: 'Nunito-Bold',
+        color: C.navyMid,
+    },
+    emptySubText: {
+        marginTop: 4,
+        fontSize: 14,
+        fontFamily: 'Nunito-Medium',
+        color: C.textTertiary,
+    },
+
+    // List
+    list: { flex: 1 },
+    listContent: {
+        paddingHorizontal: 20,
+        paddingTop: 14,
+    },
+    reportCard: {
+>>>>>>> Stashed changes
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: SPACING.xl,

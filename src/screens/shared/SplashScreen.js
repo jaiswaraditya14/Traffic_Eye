@@ -68,10 +68,18 @@ export default function SplashScreen({ navigation }) {
             ])
         ).start();
 
+<<<<<<< Updated upstream
         const timer = setTimeout(() => {
             setShowSplash(false);
         }, 8000);
 
+=======
+        console.log('SplashScreen: Starting timer (2.2s)...');
+        const timer = setTimeout(() => {
+            console.log('SplashScreen: Timer fired, calling setShowSplash(false)');
+            setShowSplash(false);
+        }, 2200);
+>>>>>>> Stashed changes
         return () => clearTimeout(timer);
     }, []);
 

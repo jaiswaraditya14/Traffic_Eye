@@ -1,6 +1,8 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { View, ActivityIndicator } from 'react-native';
+import * as Linking from 'expo-linking';
 import { useAppContext, useAuth } from '../context';
 
 // Navigators
@@ -14,72 +16,104 @@ import {
     RoleSelection,
     CitizenSignIn,
     CitizenSignUp,
+    SignUpSuccess,
     OfficerSignIn,
-    ForgotPassword
+    ForgotPassword,
+    OtpVerification,
+    NewPassword,
 } from '../screens';
 
 const Stack = createNativeStackNavigator();
 
+const prefix = Linking.createURL('/');
+
+const linking = {
+    prefixes: [prefix, 'trafficeye://'],
+    config: {
+        screens: {
+            SignUpSuccess: 'signup-success',
+            OtpVerification: 'auth/callback',
+        }
+    }
+};
+
+const ProfileLoadingScreen = () => (
+    <View style={{ flex: 1, backgroundColor: '#050309', justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+    </View>
+);
+
 export default function AppNavigator() {
     const { hasSeenOnboarding, showSplash } = useAppContext();
     const { isAuthenticated, loading, profile } = useAuth();
+    const [hasConfirmedRole, setHasConfirmedRole] = React.useState(false);
 
-    // 1. Splash Screen — always shows first on app start for 8 seconds
-    if (showSplash) {
-        return (
-            <NavigationContainer>
-                <Stack.Navigator screenOptions={{ headerShown: false }}>
-                    <Stack.Screen name="Splash" component={SplashScreen} />
-                </Stack.Navigator>
-            </NavigationContainer>
-        );
-    }
+    console.log('Navigation State:', { showSplash, loading, isAuthenticated, hasProfile: !!profile, hasSeenOnboarding });
 
-    // 2. Loading (auth check)
-    if (loading) {
-        return (
-            <NavigationContainer>
-                <Stack.Navigator screenOptions={{ headerShown: false }}>
-                    <Stack.Screen name="Loading" component={SplashScreen} />
-                </Stack.Navigator>
-            </NavigationContainer>
-        );
-    }
+    // We enforce a strict funnel on every launch. User must flow through:
+    // Splash -> Onboarding -> Role Selection -> Login OR User Dashboard.
+    // hasSeenOnboarding is always false on app start now (AppContext modification).
+    // hasConfirmedRole is always false until they click a role on the RoleSelection screen.
+    // If they click the correct role, and have an active session, they see the Dashboard.
 
-    // 2. Onboarding Flow
-    if (!hasSeenOnboarding) {
-        return (
-            <NavigationContainer>
-                <Stack.Navigator screenOptions={{ headerShown: false }}>
-                    <Stack.Screen name="Onboarding" component={OnboardingCarousel} />
-                </Stack.Navigator>
-            </NavigationContainer>
-        );
-    }
-
-    // 3. Main Navigation
     return (
-        <NavigationContainer>
-            <Stack.Navigator screenOptions={{ headerShown: false }}>
-                {!isAuthenticated ? (
-                    // Auth Stack
+        <NavigationContainer linking={linking}>
+            <Stack.Navigator
+                screenOptions={{
+                    headerShown: false,
+                    animation: 'slide_from_right',
+                    animationDuration: 250,
+                }}
+            >
+                {/* 1. Initial App Splash (Mandatory) */}
+                {showSplash ? (
+                    <Stack.Screen name="Splash" component={SplashScreen} />
+                ) : loading ? (
+                    /* 2. Authentication Loading State */
+                    <Stack.Screen name="AuthLoading" component={SplashScreen} />
+                ) : !hasSeenOnboarding ? (
+                    /* 3. Onboarding Flow (Must see first time) */
+                    <Stack.Screen 
+                        name="Onboarding" 
+                        component={OnboardingCarousel}
+                        options={{ animation: 'fade' }}
+                    />
+                ) : (!isAuthenticated || !hasConfirmedRole) ? (
+                    /* 4. Auth Stack Gate (Must pass Role Selection) */
                     <>
-                        <Stack.Screen name="RoleSelection" component={RoleSelection} />
+                        <Stack.Screen
+                            name="RoleSelection"
+                        >
+                            {(props) => <RoleSelection {...props} onConfirm={() => setHasConfirmedRole(true)} />}
+                        </Stack.Screen>
                         <Stack.Screen name="CitizenSignIn" component={CitizenSignIn} />
                         <Stack.Screen name="CitizenSignUp" component={CitizenSignUp} />
+                        <Stack.Screen name="SignUpSuccess" component={SignUpSuccess} />
                         <Stack.Screen name="OfficerSignIn" component={OfficerSignIn} />
                         <Stack.Screen name="ForgotPassword" component={ForgotPassword} />
+                        <Stack.Screen name="OtpVerification" component={OtpVerification} />
                     </>
                 ) : !profile ? (
-                    // Profile loading state
-                    <Stack.Screen name="Loading" component={SplashScreen} />
+                    /* 5. Profile Loading State */
+                    <Stack.Screen name="ProfileLoading" component={ProfileLoadingScreen} />
                 ) : profile.role === 'citizen' ? (
-                    // Citizen Flow
-                    <Stack.Screen name="Citizen" component={CitizenNavigator} />
+                    /* 6. Citizen Flow */
+                    <Stack.Screen
+                        name="Citizen"
+                        component={CitizenNavigator}
+                        options={{ animation: 'fade' }}
+                    />
                 ) : (
-                    // Officer Flow
-                    <Stack.Screen name="Officer" component={OfficerNavigator} />
+                    /* 7. Officer Flow */
+                    <Stack.Screen
+                        name="Officer"
+                        component={OfficerNavigator}
+                        options={{ animation: 'fade' }}
+                    />
                 )}
+
+                {/* ── New Password Screen (Accessible during auth / deep linking) ── */}
+                <Stack.Screen name="NewPassword" component={NewPassword} />
             </Stack.Navigator>
         </NavigationContainer>
     );

@@ -11,8 +11,14 @@ export function AuthProvider({ children }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+<<<<<<< Updated upstream
         checkSession();
 
+=======
+        // We simplified the strict auth enforcement to prevent startup hangs
+        setLoading(false);
+        
+>>>>>>> Stashed changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
                 setUser(session?.user ?? null);

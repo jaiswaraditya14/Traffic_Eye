@@ -1,6 +1,10 @@
 // ReportVerification.js
 import React, { useState } from 'react';
+<<<<<<< Updated upstream
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+=======
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, StatusBar, TextInput, Alert } from 'react-native';
+>>>>>>> Stashed changes
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MobileContainer } from '../../components';
@@ -8,16 +12,33 @@ import { Button } from '../../components';
 import { Input } from '../../components';
 import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS } from '../../utils/theme';
 
-export default function ReportVerification({ navigation }) {
+import { useAppContext } from '../../context';
+import { RewardService } from '../../services/rewards';
+
+export default function ReportVerification({ route, navigation }) {
+    const { reports } = useAppContext();
+    const { reportId } = route.params || {};
     const [notes, setNotes] = useState('');
 
     const handleVerify = () => {
+<<<<<<< Updated upstream
         navigation.goBack();
     };
 
     const handleReject = () => {
         navigation.goBack();
     };
+=======
+        const points = RewardService.calculatePoints(report?.priority, report?.type);
+        
+        Alert.alert(
+            "Verified Successfully",
+            `The report for ${report?.type} has been approved.\n\n+${points} verification points have been securely credited to the reporting Citizen.`,
+            [{ text: "Proceed", onPress: () => navigation.goBack() }]
+        );
+    };
+    const handleReject = () => navigation.goBack();
+>>>>>>> Stashed changes
 
     return (
         <MobileContainer>
@@ -39,9 +60,33 @@ export default function ReportVerification({ navigation }) {
                         <Ionicons name="image" size={64} color={COLORS.gray400} />
                     </View>
 
+<<<<<<< Updated upstream
+=======
+                    {/* ── AI Insights Card ── */}
+                    <LinearGradient colors={['#F0FDF4', '#DCFCE7']} style={styles.aiCard}>
+                        <View style={styles.aiCardHeader}>
+                            <Ionicons name="sparkles" size={18} color={C.success} />
+                            <Text style={styles.aiCardTitle}>AI Insights</Text>
+                            <View style={styles.confidenceBadge}>
+                                <Text style={styles.confidenceText}>95% Match</Text>
+                            </View>
+                        </View>
+                        <View style={styles.aiRow}>
+                            <Text style={styles.aiLabel}>Detected Plate</Text>
+                            <Text style={styles.aiValuePlate}>{report?.vehicle || 'Unknown'}</Text>
+                        </View>
+                        <View style={styles.aiRow}>
+                            <Text style={styles.aiLabel}>Violation Type</Text>
+                            <Text style={styles.aiValue}>{report?.type || 'Unknown'}</Text>
+                        </View>
+                    </LinearGradient>
+
+                    {/* ── Details ── */}
+>>>>>>> Stashed changes
                     <View style={styles.detailCard}>
                         <Text style={styles.cardTitle}>Report Details</Text>
                         <View style={styles.detailRow}>
+<<<<<<< Updated upstream
                             <Text style={styles.detailLabel}>Type:</Text>
                             <Text style={styles.detailValue}>Speeding</Text>
                         </View>
@@ -52,6 +97,14 @@ export default function ReportVerification({ navigation }) {
                         <View style={styles.detailRow}>
                             <Text style={styles.detailLabel}>Reported:</Text>
                             <Text style={styles.detailValue}>2 hours ago</Text>
+=======
+                            <Text style={styles.detailLabel}>Location</Text>
+                            <Text style={styles.detailValue}>{report?.location || 'Unknown'}</Text>
+                        </View>
+                        <View style={styles.detailRow}>
+                            <Text style={styles.detailLabel}>Date & Time</Text>
+                            <Text style={styles.detailValue}>{report?.time || report?.date || 'Unknown'}</Text>
+>>>>>>> Stashed changes
                         </View>
                         <View style={styles.detailRow}>
                             <Text style={styles.detailLabel}>Reporter:</Text>

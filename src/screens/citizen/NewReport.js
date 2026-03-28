@@ -1,9 +1,20 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+<<<<<<< Updated upstream
 import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, ScrollView, ActivityIndicator, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MobileContainer, Button, Input, ImageCropModal } from '../../components';
+=======
+import {
+    View, Text, StyleSheet, TouchableOpacity, Image, Alert, ScrollView,
+    ActivityIndicator, Animated, Modal, StatusBar, TextInput, Platform,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MobileContainer, ImageCropModal, MapComponent } from '../../components';
+>>>>>>> Stashed changes
 import { useAppContext } from '../../context';
 import { useImagePicker, useLocation } from '../../hooks';
 import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, GRADIENTS } from '../../utils';
@@ -435,6 +446,7 @@ export default function NewReport({ navigation }) {
                 </SafeAreaView>
             </MobileContainer>
 
+<<<<<<< Updated upstream
             {/* Image Crop/Zoom Modal */}
             <ImageCropModal
                 visible={showCropModal}
@@ -443,6 +455,61 @@ export default function NewReport({ navigation }) {
                 onCancel={handleCropCancel}
             />
         </>
+=======
+                    <Text style={styles.fieldLabel}>Description (Optional)</Text>
+                    <View style={[styles.descBox, focusedDesc && { borderColor: C.navyMid, backgroundColor: C.surface }]}>
+                        <TextInput
+                            style={styles.descInput}
+                            placeholder="Add specifics about the violation... AI will analyze the rest."
+                            value={description}
+                            onChangeText={setDescription}
+                            multiline
+                            numberOfLines={3}
+                            onFocus={() => setFocusedDesc(true)}
+                            onBlur={() => setFocusedDesc(false)}
+                        />
+                    </View>
+
+                    {/* ── Submit ── */}
+                    <TouchableOpacity
+                        style={[styles.submitBtn, (!image && !video) && { opacity: 0.5 }]}
+                        onPress={handleSubmit}
+                        activeOpacity={0.88}
+                        disabled={!image && !video}
+                    >
+                        <LinearGradient colors={[C.amberDark, C.amber]} style={styles.submitGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                            <Ionicons name="sparkles" size={18} color={C.navy} />
+                            <Text style={styles.submitText}>Analyze with AI</Text>
+                        </LinearGradient>
+                    </TouchableOpacity>
+
+                </ScrollView>
+            </SafeAreaView>
+
+            {/* Modals are unchanged visually for brevity, standard map picker */}
+            <Modal visible={isMapVisible} animationType="slide">
+                <View style={styles.mapContainer}>
+                    <MapComponent 
+                        region={mapRegion}
+                        onRegionChangeComplete={setMapRegion}
+                        onPress={(e) => setSelectedCoordinate(e.nativeEvent.coordinate)}
+                        selectedCoordinate={selectedCoordinate}
+                        location={location}
+                    />
+                    <View style={styles.mapHeaderLine}>
+                        <Text style={styles.mapTitle}>Pin Location</Text>
+                        <TouchableOpacity onPress={() => setIsMapVisible(false)} style={styles.closeMap}>
+                            <Ionicons name="close" size={24} color={C.textPrimary} />
+                        </TouchableOpacity>
+                    </View>
+                    <TouchableOpacity style={styles.mapConfirm} onPress={() => { setIsMapVisible(false); if (selectedCoordinate) setManualLocation(selectedCoordinate); else if (location) setManualLocation(location); }}>
+                        <Text style={styles.mapConfirmText}>Confirm Selected</Text>
+                    </TouchableOpacity>
+                </View>
+            </Modal>
+            <ImageCropModal visible={showCropModal} imageUri={pendingCropUri} onCropDone={handleCropDone} onCancel={handleCropCancel} />
+        </View>
+>>>>>>> Stashed changes
     );
 }
 

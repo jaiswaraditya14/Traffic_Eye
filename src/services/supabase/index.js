@@ -34,6 +34,12 @@ const customStorage = {
     },
 };
 
+if (SUPABASE_CONFIG.url.includes('placeholder')) {
+    console.warn('⚠️ Supabase URL is not configured. Some features (Auth, Database) will not work.');
+} else {
+    console.log('✅ Supabase initialized with URL:', SUPABASE_CONFIG.url.substring(0, 20) + '...');
+}
+
 export const supabase = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey, {
     auth: {
         storage: customStorage,
