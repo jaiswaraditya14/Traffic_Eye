@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppContext } from '../../context/AppContext';
 import { LinearGradient } from 'expo-linear-gradient';
-import { supabase } from '../../services';
+import { supabase, rewardService } from '../../services';
 import * as FileSystem from 'expo-file-system/legacy';
 const { EncodingType } = FileSystem;
 import { decode } from 'base64-arraybuffer';
@@ -112,6 +112,11 @@ export default function AIResultsVerification({ navigation, route }) {
                     });
 
                 if (imgError) throw imgError;
+            }
+
+            // 4. Award Points (Demo: Instant points on submission)
+            if (violationDetected) {
+                await rewardService.awardPointsForReport(violationType);
             }
 
             navigation.navigate('ReportSuccess', {

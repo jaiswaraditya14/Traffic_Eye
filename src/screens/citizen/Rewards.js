@@ -1,15 +1,18 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
-    Animated, StatusBar,
+    Animated, StatusBar, Image, Alert, ActivityIndicator, Modal, Dimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MobileContainer } from '../../components';
 import { useAuth } from '../../context';
+import { rewardService, VIOLATION_POINTS_MAP, REDEEM_CATALOG } from '../../services';
+import { useFocusEffect } from '@react-navigation/native';
 
-// ── Design Tokens ──
+const { width } = Dimensions.get('window');
+
+// ── Shared Design Tokens with CitizenHome.js ──
 const C = {
     navy: '#002452',
     navyMid: '#1B3A6B',
@@ -18,135 +21,187 @@ const C = {
     amberSurface: '#FEF3C7',
     white: '#FFFFFF',
     offWhite: '#F8F9FB',
-    surface: '#FFFFFF',
-    surfaceLow: '#F2F4F6',
+    bluePrimary: '#0052CC',
     textPrimary: '#191C1E',
     textSecondary: '#44474F',
     textTertiary: '#747780',
     success: '#059669',
     successSurface: '#D1FAE5',
-    primarySurface: '#D7E2FF',
 };
 
 export default function Rewards() {
-    const { profile } = useAuth();
+    const { profile, checkAuth } = useAuth();
     const userPoints = profile?.points_balance || 0;
+    
+    const [activeTab, setActiveTab] = useState('Gifts'); // 'Gifts', 'Earn Points', 'My Activity'
+    const [history, setHistory] = useState([]);
+    const [loadingHistory, setLoadingHistory] = useState(true);
+    const [redeeming, setRedeeming] = useState(false);
+
     const fadeAnim = useRef(new Animated.Value(0)).current;
-    const heroScale = useRef(new Animated.Value(0.9)).current;
 
-    useEffect(() => {
-        Animated.parallel([
-            Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
-            Animated.spring(heroScale, { toValue: 1, tension: 60, friction: 8, useNativeDriver: true }),
-        ]).start();
-    }, []);
+    const loadData = async () => {
+        if (checkAuth) await checkAuth();
+        const res = await rewardService.getUserReportHistory(10);
+        if (res.success) setHistory(res.history);
+        setLoadingHistory(false);
+    };
 
+    useFocusEffect(
+        useCallback(() => {
+            loadData();
+            Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+        }, [])
+    );
 
+    const handleRedeem = (item) => {
+        if (userPoints < item.pts) {
+            Alert.alert("Locked", "Earn more points by reporting traffic violations to unlock this reward.");
+            return;
+        }
+        Alert.alert("Confirm Redemption", `Redeem your points for: ${item.title}?`, [
+            { text: "Cancel", style: "cancel" },
+            { 
+                text: "Redeem Now", 
+                onPress: async () => {
+                    setRedeeming(true);
+                    const res = await rewardService.redeemItem(item);
+                    setRedeeming(false);
+                    if (res.success) {
+                        Alert.alert("Success!", "Your reward request has been submitted. Check your notifications for local pickup details.");
+                        loadData();
+                    }
+                }
+            }
+        ]);
+    };
 
-    const history = [
-        { icon: 'camera', label: 'Report Submitted', points: '+10', time: 'Today' },
-        { icon: 'checkmark-circle', label: 'Report Verified', points: '+50', time: 'Yesterday' },
-        { icon: 'camera', label: 'Report Submitted', points: '+10', time: 'Jan 18' },
-    ];
+    const renderHeader = () => (
+        <View>
+            <LinearGradient colors={[C.navy, C.navyMid]} style={styles.headerArea}>
+                <View style={styles.headerTop}>
+                    <Text style={styles.headerTitle}>My Rewards</Text>
+                    <View style={styles.authorityShield}>
+                        <Ionicons name="shield-checkmark" size={20} color={C.amber} />
+                    </View>
+                </View>
 
-    const redemptions = [
-        { title: 'Certificate of Civic Duty', pts: 100, icon: 'ribbon', available: true },
-        { title: 'Priority Support Access', pts: 250, icon: 'headset', available: userPoints >= 250 },
-        { title: 'Featured Reporter Badge', pts: 500, icon: 'medal', available: userPoints >= 500 },
-    ];
+                {/* Balance Card - Matching CitizenHome Stats Bar style */}
+                <View style={styles.balanceCard}>
+                    <View style={styles.trophyOuter}>
+                        <View style={styles.trophyInner}>
+                            <Ionicons name="trophy" size={32} color={C.amberDark} />
+                        </View>
+                    </View>
+                    <View style={styles.balanceInfo}>
+                        <Text style={styles.balanceLabel}>MY POINTS BALANCE</Text>
+                        <Text style={styles.balanceValue}>{userPoints.toLocaleString()}</Text>
+                    </View>
+                </View>
+            </LinearGradient>
+        </View>
+    );
+
+    const renderTabs = () => (
+        <View style={styles.tabBar}>
+            {['Gifts', 'Earn Points', 'My Activity'].map((tab) => (
+                <TouchableOpacity 
+                    key={tab} 
+                    style={[styles.tabItem, activeTab === tab && styles.tabItemActive]}
+                    onPress={() => setActiveTab(tab)}
+                >
+                    <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{tab}</Text>
+                </TouchableOpacity>
+            ))}
+        </View>
+    );
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FB" />
+            <StatusBar barStyle="light-content" backgroundColor={C.navy} />
             <SafeAreaView style={styles.safeArea} edges={['top']}>
                 <ScrollView showsVerticalScrollIndicator={false}>
-
-                    {/* ── Navy Header ── */}
-                    <LinearGradient colors={[C.navy, C.navyMid]} style={styles.header}>
-                        <View style={styles.headerTop}>
-                            <View>
-                                <Text style={styles.headerTitle}>Rewards</Text>
-                            </View>
-                            <View style={styles.authorityShield}>
-                                <Ionicons name="shield-checkmark" size={24} color={C.amber} />
-                            </View>
-                        </View>
-
-                        {/* Points Hero card - 32px Rounding */}
-                        <Animated.View
-                            style={[
-                                styles.pointsCard,
-                                { transform: [{ scale: heroScale }] },
-                            ]}
-                        >
-                            <View style={styles.pointsCardMain}>
-                                <View style={styles.trophyFrame}>
-                                    <View style={styles.trophyCircle}>
-                                        <Ionicons name="trophy" size={32} color={C.amberDark} />
+                    {renderHeader()}
+                    
+                    <View style={{ marginTop: 50, paddingHorizontal: 20 }}>
+                        {renderTabs()}
+                        
+                        <Animated.View style={{ opacity: fadeAnim, paddingBottom: 40 }}>
+                            {activeTab === 'Gifts' && (
+                                <View>
+                                    <Text style={styles.sectionTitle}>Available Gifts</Text>
+                                    <Text style={styles.sectionSub}>Use your points to get these items</Text>
+                                    <View style={styles.grid}>
+                                        {REDEEM_CATALOG.map((item) => {
+                                            const isLocked = userPoints < item.pts;
+                                            return (
+                                                <TouchableOpacity 
+                                                    key={item.id} 
+                                                    style={styles.giftCard}
+                                                    activeOpacity={0.9}
+                                                    onPress={() => handleRedeem(item)}
+                                                >
+                                                    <View style={styles.imgContainer}>
+                                                        <Image 
+                                                            source={typeof item.image === 'number' ? item.image : { uri: item.image }} 
+                                                            style={[styles.itemImg, isLocked && { opacity: 0.4 }]} 
+                                                            resizeMode="contain"
+                                                        />
+                                                    </View>
+                                                    <Text style={styles.itemTitle}>{item.title}</Text>
+                                                    <Text style={styles.itemPts}>{item.pts} <Text style={{fontSize: 10}}>PTS</Text></Text>
+                                                    <View style={[styles.btn, isLocked ? styles.btnLocked : styles.btnUnlocked]}>
+                                                        <Text style={[styles.btnText, isLocked && { color: C.textTertiary }]}>
+                                                            {isLocked ? 'LOCKED' : 'REDEEM'}
+                                                        </Text>
+                                                    </View>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
                                     </View>
                                 </View>
-                                <View style={styles.pointsCol}>
-                                    <Text style={styles.pointsLabel}>REWARD BALANCE</Text>
-                                    <Text style={styles.pointsValue}>{userPoints.toLocaleString()}</Text>
+                            )}
+
+                            {activeTab === 'Earn Points' && (
+                                <View>
+                                    <Text style={styles.sectionTitle}>How to Earn Points</Text>
+                                    <Text style={styles.sectionSub}>Get points by reporting these violations</Text>
+                                    {Object.entries(VIOLATION_POINTS_MAP).filter(([k]) => k !== 'Default').map(([key, val]) => (
+                                        <View key={key} style={styles.earnRow}>
+                                            <View style={styles.earnIconBox}>
+                                                <Ionicons name={key.includes('riding') ? 'people' : 'alert-circle'} size={20} color={C.navyMid} />
+                                            </View>
+                                            <Text style={styles.earnName}>{key}</Text>
+                                            <Text style={styles.earnVal}>+{val} pts</Text>
+                                        </View>
+                                    ))}
                                 </View>
-                            </View>
+                            )}
+
+                            {activeTab === 'My Activity' && (
+                                <View>
+                                     {loadingHistory ? (
+                                        <ActivityIndicator color={C.navyMid} style={{marginTop: 20}} />
+                                    ) : history.length === 0 ? (
+                                        <Text style={styles.emptyText}>No activity logs yet.</Text>
+                                    ) : (
+                                        history.map((item, idx) => (
+                                            <View key={idx} style={styles.earnRow}>
+                                                <View style={[styles.earnIconBox, { backgroundColor: C.successSurface }]}>
+                                                    <Ionicons name="checkmark-done" size={20} color={C.success} />
+                                                </View>
+                                                <View style={{flex: 1}}>
+                                                    <Text style={styles.earnName}>{item.ai_verdict || 'Violation Log'}</Text>
+                                                    <Text style={{fontSize: 11, color: C.textTertiary}}>{new Date(item.created_at).toLocaleDateString()}</Text>
+                                                </View>
+                                                <Text style={[styles.earnVal, { color: C.success }]}>+{rewardService.getPointsForViolation(item.ai_verdict)}</Text>
+                                            </View>
+                                        ))
+                                    )}
+                                </View>
+                            )}
                         </Animated.View>
-                    </LinearGradient>
-
-                    {/* ── Points History ── */}
-                    <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
-                        <Text style={styles.sectionTitle}>Activity History</Text>
-                        <View style={styles.historyContainer}>
-                            {history.map((h, idx) => (
-                                <View key={idx} style={styles.historyItem}>
-                                    <View style={styles.historyIconFrame}>
-                                        <Ionicons name={h.icon} size={18} color={C.navyMid} />
-                                    </View>
-                                    <View style={styles.historyContent}>
-                                        <Text style={styles.historyLabel}>{h.label}</Text>
-                                        <Text style={styles.historyTime}>{h.time}</Text>
-                                    </View>
-                                    <View style={styles.pointRewardPill}>
-                                        <Text style={styles.historyPoints}>{h.points}</Text>
-                                    </View>
-                                </View>
-                            ))}
-                        </View>
-                    </Animated.View>
-
-                    {/* ── Redemption (Authority Cards) ── */}
-                    <Animated.View style={[styles.section, { opacity: fadeAnim, marginBottom: 40 }]}>
-                        <Text style={styles.sectionTitle}>Civic Privileges</Text>
-                        {redemptions.map((r, idx) => (
-                            <TouchableOpacity
-                                key={idx}
-                                style={[styles.redeemCard, !r.available && styles.redeemCardLocked]}
-                                activeOpacity={r.available ? 0.85 : 1}
-                            >
-                                <View style={styles.redeemIconFrame}>
-                                    <Ionicons name={r.icon} size={24} color={r.available ? C.navyMid : '#94A3B8'} />
-                                </View>
-                                <View style={styles.redeemContent}>
-                                    <Text style={[styles.redeemTitle, !r.available && { color: '#94A3B8' }]}>
-                                        {r.title}
-                                    </Text>
-                                    <View style={styles.redeemPtsRow}>
-                                        <Ionicons name="diamond-outline" size={12} color={r.available ? C.amberDark : '#94A3B8'} />
-                                        <Text style={[styles.redeemPts, !r.available && { color: '#94A3B8' }]}>
-                                            {r.pts} Verification Points
-                                        </Text>
-                                    </View>
-                                </View>
-                                <View style={[styles.redeemAction, !r.available && styles.redeemActionLocked]}>
-                                    <Ionicons
-                                        name={r.available ? "arrow-forward" : "lock-closed"}
-                                        size={18}
-                                        color={r.available ? C.navyMid : '#94A3B8'}
-                                    />
-                                </View>
-                            </TouchableOpacity>
-                        ))}
-                    </Animated.View>
+                    </View>
                 </ScrollView>
             </SafeAreaView>
         </View>
@@ -157,316 +212,78 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: C.offWhite },
     safeArea: { flex: 1 },
 
-    // Header
-    header: {
-        paddingHorizontal: 20,
+    // Header matching Home.js
+    headerArea: {
+        paddingHorizontal: 22,
         paddingTop: 16,
-        paddingBottom: 32,
-        borderBottomLeftRadius: 32,
-        borderBottomRightRadius: 32,
-        shadowColor: C.navy,
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.1,
-        shadowRadius: 20,
-        elevation: 10,
+        paddingBottom: 60,
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28,
     },
-    headerTop: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 24,
-    },
-    headerTitle: {
-        fontSize: 24,
-        fontFamily: 'Nunito-Bold',
-        color: C.white,
-        letterSpacing: -0.5,
-    },
-    headerSubtitle: {
-        fontSize: 14,
-        color: 'rgba(255,255,255,0.7)',
-        fontFamily: 'Nunito-Medium',
-        marginTop: 2,
-    },
-    authorityShield: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: 'rgba(255,255,255,0.12)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.2)',
-    },
+    headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 },
+    headerTitle: { fontSize: 22, fontFamily: 'Nunito-Bold', color: '#FFF' },
+    authorityShield: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.12)', justifyContent: 'center', alignItems: 'center' },
 
-    // Points card
-    pointsCard: {
-        backgroundColor: C.white,
-        borderRadius: 28,
-        padding: 24,
-        shadowColor: C.navy,
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.15,
-        shadowRadius: 24,
-        elevation: 8,
-    },
-    pointsCardMain: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 20,
-        marginBottom: 20,
-    },
-    trophyFrame: {
-        width: 72,
-        height: 72,
-        borderRadius: 36,
-        backgroundColor: '#FFFBEB',
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#FEF3C7',
-    },
-    trophyCircle: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        backgroundColor: C.amberSurface,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    pointsCol: {
-        flex: 1,
-    },
-    pointsLabel: {
-        fontSize: 10,
-        fontFamily: 'Nunito-ExtraBold',
-        color: C.textTertiary,
-        letterSpacing: 1.2,
-        marginBottom: 4,
-    },
-    pointsValue: {
-        fontSize: 36,
-        fontFamily: 'Nunito-Bold',
-        color: C.navy,
-        letterSpacing: -1,
-    },
-    pointsBadgeRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        marginTop: 4,
-    },
-    badgeText: {
-        fontSize: 11,
-        fontFamily: 'Nunito-Bold',
-        color: C.success,
-    },
-
-    // Progress Section
-    progressSection: {
-        marginTop: 4,
-    },
-    progressHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    progressInfo: {
-        fontSize: 12,
-        color: C.textSecondary,
-        fontFamily: 'Nunito-Medium',
-    },
-    progressPercent: {
-        fontSize: 12,
-        color: C.navyMid,
-        fontFamily: 'Nunito-Bold',
-    },
-    progressTrackOuter: {
-        height: 10,
-        backgroundColor: C.surfaceLow,
-        borderRadius: 5,
-        overflow: 'hidden',
-    },
-    progressFill: {
-        height: '100%',
-        borderRadius: 5,
-    },
-
-    // Sections
-    section: {
-        paddingHorizontal: 20,
-        paddingTop: 32,
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontFamily: 'Nunito-Bold',
-        color: C.textPrimary,
-        letterSpacing: -0.3,
-        marginBottom: 16,
-    },
-
-    // Badges (Circular)
-    badgesScroll: {
-        gap: 16,
-        paddingBottom: 8,
-    },
-    badgeFrame: {
-        alignItems: 'center',
-        width: 100,
-    },
-    badgeOuterCircle: {
-        width: 84,
-        height: 84,
-        borderRadius: 42,
-        backgroundColor: C.white,
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: C.navyMid,
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.08,
-        shadowRadius: 10,
-        elevation: 3,
-        marginBottom: 12,
-        position: 'relative',
-    },
-    badgeInnerCircle: {
-        width: 70,
-        height: 70,
-        borderRadius: 35,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    badgeLocked: {
-        opacity: 0.6,
-        backgroundColor: '#F8FAFC',
-    },
-    earnedDot: {
+    // Balance Card matching provided UI
+    balanceCard: {
         position: 'absolute',
-        top: 4,
-        right: 4,
-        width: 18,
-        height: 18,
-        borderRadius: 9,
-        backgroundColor: C.success,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 2,
-        borderColor: C.white,
-    },
-    badgeLabel: {
-        fontSize: 12,
-        fontFamily: 'Nunito-Bold',
-        color: C.textPrimary,
-        textAlign: 'center',
-    },
-
-    // Points History
-    historyContainer: {
-        backgroundColor: C.white,
+        bottom: -40,
+        left: 20,
+        right: 20,
+        backgroundColor: '#FFF',
         borderRadius: 24,
-        padding: 4,
-        shadowColor: C.navyMid,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.04,
-        shadowRadius: 12,
-        elevation: 2,
-    },
-    historyItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 16,
-        gap: 16,
-    },
-    historyIconFrame: {
-        width: 44,
-        height: 44,
-        borderRadius: 14,
-        backgroundColor: C.offWhite,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    historyContent: {
-        flex: 1,
-    },
-    historyLabel: {
-        fontSize: 15,
-        fontFamily: 'Nunito-SemiBold',
-        color: C.textPrimary,
-    },
-    historyTime: {
-        fontSize: 12,
-        color: C.textTertiary,
-        marginTop: 2,
-        fontFamily: 'Nunito-Medium',
-    },
-    pointRewardPill: {
-        backgroundColor: C.successSurface,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 12,
-    },
-    historyPoints: {
-        fontSize: 13,
-        fontFamily: 'Nunito-Bold',
-        color: C.success,
-    },
-
-    // Redemption
-    redeemCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: C.white,
-        borderRadius: 24,
-        padding: 18,
-        marginBottom: 12,
-        gap: 16,
-        shadowColor: C.navyMid,
+        padding: 24,
+        elevation: 8,
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.05,
+        shadowOpacity: 0.1,
         shadowRadius: 12,
+    },
+    trophyOuter: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#FFF9E6', justifyContent: 'center', alignItems: 'center' },
+    trophyInner: { width: 50, height: 50, borderRadius: 25, backgroundColor: C.amberSurface, justifyContent: 'center', alignItems: 'center' },
+    balanceInfo: { marginLeft: 20 },
+    balanceLabel: { fontSize: 10, fontFamily: 'Nunito-Bold', color: C.textTertiary, letterSpacing: 0.5 },
+    balanceValue: { fontSize: 36, fontFamily: 'Nunito-Bold', color: C.navy, marginTop: 2 },
+
+    // Tabs
+    tabBar: { flexDirection: 'row', backgroundColor: '#FFF', borderRadius: 12, padding: 4, marginBottom: 26 },
+    tabItem: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10 },
+    tabItemActive: { backgroundColor: '#F0F3F8' },
+    tabText: { fontSize: 13, fontFamily: 'Nunito-SemiBold', color: C.textTertiary },
+    tabTextActive: { color: C.navyMid, fontFamily: 'Nunito-Bold' },
+
+    // Grid View
+    sectionTitle: { fontSize: 17, fontFamily: 'Nunito-Bold', color: C.textPrimary },
+    sectionSub: { fontSize: 13, fontFamily: 'Nunito-Medium', color: C.textTertiary, marginTop: 4, marginBottom: 20 },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+    giftCard: {
+        width: (width - 60) / 2,
+        backgroundColor: '#FFF',
+        borderRadius: 22,
+        padding: 14,
+        marginBottom: 16,
+        alignItems: 'center',
         elevation: 3,
+        shadowColor: C.navyMid,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
     },
-    redeemCardLocked: {
-        opacity: 0.7,
-        backgroundColor: '#F8FAFC',
-    },
-    redeemIconFrame: {
-        width: 52,
-        height: 52,
-        borderRadius: 16,
-        backgroundColor: C.offWhite,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    redeemContent: {
-        flex: 1,
-    },
-    redeemTitle: {
-        fontSize: 16,
-        fontFamily: 'Nunito-Bold',
-        color: C.textPrimary,
-        marginBottom: 4,
-    },
-    redeemPtsRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
-    redeemPts: {
-        fontSize: 12,
-        fontFamily: 'Nunito-Medium',
-        color: C.amberDark,
-    },
-    redeemAction: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        backgroundColor: C.primarySurface,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    redeemActionLocked: {
-        backgroundColor: '#F1F5F9',
-    },
+    imgContainer: { width: '100%', height: 110, backgroundColor: '#F8F9FB', borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+    itemImg: { width: '85%', height: '85%' },
+    itemTitle: { fontSize: 14, fontFamily: 'Nunito-Bold', color: C.textPrimary, textAlign: 'center' },
+    itemPts: { fontSize: 17, fontFamily: 'Nunito-Bold', color: C.bluePrimary, marginTop: 8 },
+    btn: { marginTop: 12, width: '100%', paddingVertical: 8, borderRadius: 10, alignItems: 'center' },
+    btnUnlocked: { backgroundColor: C.bluePrimary },
+    btnLocked: { backgroundColor: '#F2F4F7' },
+    btnText: { fontSize: 11, fontFamily: 'Nunito-ExtraBold', color: '#FFF' },
+
+    // List View
+    earnRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', padding: 16, borderRadius: 18, marginBottom: 12, elevation: 2, shadowColor: C.navyMid, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6 },
+    earnIconBox: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#ECF1F9', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
+    earnName: { flex: 1, fontSize: 15, fontFamily: 'Nunito-SemiBold', color: C.textPrimary },
+    earnVal: { fontSize: 15, fontFamily: 'Nunito-Bold', color: C.success },
+    emptyText: { textAlign: 'center', marginTop: 40, color: C.textTertiary, fontFamily: 'Nunito-Medium' }
 });
