@@ -26,7 +26,7 @@ export default function App() {
   return (
     <AuthProvider>
       <AppProvider>
-        <StatusBar style="dark" />
+        <StatusBar style="auto" />
         <AppNavigator />
       </AppProvider>
     </AuthProvider>

@@ -421,7 +421,7 @@ export default function VerificationReports({ navigation }) {
 
     return (
         <MobileContainer>
-            <StatusBar barStyle="light-content" backgroundColor={C.navy} />
+            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
 
             {/* Header */}
             <LinearGradient colors={[C.navy, C.navyMid]} style={styles.header}>

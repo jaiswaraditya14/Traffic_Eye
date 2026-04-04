@@ -72,7 +72,7 @@ export default function OfficerDashboard({ navigation }) {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FB" />
+            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
             <SafeAreaView style={styles.safeArea} edges={['top']}>
                 <ScrollView showsVerticalScrollIndicator={false}>
 
