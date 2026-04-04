@@ -3,7 +3,7 @@ import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MobileContainer } from '../../components';
 
@@ -40,6 +40,7 @@ export default function MyReports({ navigation }) {
 
     const filters = ['All', 'Pending', 'Verified', 'Rejected'];
     const [active, setActive] = React.useState('All');
+    const insets = useSafeAreaInsets();
 
     const getStatusConfig = (status) => ({
         verified: { icon: 'checkmark-circle', color: C.success, bg: C.successSurface, label: 'Verified', barColor: C.success },
@@ -53,10 +54,10 @@ export default function MyReports({ navigation }) {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FB" />
-            <SafeAreaView style={styles.safeArea} edges={['top']}>
+            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
+            <SafeAreaView style={styles.safeArea} edges={['bottom']}>
                 {/* Navy Header */}
-                <LinearGradient colors={[C.navy, C.navyMid]} style={styles.header}>
+                <LinearGradient colors={[C.navy, C.navyMid]} style={[styles.header, { paddingTop: insets.top + 16 }]}>
                     <View style={styles.headerRow}>
                         <Text style={styles.headerTitle}>My Reports</Text>
                         <View style={styles.countBadge}>

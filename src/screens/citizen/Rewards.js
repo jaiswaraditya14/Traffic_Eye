@@ -4,7 +4,7 @@ import {
     Animated, StatusBar, Image, Alert, ActivityIndicator, Modal, Dimensions, Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useAuth } from '../../context';
@@ -67,6 +67,7 @@ export default function Rewards() {
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const gridSlideAnim = useRef(new Animated.Value(30)).current;
     const headerScaleAnim = useRef(new Animated.Value(0.96)).current;
+    const insets = useSafeAreaInsets();
 
     // Staggered card animations
     const cardAnims = useRef(REDEEM_CATALOG.map(() => new Animated.Value(0))).current;
@@ -171,7 +172,7 @@ export default function Rewards() {
                 colors={[C.navyDeep, C.navy, C.navyMid]} 
                 start={{ x: 0, y: 0 }} 
                 end={{ x: 1, y: 1 }}
-                style={styles.headerArea}
+                style={[styles.headerArea, { paddingTop: insets.top + 18 }]}
             >
                 {/* Decorative circles */}
                 <View style={styles.headerDecor1} />
@@ -579,7 +580,7 @@ export default function Rewards() {
     return (
         <View style={styles.container}>
             <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
-            <SafeAreaView style={styles.safeArea} edges={['top']}>
+            <SafeAreaView style={styles.safeArea} edges={['bottom']}>
                 <ScrollView showsVerticalScrollIndicator={false}>
                     {renderHeader()}
                     

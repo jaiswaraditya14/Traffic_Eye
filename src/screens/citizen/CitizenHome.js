@@ -4,7 +4,7 @@ import {
     Animated, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context';
 import { formatNumber } from '../../utils';
@@ -112,6 +112,8 @@ export default function CitizenHome({ navigation }) {
         { id: '6', title: 'Emergency', icon: 'call', color: '#EF4444', bg: '#FEE2E2', screen: 'EmergencyContacts' },
     ];
 
+    const insets = useSafeAreaInsets();
+    
     const getTimeOfDay = () => {
         const h = new Date().getHours();
         if (h < 12) return 'Good Morning';
@@ -122,13 +124,13 @@ export default function CitizenHome({ navigation }) {
     return (
         <View style={styles.container}>
             <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
-            <SafeAreaView style={styles.safeArea} edges={['top']}>
+            <SafeAreaView style={styles.safeArea} edges={['bottom']}>
                 <ScrollView showsVerticalScrollIndicator={false}>
 
                     {/* ── Navy Header ── */}
                     <LinearGradient
                         colors={[C.navy, C.navyMid]}
-                        style={styles.header}
+                        style={[styles.header, { paddingTop: insets.top + 16 }]}
                     >
                         <View style={styles.headerTop}>
                             <View style={styles.headerLeft}>
@@ -216,6 +218,7 @@ export default function CitizenHome({ navigation }) {
                                 </LinearGradient>
                             </TouchableOpacity>
                         </Animated.View>
+
 
                         {/* ── Traffic Info ── */}
                         <Animated.View

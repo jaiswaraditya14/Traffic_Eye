@@ -4,7 +4,7 @@ import {
     Alert, ActivityIndicator, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MobileContainer } from '../../components';
 import { useAppContext, useAuth } from '../../context';
@@ -38,6 +38,7 @@ export default function Profile({ navigation }) {
     const { setIsAuthenticated, setUserRole } = useAppContext();
     const { profile, signOut } = useAuth();
     const [loggingOut, setLoggingOut] = useState(false);
+    const insets = useSafeAreaInsets();
 
     // ── BACKEND INTACT: uses signOut, setIsAuthenticated, setUserRole ──
     const handleLogout = () => {
@@ -99,10 +100,10 @@ export default function Profile({ navigation }) {
     return (
         <View style={styles.container}>
             <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
-            <SafeAreaView style={styles.safeArea} edges={['top']}>
+            <SafeAreaView style={styles.safeArea} edges={['bottom']}>
                 <ScrollView showsVerticalScrollIndicator={false}>
                     {/* ── Navy Profile Hero ── */}
-                    <LinearGradient colors={[C.navy, C.navyMid]} style={styles.hero}>
+                    <LinearGradient colors={[C.navy, C.navyMid]} style={[styles.hero, { paddingTop: insets.top + 16 }]}>
                         <View style={styles.heroContent}>
                             {/* Avatar with Circular Frame */}
                             <View style={styles.avatarFrame}>

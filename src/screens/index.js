@@ -27,6 +27,9 @@ export { default as SpeedLimits } from './citizen/SpeedLimits';
 export { default as EmergencyContacts } from './citizen/EmergencyContacts';
 export { default as VerificationReports } from './citizen/VerificationReports';
 export { default as ReferralProgram } from './citizen/ReferralProgram';
+export { default as VideoReport } from './citizen/VideoReport';
+export { default as VideoReportSuccess } from './citizen/VideoReportSuccess';
+export { default as VideoReportStatus } from './citizen/VideoReportStatus';
 
 // Officer Screens
 export { default as OfficerDashboard } from './officer/OfficerDashboard';

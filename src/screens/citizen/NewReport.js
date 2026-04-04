@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MobileContainer, ImageCropModal } from '../../components';
 import { useAppContext } from '../../context';
@@ -39,6 +39,7 @@ export default function NewReport({ navigation }) {
         image, setImage, pickFromGallery, captureFromCamera,
         pickVideoFromGallery, captureVideoFromCamera
     } = useImagePicker();
+    const insets = useSafeAreaInsets();
 
     const {
         location, address, setAddress, loading: loadingLocation,
@@ -157,22 +158,6 @@ export default function NewReport({ navigation }) {
         setPendingExif(null); setPendingMediaSource(null);
     };
 
-    const handleRecordVideo = async () => {
-        const result = await captureVideoFromCamera();
-        if (result?.uri) {
-            setImage(null); setVideo(result.uri); setMediaType('video');
-            await handleLocationExtraction(result.exif, 'camera');
-        }
-    };
-
-    const handlePickVideo = async () => {
-        const result = await pickVideoFromGallery();
-        if (result?.uri) {
-            setImage(null); setVideo(result.uri); setMediaType('video');
-            await handleLocationExtraction(result.exif, 'gallery');
-        }
-    };
-
     const handleDetectLocation = async () => {
         const result = await detectLocation();
         if (result) {
@@ -194,15 +179,33 @@ export default function NewReport({ navigation }) {
     return (
         <View style={styles.container}>
             <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
-            <SafeAreaView style={styles.safeArea} edges={['top']}>
+            <SafeAreaView style={styles.safeArea} edges={['bottom']}>
                 {/* ── Navy Header ── */}
-                <LinearGradient colors={[C.navy, C.navyMid]} style={styles.header}>
+                <LinearGradient colors={[C.navy, C.navyMid]} style={[styles.header, { paddingTop: insets.top + 16 }]}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                         <Ionicons name="arrow-back" size={20} color={C.white} />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>New Report</Text>
                     <View style={{ width: 36 }} />
                 </LinearGradient>
+
+                {/* ── Report Type Toggle ── */}
+                <View style={styles.reportTypeBar}>
+                    <View style={styles.reportTypeToggle}>
+                        <View style={styles.reportTypeActiveTab}>
+                            <Ionicons name="flash" size={14} color={C.navy} />
+                            <Text style={styles.reportTypeActiveText}>AI Analysis</Text>
+                        </View>
+                        <TouchableOpacity
+                            style={styles.reportTypeInactiveTab}
+                            onPress={() => navigation.replace('VideoReport')}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="videocam-outline" size={14} color={C.textTertiary} />
+                            <Text style={styles.reportTypeInactiveText}>Manual Video</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
 
                 <ScrollView
                     style={styles.scrollContent}
@@ -230,11 +233,6 @@ export default function NewReport({ navigation }) {
                     <View style={styles.imageContainer}>
                         {image ? (
                             <Image source={{ uri: image }} style={styles.mediaImage} />
-                        ) : video ? (
-                            <View style={styles.videoPlaceholder}>
-                                <Ionicons name="videocam" size={48} color="#BA1A1A" />
-                                <Text style={styles.videoText}>Video Selected</Text>
-                            </View>
                         ) : (
                             <View style={styles.cameraPlaceholder}>
                                 <Ionicons name="camera-outline" size={48} color={C.textTertiary} />
@@ -260,18 +258,6 @@ export default function NewReport({ navigation }) {
                         <TouchableOpacity style={styles.mediaBtnOutline} onPress={handlePickImage} activeOpacity={0.8}>
                             <Ionicons name="images" size={18} color={C.navyMid} />
                             <Text style={styles.mediaBtnOutlineText}>Gallery</Text>
-                        </TouchableOpacity>
-                    </View>
-                    <View style={styles.mediaBtnRow}>
-                        <TouchableOpacity style={styles.mediaBtn} onPress={handleRecordVideo} activeOpacity={0.8}>
-                            <LinearGradient colors={['#DC2626', '#B91C1C']} style={styles.mediaBtnGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                                <Ionicons name="videocam" size={18} color={C.white} />
-                                <Text style={styles.mediaBtnText}>Record</Text>
-                            </LinearGradient>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.mediaBtnOutline} onPress={handlePickVideo} activeOpacity={0.8}>
-                            <Ionicons name="film" size={18} color={C.textTertiary} />
-                            <Text style={[styles.mediaBtnOutlineText, { color: C.textTertiary }]}>Video</Text>
                         </TouchableOpacity>
                     </View>
 
@@ -549,4 +535,52 @@ const styles = StyleSheet.create({
     closeMap: { padding: 4 },
     mapConfirm: { position: 'absolute', bottom: 40, left: 20, right: 20, backgroundColor: C.navyMid, padding: 16, borderRadius: 14, alignItems: 'center', elevation: 4 },
     mapConfirmText: { color: C.white, fontSize: 16, fontFamily: 'Nunito-Bold' },
+    // Report Type Toggle Bar
+    reportTypeBar: {
+        backgroundColor: C.surface,
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0,0,0,0.04)',
+    },
+    reportTypeToggle: {
+        flexDirection: 'row',
+        backgroundColor: C.surfaceInput,
+        borderRadius: 14,
+        padding: 4,
+    },
+    reportTypeActiveTab: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingVertical: 9,
+        backgroundColor: C.amber,
+        borderRadius: 11,
+        shadowColor: C.amberDark,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+        elevation: 3,
+    },
+    reportTypeActiveText: {
+        fontSize: 13,
+        fontFamily: 'Nunito-Bold',
+        color: C.navy,
+    },
+    reportTypeInactiveTab: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingVertical: 9,
+        borderRadius: 11,
+    },
+    reportTypeInactiveText: {
+        fontSize: 13,
+        fontFamily: 'Nunito-Medium',
+        color: C.textTertiary,
+    },
 });

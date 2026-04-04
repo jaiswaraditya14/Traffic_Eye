@@ -4,7 +4,7 @@ import {
     Image, Animated, StatusBar, Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MobileContainer } from '../../components';
 import { useAuth } from '../../context';
@@ -40,6 +40,7 @@ export default function OfficerDashboard({ navigation }) {
     const officerName = profile?.full_name?.split(' ')[0] || 'Officer';
     const officerTitle = profile?.badge_title || 'Traffic Inspector';
     const officerZone = 'Mumbai Central';
+    const insets = useSafeAreaInsets();
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
@@ -73,13 +74,13 @@ export default function OfficerDashboard({ navigation }) {
     return (
         <View style={styles.container}>
             <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
-            <SafeAreaView style={styles.safeArea} edges={['top']}>
+            <SafeAreaView style={styles.safeArea} edges={['bottom']}>
                 <ScrollView showsVerticalScrollIndicator={false}>
 
                     {/* ── Navy Officer Header ── */}
                     <LinearGradient
                         colors={[C.navy, C.navyMid]}
-                        style={styles.header}
+                        style={[styles.header, { paddingTop: insets.top + 16 }]}
                     >
                         <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
                             <View style={styles.headerTop}>
