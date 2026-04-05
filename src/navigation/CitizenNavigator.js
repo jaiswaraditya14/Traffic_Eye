@@ -28,10 +28,10 @@ import {
     SpeedLimits,
     EmergencyContacts,
     VerificationReports,
-    ReferralProgram,
     VideoReport,
     VideoReportSuccess,
     VideoReportStatus,
+    ImageReportStatus,
 } from '../screens';
 
 const Tab = createBottomTabNavigator();
@@ -99,10 +99,10 @@ export default function CitizenNavigator() {
             <Stack.Screen name="SpeedLimits" component={SpeedLimits} />
             <Stack.Screen name="EmergencyContacts" component={EmergencyContacts} />
             <Stack.Screen name="VerificationReports" component={VerificationReports} />
-            <Stack.Screen name="ReferralProgram" component={ReferralProgram} />
             <Stack.Screen name="VideoReport" component={VideoReport} />
             <Stack.Screen name="VideoReportSuccess" component={VideoReportSuccess} />
             <Stack.Screen name="VideoReportStatus" component={VideoReportStatus} />
+            <Stack.Screen name="ImageReportStatus" component={ImageReportStatus} />
         </Stack.Navigator>
     );
 }

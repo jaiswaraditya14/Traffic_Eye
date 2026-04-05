@@ -10,23 +10,6 @@ RETURNS TRIGGER
 SECURITY DEFINER -- This is critical - allows bypassing RLS
 SET search_path = public
 AS $$
-DECLARE
-    referrer_id UUID;
-BEGIN
-    -- Try to find referrer if referral code provided
-    BEGIN
-        IF NEW.raw_user_meta_data->>'referral_code' IS NOT NULL AND 
-           NEW.raw_user_meta_data->>'referral_code' != '' THEN
-            SELECT id INTO referrer_id 
-            FROM profiles 
-            WHERE referral_code = NEW.raw_user_meta_data->>'referral_code'
-            LIMIT 1;
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-        RAISE WARNING 'Referral lookup failed: %', SQLERRM;
-        referrer_id := NULL;
-    END;
-
     -- Insert profile (bypasses RLS because of SECURITY DEFINER)
     INSERT INTO profiles (
         id, 
@@ -36,8 +19,7 @@ BEGIN
         role, 
         badge_id, 
         department, 
-        jurisdiction, 
-        referred_by
+        jurisdiction
     )
     VALUES (
         NEW.id,
@@ -47,37 +29,8 @@ BEGIN
         COALESCE(NEW.raw_user_meta_data->>'role', 'citizen'),
         NEW.raw_user_meta_data->>'badge_id',
         NEW.raw_user_meta_data->>'department',
-        NEW.raw_user_meta_data->>'jurisdiction',
-        referrer_id
+        NEW.raw_user_meta_data->>'jurisdiction'
     );
-
-    -- Award referral bonus if applicable
-    IF referrer_id IS NOT NULL THEN
-        BEGIN
-            UPDATE profiles 
-            SET points_balance = points_balance + 50 
-            WHERE id = referrer_id;
-            
-            INSERT INTO point_transactions (
-                user_id, 
-                amount, 
-                type, 
-                action, 
-                reference_id, 
-                description
-            )
-            VALUES (
-                referrer_id, 
-                50, 
-                'referral', 
-                'referral_success', 
-                NEW.id, 
-                'Referral bonus for inviting a friend'
-            );
-        EXCEPTION WHEN OTHERS THEN
-            RAISE WARNING 'Failed to award referral bonus: %', SQLERRM;
-        END;
-    END IF;
 
     RETURN NEW;
 END;

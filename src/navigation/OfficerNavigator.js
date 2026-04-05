@@ -13,6 +13,7 @@ import {
     VerifiedReports,
     OfficerProfile,
     ReportVerification,
+    ImageReportReview,
     OfficerSettings,
     PermissionsRequest
 } from '../screens';
@@ -68,6 +69,7 @@ export default function OfficerNavigator() {
             <Stack.Screen name="OfficerMain" component={OfficerTabNavigator} />
             <Stack.Screen name="PermissionsRequest" component={PermissionsRequest} />
             <Stack.Screen name="ReportVerification" component={ReportVerification} />
+            <Stack.Screen name="ImageReportReview" component={ImageReportReview} />
             <Stack.Screen name="OfficerSettings" component={OfficerSettings} />
         </Stack.Navigator>
     );

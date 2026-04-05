@@ -480,14 +480,14 @@ const styles = StyleSheet.create({
 
     fieldLabel: { fontSize: 13, fontFamily: 'Nunito-Bold', color: C.navy, marginBottom: 10, marginTop: 12 },
     addressBox: { 
-        flexDirection: 'row', 
+        flexDirection: 'column', 
         backgroundColor: '#F1F5F9', // Subtle distinct color 
         borderRadius: 20, 
         paddingLeft: 18, 
-        paddingRight: 10, 
-        paddingVertical: 14, 
+        paddingRight: 18, 
+        paddingTop: 14, 
+        paddingBottom: 14,
         minHeight: 150, // Massive box
-        alignItems: 'flex-start',
         borderWidth: 1.5,
         borderColor: '#E2E8F0',
         shadowColor: '#1B3A6B',
@@ -495,8 +495,8 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.08,
         shadowRadius: 10,
     },
-    addressInput: { flex: 1, fontSize: 14, color: C.textPrimary, paddingRight: 10, fontFamily: 'Nunito-Medium', textAlignVertical: 'top', height: '100%', paddingTop: 4 },
-    addressBtns: { flexDirection: 'row', gap: 8, alignSelf: 'flex-end', paddingTop: 20 },
+    addressInput: { flex: 1, fontSize: 14, color: C.textPrimary, fontFamily: 'Nunito-Medium', textAlignVertical: 'top', minHeight: 70 },
+    addressBtns: { flexDirection: 'row', gap: 8, alignSelf: 'flex-end', marginTop: 10 },
     addrBtnWithText: { flexDirection: 'row', gap: 6, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, backgroundColor: C.navyMid, justifyContent: 'center', alignItems: 'center' },
     addrBtnText: { color: C.white, fontSize: 13, fontFamily: 'Nunito-Bold' },
 

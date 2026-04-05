@@ -26,16 +26,17 @@ export { default as FineCalculator } from './citizen/FineCalculator';
 export { default as SpeedLimits } from './citizen/SpeedLimits';
 export { default as EmergencyContacts } from './citizen/EmergencyContacts';
 export { default as VerificationReports } from './citizen/VerificationReports';
-export { default as ReferralProgram } from './citizen/ReferralProgram';
 export { default as VideoReport } from './citizen/VideoReport';
 export { default as VideoReportSuccess } from './citizen/VideoReportSuccess';
 export { default as VideoReportStatus } from './citizen/VideoReportStatus';
+export { default as ImageReportStatus } from './citizen/ImageReportStatus';
 
 // Officer Screens
 export { default as OfficerDashboard } from './officer/OfficerDashboard';
 export { default as PendingQueue } from './officer/PendingQueue';
 export { default as VerifiedReports } from './officer/VerifiedReports';
 export { default as ReportVerification } from './officer/ReportVerification';
+export { default as ImageReportReview } from './officer/ImageReportReview';
 export { default as OfficerProfile } from './officer/OfficerProfile';
 export { default as OfficerSettings } from './officer/OfficerSettings';
 

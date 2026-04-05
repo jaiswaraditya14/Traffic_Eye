@@ -31,6 +31,11 @@ const slides = [
         title: 'Report Violations',
         description: 'Capture traffic violations with your phone camera. Help keep roads safe and earn rewards for your community.',
         accent: C.navyMid,
+        pills: [
+            { icon: 'camera-outline', label: 'Photo & Video' },
+            { icon: 'location-outline', label: 'GPS Tagged' },
+            { icon: 'flash-outline', label: 'Instant' },
+        ],
     },
     {
         image: require('../../../assets/images/onboarding_ai.jpg'),
@@ -40,6 +45,11 @@ const slides = [
         title: 'AI Verification',
         description: 'Gemini AI instantly analyzes license plates, violation types, and location with government-grade accuracy.',
         accent: '#047857',
+        pills: [
+            { icon: 'sparkles-outline', label: 'Gemini AI' },
+            { icon: 'car-outline', label: 'Plate Scan' },
+            { icon: 'shield-outline', label: 'Validated' },
+        ],
     },
     {
         image: require('../../../assets/images/onboarding_rewards.jpg'),
@@ -49,8 +59,22 @@ const slides = [
         title: 'Earn Rewards',
         description: 'Get recognition for verified reports. Accumulate points, unlock achievements and make a real difference.',
         accent: C.amberDark,
+        pills: [
+            { icon: 'trophy-outline', label: 'Points' },
+            { icon: 'gift-outline', label: 'Rewards' },
+            { icon: 'ribbon-outline', label: 'Rankings' },
+        ],
     },
 ];
+
+function FeaturePill({ icon, label, color }) {
+    return (
+        <View style={[pillStyles.pill, { borderColor: color + '40', backgroundColor: color + '12' }]}>
+            <Ionicons name={icon} size={13} color={color} />
+            <Text style={[pillStyles.label, { color }]}>{label}</Text>
+        </View>
+    );
+}
 
 export default function OnboardingCarousel({ navigation }) {
     const [currentSlide, setCurrentSlide] = useState(0);
@@ -75,12 +99,10 @@ export default function OnboardingCarousel({ navigation }) {
         setCurrentSlide(idx);
     };
 
-    const onPressIn = () => {
+    const onPressIn = () =>
         Animated.spring(buttonScale, { toValue: 0.96, useNativeDriver: true }).start();
-    };
-    const onPressOut = () => {
+    const onPressOut = () =>
         Animated.spring(buttonScale, { toValue: 1, useNativeDriver: true }).start();
-    };
 
     return (
         <View style={styles.container}>
@@ -97,34 +119,43 @@ export default function OnboardingCarousel({ navigation }) {
             >
                 {slides.map((s, index) => (
                     <View key={index} style={[styles.slide, { width }]}>
-                        {/* Circle Image Frame */}
+
+                        {/* ── Large rounded image card ── */}
                         <View style={styles.imageContainer}>
                             <Image
                                 source={s.image}
                                 style={styles.slideImage}
                                 resizeMode="cover"
                             />
+                            {/* Accent top bar */}
+                            <View style={[styles.accentBar, { backgroundColor: s.accent }]} />
+                            {/* Fade-out at bottom so it blends into page */}
                             <LinearGradient
-                                colors={['transparent', 'rgba(255,255,255,0.2)', '#FFFFFF']}
+                                colors={['transparent', 'rgba(248,249,251,0.55)', C.offWhite]}
                                 style={styles.imageGradient}
                             />
                         </View>
 
-                        {/* Feature icon badge */}
+                        {/* ── Icon badge overlapping image bottom ── */}
                         <View style={[styles.iconBadge, { backgroundColor: s.iconBg }]}>
                             <Ionicons name={s.icon} size={32} color={s.iconColor} />
                         </View>
 
-                        {/* Text section */}
+                        {/* ── Text + feature pills ── */}
                         <View style={styles.textSection}>
                             <Text style={styles.slideTitle}>{s.title}</Text>
                             <Text style={styles.slideDescription}>{s.description}</Text>
+                            <View style={styles.pillRow}>
+                                {s.pills.map((p, i) => (
+                                    <FeaturePill key={i} icon={p.icon} label={p.label} color={s.accent} />
+                                ))}
+                            </View>
                         </View>
                     </View>
                 ))}
             </ScrollView>
 
-            {/* Bottom Controls */}
+            {/* ── Bottom Controls ── */}
             <View style={styles.bottomSection}>
                 <View style={styles.indicators}>
                     {slides.map((s, index) => (
@@ -141,7 +172,7 @@ export default function OnboardingCarousel({ navigation }) {
                 </View>
 
                 <View style={styles.ctaRow}>
-                    {! (currentSlide === slides.length -1) && (
+                    {!(currentSlide === slides.length - 1) && (
                         <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
                             <Text style={styles.skipText}>Skip</Text>
                         </TouchableOpacity>
@@ -150,7 +181,7 @@ export default function OnboardingCarousel({ navigation }) {
                     <Animated.View
                         style={[
                             styles.nextButtonWrapper,
-                            currentSlide < slides.length - 1 ? { flex: 1 } : { width: '100%' },
+                            { flex: 1 },
                             { transform: [{ scale: buttonScale }] },
                         ]}
                     >
@@ -189,6 +220,22 @@ export default function OnboardingCarousel({ navigation }) {
     );
 }
 
+const pillStyles = StyleSheet.create({
+    pill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderRadius: 99,
+        borderWidth: 1,
+    },
+    label: {
+        fontSize: 12,
+        fontFamily: 'Nunito-Bold',
+    },
+});
+
 const styles = StyleSheet.create({
     container: {
         flex: 1,
@@ -200,21 +247,30 @@ const styles = StyleSheet.create({
     slide: {
         flex: 1,
         backgroundColor: C.offWhite,
-        paddingTop: 60,
     },
+
+    // ── Large card image (replaces small circle) ──
     imageContainer: {
-        width: 280,
-        height: 280,
+        width: width - 32,
+        height: 310,
         alignSelf: 'center',
-        borderRadius: 140,
+        borderRadius: 28,
         overflow: 'hidden',
-        borderWidth: 8,
-        borderColor: '#FFFFFF',
+        marginTop: 52,
+        // Shadow
         shadowColor: '#1B3A6B',
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.15,
-        shadowRadius: 24,
-        elevation: 10,
+        shadowOffset: { width: 0, height: 16 },
+        shadowOpacity: 0.18,
+        shadowRadius: 30,
+        elevation: 12,
+    },
+    accentBar: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 5,
+        zIndex: 1,
     },
     slideImage: {
         width: '100%',
@@ -225,8 +281,10 @@ const styles = StyleSheet.create({
         bottom: 0,
         left: 0,
         right: 0,
-        height: 80,
+        height: 110,
     },
+
+    // ── Icon badge ──
     iconBadge: {
         width: 68,
         height: 68,
@@ -234,64 +292,69 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         alignSelf: 'center',
-        marginTop: -34,
+        marginTop: -22,
         zIndex: 10,
-        backgroundColor: '#FFFFFF',
         shadowColor: '#1B3A6B',
         shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.12,
         shadowRadius: 16,
         elevation: 6,
     },
+
+    // ── Text section ──
     textSection: {
-        flex: 1,
-        paddingHorizontal: 36,
-        paddingTop: 40,
+        paddingHorizontal: 28,
+        paddingTop: 22,
         alignItems: 'center',
     },
     slideTitle: {
         fontFamily: 'Nunito-Bold',
-        fontSize: 30,
+        fontSize: 28,
         color: C.navy,
         letterSpacing: -0.5,
-        marginBottom: 16,
+        marginBottom: 10,
         textAlign: 'center',
     },
     slideDescription: {
         fontFamily: 'Nunito-Regular',
-        fontSize: 16,
+        fontSize: 15,
         color: C.textSecondary,
         textAlign: 'center',
-        lineHeight: 26,
+        lineHeight: 24,
         maxWidth: 320,
+        marginBottom: 18,
     },
+    pillRow: {
+        flexDirection: 'row',
+        gap: 8,
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+    },
+
+    // ── Bottom controls ──
     bottomSection: {
         paddingHorizontal: 28,
-        paddingBottom: 50,
+        paddingBottom: 44,
         backgroundColor: C.offWhite,
     },
     indicators: {
         flexDirection: 'row',
         justifyContent: 'center',
         gap: 8,
-        marginBottom: 32,
+        marginBottom: 24,
     },
     indicator: {
         height: 6,
         borderRadius: 3,
     },
-    indicatorActive: {
-        width: 30,
-    },
-    indicatorInactive: {
-        width: 6,
-        backgroundColor: '#D1D5DB',
-    },
+    indicatorActive: { width: 30 },
+    indicatorInactive: { width: 6, backgroundColor: '#D1D5DB' },
+
     ctaRow: {
         flexDirection: 'row',
         gap: 16,
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: 16,
     },
     skipButton: {
         paddingHorizontal: 22,

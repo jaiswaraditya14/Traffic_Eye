@@ -83,7 +83,7 @@ export default function AIResultsVerification({ navigation, route }) {
                 publicUrl = url;
             }
 
-            // 2. Insert into verification_reports
+            // 2. Insert into verification_reports (legacy table for backward compat)
             const { data: report, error: reportError } = await supabase
                 .from('verification_reports')
                 .insert({
@@ -113,6 +113,23 @@ export default function AIResultsVerification({ navigation, route }) {
 
                 if (imgError) throw imgError;
             }
+
+            // 3b. Also save to new image_reports table (officer queue + transparency layer)
+            const severityLower = (aiResults?.severity || 'medium').toLowerCase();
+            const normSeverity = ['low', 'medium', 'high', 'critical'].includes(severityLower) ? severityLower : 'medium';
+            await supabase.from('image_reports').insert({
+                user_id:               user.id,
+                image_url:             publicUrl || '',
+                image_storage_path:    storagePath,
+                location_address:      address || currentReport?.address || null,
+                violation_type:        violationType,
+                violation_description: aiResults?.description || null,
+                severity:              normSeverity,
+                ai_confidence:         parseFloat(confidence) / 100,
+                ai_raw_result:         aiResults,
+                vehicle_number:        vehicleNumber,
+                status:                'pending',
+            });
 
             // 4. Award Points (Demo: Instant points on submission)
             if (violationDetected) {

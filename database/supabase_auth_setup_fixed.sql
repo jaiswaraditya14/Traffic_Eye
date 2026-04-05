@@ -114,24 +114,8 @@ CREATE POLICY "System can insert transactions" ON point_transactions
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
-    referrer_id UUID;
     profile_inserted BOOLEAN := false;
 BEGIN
-    -- Try to find referrer if referral code provided
-    BEGIN
-        IF NEW.raw_user_meta_data->>'referral_code' IS NOT NULL AND 
-           NEW.raw_user_meta_data->>'referral_code' != '' THEN
-            SELECT id INTO referrer_id 
-            FROM profiles 
-            WHERE referral_code = NEW.raw_user_meta_data->>'referral_code'
-            LIMIT 1;
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-        -- Log but don't fail if referral lookup fails
-        RAISE WARNING 'Referral lookup failed: %', SQLERRM;
-        referrer_id := NULL;
-    END;
-
     -- Insert profile (this is the critical part that must succeed)
     BEGIN
         INSERT INTO profiles (
@@ -142,8 +126,7 @@ BEGIN
             role, 
             badge_id, 
             department, 
-            jurisdiction, 
-            referred_by
+            jurisdiction
         )
         VALUES (
             NEW.id,
@@ -153,45 +136,13 @@ BEGIN
             COALESCE(NEW.raw_user_meta_data->>'role', 'citizen'),
             NEW.raw_user_meta_data->>'badge_id',
             NEW.raw_user_meta_data->>'department',
-            NEW.raw_user_meta_data->>'jurisdiction',
-            referrer_id
+            NEW.raw_user_meta_data->>'jurisdiction'
         );
         profile_inserted := true;
     EXCEPTION WHEN OTHERS THEN
         -- This is critical - if profile insert fails, the signup should fail
         RAISE EXCEPTION 'Failed to create profile: %', SQLERRM;
     END;
-
-    -- Award referral bonus if applicable (non-critical, don't fail signup if this fails)
-    IF profile_inserted AND referrer_id IS NOT NULL THEN
-        BEGIN
-            -- Update referrer's points
-            UPDATE profiles 
-            SET points_balance = points_balance + 50 
-            WHERE id = referrer_id;
-            
-            -- Log the referral transaction
-            INSERT INTO point_transactions (
-                user_id, 
-                amount, 
-                type, 
-                action, 
-                reference_id, 
-                description
-            )
-            VALUES (
-                referrer_id, 
-                50, 
-                'referral', 
-                'referral_success', 
-                NEW.id, 
-                'Referral bonus for inviting a friend'
-            );
-        EXCEPTION WHEN OTHERS THEN
-            -- Log warning but don't fail the signup
-            RAISE WARNING 'Failed to award referral bonus: %', SQLERRM;
-        END;
-    END IF;
 
     RETURN NEW;
 END;

@@ -19,11 +19,7 @@ const C = {
 };
 
 export default function VerifiedReports({ navigation }) {
-    const verifiedReports = [
-        { id: 1, type: 'Speeding', location: 'Main St & 5th Ave', date: '2024-01-20', officer: 'Badge #1234', plate: 'MH12AB1234' },
-        { id: 2, type: 'Red Light', location: 'Oak Rd & Elm St', date: '2024-01-19', officer: 'Badge #1234', plate: 'MH01CD5678' },
-        { id: 3, type: 'Parking', location: 'Park Ave', date: '2024-01-18', officer: 'Badge #5678', plate: 'MH08EF9012' },
-    ];
+    const verifiedReports = [];
 
     return (
         <View style={styles.container}>
@@ -41,47 +37,54 @@ export default function VerifiedReports({ navigation }) {
                 </LinearGradient>
 
                 <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                    {verifiedReports.map((report) => (
-                        <View key={report.id} style={styles.reportCard}>
-                            {/* Success Left Bar */}
-                            <View style={styles.cardBar} />
+                    {verifiedReports.length === 0 ? (
+                        <View style={{alignItems: 'center', marginTop: 60}}>
+                            <Ionicons name="document-text-outline" size={48} color={C.textTertiary} />
+                            <Text style={{color: C.textSecondary, marginTop: 12, fontFamily: 'Nunito-Medium'}}>No verified reports history.</Text>
+                        </View>
+                    ) : (
+                        verifiedReports.map((report) => (
+                            <View key={report.id} style={styles.reportCard}>
+                                {/* Success Left Bar */}
+                                <View style={styles.cardBar} />
 
-                            {/* Thumbnail */}
-                            <Image
-                                source={require('../../../assets/images/traffic_violation.jpg')}
-                                style={styles.thumbnail}
-                                resizeMode="cover"
-                            />
+                                {/* Thumbnail */}
+                                <Image
+                                    source={require('../../../assets/images/traffic_violation.jpg')}
+                                    style={styles.thumbnail}
+                                    resizeMode="cover"
+                                />
 
-                            <View style={styles.cardContent}>
-                                <View style={styles.cardTopRow}>
-                                    <Text style={styles.reportType}>{report.type}</Text>
-                                    <Ionicons name="checkmark-circle" size={16} color={C.success} />
-                                </View>
-
-                                <View style={styles.vehicleRow}>
-                                    <Ionicons name="car-outline" size={12} color={C.navyMid} />
-                                    <Text style={styles.vehicleText}>{report.plate}</Text>
-                                </View>
-
-                                <View style={styles.metaRow}>
-                                    <Ionicons name="location-outline" size={12} color={C.textTertiary} />
-                                    <Text style={styles.metaText}>{report.location}</Text>
-                                </View>
-                                
-                                <View style={styles.bottomRow}>
-                                    <View style={styles.metaRow}>
-                                        <Ionicons name="calendar-outline" size={12} color={C.textTertiary} />
-                                        <Text style={styles.metaText}>{report.date}</Text>
+                                <View style={styles.cardContent}>
+                                    <View style={styles.cardTopRow}>
+                                        <Text style={styles.reportType}>{report.type}</Text>
+                                        <Ionicons name="checkmark-circle" size={16} color={C.success} />
                                     </View>
-                                    <View style={styles.officerBadge}>
-                                        <Ionicons name="shield-checkmark" size={10} color={C.success} />
-                                        <Text style={styles.officerText}>{report.officer}</Text>
+
+                                    <View style={styles.vehicleRow}>
+                                        <Ionicons name="car-outline" size={12} color={C.navyMid} />
+                                        <Text style={styles.vehicleText}>{report.plate}</Text>
+                                    </View>
+
+                                    <View style={styles.metaRow}>
+                                        <Ionicons name="location-outline" size={12} color={C.textTertiary} />
+                                        <Text style={styles.metaText}>{report.location}</Text>
+                                    </View>
+                                    
+                                    <View style={styles.bottomRow}>
+                                        <View style={styles.metaRow}>
+                                            <Ionicons name="calendar-outline" size={12} color={C.textTertiary} />
+                                            <Text style={styles.metaText}>{report.date}</Text>
+                                        </View>
+                                        <View style={styles.officerBadge}>
+                                            <Ionicons name="shield-checkmark" size={10} color={C.success} />
+                                            <Text style={styles.officerText}>{report.officer}</Text>
+                                        </View>
                                     </View>
                                 </View>
                             </View>
-                        </View>
-                    ))}
+                        ))
+                    )}
                 </ScrollView>
             </SafeAreaView>
         </View>

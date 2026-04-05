@@ -5,10 +5,10 @@
     "scheme": "trafficeye",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/image.png",
+    "icon": "./assets/images/image copy.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/image.png",
+      "image": "./assets/images/image copy.png",
       "resizeMode": "cover",
       "backgroundColor": "#050309"
     },
@@ -23,7 +23,7 @@
     "android": {
       "package": "com.anonymous.TrafficEye",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/image.png",
+        "foregroundImage": "./assets/images/image copy.png",
         "backgroundColor": "#ffffff"
       },
       "permissions": [
@@ -42,7 +42,7 @@
       "edgeToEdgeEnabled": true
     },
     "web": {
-      "favicon": "./assets/image.png"
+      "favicon": "./assets/images/image copy.png"
     },
     "plugins": [
       "expo-web-browser",

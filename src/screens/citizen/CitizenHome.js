@@ -51,15 +51,12 @@ export default function CitizenHome({ navigation }) {
 
     // Stats data
     const quickStats = [
-        { label: 'Reports', value: '12', icon: 'document-text', color: C.navyMid, bg: C.primarySurface },
-        { label: 'Verified', value: '8', icon: 'checkmark-circle', color: C.success, bg: C.successSurface },
+        { label: 'Reports', value: '0', icon: 'document-text', color: C.navyMid, bg: C.primarySurface },
+        { label: 'Verified', value: '0', icon: 'checkmark-circle', color: C.success, bg: C.successSurface },
         { label: 'Points', value: formatNumber(userPoints), icon: 'trophy', color: C.amberDark, bg: C.amberSurface },
     ];
 
-    const recentActivity = [
-        { id: 1, type: 'Illegal Parking', desc: 'Downtown St., Mumbai', time: 'Today, 10:45 AM', status: 'pending' },
-        { id: 2, type: 'Red Light Violation', desc: 'Main intersection, Bandra', time: 'Oct 12, 4:20 PM', status: 'success' },
-    ];
+    const recentActivity = [];
 
     const getStatusConfig = (status) => ({
         success: { icon: 'checkmark-circle', color: C.success, bg: C.successSurface, label: 'Verified', barColor: C.success },
@@ -108,8 +105,10 @@ export default function CitizenHome({ navigation }) {
     ];
 
     const QUICK_SERVICES = [
-        { id: '5', title: 'Speed Limits', icon: 'speedometer', color: '#6366F1', bg: '#EDE9FE', screen: 'SpeedLimits' },
-        { id: '6', title: 'Emergency', icon: 'call', color: '#EF4444', bg: '#FEE2E2', screen: 'EmergencyContacts' },
+        { id: '5', title: 'Speed Limits',      icon: 'speedometer',      color: '#6366F1', bg: '#EDE9FE', screen: 'SpeedLimits' },
+        { id: '6', title: 'Emergency',          icon: 'call',             color: '#EF4444', bg: '#FEE2E2', screen: 'EmergencyContacts' },
+        { id: '7', title: 'My Image Reports',   icon: 'shield-checkmark', color: '#059669', bg: '#D1FAE5', screen: 'ImageReportStatus' },
+        { id: '8', title: 'Fine Calculator',    icon: 'calculator',       color: '#D97706', bg: '#FEF3C7', screen: 'FineCalculator' },
     ];
 
     const insets = useSafeAreaInsets();
@@ -149,7 +148,7 @@ export default function CitizenHome({ navigation }) {
                             >
                                 <Ionicons name="notifications-outline" size={20} color={C.white} />
                                 <View style={styles.notifBadge}>
-                                    <Text style={styles.notifBadgeText}>3</Text>
+                                    <Text style={styles.notifBadgeText}>0</Text>
                                 </View>
                             </TouchableOpacity>
                         </View>

@@ -124,8 +124,8 @@ export default function Profile({ navigation }) {
                         {/* Stats mini bar */}
                         <View style={styles.heroStats}>
                             {[
-                                { label: 'Reports', value: '12', icon: 'document-text' },
-                                { label: 'Verified', value: '8', icon: 'checkmark-circle' },
+                                { label: 'Reports', value: '0', icon: 'document-text' },
+                                { label: 'Verified', value: '0', icon: 'checkmark-circle' },
                                 { label: 'Points', value: formatPoints ? formatPoints(displayPoints) : displayPoints.toLocaleString(), icon: 'trophy' },
                             ].map((s, idx, arr) => (
                                 <View key={idx} style={styles.heroStatItem}>
@@ -141,25 +141,6 @@ export default function Profile({ navigation }) {
 
                     {/* ── Menu Sections ── */}
                     <View style={styles.menuArea}>
-                        {/* Referral Code with Premium Framing */}
-                        {profile?.referral_code && (
-                            <TouchableOpacity style={styles.referralCard} activeOpacity={0.9} onPress={() => navigation.navigate('ReferralProgram')}>
-                                <LinearGradient colors={['#FEF3C7', '#FFFBEB']} style={styles.referralGradient}>
-                                    <View style={styles.referralHeader}>
-                                        <View style={styles.giftIconFrame}>
-                                            <Ionicons name="gift" size={20} color={C.amberDark} />
-                                        </View>
-                                        <Text style={styles.referralTitle}>Referral Program</Text>
-                                    </View>
-                                    <View style={styles.codeContainer}>
-                                        <Text style={styles.referralCode}>{profile.referral_code}</Text>
-                                        <Ionicons name="copy-outline" size={14} color={C.amberDark} />
-                                    </View>
-                                    <Text style={styles.referralInfo}>Invite friends & earn 50 points per user</Text>
-                                </LinearGradient>
-                            </TouchableOpacity>
-                        )}
-
                         {menuSections.map((section, sIdx) => (
                             <View key={sIdx} style={styles.menuSection}>
                                 <Text style={styles.menuSectionTitle}>{section.title}</Text>

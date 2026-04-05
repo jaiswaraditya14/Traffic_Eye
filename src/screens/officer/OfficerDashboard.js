@@ -53,16 +53,12 @@ export default function OfficerDashboard({ navigation }) {
     }, []);
 
     const stats = [
-        { label: 'Pending', value: '24', icon: 'time-outline', color: C.warning, bg: C.warningSurface },
-        { label: 'Verified', value: '156', icon: 'checkmark-circle-outline', color: C.success, bg: C.successSurface },
-        { label: 'Accuracy', value: '98%', icon: 'stats-chart-outline', color: C.navyMid, bg: C.primarySurface },
+        { label: 'Pending', value: '0', icon: 'time-outline', color: C.warning, bg: C.warningSurface },
+        { label: 'Verified', value: '0', icon: 'checkmark-circle-outline', color: C.success, bg: C.successSurface },
+        { label: 'Accuracy', value: '-', icon: 'stats-chart-outline', color: C.navyMid, bg: C.primarySurface },
     ];
 
-    const recentReports = [
-        { id: 1, type: 'Speeding', location: 'Main St & 5th Ave', time: '15 min ago', priority: 'critical', vehicle: 'MH12AB1234' },
-        { id: 2, type: 'Red Light', location: 'Oak Rd & Elm St', time: '1h ago', priority: 'high', vehicle: 'MH01CD5678' },
-        { id: 3, type: 'No Helmet', location: 'Park Avenue East', time: '2h ago', priority: 'medium', vehicle: 'MH08EF9012' },
-    ];
+    const recentReports = [];
 
     const getPriorityConfig = (priority) => ({
         critical: { color: C.critical, bg: C.errorSurface, label: 'CRITICAL', barColor: C.critical },
@@ -115,7 +111,7 @@ export default function OfficerDashboard({ navigation }) {
                                     <Ionicons name="warning" size={18} color={C.amberDark} />
                                 </View>
                                 <View style={styles.alertContent}>
-                                    <Text style={styles.alertTitle}>3 High Priority Reports</Text>
+                                    <Text style={styles.alertTitle}>0 High Priority Reports</Text>
                                     <Text style={styles.alertSubtitle}>Require immediate review</Text>
                                 </View>
                                 <View style={styles.alertButton}>
@@ -160,10 +156,10 @@ export default function OfficerDashboard({ navigation }) {
                             </View>
                             <View style={styles.actionCardContent}>
                                 <Text style={styles.actionCardTitle}>Review Pending Reports</Text>
-                                <Text style={styles.actionCardDesc}>24 reports waiting for verification</Text>
+                                <Text style={styles.actionCardDesc}>0 reports waiting for verification</Text>
                             </View>
                             <View style={styles.amberCountBadge}>
-                                <Text style={styles.amberCountText}>24</Text>
+                                <Text style={styles.amberCountText}>0</Text>
                             </View>
                         </TouchableOpacity>
 
@@ -194,65 +190,72 @@ export default function OfficerDashboard({ navigation }) {
                             </TouchableOpacity>
                         </View>
 
-                        {recentReports.map((report) => {
-                            const config = getPriorityConfig(report.priority);
-                            return (
-                                <TouchableOpacity
-                                    key={report.id}
-                                    style={styles.reportCard}
-                                    activeOpacity={0.8}
-                                    onPress={() =>
-                                        navigation.getParent()?.navigate('ReportVerification', { reportId: report.id }) ??
-                                        navigation.navigate('ReportVerification', { reportId: report.id })
-                                    }
-                                >
-                                    {/* Priority left bar */}
-                                    <View style={[styles.reportBar, { backgroundColor: config.barColor }]} />
+                        {recentReports.length === 0 ? (
+                            <View style={{alignItems: 'center', marginTop: 20, marginBottom: 20}}>
+                                <Ionicons name="checkmark-circle-outline" size={40} color={C.success} />
+                                <Text style={{color: C.textSecondary, marginTop: 8, fontFamily: 'Nunito-Medium'}}>All caught up! No pending reports.</Text>
+                            </View>
+                        ) : (
+                            recentReports.map((report) => {
+                                const config = getPriorityConfig(report.priority);
+                                return (
+                                    <TouchableOpacity
+                                        key={report.id}
+                                        style={styles.reportCard}
+                                        activeOpacity={0.8}
+                                        onPress={() =>
+                                            navigation.getParent()?.navigate('ReportVerification', { reportId: report.id }) ??
+                                            navigation.navigate('ReportVerification', { reportId: report.id })
+                                        }
+                                    >
+                                        {/* Priority left bar */}
+                                        <View style={[styles.reportBar, { backgroundColor: config.barColor }]} />
 
-                                    {/* Thumbnail Frame (16:9 ish) */}
-                                    <View style={styles.thumbnailFrame}>
-                                        <Image
-                                            source={require('../../../assets/images/traffic_violation.jpg')}
-                                            style={styles.reportThumbnail}
-                                            resizeMode="cover"
-                                        />
-                                        <View style={styles.thumbnailOverlay}>
-                                            <Ionicons name="scan" size={14} color={C.white} />
-                                        </View>
-                                    </View>
-
-                                    {/* Content */}
-                                    <View style={styles.reportContent}>
-                                        <View style={styles.reportTopRow}>
-                                            <Text style={styles.reportType}>{report.type}</Text>
-                                            <View style={[styles.priorityChip, { backgroundColor: config.bg }]}>
-                                                <Text style={[styles.priorityChipText, { color: config.color }]}>
-                                                    {config.label}
-                                                </Text>
+                                        {/* Thumbnail Frame (16:9 ish) */}
+                                        <View style={styles.thumbnailFrame}>
+                                            <Image
+                                                source={require('../../../assets/images/traffic_violation.jpg')}
+                                                style={styles.reportThumbnail}
+                                                resizeMode="cover"
+                                            />
+                                            <View style={styles.thumbnailOverlay}>
+                                                <Ionicons name="scan" size={14} color={C.white} />
                                             </View>
                                         </View>
-                                        
-                                        <Text style={styles.reportVehicle}>{report.vehicle}</Text>
-                                        
-                                        <View style={styles.metaRow}>
-                                            <View style={styles.reportMeta}>
-                                                <Ionicons name="location" size={11} color={C.textTertiary} />
-                                                <Text style={styles.reportMetaText} numberOfLines={1}>{report.location}</Text>
+
+                                        {/* Content */}
+                                        <View style={styles.reportContent}>
+                                            <View style={styles.reportTopRow}>
+                                                <Text style={styles.reportType}>{report.type}</Text>
+                                                <View style={[styles.priorityChip, { backgroundColor: config.bg }]}>
+                                                    <Text style={[styles.priorityChipText, { color: config.color }]}>
+                                                        {config.label}
+                                                    </Text>
+                                                </View>
                                             </View>
-                                            <View style={styles.reportMeta}>
-                                                <Ionicons name="time" size={11} color={C.textTertiary} />
-                                                <Text style={styles.reportMetaText}>{report.time}</Text>
+                                            
+                                            <Text style={styles.reportVehicle}>{report.vehicle}</Text>
+                                            
+                                            <View style={styles.metaRow}>
+                                                <View style={styles.reportMeta}>
+                                                    <Ionicons name="location" size={11} color={C.textTertiary} />
+                                                    <Text style={styles.reportMetaText} numberOfLines={1}>{report.location}</Text>
+                                                </View>
+                                                <View style={styles.reportMeta}>
+                                                    <Ionicons name="time" size={11} color={C.textTertiary} />
+                                                    <Text style={styles.reportMetaText}>{report.time}</Text>
+                                                </View>
                                             </View>
                                         </View>
-                                    </View>
 
-                                    {/* Review Action */}
-                                    <View style={styles.actionArrow}>
-                                        <Ionicons name="chevron-forward" size={18} color={C.navyMid} />
-                                    </View>
-                                </TouchableOpacity>
-                            );
-                        })}
+                                        {/* Review Action */}
+                                        <View style={styles.actionArrow}>
+                                            <Ionicons name="chevron-forward" size={18} color={C.navyMid} />
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            })
+                        )}
                     </Animated.View>
                 </ScrollView>
             </SafeAreaView>
