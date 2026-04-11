@@ -437,7 +437,7 @@ export default function VideoReport({ navigation }) {
                         </TouchableOpacity>
                         <View style={styles.reportTypeActiveTab}>
                             <Ionicons name="videocam" size={14} color={C.navy} />
-                            <Text style={styles.reportTypeActiveText}>Manual Video</Text>
+                            <Text style={styles.reportTypeActiveText}>Video </Text>
                         </View>
                     </View>
                 </View>

@@ -202,7 +202,7 @@ export default function NewReport({ navigation }) {
                             activeOpacity={0.8}
                         >
                             <Ionicons name="videocam-outline" size={14} color={C.textTertiary} />
-                            <Text style={styles.reportTypeInactiveText}>Manual Video</Text>
+                            <Text style={styles.reportTypeInactiveText}>Video </Text>
                         </TouchableOpacity>
                     </View>
                 </View>
