@@ -179,7 +179,7 @@ export default function CitizenSignUp({ navigation }) {
     // ── Sign Up Form ──
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FB" />
+            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
             <ScrollView
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}

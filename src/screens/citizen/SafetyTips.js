@@ -25,7 +25,7 @@ export default function SafetyTips({ navigation }) {
 
     return (
         <View style={s.root}>
-            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FB" />
+            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
             <SafeAreaView style={s.safe} edges={['top']}>
 
                 {/* Header */}

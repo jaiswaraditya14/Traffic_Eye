@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MobileContainer } from '../../components';
@@ -18,6 +18,7 @@ const C = {
 export default function SignUpSuccess({ navigation }) {
     return (
         <MobileContainer>
+            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FB" />
             <View style={styles.container}>
                 <Ionicons name="checkmark-circle" size={100} color={C.success} />
                 <Text style={styles.title}>Signup Successful! 🎉</Text>

@@ -1,60 +1,103 @@
 import React, { useRef, useEffect } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, ScrollView,
-    Animated, StatusBar, Dimensions,
+    Animated, StatusBar, Dimensions, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MobileContainer } from '../../components';
 import { useAppContext, useAuth } from '../../context';
 import { ROLES } from '../../utils';
+import {
+    COLORS, SPACING, FONT_FAMILIES, FONT_SIZES,
+    BORDER_RADIUS, SHADOWS, GRADIENTS,
+} from '../../utils/theme';
 
 const { width } = Dimensions.get('window');
 
+// ── Design tokens (theme-aligned) ────────────────────────────────────────
 const C = {
-    navy: '#002452',
-    navyMid: '#1B3A6B',
-    navyLight: '#2C4E80',
-    amber: '#F59E0B',
-    amberDark: '#D97706',
-    white: '#FFFFFF',
-    offWhite: '#F8F9FB',
-    surface: '#FFFFFF',
-    surfaceLow: '#F2F4F6',
-    textPrimary: '#191C1E',
-    textSecondary: '#44474F',
-    textTertiary: '#747780',
-    success: '#059669',
-    successSurface: '#D1FAE5',
-    primarySurface: '#D7E2FF',
-    amberSurface: '#FEF3C7',
+    navy:           COLORS.primaryDark,     // #002452
+    navyMid:        COLORS.primary,         // #1B3A6B
+    navyLight:      COLORS.primaryLight,    // #2C4E80
+    amber:          COLORS.secondary,       // #F59E0B
+    amberDark:      COLORS.secondaryDark,   // #D97706
+    white:          COLORS.white,
+    offWhite:       COLORS.background,      // #F8F9FB
+    surface:        COLORS.surface,
+    surfaceLow:     COLORS.surfaceContainerLow,
+    textPrimary:    COLORS.textPrimary,
+    textSecondary:  COLORS.textSecondary,
+    textTertiary:   COLORS.textTertiary,
+    success:        COLORS.success,
+    successSurface: COLORS.successSurface,
+    primarySurface: COLORS.primarySurface,
+    amberSurface:   COLORS.secondarySurface,
+    border:         COLORS.borderLight,
 };
 
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ROLE SELECTION — Premium UI
+// ═════════════════════════════════════════════════════════════════════════════
+
 export default function RoleSelection({ navigation, onConfirm }) {
+    // ── Context (unchanged) ──
     const { setUserRole } = useAppContext();
     const { isAuthenticated, profile, signOut } = useAuth();
 
-    const fadeAnim = useRef(new Animated.Value(0)).current;
-    const headerSlide = useRef(new Animated.Value(-30)).current;
-    const card1Slide = useRef(new Animated.Value(40)).current;
-    const card2Slide = useRef(new Animated.Value(40)).current;
+    // ── Animations ──
+    const fadeAnim    = useRef(new Animated.Value(0)).current;
+    const headerSlide = useRef(new Animated.Value(-40)).current;
+    const card1Scale  = useRef(new Animated.Value(0.92)).current;
+    const card1Fade   = useRef(new Animated.Value(0)).current;
+    const card2Scale  = useRef(new Animated.Value(0.92)).current;
+    const card2Fade   = useRef(new Animated.Value(0)).current;
+    const footerFade  = useRef(new Animated.Value(0)).current;
+
+    // Floating decorative orbs (subtle ambient movement)
+    const orb1Y = useRef(new Animated.Value(0)).current;
+    const orb2Y = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
+        // Entrance sequence
         Animated.sequence([
+            // 1. Header fades in & slides down
             Animated.parallel([
-                Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
-                Animated.timing(headerSlide, { toValue: 0, duration: 400, useNativeDriver: true }),
+                Animated.timing(fadeAnim,    { toValue: 1, duration: 500, useNativeDriver: true }),
+                Animated.spring(headerSlide, { toValue: 0, tension: 60, friction: 12, useNativeDriver: true }),
             ]),
-            Animated.stagger(120, [
-                Animated.spring(card1Slide, { toValue: 0, tension: 70, friction: 10, useNativeDriver: true }),
-                Animated.spring(card2Slide, { toValue: 0, tension: 70, friction: 10, useNativeDriver: true }),
+            // 2. Cards spring in with stagger
+            Animated.stagger(150, [
+                Animated.parallel([
+                    Animated.spring(card1Scale, { toValue: 1, tension: 65, friction: 9, useNativeDriver: true }),
+                    Animated.timing(card1Fade,  { toValue: 1, duration: 350, useNativeDriver: true }),
+                ]),
+                Animated.parallel([
+                    Animated.spring(card2Scale, { toValue: 1, tension: 65, friction: 9, useNativeDriver: true }),
+                    Animated.timing(card2Fade,  { toValue: 1, duration: 350, useNativeDriver: true }),
+                ]),
             ]),
+            // 3. Footer fades in
+            Animated.timing(footerFade, { toValue: 1, duration: 300, useNativeDriver: true }),
         ]).start();
+
+        // Ambient floating orbs (loop)
+        const floatOrb = (anim, duration) =>
+            Animated.loop(
+                Animated.sequence([
+                    Animated.timing(anim, { toValue: -8, duration, useNativeDriver: true }),
+                    Animated.timing(anim, { toValue: 8,  duration, useNativeDriver: true }),
+                ]),
+            );
+        floatOrb(orb1Y, 3000).start();
+        floatOrb(orb2Y, 4000).start();
     }, []);
 
+    // ── Role selection handler (logic unchanged) ──
     const handleRoleSelect = async (role) => {
         setUserRole(role);
-        
+
         // Security logic: If already authenticated but choosing a different role, sign out
         if (isAuthenticated && profile && profile.role !== role) {
             console.log("Role mismatch in session, signing out for security.");
@@ -78,19 +121,27 @@ export default function RoleSelection({ navigation, onConfirm }) {
         }
     };
 
+    // ── Render ──
     return (
         <MobileContainer>
-            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FB" />
+            <StatusBar barStyle="light-content" backgroundColor={C.navy} />
             <ScrollView
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
+                bounces={false}
             >
-                {/* ── Navy Header ── */}
+                {/* ── Immersive Hero Header ── */}
                 <LinearGradient
-                    colors={[C.navy, C.navyMid]}
-                    style={styles.header}
+                    colors={GRADIENTS.heroDark}
+                    start={{ x: 0.2, y: 0 }}
+                    end={{ x: 0.8, y: 1 }}
+                    style={styles.hero}
                 >
+                    {/* Decorative floating orbs */}
+                    <Animated.View style={[styles.orb, styles.orb1, { transform: [{ translateY: orb1Y }] }]} />
+                    <Animated.View style={[styles.orb, styles.orb2, { transform: [{ translateY: orb2Y }] }]} />
+
                     <Animated.View
                         style={{
                             opacity: fadeAnim,
@@ -98,268 +149,353 @@ export default function RoleSelection({ navigation, onConfirm }) {
                             alignItems: 'center',
                         }}
                     >
-                        {/* Shield icon */}
-                        <View style={styles.shieldContainer}>
-                            <Ionicons name="shield-checkmark" size={44} color={C.amber} />
+                        {/* Glowing shield icon */}
+                        <View style={styles.shieldGlow}>
+                            <LinearGradient
+                                colors={['rgba(245,158,11,0.15)', 'rgba(245,158,11,0.04)']}
+                                style={styles.shieldOuter}
+                            >
+                                <View style={styles.shieldInner}>
+                                    <Ionicons name="shield-checkmark" size={36} color={C.amber} />
+                                </View>
+                            </LinearGradient>
                         </View>
-                        <Text style={styles.headerTitle}>Welcome to TrafficEye</Text>
-                        <Text style={styles.headerSubtitle}>
-                            Choose how you'd like to use the platform
-                        </Text>
+
+                        <Text style={styles.heroTitle}>Welcome to TrafficEye</Text>
+                        <Text style={styles.heroSubtitle}>Select your role to get started</Text>
                     </Animated.View>
                 </LinearGradient>
 
                 {/* ── Role Cards ── */}
                 <View style={styles.cardsSection}>
 
-                    {/* Citizen Card */}
-                    <Animated.View style={{ transform: [{ translateY: card1Slide }], opacity: fadeAnim }}>
+                    {/* ─── Citizen Card ─── */}
+                    <Animated.View style={{
+                        opacity: card1Fade,
+                        transform: [{ scale: card1Scale }],
+                    }}>
                         <TouchableOpacity
                             style={styles.card}
                             onPress={() => handleRoleSelect(ROLES.CITIZEN)}
-                            activeOpacity={0.82}
+                            activeOpacity={0.85}
                         >
-                            {/* Left accent bar */}
-                            <View style={[styles.cardAccentBar, { backgroundColor: C.navyMid }]} />
-                            <View style={styles.cardContent}>
-                                {/* Circle Frame Icon */}
-                                <View style={styles.iconFrame}>
-                                    <Ionicons name="person" size={28} color={C.navyMid} />
-                                </View>
-                                {/* Text Content */}
-                                <View style={styles.cardText}>
-                                    <View style={styles.cardTitleRow}>
+                            {/* Top gradient accent strip */}
+                            <LinearGradient
+                                colors={[C.navyMid, C.navyLight]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={styles.cardAccentStrip}
+                            />
+
+                            <View style={styles.cardBody}>
+                                {/* Icon + Title row */}
+                                <View style={styles.cardHeader}>
+                                    <View style={[styles.iconCircle, { backgroundColor: C.primarySurface }]}>
+                                        <Ionicons name="person" size={26} color={C.navyMid} />
+                                    </View>
+                                    <View style={styles.cardTitleBlock}>
                                         <Text style={styles.cardTitle}>Citizen</Text>
-                                        <View style={[styles.roleBadge, { backgroundColor: C.primarySurface, borderColor: C.navyMid + '20' }]}>
-                                            <Text style={[styles.roleBadgeText, { color: C.navyMid }]}>REPORTER</Text>
+                                        <View style={[styles.rolePill, { backgroundColor: C.primarySurface }]}>
+                                            <Text style={[styles.rolePillText, { color: C.navyMid }]}>REPORTER</Text>
                                         </View>
                                     </View>
-                                    <Text style={styles.cardDescription}>
-                                        Report traffic violations and earn rewards for making your community safer
-                                    </Text>
-                                    {/* Feature list */}
-                                    <View style={styles.featureList}>
-                                        {['Report violations with AI', 'Track your reports', 'Earn reward points'].map((f, i) => (
-                                            <View key={i} style={styles.featureItem}>
-                                                <View style={[styles.featureDot, { backgroundColor: C.success }]} />
-                                                <Text style={styles.featureText}>{f}</Text>
-                                            </View>
-                                        ))}
+                                    <View style={styles.arrowCircle}>
+                                        <Ionicons name="arrow-forward" size={18} color={C.navyMid} />
                                     </View>
                                 </View>
-                                {/* Arrow */}
-                                <Ionicons name="chevron-forward" size={20} color={C.textTertiary} style={{ marginTop: 4 }} />
+
+                                {/* Description */}
+                                <Text style={styles.cardDesc}>
+                                    Report traffic violations and earn rewards for making roads safer.
+                                </Text>
+
+                                {/* Feature chips */}
+                                <View style={styles.chipRow}>
+                                    {['AI Reports', 'Track Status', 'Earn Points'].map((label, i) => (
+                                        <View key={i} style={[styles.chip, { backgroundColor: C.successSurface }]}>
+                                            <Ionicons name="checkmark-circle" size={13} color={C.success} />
+                                            <Text style={[styles.chipText, { color: C.success }]}>{label}</Text>
+                                        </View>
+                                    ))}
+                                </View>
                             </View>
                         </TouchableOpacity>
                     </Animated.View>
 
-                    {/* Officer Card */}
-                    <Animated.View style={{ transform: [{ translateY: card2Slide }], opacity: fadeAnim }}>
+                    {/* ─── Officer Card ─── */}
+                    <Animated.View style={{
+                        opacity: card2Fade,
+                        transform: [{ scale: card2Scale }],
+                    }}>
                         <TouchableOpacity
                             style={styles.card}
                             onPress={() => handleRoleSelect(ROLES.OFFICER)}
-                            activeOpacity={0.82}
+                            activeOpacity={0.85}
                         >
-                            {/* Left accent bar */}
-                            <View style={[styles.cardAccentBar, { backgroundColor: C.amber }]} />
-                            <View style={styles.cardContent}>
-                                {/* Circle Frame Icon */}
-                                <View style={styles.iconFrame}>
-                                    <Ionicons name="shield-checkmark" size={28} color={C.amberDark} />
-                                </View>
-                                {/* Text Content */}
-                                <View style={styles.cardText}>
-                                    <View style={styles.cardTitleRow}>
+                            {/* Top gradient accent strip */}
+                            <LinearGradient
+                                colors={GRADIENTS.amber}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={styles.cardAccentStrip}
+                            />
+
+                            <View style={styles.cardBody}>
+                                {/* Icon + Title row */}
+                                <View style={styles.cardHeader}>
+                                    <View style={[styles.iconCircle, { backgroundColor: C.amberSurface }]}>
+                                        <Ionicons name="shield-checkmark" size={26} color={C.amberDark} />
+                                    </View>
+                                    <View style={styles.cardTitleBlock}>
                                         <Text style={styles.cardTitle}>Traffic Officer</Text>
-                                        <View style={[styles.roleBadge, { backgroundColor: C.amberSurface, borderColor: C.amber + '40' }]}>
-                                            <Text style={[styles.roleBadgeText, { color: C.amberDark }]}>AUTHORITY</Text>
+                                        <View style={[styles.rolePill, { backgroundColor: C.amberSurface }]}>
+                                            <Text style={[styles.rolePillText, { color: C.amberDark }]}>AUTHORITY</Text>
                                         </View>
                                     </View>
-                                    <Text style={styles.cardDescription}>
-                                        Verify citizen reports, manage the violation queue, and maintain road safety
-                                    </Text>
-                                    {/* Feature list */}
-                                    <View style={styles.featureList}>
-                                        {['Verify & approve reports', 'Manage pending queue', 'Track enforcement stats'].map((f, i) => (
-                                            <View key={i} style={styles.featureItem}>
-                                                <View style={[styles.featureDot, { backgroundColor: C.amber }]} />
-                                                <Text style={styles.featureText}>{f}</Text>
-                                            </View>
-                                        ))}
+                                    <View style={[styles.arrowCircle, { backgroundColor: C.amberSurface }]}>
+                                        <Ionicons name="arrow-forward" size={18} color={C.amberDark} />
                                     </View>
                                 </View>
-                                {/* Arrow */}
-                                <Ionicons name="chevron-forward" size={20} color={C.textTertiary} style={{ marginTop: 4 }} />
+
+                                {/* Description */}
+                                <Text style={styles.cardDesc}>
+                                    Verify reports, manage violations, and maintain road safety.
+                                </Text>
+
+                                {/* Feature chips */}
+                                <View style={styles.chipRow}>
+                                    {['Verify Reports', 'Manage Queue', 'Track Stats'].map((label, i) => (
+                                        <View key={i} style={[styles.chip, { backgroundColor: C.amberSurface }]}>
+                                            <Ionicons name="checkmark-circle" size={13} color={C.amberDark} />
+                                            <Text style={[styles.chipText, { color: C.amberDark }]}>{label}</Text>
+                                        </View>
+                                    ))}
+                                </View>
                             </View>
                         </TouchableOpacity>
                     </Animated.View>
-
-                    {/* Footer note */}
-                    <Animated.View style={[styles.footerNote, { opacity: fadeAnim }]}>
-                        <Ionicons name="information-circle-outline" size={14} color={C.textTertiary} />
-                        <Text style={styles.footerNoteText}>
-                            Officer access requires registration by the Traffic Authority
-                        </Text>
-                    </Animated.View>
                 </View>
+
+                {/* ── Footer ── */}
+                <Animated.View style={[styles.footer, { opacity: footerFade }]}>
+                    <View style={styles.footerDivider} />
+                    <View style={styles.footerContent}>
+                        <Ionicons name="lock-closed" size={13} color={C.textTertiary} />
+                        <Text style={styles.footerText}>
+                            Officer access requires Traffic Authority registration
+                        </Text>
+                    </View>
+                </Animated.View>
+
             </ScrollView>
         </MobileContainer>
     );
 }
 
+
+// ═════════════════════════════════════════════════════════════════════════════
+// STYLES
+// ═════════════════════════════════════════════════════════════════════════════
+
 const styles = StyleSheet.create({
+
+    // ── Scroll container ──
     scrollView: {
         flex: 1,
         backgroundColor: C.offWhite,
     },
     scrollContent: {
+        flexGrow: 1,
         paddingBottom: 40,
     },
 
-    // ── Header ──
-    header: {
-        paddingTop: 60,
-        paddingBottom: 36,
-        paddingHorizontal: 28,
-        borderBottomLeftRadius: 28,
-        borderBottomRightRadius: 28,
+    // ── Hero header ──
+    hero: {
+        paddingTop: Platform.OS === 'ios' ? 70 : 56,
+        paddingBottom: 48,
+        paddingHorizontal: SPACING.xl,
+        borderBottomLeftRadius: 32,
+        borderBottomRightRadius: 32,
         alignItems: 'center',
+        overflow: 'hidden',
+        position: 'relative',
     },
-    shieldContainer: {
+
+    // Decorative floating orbs
+    orb: {
+        position: 'absolute',
+        borderRadius: 999,
+    },
+    orb1: {
+        width: 120,
+        height: 120,
+        backgroundColor: 'rgba(245, 158, 11, 0.06)',
+        top: -20,
+        right: -30,
+    },
+    orb2: {
         width: 80,
         height: 80,
-        borderRadius: 22,
-        backgroundColor: 'rgba(255,255,255,0.1)',
+        backgroundColor: 'rgba(255, 255, 255, 0.04)',
+        bottom: 10,
+        left: -20,
+    },
+
+    // Shield icon with glow ring
+    shieldGlow: {
+        marginBottom: 20,
+    },
+    shieldOuter: {
+        width: 88,
+        height: 88,
+        borderRadius: 28,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.15)',
     },
-    headerTitle: {
-        fontFamily: 'Nunito-Bold',
-        fontSize: 24,
+    shieldInner: {
+        width: 64,
+        height: 64,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(245,158,11,0.2)',
+    },
+
+    heroTitle: {
+        fontFamily: FONT_FAMILIES.bold,
+        fontSize: 26,
         color: C.white,
         letterSpacing: -0.5,
         textAlign: 'center',
         marginBottom: 8,
     },
-    headerSubtitle: {
-        fontFamily: 'Nunito-Regular',
-        fontSize: 14,
-        color: 'rgba(255,255,255,0.65)',
+    heroSubtitle: {
+        fontFamily: FONT_FAMILIES.medium,
+        fontSize: FONT_SIZES.md,
+        color: 'rgba(255,255,255,0.55)',
         textAlign: 'center',
-        lineHeight: 20,
     },
 
-    // ── Cards Section ──
+    // ── Cards section ──
     cardsSection: {
-        paddingHorizontal: 22,
-        paddingTop: 32,
-        gap: 20,
+        paddingHorizontal: 20,
+        marginTop: -16,         // Overlap hero slightly for depth
+        gap: 18,
+        zIndex: 1,
     },
+
+    // ── Individual card ──
     card: {
         backgroundColor: C.surface,
-        borderRadius: 24,
-        flexDirection: 'row',
+        borderRadius: BORDER_RADIUS.xxxl,
         overflow: 'hidden',
-        shadowColor: '#1B3A6B',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.1,
-        shadowRadius: 20,
-        elevation: 4,
+        ...SHADOWS.lg,
         borderWidth: 1,
         borderColor: 'rgba(0,0,0,0.03)',
     },
-    cardAccentBar: {
-        width: 6,
+    cardAccentStrip: {
+        height: 4,
+        width: '100%',
     },
-    cardContent: {
-        flex: 1,
+    cardBody: {
+        padding: 22,
+    },
+
+    // Card header (icon + title + arrow)
+    cardHeader: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
-        padding: 24,
-        gap: 16,
+        alignItems: 'center',
+        gap: 14,
+        marginBottom: 14,
     },
-    iconFrame: {
-        width: 60,
-        height: 60,
-        borderRadius: 30, // Circle Frame for roles
+    iconCircle: {
+        width: 54,
+        height: 54,
+        borderRadius: 27,
         justifyContent: 'center',
         alignItems: 'center',
-        flexShrink: 0,
-        backgroundColor: '#FFFFFF',
-        shadowColor: '#1B3A6B',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 10,
-        elevation: 2,
     },
-    cardText: {
+    cardTitleBlock: {
         flex: 1,
-    },
-    cardTitleRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        marginBottom: 8,
-        flexWrap: 'wrap',
+        gap: 6,
     },
     cardTitle: {
-        fontFamily: 'Nunito-Bold',
-        fontSize: 19,
+        fontFamily: FONT_FAMILIES.bold,
+        fontSize: 20,
         color: C.textPrimary,
         letterSpacing: -0.3,
     },
-    roleBadge: {
+    rolePill: {
+        alignSelf: 'flex-start',
         paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 20,
-        borderWidth: 1,
+        paddingVertical: 3,
+        borderRadius: BORDER_RADIUS.full,
     },
-    roleBadgeText: {
-        fontFamily: 'Nunito-ExtraBold',
-        fontSize: 10,
-        letterSpacing: 1.2,
+    rolePillText: {
+        fontFamily: FONT_FAMILIES.bold,
+        fontSize: 9,
+        letterSpacing: 1.4,
     },
-    cardDescription: {
-        fontFamily: 'Nunito-Regular',
-        fontSize: 14,
-        color: C.textSecondary,
-        lineHeight: 21,
-        marginBottom: 16,
-    },
-    featureList: {
-        gap: 8,
-    },
-    featureItem: {
-        flexDirection: 'row',
+    arrowCircle: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: C.primarySurface,
+        justifyContent: 'center',
         alignItems: 'center',
-        gap: 10,
-    },
-    featureDot: {
-        width: 7,
-        height: 7,
-        borderRadius: 3.5,
-    },
-    featureText: {
-        fontFamily: 'Nunito-SemiBold',
-        fontSize: 13,
-        color: C.textPrimary,
     },
 
-    // Footer note
-    footerNote: {
+    // Card description
+    cardDesc: {
+        fontFamily: FONT_FAMILIES.regular,
+        fontSize: FONT_SIZES.sm,
+        color: C.textSecondary,
+        lineHeight: 20,
+        marginBottom: 16,
+    },
+
+    // Feature chips
+    chipRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    chip: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        marginTop: 12,
-        paddingBottom: 20,
+        gap: 5,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: BORDER_RADIUS.full,
     },
-    footerNoteText: {
-        fontFamily: 'Nunito-Regular',
-        fontSize: 12,
+    chipText: {
+        fontFamily: FONT_FAMILIES.semibold,
+        fontSize: 11,
+    },
+
+    // ── Footer ──
+    footer: {
+        paddingHorizontal: 32,
+        marginTop: 28,
+        alignItems: 'center',
+    },
+    footerDivider: {
+        width: 48,
+        height: 3,
+        borderRadius: 2,
+        backgroundColor: C.border,
+        marginBottom: 16,
+    },
+    footerContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    footerText: {
+        fontFamily: FONT_FAMILIES.regular,
+        fontSize: FONT_SIZES.xs,
         color: C.textTertiary,
         textAlign: 'center',
     },

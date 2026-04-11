@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Easing, Alert } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing, Alert, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context';
 import { aiService } from '../../services';
@@ -91,6 +91,7 @@ export default function AIProcessing({ navigation }) {
 
     return (
         <View style={styles.container}>
+            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
             <View style={styles.radarWrapper}>
                 <Animated.View style={[styles.pulseCircle, { transform: [{ scale: pulseValue }] }]} />
                 <Animated.View style={[styles.spinCircle, { transform: [{ rotate: spin }] }]}>

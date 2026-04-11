@@ -181,7 +181,7 @@ export default function OtpVerification({ navigation, route }) {
 
     return (
         <MobileContainer>
-            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FB" />
+            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
                 <ScrollView
                     contentContainerStyle={styles.scrollContent}
