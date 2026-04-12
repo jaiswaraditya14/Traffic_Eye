@@ -266,6 +266,49 @@ export const rewardService = {
     },
 
     /**
+     * Award base submission points immediately upon saving a report
+     */
+    async awardBaseSubmissionPoints(reportId) {
+        try {
+            const pointsToAward = 10;
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('Not authenticated');
+
+            const { data: profile, error: readError } = await supabase
+                .from('profiles')
+                .select('points_balance')
+                .eq('id', user.id)
+                .single();
+
+            if (readError) throw readError;
+
+            const newBalance = (profile?.points_balance || 0) + pointsToAward;
+
+            const { error: updateError } = await supabase
+                .from('profiles')
+                .update({ points_balance: newBalance })
+                .eq('id', user.id);
+
+            if (updateError) throw updateError;
+
+            // Record transaction
+            await supabase.from('point_transactions').insert({
+                user_id: user.id,
+                amount: pointsToAward,
+                type: 'earned',
+                action: 'report_submitted',
+                reference_id: reportId || null,
+                description: 'Base reward for submitting a traffic report'
+            });
+
+            return { success: true, pointsAwarded: pointsToAward, newBalance };
+        } catch (error) {
+            console.error('Error awarding submission points:', error);
+            return { success: false, error: error.message };
+        }
+    },
+
+    /**
      * Handle item redemption — generates coupon code and deducts points
      */
     async redeemItem(item) {

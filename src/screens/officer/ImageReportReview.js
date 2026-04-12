@@ -2,32 +2,40 @@
  * ImageReportReview.js  (Officer Screen)
  *
  * Shows the officer the full details of an image report:
- *  • Evidence photo
+ *  • Evidence photo + full media gallery (images + videos)
  *  • AI analysis block (violation type, description, severity, confidence)
  *  • Submitter information
  *  • Notes / remarks input
  *  • Approve / Reject footer — atomically updates DB and notifies citizen in real-time
+ *  • On approval, severity-based reward is computed and displayed
  */
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     TextInput, Image, StatusBar, ActivityIndicator,
-    Alert, Animated, Keyboard,
+    Alert, Animated, Keyboard, Dimensions, Modal,
 } from 'react-native';
+import { Video, ResizeMode } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context';
 import { fetchReportById, submitOfficerDecision } from '../../services/reports';
+import { rewardService } from '../../services';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ── Tokens ────────────────────────────────────────────────────────────────
 const C = {
     navy:           '#002452',
+    navyDeep:       '#00102B',
     navyMid:        '#1B3A6B',
     amber:          '#F59E0B',
+    amberDark:      '#D97706',
     white:          '#FFFFFF',
     offWhite:       '#F8F9FB',
     surface:        '#FFFFFF',
+    surfaceLow:     '#F2F4F6',
     textPrimary:    '#191C1E',
     textSecondary:  '#44474F',
     textTertiary:   '#747780',
@@ -36,14 +44,13 @@ const C = {
     successSurface: '#D1FAE5',
     error:          '#DC2626',
     errorSurface:   '#FEE2E2',
-    amber04: 'rgba(245,158,11,0.15)',
 };
 
 const SEVERITY_CFG = {
-    critical: { color: '#DC2626', bg: '#FEE2E2', label: 'Critical', icon: 'flame' },
-    high:     { color: '#EA580C', bg: '#FFEDD5', label: 'High',     icon: 'warning' },
-    medium:   { color: '#D97706', bg: '#FEF3C7', label: 'Medium',   icon: 'alert-circle' },
-    low:      { color: '#059669', bg: '#D1FAE5', label: 'Low',      icon: 'checkmark-circle' },
+    critical: { color: '#DC2626', bg: '#FEE2E2', label: 'Critical', icon: 'flame',           reward: 200 },
+    high:     { color: '#EA580C', bg: '#FFEDD5', label: 'High',     icon: 'warning',          reward: 200 },
+    medium:   { color: '#D97706', bg: '#FEF3C7', label: 'Medium',   icon: 'alert-circle',     reward: 100 },
+    low:      { color: '#059669', bg: '#D1FAE5', label: 'Low',      icon: 'checkmark-circle', reward: 50  },
 };
 
 // ── Confidence bar ────────────────────────────────────────────────────────
@@ -92,6 +99,7 @@ export default function ImageReportReview({ route, navigation }) {
     const [internal, setInternal] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [alreadyReviewed, setAlreadyReviewed] = useState(false);
+    const [fullscreenImage, setFullscreenImage] = useState(null);
 
     // Success animation
     const successScale = useRef(new Animated.Value(0)).current;
@@ -121,9 +129,12 @@ export default function ImageReportReview({ route, navigation }) {
             return;
         }
 
+        const sevCfg = SEVERITY_CFG[report?.severity] || SEVERITY_CFG.medium;
+        const rewardInfo = decision === 'approved' ? `\n\n🏆 Reward: +${sevCfg.reward} pts (${sevCfg.label} severity)` : '';
+
         Alert.alert(
             decision === 'approved' ? 'Approve Report?' : 'Reject Report?',
-            `This will ${decision === 'approved' ? 'approve' : 'reject'} the report and notify the citizen.\n\n${remarks ? `Remark: ${remarks}` : ''}`,
+            `This will ${decision === 'approved' ? 'approve' : 'reject'} the report and notify the citizen.${remarks ? `\n\nRemark: ${remarks}` : ''}${rewardInfo}`,
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
@@ -171,6 +182,9 @@ export default function ImageReportReview({ route, navigation }) {
     }
 
     const sevCfg = SEVERITY_CFG[report?.severity] || SEVERITY_CFG.medium;
+    const allMedia = report?.media || [];
+    const mediaImages = allMedia.filter(m => m.file_type === 'image');
+    const mediaVideos = allMedia.filter(m => m.file_type === 'video');
     const submitted = report?.submitted_at
         ? new Date(report.submitted_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
         : '—';
@@ -181,7 +195,7 @@ export default function ImageReportReview({ route, navigation }) {
             <SafeAreaView style={{ flex: 1 }} edges={['top']}>
 
                 {/* Header */}
-                <LinearGradient colors={[C.navy, C.navyMid]} style={s.header}>
+                <LinearGradient colors={[C.navyDeep, C.navy, C.navyMid]} style={s.header}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
                         <Ionicons name="arrow-back" size={20} color={C.white} />
                     </TouchableOpacity>
@@ -215,24 +229,64 @@ export default function ImageReportReview({ route, navigation }) {
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
                 >
-                    {/* Evidence image */}
-                    <View style={s.imgCard}>
-                        {report?.image_url ? (
-                            <Image source={{ uri: report.image_url }} style={s.evidenceImg} resizeMode="cover" />
-                        ) : (
-                            <View style={[s.evidenceImg, s.imgPlaceholder]}>
-                                <Ionicons name="image-outline" size={40} color={C.textTertiary} />
-                                <Text style={{ fontFamily: 'Nunito-Medium', color: C.textTertiary, marginTop: 6 }}>No image provided</Text>
-                            </View>
-                        )}
-                        <View style={s.imgOverlay}>
-                            <View style={[s.sevPill, { backgroundColor: sevCfg.color }]}>
-                                <Text style={s.sevPillText}>{sevCfg.label.toUpperCase()} PRIORITY</Text>
+                    {/* ── Main Evidence Image ── */}
+                    <TouchableOpacity onPress={() => report?.image_url && setFullscreenImage(report.image_url)} activeOpacity={0.9}>
+                        <View style={s.imgCard}>
+                            {report?.image_url ? (
+                                <Image source={{ uri: report.image_url }} style={s.evidenceImg} resizeMode="cover" />
+                            ) : (
+                                <View style={[s.evidenceImg, s.imgPlaceholder]}>
+                                    <Ionicons name="image-outline" size={40} color={C.textTertiary} />
+                                    <Text style={{ fontFamily: 'Nunito-Medium', color: C.textTertiary, marginTop: 6 }}>No image provided</Text>
+                                </View>
+                            )}
+                            <View style={s.imgOverlay}>
+                                <View style={[s.sevPill, { backgroundColor: sevCfg.color }]}>
+                                    <Text style={s.sevPillText}>{sevCfg.label.toUpperCase()} PRIORITY</Text>
+                                </View>
                             </View>
                         </View>
-                    </View>
+                    </TouchableOpacity>
 
-                    {/* AI Analysis card */}
+                    {/* ── Media Gallery (additional images + videos) ── */}
+                    {allMedia.length > 0 && (
+                        <View style={s.card}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                                <Ionicons name="images" size={16} color={C.navyMid} />
+                                <Text style={s.cardTitle}>Evidence Gallery</Text>
+                                <View style={{ backgroundColor: C.surfaceLow, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
+                                    <Text style={{ fontSize: 11, fontFamily: 'Nunito-Bold', color: C.textSecondary }}>{allMedia.length} file{allMedia.length > 1 ? 's' : ''}</Text>
+                                </View>
+                            </View>
+
+                            {/* Large image previews */}
+                            {mediaImages.map((img) => (
+                                <TouchableOpacity key={img.id} onPress={() => setFullscreenImage(img.file_url)} activeOpacity={0.9}>
+                                    <View style={s.galleryImgContainer}>
+                                        <Image source={{ uri: img.file_url }} style={s.galleryImg} resizeMode="cover" />
+                                        <View style={s.galleryImgOverlay}>
+                                            <Ionicons name="expand" size={20} color={C.white} />
+                                        </View>
+                                    </View>
+                                </TouchableOpacity>
+                            ))}
+
+                            {/* Playable video players */}
+                            {mediaVideos.map((vid) => (
+                                <View key={vid.id} style={s.galleryVideoContainer}>
+                                    <Video
+                                        source={{ uri: vid.file_url }}
+                                        style={s.galleryVideo}
+                                        useNativeControls
+                                        resizeMode={ResizeMode.CONTAIN}
+                                        shouldPlay={false}
+                                    />
+                                </View>
+                            ))}
+                        </View>
+                    )}
+
+                    {/* ── AI Analysis Card ── */}
                     <LinearGradient colors={['#F0FDF4', '#DCFCE7']} style={s.aiCard}>
                         <View style={s.aiCardHeader}>
                             <Ionicons name="sparkles" size={18} color={C.success} />
@@ -244,13 +298,11 @@ export default function ImageReportReview({ route, navigation }) {
                             </View>
                         </View>
 
-                        {/* Violation type */}
                         <View style={s.aiRow}>
                             <Text style={s.aiLabel}>Violation Type</Text>
                             <Text style={s.aiValue}>{report?.violation_type || '—'}</Text>
                         </View>
 
-                        {/* Vehicle number */}
                         {report?.vehicle_number && (
                             <View style={s.aiRow}>
                                 <Text style={s.aiLabel}>Vehicle Plate</Text>
@@ -260,12 +312,10 @@ export default function ImageReportReview({ route, navigation }) {
                             </View>
                         )}
 
-                        {/* Confidence bar */}
                         <View style={{ marginTop: 4 }}>
                             <ConfBar score={report?.ai_confidence} />
                         </View>
 
-                        {/* AI Description */}
                         {report?.violation_description && (
                             <View style={s.aiDescBox}>
                                 <Text style={s.aiDescText}>{report.violation_description}</Text>
@@ -273,7 +323,19 @@ export default function ImageReportReview({ route, navigation }) {
                         )}
                     </LinearGradient>
 
-                    {/* Submission details */}
+                    {/* ── Reward Preview ── */}
+                    <View style={s.rewardPreview}>
+                        <LinearGradient colors={['#FFFBEB', '#FEF3C7']} style={s.rewardPreviewGrad}>
+                            <Ionicons name="trophy" size={24} color={C.amberDark} />
+                            <View style={{ flex: 1 }}>
+                                <Text style={s.rewardPreviewTitle}>Reward on Approval</Text>
+                                <Text style={s.rewardPreviewSub}>Based on {sevCfg.label.toLowerCase()} severity level</Text>
+                            </View>
+                            <Text style={s.rewardPreviewPts}>+{sevCfg.reward} pts</Text>
+                        </LinearGradient>
+                    </View>
+
+                    {/* ── Submission Details ── */}
                     <View style={s.card}>
                         <Text style={s.cardTitle}>Submission Details</Text>
                         <InfoRow label="Reported At"  value={submitted} />
@@ -284,7 +346,7 @@ export default function ImageReportReview({ route, navigation }) {
                         <InfoRow label="Report ID"    value={`#${report?.id?.slice(0, 8).toUpperCase()}`} mono />
                     </View>
 
-                    {/* Submitter identity */}
+                    {/* ── Submitter Identity ── */}
                     <View style={s.card}>
                         <Text style={s.cardTitle}>Citizen Info</Text>
                         <InfoRow label="Full Name"  value={report?.submitter?.full_name || '—'} />
@@ -292,7 +354,7 @@ export default function ImageReportReview({ route, navigation }) {
                         <InfoRow label="Phone"      value={report?.submitter?.phone} />
                     </View>
 
-                    {/* Officer remarks */}
+                    {/* ── Officer Remarks ── */}
                     <Text style={s.inputLabel}>Public Remark (shown to citizen) *</Text>
                     <View style={s.inputBox}>
                         <TextInput
@@ -365,6 +427,18 @@ export default function ImageReportReview({ route, navigation }) {
                     <Text style={s.successSub}>Citizen has been notified in real-time.</Text>
                 </LinearGradient>
             </Animated.View>
+
+            {/* Fullscreen Image Modal */}
+            <Modal visible={!!fullscreenImage} transparent={true} animationType="fade" onRequestClose={() => setFullscreenImage(null)}>
+                <View style={s.modalBg}>
+                    <TouchableOpacity style={s.modalClose} onPress={() => setFullscreenImage(null)}>
+                        <Ionicons name="close" size={28} color={C.white} />
+                    </TouchableOpacity>
+                    {fullscreenImage && (
+                        <Image source={{ uri: fullscreenImage }} style={s.modalImg} resizeMode="contain" />
+                    )}
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -391,6 +465,23 @@ const s = StyleSheet.create({
     sevPill:        { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
     sevPillText:    { fontSize: 10, fontFamily: 'Nunito-ExtraBold', color: C.white, letterSpacing: 0.6 },
 
+    // Gallery
+    galleryImgContainer: {
+        width: '100%', height: 240, borderRadius: 14, overflow: 'hidden',
+        marginBottom: 12, backgroundColor: C.surfaceLow,
+    },
+    galleryImg: { width: '100%', height: '100%' },
+    galleryImgOverlay: {
+        position: 'absolute', bottom: 10, right: 10,
+        backgroundColor: 'rgba(0,0,0,0.5)', padding: 10, borderRadius: 12,
+    },
+    galleryVideoContainer: {
+        width: '100%', height: 260, borderRadius: 14, overflow: 'hidden',
+        marginBottom: 12, backgroundColor: '#000',
+    },
+    galleryVideo: { width: '100%', height: '100%' },
+
+    // AI Card
     aiCard:       { borderRadius: 18, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#BBF7D0' },
     aiCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
     aiCardTitle:  { flex: 1, fontSize: 15, fontFamily: 'Nunito-Bold', color: '#166534' },
@@ -399,6 +490,13 @@ const s = StyleSheet.create({
     aiValue:      { fontSize: 13, fontFamily: 'Nunito-Bold', color: '#166534' },
     aiDescBox:    { marginTop: 10, backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 10, padding: 10 },
     aiDescText:   { fontSize: 13, fontFamily: 'Nunito-SemiBold', color: C.textPrimary, lineHeight: 19 },
+
+    // Reward Preview
+    rewardPreview: { marginBottom: 16, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(245,158,11,0.2)' },
+    rewardPreviewGrad: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 },
+    rewardPreviewTitle: { fontSize: 14, fontFamily: 'Nunito-Bold', color: C.textPrimary },
+    rewardPreviewSub: { fontSize: 11, fontFamily: 'Nunito-Medium', color: C.textTertiary },
+    rewardPreviewPts: { fontSize: 22, fontFamily: 'Nunito-ExtraBold', color: C.amberDark },
 
     card:      { backgroundColor: C.surface, borderRadius: 18, padding: 16, marginBottom: 14, shadowColor: C.navy, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
     cardTitle: { fontSize: 14, fontFamily: 'Nunito-Bold', color: C.navyMid, marginBottom: 8 },
@@ -417,4 +515,14 @@ const s = StyleSheet.create({
     successContent: { borderRadius: 24, padding: 40, alignItems: 'center', gap: 12, minWidth: 260 },
     successTitle:   { fontSize: 22, fontFamily: 'Nunito-ExtraBold', color: C.white },
     successSub:     { fontSize: 14, fontFamily: 'Nunito-Medium', color: 'rgba(255,255,255,0.8)', textAlign: 'center' },
+
+    // Fullscreen Modal
+    modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
+    modalClose: {
+        position: 'absolute', top: 60, right: 24, zIndex: 10,
+        width: 44, height: 44, borderRadius: 22,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        justifyContent: 'center', alignItems: 'center',
+    },
+    modalImg: { width: '100%', height: '85%' },
 });

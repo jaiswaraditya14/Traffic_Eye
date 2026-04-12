@@ -1,13 +1,15 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
-    Image, Animated, StatusBar, Platform
+    Image, Animated, StatusBar, ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MobileContainer } from '../../components';
 import { useAuth } from '../../context';
+import { useFocusEffect } from '@react-navigation/native';
+import { supabase } from '../../services';
 
 // ── Design Tokens (Civic Authority — Officer Side) ──
 const C = {
@@ -45,6 +47,59 @@ export default function OfficerDashboard({ navigation }) {
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
 
+    const [pendingReports, setPendingReports] = useState([]);
+    const [approvedCount, setApprovedCount] = useState(0);
+    const [loadingData, setLoadingData] = useState(true);
+
+    const fetchData = useCallback(async () => {
+        setLoadingData(true);
+        try {
+            // Fetch all pending reports
+            const { data: pending } = await supabase
+                .from('image_reports')
+                .select(`
+                    id, violation_type, vehicle_number, location_address,
+                    severity, submitted_at, status, image_url,
+                    submitter:user_id ( full_name )
+                `)
+                .eq('status', 'pending')
+                .order('submitted_at', { ascending: false })
+                .limit(10);
+
+            // Fetch approved count
+            const { count } = await supabase
+                .from('image_reports')
+                .select('id', { count: 'exact', head: true })
+                .eq('status', 'approved');
+
+            setPendingReports(pending || []);
+            setApprovedCount(count || 0);
+        } catch (e) {
+            console.error('Officer dashboard fetch error:', e);
+        } finally {
+            setLoadingData(false);
+        }
+    }, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            fetchData();
+        }, [fetchData])
+    );
+
+    // Subscribe to realtime changes on image_reports
+    useFocusEffect(
+        useCallback(() => {
+            const ch = supabase
+                .channel('officer_dashboard')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'image_reports' },
+                    () => fetchData()
+                )
+                .subscribe();
+            return () => ch.unsubscribe();
+        }, [fetchData])
+    );
+
     useEffect(() => {
         Animated.parallel([
             Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
@@ -53,19 +108,23 @@ export default function OfficerDashboard({ navigation }) {
     }, []);
 
     const stats = [
-        { label: 'Pending', value: '0', icon: 'time-outline', color: C.warning, bg: C.warningSurface },
-        { label: 'Verified', value: '0', icon: 'checkmark-circle-outline', color: C.success, bg: C.successSurface },
-        { label: 'Accuracy', value: '-', icon: 'stats-chart-outline', color: C.navyMid, bg: C.primarySurface },
+        { label: 'Pending', value: pendingReports.length.toString(), icon: 'time-outline', color: C.warning, bg: C.warningSurface },
+        { label: 'Verified', value: approvedCount.toString(), icon: 'checkmark-circle-outline', color: C.success, bg: C.successSurface },
     ];
 
-    const recentReports = [];
+    const formatDate = (dateStr) => {
+        if (!dateStr) return '—';
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) +
+            ' ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    };
 
-    const getPriorityConfig = (priority) => ({
+    const getPriorityConfig = (severity) => ({
         critical: { color: C.critical, bg: C.errorSurface, label: 'CRITICAL', barColor: C.critical },
-        high: { color: C.error, bg: '#FFE4E4', label: 'HIGH', barColor: C.error },
-        medium: { color: C.warning, bg: C.warningSurface, label: 'MEDIUM', barColor: C.amber },
-        low: { color: C.textTertiary, bg: C.surfaceLow, label: 'LOW', barColor: C.border },
-    }[priority]);
+        high:     { color: C.error, bg: '#FFE4E4', label: 'HIGH', barColor: C.error },
+        medium:   { color: C.warning, bg: C.warningSurface, label: 'MEDIUM', barColor: C.amber },
+        low:      { color: C.textTertiary, bg: C.surfaceLow, label: 'LOW', barColor: C.border },
+    }[severity] || { color: C.warning, bg: C.warningSurface, label: 'MEDIUM', barColor: C.amber });
 
     return (
         <View style={styles.container}>
@@ -111,7 +170,7 @@ export default function OfficerDashboard({ navigation }) {
                                     <Ionicons name="warning" size={18} color={C.amberDark} />
                                 </View>
                                 <View style={styles.alertContent}>
-                                    <Text style={styles.alertTitle}>0 High Priority Reports</Text>
+                                    <Text style={styles.alertTitle}>{pendingReports.length} Pending Report{pendingReports.length !== 1 ? 's' : ''}</Text>
                                     <Text style={styles.alertSubtitle}>Require immediate review</Text>
                                 </View>
                                 <View style={styles.alertButton}>
@@ -156,10 +215,10 @@ export default function OfficerDashboard({ navigation }) {
                             </View>
                             <View style={styles.actionCardContent}>
                                 <Text style={styles.actionCardTitle}>Review Pending Reports</Text>
-                                <Text style={styles.actionCardDesc}>0 reports waiting for verification</Text>
+                                <Text style={styles.actionCardDesc}>{pendingReports.length} report{pendingReports.length !== 1 ? 's' : ''} waiting for verification</Text>
                             </View>
                             <View style={styles.amberCountBadge}>
-                                <Text style={styles.amberCountText}>0</Text>
+                                <Text style={styles.amberCountText}>{pendingReports.length}</Text>
                             </View>
                         </TouchableOpacity>
 
@@ -190,34 +249,41 @@ export default function OfficerDashboard({ navigation }) {
                             </TouchableOpacity>
                         </View>
 
-                        {recentReports.length === 0 ? (
+                        {loadingData ? (
+                            <ActivityIndicator size="small" color={C.navyMid} style={{ marginTop: 20 }} />
+                        ) : pendingReports.length === 0 ? (
                             <View style={{alignItems: 'center', marginTop: 20, marginBottom: 20}}>
                                 <Ionicons name="checkmark-circle-outline" size={40} color={C.success} />
                                 <Text style={{color: C.textSecondary, marginTop: 8, fontFamily: 'Nunito-Medium'}}>All caught up! No pending reports.</Text>
                             </View>
                         ) : (
-                            recentReports.map((report) => {
-                                const config = getPriorityConfig(report.priority);
+                            pendingReports.map((report) => {
+                                const config = getPriorityConfig(report.severity);
                                 return (
                                     <TouchableOpacity
                                         key={report.id}
                                         style={styles.reportCard}
                                         activeOpacity={0.8}
                                         onPress={() =>
-                                            navigation.getParent()?.navigate('ReportVerification', { reportId: report.id }) ??
-                                            navigation.navigate('ReportVerification', { reportId: report.id })
+                                            navigation.navigate('ImageReportReview', { reportId: report.id })
                                         }
                                     >
                                         {/* Priority left bar */}
                                         <View style={[styles.reportBar, { backgroundColor: config.barColor }]} />
 
-                                        {/* Thumbnail Frame (16:9 ish) */}
+                                        {/* Thumbnail */}
                                         <View style={styles.thumbnailFrame}>
-                                            <Image
-                                                source={require('../../../assets/images/traffic_violation.jpg')}
-                                                style={styles.reportThumbnail}
-                                                resizeMode="cover"
-                                            />
+                                            {report.image_url ? (
+                                                <Image
+                                                    source={{ uri: report.image_url }}
+                                                    style={styles.reportThumbnail}
+                                                    resizeMode="cover"
+                                                />
+                                            ) : (
+                                                <View style={[styles.reportThumbnail, { justifyContent: 'center', alignItems: 'center', backgroundColor: C.surfaceLow }]}>
+                                                    <Ionicons name="videocam-outline" size={22} color={C.textTertiary} />
+                                                </View>
+                                            )}
                                             <View style={styles.thumbnailOverlay}>
                                                 <Ionicons name="scan" size={14} color={C.white} />
                                             </View>
@@ -226,24 +292,30 @@ export default function OfficerDashboard({ navigation }) {
                                         {/* Content */}
                                         <View style={styles.reportContent}>
                                             <View style={styles.reportTopRow}>
-                                                <Text style={styles.reportType}>{report.type}</Text>
+                                                <Text style={styles.reportType} numberOfLines={1}>
+                                                    {report.violation_type || 'Traffic Violation'}
+                                                </Text>
                                                 <View style={[styles.priorityChip, { backgroundColor: config.bg }]}>
                                                     <Text style={[styles.priorityChipText, { color: config.color }]}>
                                                         {config.label}
                                                     </Text>
                                                 </View>
                                             </View>
-                                            
-                                            <Text style={styles.reportVehicle}>{report.vehicle}</Text>
-                                            
+
+                                            {!!report.vehicle_number && (
+                                                <Text style={styles.reportVehicle}>{report.vehicle_number}</Text>
+                                            )}
+
                                             <View style={styles.metaRow}>
-                                                <View style={styles.reportMeta}>
-                                                    <Ionicons name="location" size={11} color={C.textTertiary} />
-                                                    <Text style={styles.reportMetaText} numberOfLines={1}>{report.location}</Text>
-                                                </View>
+                                                {!!report.location_address && (
+                                                    <View style={styles.reportMeta}>
+                                                        <Ionicons name="location" size={11} color={C.textTertiary} />
+                                                        <Text style={styles.reportMetaText} numberOfLines={1}>{report.location_address}</Text>
+                                                    </View>
+                                                )}
                                                 <View style={styles.reportMeta}>
                                                     <Ionicons name="time" size={11} color={C.textTertiary} />
-                                                    <Text style={styles.reportMetaText}>{report.time}</Text>
+                                                    <Text style={styles.reportMetaText}>{formatDate(report.submitted_at)}</Text>
                                                 </View>
                                             </View>
                                         </View>

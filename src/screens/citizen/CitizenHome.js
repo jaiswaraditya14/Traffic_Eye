@@ -8,6 +8,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context';
 import { formatNumber } from '../../utils';
+import { fetchCitizenReports, subscribeToReportUpdates } from '../../services/reports';
+import { useFocusEffect } from '@react-navigation/native';
 
 // ── Design Tokens (Civic Authority) ──
 const C = {
@@ -50,19 +52,53 @@ export default function CitizenHome({ navigation }) {
     }, []);
 
     // Stats data
+    const [reports, setReports] = React.useState([]);
+
+    const loadData = React.useCallback(async () => {
+        if (!profile?.id) return;
+        const { data, error } = await fetchCitizenReports(profile.id);
+        if (!error && data) {
+            setReports(data);
+        }
+    }, [profile?.id]);
+
+    useFocusEffect(
+        React.useCallback(() => {
+            loadData();
+        }, [loadData])
+    );
+
+    useFocusEffect(
+        React.useCallback(() => {
+            if (!profile?.id) return;
+            const ch = subscribeToReportUpdates(
+                profile.id,
+                (payload) => setReports(prev => prev.map(r => r.id === payload.new.id ? { ...r, ...payload.new } : r)),
+                (payload) => setReports(prev => [payload.new, ...prev]),
+            );
+            return () => { if (ch) ch.unsubscribe(); };
+        }, [profile?.id])
+    );
+
     const quickStats = [
-        { label: 'Reports', value: '0', icon: 'document-text', color: C.navyMid, bg: C.primarySurface },
-        { label: 'Verified', value: '0', icon: 'checkmark-circle', color: C.success, bg: C.successSurface },
+        { label: 'Reports', value: reports.length.toString(), icon: 'document-text', color: C.navyMid, bg: C.primarySurface },
+        { label: 'Verified', value: reports.filter(r => r.status === 'approved').length.toString(), icon: 'checkmark-circle', color: C.success, bg: C.successSurface },
         { label: 'Points', value: formatNumber(userPoints), icon: 'trophy', color: C.amberDark, bg: C.amberSurface },
     ];
 
-    const recentActivity = [];
-
     const getStatusConfig = (status) => ({
-        success: { icon: 'checkmark-circle', color: C.success, bg: C.successSurface, label: 'Verified', barColor: C.success },
+        approved: { icon: 'checkmark-circle', color: C.success, bg: C.successSurface, label: 'Verified', barColor: C.success },
         pending: { icon: 'time', color: C.warning, bg: C.warningSurface, label: 'Pending', barColor: C.amber },
         rejected: { icon: 'close-circle', color: C.error, bg: C.errorSurface, label: 'Rejected', barColor: C.error },
-    }[status]);
+    }[status] || { icon: 'time', color: C.warning, bg: C.warningSurface, label: 'Pending', barColor: C.amber });
+
+    const recentActivity = reports.slice(0, 3).map(r => ({
+        id: r.id,
+        type: r.violation_type || 'Traffic Violation',
+        desc: r.location_address || 'Report submitted',
+        time: new Date(r.submitted_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
+        status: r.status,
+    }));
 
     // Navigate to Reports tab within the bottom tab navigator
     const handleSeeAllReports = () => navigation.navigate('Reports');

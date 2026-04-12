@@ -1,8 +1,10 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, StatusBar, TouchableOpacity } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, Image, StatusBar, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
+import { supabase } from '../../services';
 
 const C = {
     navy: '#002452',
@@ -19,7 +21,41 @@ const C = {
 };
 
 export default function VerifiedReports({ navigation }) {
-    const verifiedReports = [];
+    const [verifiedReports, setVerifiedReports] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const hasLoadedRef = React.useRef(false);
+
+    const loadReports = useCallback(async () => {
+        if (!hasLoadedRef.current) setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('image_reports')
+                .select(`
+                    id, violation_type, vehicle_number, location_address,
+                    severity, reviewed_at, status, image_url, reward_amount,
+                    officer_reviews ( officer_id, decision, remarks ),
+                    submitter:user_id ( full_name )
+                `)
+                .eq('status', 'approved')
+                .order('reviewed_at', { ascending: false });
+            
+            if (!error) {
+                setVerifiedReports(data || []);
+                hasLoadedRef.current = true;
+            }
+        } catch (e) {
+            console.error('Error fetching verified reports:', e);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            loadReports();
+        }, [loadReports])
+    );
+
 
     return (
         <View style={styles.container}>
@@ -37,53 +73,79 @@ export default function VerifiedReports({ navigation }) {
                 </LinearGradient>
 
                 <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                    {verifiedReports.length === 0 ? (
+                    {loading ? (
+                        <ActivityIndicator size="large" color={C.navyMid} style={{ marginTop: 60 }} />
+                    ) : verifiedReports.length === 0 ? (
                         <View style={{alignItems: 'center', marginTop: 60}}>
                             <Ionicons name="document-text-outline" size={48} color={C.textTertiary} />
                             <Text style={{color: C.textSecondary, marginTop: 12, fontFamily: 'Nunito-Medium'}}>No verified reports history.</Text>
                         </View>
                     ) : (
-                        verifiedReports.map((report) => (
-                            <View key={report.id} style={styles.reportCard}>
-                                {/* Success Left Bar */}
-                                <View style={styles.cardBar} />
+                        verifiedReports.map((report) => {
+                            const dateApproved = report.reviewed_at
+                                ? new Date(report.reviewed_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                                : '—';
+                            
+                            return (
+                                <TouchableOpacity
+                                    key={report.id}
+                                    style={styles.reportCard}
+                                    onPress={() => navigation.navigate('VerifiedReportDetail', { reportId: report.id })}
+                                    activeOpacity={0.82}
+                                >
+                                    {/* Success Left Bar */}
+                                    <View style={styles.cardBar} />
 
-                                {/* Thumbnail */}
-                                <Image
-                                    source={require('../../../assets/images/traffic_violation.jpg')}
-                                    style={styles.thumbnail}
-                                    resizeMode="cover"
-                                />
-
-                                <View style={styles.cardContent}>
-                                    <View style={styles.cardTopRow}>
-                                        <Text style={styles.reportType}>{report.type}</Text>
-                                        <Ionicons name="checkmark-circle" size={16} color={C.success} />
-                                    </View>
-
-                                    <View style={styles.vehicleRow}>
-                                        <Ionicons name="car-outline" size={12} color={C.navyMid} />
-                                        <Text style={styles.vehicleText}>{report.plate}</Text>
-                                    </View>
-
-                                    <View style={styles.metaRow}>
-                                        <Ionicons name="location-outline" size={12} color={C.textTertiary} />
-                                        <Text style={styles.metaText}>{report.location}</Text>
-                                    </View>
-                                    
-                                    <View style={styles.bottomRow}>
-                                        <View style={styles.metaRow}>
-                                            <Ionicons name="calendar-outline" size={12} color={C.textTertiary} />
-                                            <Text style={styles.metaText}>{report.date}</Text>
+                                    {/* Thumbnail */}
+                                    {report.image_url ? (
+                                        <Image
+                                            source={{ uri: report.image_url }}
+                                            style={styles.thumbnail}
+                                            resizeMode="cover"
+                                        />
+                                    ) : (
+                                        <View style={[styles.thumbnail, { justifyContent: 'center', alignItems: 'center', backgroundColor: C.offWhite }]}>
+                                            <Ionicons name="image-outline" size={24} color={C.textTertiary} />
                                         </View>
-                                        <View style={styles.officerBadge}>
-                                            <Ionicons name="shield-checkmark" size={10} color={C.success} />
-                                            <Text style={styles.officerText}>{report.officer}</Text>
+                                    )}
+
+                                    <View style={styles.cardContent}>
+                                        <View style={styles.cardTopRow}>
+                                            <Text style={styles.reportType}>{report.violation_type || 'Traffic Violation'}</Text>
+                                            <Ionicons name="checkmark-circle" size={16} color={C.success} />
+                                        </View>
+
+                                        <View style={styles.vehicleRow}>
+                                            <Ionicons name="person-outline" size={12} color={C.navyMid} />
+                                            <Text style={styles.vehicleText}>{report.submitter?.full_name || 'Anonymous'}</Text>
+                                        </View>
+
+                                        {report.location_address && (
+                                            <View style={styles.metaRow}>
+                                                <Ionicons name="location-outline" size={12} color={C.textTertiary} />
+                                                <Text style={styles.metaText} numberOfLines={1}>{report.location_address}</Text>
+                                            </View>
+                                        )}
+                                        
+                                        <View style={styles.bottomRow}>
+                                            <View style={styles.metaRow}>
+                                                <Ionicons name="calendar-outline" size={12} color={C.textTertiary} />
+                                                <Text style={styles.metaText}>{dateApproved}</Text>
+                                            </View>
+                                            <View style={styles.officerBadge}>
+                                                <Ionicons name="trophy-outline" size={10} color={C.success} />
+                                                <Text style={styles.officerText}>{report.reward_amount || 0} pts</Text>
+                                            </View>
                                         </View>
                                     </View>
-                                </View>
-                            </View>
-                        ))
+
+                                    {/* Tap arrow */}
+                                    <View style={styles.tapArrow}>
+                                        <Ionicons name="chevron-forward" size={16} color={C.navyMid} />
+                                    </View>
+                                </TouchableOpacity>
+                            );
+                        })
                     )}
                 </ScrollView>
             </SafeAreaView>
@@ -134,4 +196,5 @@ const styles = StyleSheet.create({
     bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
     officerBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.successSurface, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
     officerText: { fontSize: 10, fontFamily: 'Nunito-Bold', color: C.success },
+    tapArrow: { width: 28, height: 28, borderRadius: 8, backgroundColor: C.successSurface, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
 });

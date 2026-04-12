@@ -15,7 +15,8 @@ import {
     ReportVerification,
     ImageReportReview,
     OfficerSettings,
-    PermissionsRequest
+    PermissionsRequest,
+    VerifiedReportDetail,
 } from '../screens';
 
 const Tab = createBottomTabNavigator();
@@ -70,6 +71,7 @@ export default function OfficerNavigator() {
             <Stack.Screen name="PermissionsRequest" component={PermissionsRequest} />
             <Stack.Screen name="ReportVerification" component={ReportVerification} />
             <Stack.Screen name="ImageReportReview" component={ImageReportReview} />
+            <Stack.Screen name="VerifiedReportDetail" component={VerifiedReportDetail} />
             <Stack.Screen name="OfficerSettings" component={OfficerSettings} />
         </Stack.Navigator>
     );

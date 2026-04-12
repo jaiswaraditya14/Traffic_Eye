@@ -1,9 +1,104 @@
 /**
- * reportService.js  –  Image Report + Officer Review data layer
+ * reportService.js  –  Image Report + Officer Review + Media data layer
  *
  * All functions return { data, error } so callers can handle both paths cleanly.
  */
 import { supabase } from '../supabase';
+import * as FileSystem from 'expo-file-system/legacy';
+const { EncodingType } = FileSystem;
+import { decode } from 'base64-arraybuffer';
+
+// ── File validation helpers ────────────────────────────────────────────────
+
+const ALLOWED_IMAGE_TYPES = ['jpg', 'jpeg', 'png'];
+const ALLOWED_VIDEO_TYPES = ['mp4', 'mov', 'webm'];
+const ALLOWED_TYPES = [...ALLOWED_IMAGE_TYPES, ...ALLOWED_VIDEO_TYPES];
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+
+/**
+ * Validate a file by extension and size.
+ * @param {string} uri
+ * @param {number} [fileSize]
+ * @returns {{ valid: boolean, error?: string, fileType: 'image'|'video' }}
+ */
+export function validateMediaFile(uri, fileSize) {
+    const ext = uri.split('.').pop()?.toLowerCase() || '';
+    if (!ALLOWED_TYPES.includes(ext)) {
+        return { valid: false, error: `File type .${ext} is not allowed. Allowed: ${ALLOWED_TYPES.join(', ')}`, fileType: null };
+    }
+    if (fileSize && fileSize > MAX_FILE_SIZE) {
+        return { valid: false, error: `File exceeds maximum size of ${MAX_FILE_SIZE / (1024 * 1024)}MB.`, fileType: null };
+    }
+    const fileType = ALLOWED_IMAGE_TYPES.includes(ext) ? 'image' : 'video';
+    return { valid: true, fileType };
+}
+
+// ── Media helpers ──────────────────────────────────────────────────────────
+
+/**
+ * Upload a media file (image or video) to the report-media bucket.
+ * Returns the public URL and storage path.
+ */
+export async function uploadReportMedia(userId, fileUri, mimeType = 'image/jpeg') {
+    try {
+        const ext = fileUri.split('.').pop()?.toLowerCase() || 'jpg';
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+        const storagePath = `${userId}/${fileName}`;
+
+        const base64 = await FileSystem.readAsStringAsync(fileUri, {
+            encoding: EncodingType?.Base64 || 'base64',
+        });
+
+        const { error: uploadError } = await supabase.storage
+            .from('report-media')
+            .upload(storagePath, decode(base64), {
+                contentType: mimeType,
+                upsert: true,
+            });
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+            .from('report-media')
+            .getPublicUrl(storagePath);
+
+        return { data: { publicUrl, storagePath, fileName }, error: null };
+    } catch (error) {
+        return { data: null, error };
+    }
+}
+
+/**
+ * Insert a row into report_media.
+ */
+export async function insertReportMedia(reportId, mediaData) {
+    const { data, error } = await supabase
+        .from('report_media')
+        .insert({
+            report_id: reportId,
+            file_url: mediaData.publicUrl,
+            file_type: mediaData.fileType,
+            storage_path: mediaData.storagePath || null,
+            file_name: mediaData.fileName || null,
+            mime_type: mediaData.mimeType || null,
+            file_size: mediaData.fileSize || null,
+        })
+        .select()
+        .single();
+    return { data, error };
+}
+
+/**
+ * Fetch all media attached to a report.
+ */
+export async function fetchReportMedia(reportId) {
+    const { data, error } = await supabase
+        .from('report_media')
+        .select('*')
+        .eq('report_id', reportId)
+        .order('created_at', { ascending: true });
+    return { data, error };
+}
 
 // ── Citizen helpers ────────────────────────────────────────────────────────
 
@@ -26,7 +121,7 @@ export async function submitImageReport(payload) {
 
 /**
  * Fetch all image reports for the current citizen, ordered newest-first.
- * Each row is joined with its officer_review (if any).
+ * Each row is joined with its officer_review (if any) and report_media.
  */
 export async function fetchCitizenReports(userId) {
     const { data, error } = await supabase
@@ -39,6 +134,13 @@ export async function fetchCitizenReports(userId) {
                 remarks,
                 review_timestamp,
                 officer:officer_id ( full_name, badge_id )
+            ),
+            media:report_media (
+                id,
+                file_url,
+                file_type,
+                mime_type,
+                created_at
             )
         `)
         .eq('user_id', userId)
@@ -62,6 +164,15 @@ export async function fetchReportById(reportId) {
                 internal_notes,
                 review_timestamp,
                 officer:officer_id ( id, full_name, badge_id, department )
+            ),
+            media:report_media (
+                id,
+                file_url,
+                file_type,
+                mime_type,
+                file_name,
+                file_size,
+                created_at
             )
         `)
         .eq('id', reportId)
@@ -73,14 +184,20 @@ export async function fetchReportById(reportId) {
 
 /**
  * Fetch all pending reports for the officer queue, newest-first.
- * Includes submitter profile.
+ * Includes submitter profile and media.
  */
 export async function fetchPendingReports() {
     const { data, error } = await supabase
         .from('image_reports')
         .select(`
             *,
-            submitter:user_id ( id, full_name, email, phone )
+            submitter:user_id ( id, full_name, email, phone ),
+            media:report_media (
+                id,
+                file_url,
+                file_type,
+                mime_type
+            )
         `)
         .eq('status', 'pending')
         .order('submitted_at', { ascending: false });
@@ -101,6 +218,12 @@ export async function fetchReviewedReports() {
                 remarks,
                 review_timestamp,
                 officer:officer_id ( full_name, badge_id )
+            ),
+            media:report_media (
+                id,
+                file_url,
+                file_type,
+                mime_type
             )
         `)
         .in('status', ['approved', 'rejected'])

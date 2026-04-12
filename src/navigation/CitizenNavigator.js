@@ -66,7 +66,7 @@ function CitizenTabNavigator() {
             })}
         >
             <Tab.Screen name="Home" component={CitizenHome} />
-            <Tab.Screen name="Reports" component={VerificationReports} />
+            <Tab.Screen name="Reports" component={MyReports} />
             <Tab.Screen name="Rewards" component={Rewards} />
             <Tab.Screen name="ProfileTab" component={Profile} options={{ title: 'Profile' }} />
         </Tab.Navigator>
@@ -103,6 +103,8 @@ export default function CitizenNavigator() {
             <Stack.Screen name="VideoReportSuccess" component={VideoReportSuccess} />
             <Stack.Screen name="VideoReportStatus" component={VideoReportStatus} />
             <Stack.Screen name="ImageReportStatus" component={ImageReportStatus} />
+            <Stack.Screen name="ImageReportDetail" component={ReportDetail} />
+            <Stack.Screen name="MyReports" component={MyReports} />
         </Stack.Navigator>
     );
 }

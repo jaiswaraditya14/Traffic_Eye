@@ -68,7 +68,7 @@ export default function AIResultsVerification({ navigation, route }) {
                 });
 
                 const { error: uploadError } = await supabase.storage
-                    .from('verification-images')
+                    .from('report-media')
                     .upload(storagePath, decode(base64), {
                         contentType: 'image/jpeg',
                         upsert: true
@@ -77,47 +77,18 @@ export default function AIResultsVerification({ navigation, route }) {
                 if (uploadError) throw uploadError;
 
                 const { data: { publicUrl: url } } = supabase.storage
-                    .from('verification-images')
+                    .from('report-media')
                     .getPublicUrl(storagePath);
                 
                 publicUrl = url;
             }
 
-            // 2. Insert into verification_reports (legacy table for backward compat)
-            const { data: report, error: reportError } = await supabase
-                .from('verification_reports')
-                .insert({
-                    user_id: user.id,
-                    status: 'pending',
-                    ai_result: aiResults,
-                    ai_verdict: violationType,
-                    ai_confidence_score: parseFloat(confidence) / 100,
-                })
-                .select()
-                .single();
+            let imgReportId = null;
 
-            if (reportError) throw reportError;
-
-            // 3. Insert into verification_images
-            if (storagePath) {
-                const { error: imgError } = await supabase
-                    .from('verification_images')
-                    .insert({
-                        report_id: report.id,
-                        user_id: user.id,
-                        storage_path: storagePath,
-                        public_url: publicUrl,
-                        file_name: storagePath.split('/').pop(),
-                        mime_type: 'image/jpeg',
-                    });
-
-                if (imgError) throw imgError;
-            }
-
-            // 3b. Also save to new image_reports table (officer queue + transparency layer)
+            // Save to new image_reports table (officer queue + transparency layer)
             const severityLower = (aiResults?.severity || 'medium').toLowerCase();
             const normSeverity = ['low', 'medium', 'high', 'critical'].includes(severityLower) ? severityLower : 'medium';
-            await supabase.from('image_reports').insert({
+            const { data: imgReport, error: imgReportError } = await supabase.from('image_reports').insert({
                 user_id:               user.id,
                 image_url:             publicUrl || '',
                 image_storage_path:    storagePath,
@@ -129,12 +100,25 @@ export default function AIResultsVerification({ navigation, route }) {
                 ai_raw_result:         aiResults,
                 vehicle_number:        vehicleNumber,
                 status:                'pending',
-            });
+            }).select().single();
 
-            // 4. Award Points (Demo: Instant points on submission)
-            if (violationDetected) {
-                await rewardService.awardPointsForReport(violationType);
+            if (imgReportError) throw imgReportError;
+            imgReportId = imgReport.id;
+
+            // Link evidence to report_media table (for gallery display)
+            if (imgReportId && publicUrl) {
+                await supabase.from('report_media').insert({
+                    report_id:    imgReportId,
+                    file_url:     publicUrl,
+                    file_type:    'image',
+                    storage_path: storagePath,
+                    file_name:    storagePath?.split('/').pop(),
+                    mime_type:    'image/jpeg',
+                });
             }
+
+            // No points awarded at submission time.
+            // Points are awarded by the officer via submit_officer_review DB function upon approval.
 
             navigation.navigate('ReportSuccess', {
                 verifiedData: {
@@ -144,7 +128,7 @@ export default function AIResultsVerification({ navigation, route }) {
                     confidence: `${confidence}%`,
                     ...currentReport,
                     address, // Use edited address
-                    reportId: report.id
+                    reportId: imgReportId
                 }
             });
         } catch (error) {

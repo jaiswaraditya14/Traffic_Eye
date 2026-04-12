@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppContext } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
+import { useFocusEffect } from '@react-navigation/native';
+import { supabase } from '../../services';
 
 const C = {
     navy: '#002452',
@@ -27,6 +29,42 @@ export default function OfficerProfile({ navigation }) {
     const { setIsAuthenticated, setUserRole } = useAppContext();
     const { profile, signOut } = useAuth();
     const [loggingOut, setLoggingOut] = useState(false);
+    const [stats, setStats] = useState({ verified: 0, rejected: 0, thisMonth: 0 });
+
+    const loadStats = useCallback(async () => {
+        if (!profile?.id) return;
+        try {
+            const { data, error } = await supabase
+                .from('officer_reviews')
+                .select('decision, review_timestamp')
+                .eq('officer_id', profile.id);
+            
+            if (!error && data) {
+                let verified = 0, rejected = 0, thisMonth = 0;
+                const now = new Date();
+                data.forEach(r => {
+                    if (r.decision === 'approved') verified++;
+                    if (r.decision === 'rejected') rejected++;
+                    
+                    if (r.review_timestamp) {
+                        const d = new Date(r.review_timestamp);
+                        if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+                            thisMonth++;
+                        }
+                    }
+                });
+                setStats({ verified, rejected, thisMonth });
+            }
+        } catch (error) {
+            console.error('Error fetching officer stats:', error);
+        }
+    }, [profile?.id]);
+
+    useFocusEffect(
+        useCallback(() => {
+            loadStats();
+        }, [loadStats])
+    );
 
     const handleLogout = () => {
         Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -100,7 +138,7 @@ export default function OfficerProfile({ navigation }) {
                         <View style={[styles.statIconBg, { backgroundColor: C.successSurface }]}>
                             <Ionicons name="checkmark-done" size={20} color={C.success} />
                         </View>
-                        <Text style={styles.statValue}>156</Text>
+                        <Text style={styles.statValue}>{stats.verified}</Text>
                         <Text style={styles.statLabel}>Verified</Text>
                     </View>
                     <View style={styles.statDivider} />
@@ -108,7 +146,7 @@ export default function OfficerProfile({ navigation }) {
                         <View style={[styles.statIconBg, { backgroundColor: C.errorSurface }]}>
                             <Ionicons name="close" size={20} color={C.error} />
                         </View>
-                        <Text style={styles.statValue}>24</Text>
+                        <Text style={styles.statValue}>{stats.rejected}</Text>
                         <Text style={styles.statLabel}>Rejected</Text>
                     </View>
                     <View style={styles.statDivider} />
@@ -116,7 +154,7 @@ export default function OfficerProfile({ navigation }) {
                         <View style={[styles.statIconBg, { backgroundColor: '#E0E7FF' }]}>
                             <Ionicons name="calendar" size={18} color={C.navyMid} />
                         </View>
-                        <Text style={styles.statValue}>45</Text>
+                        <Text style={styles.statValue}>{stats.thisMonth}</Text>
                         <Text style={styles.statLabel}>This Month</Text>
                     </View>
                 </View>

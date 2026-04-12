@@ -125,6 +125,8 @@ const rc = StyleSheet.create({
     infoText: { fontSize: 11, fontFamily: 'Nunito-Medium', color: C.textSecondary },
 });
 
+import { useFocusEffect } from '@react-navigation/native';
+
 // ── Main screen ───────────────────────────────────────────────────────────
 export default function PendingQueue({ navigation }) {
     const [reports,    setReports]    = useState([]);
@@ -132,33 +134,36 @@ export default function PendingQueue({ navigation }) {
     const [refreshing, setRefreshing] = useState(false);
     const [search,     setSearch]     = useState('');
     const fadeAnim = useRef(new Animated.Value(0)).current;
+    const hasLoadedRef = useRef(false);  // prevents blank list on focus returns
 
     const load = useCallback(async (isRefresh = false) => {
-        if (!isRefresh) setLoading(true);
+        if (!hasLoadedRef.current && !isRefresh) setLoading(true);
         const { data, error } = await fetchPendingReports();
-        if (!error && data) setReports(data);
+        if (!error && data) {
+            setReports(data);
+            hasLoadedRef.current = true;
+        }
         setLoading(false);
         setRefreshing(false);
         Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
-    }, []);
+    }, [fadeAnim]);
 
-    useEffect(() => {
-        load();
-    }, [load]);
+    useFocusEffect(
+        useCallback(() => {
+            load();
+        }, [load])
+    );
 
-    // Realtime subscription
-    useEffect(() => {
-        const ch = subscribeToOfficerQueue(
-            (payload) => setReports(prev => [payload.new, ...prev]),
-            (payload) => setReports(prev =>
-                prev.filter(r => r.id !== payload.new.id ||
-                    (payload.new.status === 'pending' && prev.some(x => x.id === payload.new.id)))
-                    .map(r => r.id === payload.new.id ? { ...r, ...payload.new } : r)
-                    .filter(r => r.status === 'pending')
-            ),
-        );
-        return () => { if (ch) ch.unsubscribe(); };
-    }, []);
+    // Realtime subscription — resubscribe on every focus so we never miss changes
+    useFocusEffect(
+        useCallback(() => {
+            const ch = subscribeToOfficerQueue(
+                () => load(true),   // INSERT: full reload
+                () => load(true),   // UPDATE: full reload (handles pending→approved transitions)
+            );
+            return () => { if (ch) ch.unsubscribe(); };
+        }, [load])
+    );
 
     const filtered = reports.filter(r => {
         if (!search.trim()) return true;

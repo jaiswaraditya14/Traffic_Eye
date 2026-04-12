@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS public.image_reports (
     -- Workflow
     status                TEXT NOT NULL DEFAULT 'pending'
                               CHECK (status IN ('pending', 'approved', 'rejected')),
+    reward_amount         INTEGER NOT NULL DEFAULT 0,
     -- Timestamps
     submitted_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     reviewed_at           TIMESTAMPTZ,
@@ -97,6 +98,10 @@ CREATE TABLE IF NOT EXISTS public.image_reports (
     -- Soft-delete
     is_archived           BOOLEAN NOT NULL DEFAULT false
 );
+
+-- If image_reports already existed, ensure the new columns are present
+ALTER TABLE public.image_reports ADD COLUMN IF NOT EXISTS reward_amount INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE public.image_reports ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
 
 -- ┌──────────────────────────────────────────────────────────────────────────┐
 -- │ officer_reviews — one review per image_report                           │
@@ -125,6 +130,21 @@ CREATE TABLE IF NOT EXISTS public.notifications (
                          CHECK (type IN ('report_approved', 'report_rejected', 'points_earned', 'system')),
     reference_id     UUID,
     is_read          BOOLEAN NOT NULL DEFAULT false,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ┌──────────────────────────────────────────────────────────────────────────┐
+-- │ report_media — images & videos linked to image_reports (evidence gallery)│
+-- └──────────────────────────────────────────────────────────────────────────┘
+CREATE TABLE IF NOT EXISTS public.report_media (
+    id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    report_id        UUID NOT NULL REFERENCES public.image_reports(id) ON DELETE CASCADE,
+    file_url         TEXT NOT NULL,
+    file_type        TEXT NOT NULL CHECK (file_type IN ('image', 'video')),
+    storage_path     TEXT,
+    file_name        TEXT,
+    mime_type        TEXT,
+    file_size        INTEGER,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -176,6 +196,10 @@ CREATE INDEX IF NOT EXISTS idx_image_reports_user_id    ON public.image_reports(
 CREATE INDEX IF NOT EXISTS idx_image_reports_status     ON public.image_reports(status);
 CREATE INDEX IF NOT EXISTS idx_image_reports_submitted  ON public.image_reports(submitted_at DESC);
 CREATE INDEX IF NOT EXISTS idx_image_reports_severity   ON public.image_reports(severity);
+CREATE INDEX IF NOT EXISTS idx_image_reports_reward     ON public.image_reports(reward_amount);
+
+-- report_media
+CREATE INDEX IF NOT EXISTS idx_report_media_report      ON public.report_media(report_id);
 
 -- officer_reviews
 CREATE INDEX IF NOT EXISTS idx_officer_reviews_report   ON public.officer_reviews(report_id);
@@ -202,6 +226,7 @@ ALTER TABLE public.profiles              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.point_rules           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.point_transactions    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.image_reports         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.report_media          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.officer_reviews       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.verification_reports  ENABLE ROW LEVEL SECURITY;
@@ -273,6 +298,35 @@ CREATE POLICY "Officers view all pending reports"
 
 CREATE POLICY "Officers update report status"
     ON public.image_reports FOR UPDATE
+    USING (is_officer());
+
+-- ── report_media ──
+DROP POLICY IF EXISTS "Citizens view own report media"    ON public.report_media;
+DROP POLICY IF EXISTS "Citizens insert own report media"  ON public.report_media;
+DROP POLICY IF EXISTS "Officers view all report media"    ON public.report_media;
+
+CREATE POLICY "Citizens view own report media"
+    ON public.report_media FOR SELECT
+    USING (
+        EXISTS (
+            SELECT 1 FROM public.image_reports
+            WHERE image_reports.id = report_media.report_id
+              AND image_reports.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Citizens insert own report media"
+    ON public.report_media FOR INSERT
+    WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM public.image_reports
+            WHERE image_reports.id = report_media.report_id
+              AND image_reports.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Officers view all report media"
+    ON public.report_media FOR SELECT
     USING (is_officer());
 
 -- ── officer_reviews ──
@@ -478,7 +532,12 @@ $$;
 
 -- ┌──────────────────────────────────────────────────────────────────────────┐
 -- │ submit_officer_review() — atomic officer decision on a report           │
--- │ Inserts review, updates status, awards points, sends notification       │
+-- │ Inserts review, updates status, computes severity-based reward,         │
+-- │ credits citizen points, and sends push notification                      │
+-- │                                                                          │
+-- │ Reward table:                                                            │
+-- │   low      → 50 pts    medium   → 100 pts                               │
+-- │   high     → 200 pts   critical → 200 pts                               │
 -- └──────────────────────────────────────────────────────────────────────────┘
 CREATE OR REPLACE FUNCTION public.submit_officer_review(
     p_report_id    UUID,
@@ -495,7 +554,7 @@ AS $$
 DECLARE
     v_report        RECORD;
     v_review_id     UUID;
-    v_points_ok     BOOLEAN;
+    v_reward        INTEGER := 0;
     v_notif_title   TEXT;
     v_notif_body    TEXT;
 BEGIN
@@ -521,23 +580,47 @@ BEGIN
             officer_id       = EXCLUDED.officer_id
     RETURNING id INTO v_review_id;
 
-    -- Update report status & reviewed_at
+    -- Compute severity-based reward (only on approval)
+    IF p_decision = 'approved' THEN
+        CASE v_report.severity
+            WHEN 'low'      THEN v_reward := 50;
+            WHEN 'medium'   THEN v_reward := 100;
+            WHEN 'high'     THEN v_reward := 200;
+            WHEN 'critical' THEN v_reward := 200;
+            ELSE                  v_reward := 50;
+        END CASE;
+    END IF;
+
+    -- Update report status, reviewed_at, and reward_amount
     UPDATE public.image_reports
-    SET status      = p_decision,
-        reviewed_at = now()
+    SET status        = p_decision,
+        reviewed_at   = now(),
+        reward_amount = v_reward
     WHERE id = p_report_id;
 
-    -- Award points if approved
-    IF p_decision = 'approved' THEN
-        SELECT public.award_points(v_report.user_id, 'report_verified', p_report_id)
-        INTO v_points_ok;
+    -- Credit user's points balance on approval
+    IF p_decision = 'approved' AND v_reward > 0 THEN
+        UPDATE public.profiles
+        SET points_balance = points_balance + v_reward
+        WHERE id = v_report.user_id;
+
+        -- Record the transaction
+        INSERT INTO public.point_transactions (user_id, amount, type, action, reference_id, description)
+        VALUES (
+            v_report.user_id,
+            v_reward,
+            'earned',
+            'report_approved',
+            p_report_id,
+            'Reward for approved violation report (severity: ' || COALESCE(v_report.severity, 'unknown') || ')'
+        );
     END IF;
 
     -- Build notification content
     IF p_decision = 'approved' THEN
-        v_notif_title := 'Report Approved!';
+        v_notif_title := 'Report Approved! 🎉';
         v_notif_body  := COALESCE(p_remarks,
-            'Your traffic violation report has been reviewed and approved by an officer.');
+            'Your traffic violation report has been approved! You earned ' || v_reward || ' points.');
     ELSE
         v_notif_title := 'Report Rejected';
         v_notif_body  := COALESCE(p_remarks,
@@ -555,9 +638,10 @@ BEGIN
     );
 
     RETURN jsonb_build_object(
-        'success',   true,
-        'review_id', v_review_id,
-        'decision',  p_decision
+        'success',       true,
+        'review_id',     v_review_id,
+        'decision',      p_decision,
+        'reward_amount', v_reward
     );
 END;
 $$;
@@ -616,9 +700,16 @@ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.report_media;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
 
 -- ── 9. STORAGE BUCKETS ─────────────────────────────────────────────────────
 
+-- 9a. verification-images bucket (legacy, used by verification_reports)
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
     'verification-images',
@@ -660,6 +751,43 @@ CREATE POLICY "Users can delete own verification images"
     ON storage.objects FOR DELETE
     USING (
         bucket_id = 'verification-images'
+        AND auth.uid()::text = (storage.foldername(name))[1]
+    );
+
+-- 9b. report-media bucket (images + videos for image_reports)
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+    'report-media',
+    'report-media',
+    true,
+    52428800,   -- 50 MB (supports videos)
+    ARRAY[
+        'image/jpeg', 'image/png', 'image/webp',
+        'video/mp4', 'video/quicktime', 'video/webm'
+    ]
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- Storage RLS Policies for report-media bucket
+DROP POLICY IF EXISTS "Users can upload report media"      ON storage.objects;
+DROP POLICY IF EXISTS "Public can view report media"       ON storage.objects;
+DROP POLICY IF EXISTS "Users can delete own report media"  ON storage.objects;
+
+CREATE POLICY "Users can upload report media"
+    ON storage.objects FOR INSERT
+    WITH CHECK (
+        bucket_id = 'report-media'
+        AND auth.uid()::text = (storage.foldername(name))[1]
+    );
+
+CREATE POLICY "Public can view report media"
+    ON storage.objects FOR SELECT
+    USING (bucket_id = 'report-media');
+
+CREATE POLICY "Users can delete own report media"
+    ON storage.objects FOR DELETE
+    USING (
+        bucket_id = 'report-media'
         AND auth.uid()::text = (storage.foldername(name))[1]
     );
 

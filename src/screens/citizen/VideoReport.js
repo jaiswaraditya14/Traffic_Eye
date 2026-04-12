@@ -9,6 +9,10 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient';
 import MapView, { Marker } from 'react-native-maps';
 import { useImagePicker, useLocation } from '../../hooks';
+import { supabase } from '../../services';
+import * as FileSystem from 'expo-file-system/legacy';
+const { EncodingType } = FileSystem;
+import { decode } from 'base64-arraybuffer';
 
 // ── Design Tokens (matches existing app exactly) ──
 const C = {
@@ -399,11 +403,76 @@ export default function VideoReport({ navigation }) {
 
     const handleSubmit = async () => {
         setSubmitting(true);
-        // Simulate submission
-        setTimeout(() => {
-            setSubmitting(false);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('User not authenticated.');
+
+            let publicUrl = null;
+            let storagePath = null;
+
+            if (video) {
+                const ext = video.split('.').pop()?.toLowerCase() || 'mp4';
+                const fileName = `vid-${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+                storagePath = `${user.id}/${fileName}`;
+
+                const base64 = await FileSystem.readAsStringAsync(video, {
+                    encoding: EncodingType?.Base64 || 'base64',
+                });
+
+                const { error: uploadError } = await supabase.storage
+                    .from('report-media')
+                    .upload(storagePath, decode(base64), {
+                        contentType: `video/${ext === 'mov' ? 'quicktime' : ext}`,
+                        upsert: true
+                    });
+
+                if (uploadError) throw uploadError;
+
+                const { data: { publicUrl: url } } = supabase.storage
+                    .from('report-media')
+                    .getPublicUrl(storagePath);
+                
+                publicUrl = url;
+            }
+
+            // Insert into image_reports
+            const violationLabel = VIOLATION_TYPES.find(v => v.id === violationType)?.label || 'Other';
+            const { data: report, error: reportError } = await supabase.from('image_reports').insert({
+                user_id: user.id,
+                image_url: publicUrl || '',
+                image_storage_path: storagePath,
+                location_address: address,
+                violation_type: violationLabel,
+                violation_description: description,
+                severity: 'medium', // Default for video reports before officer review
+                ai_confidence: 0,
+                status: 'pending',
+            }).select().single();
+
+            if (reportError) throw reportError;
+
+            // Link evidence to report_media table
+            if (report.id && publicUrl) {
+                await supabase.from('report_media').insert({
+                    report_id: report.id,
+                    file_url: publicUrl,
+                    file_type: 'video',
+                    storage_path: storagePath,
+                    file_name: storagePath?.split('/').pop(),
+                    mime_type: 'video/mp4',
+                });
+            }
+
+            // No points awarded at submission time.
+            // Points are awarded on approval by the DB function submit_officer_review.
+
             navigation.navigate('VideoReportSuccess');
-        }, 1800);
+        } catch (error) {
+            console.error('Video submission error:', error);
+            Alert.alert('Submission Failed', error.message || 'Could not submit your video report.');
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     const isNextEnabled = currentStep === 1 ? !!video : currentStep === 2 ? !!description.trim() : true;
