@@ -1,16 +1,33 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import {
+    View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, StatusBar,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MobileContainer, Button, Input } from '../../components';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MobileContainer, Input } from '../../components';
 import { useAuth } from '../../context';
 import { authService } from '../../services';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS } from '../../utils';
+
+// ── Design Tokens ──
+const C = {
+    navy: '#002452',
+    navyMid: '#1B3A6B',
+    amber: '#F59E0B',
+    white: '#FFFFFF',
+    offWhite: '#F8F9FB',
+    surface: '#FFFFFF',
+    surfaceInput: '#F2F4F6',
+    textPrimary: '#191C1E',
+    textSecondary: '#44474F',
+    textTertiary: '#747780',
+    primarySurface: '#D7E2FF',
+};
 
 export default function EditProfile({ navigation }) {
     const { profile, user, refreshProfile } = useAuth();
     const [fullName, setFullName] = useState(profile?.full_name || '');
-    const [phone, setPhone] = useState(profile?.phone || '');
+    const phone = profile?.phone || '';
     const [loading, setLoading] = useState(false);
 
     const handleSave = async () => {
@@ -22,7 +39,7 @@ export default function EditProfile({ navigation }) {
         setLoading(true);
         try {
             const { error } = await authService.updateProfile(user.id, {
-                full_name: fullName,
+                full_name: fullName.trim(),
                 updated_at: new Date(),
             });
 
@@ -41,27 +58,31 @@ export default function EditProfile({ navigation }) {
     };
 
     return (
-        <MobileContainer>
-            <SafeAreaView style={styles.container} edges={['top']}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()}>
-                        <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+        <View style={styles.container}>
+            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+            <SafeAreaView style={styles.safeArea} edges={['top']}>
+                {/* ── Navy Header ── */}
+                <LinearGradient colors={[C.navy, C.navyMid]} style={styles.header}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                        <Ionicons name="arrow-back" size={20} color={C.white} />
                     </TouchableOpacity>
-                    <Text style={styles.title}>Edit Profile</Text>
-                    <View style={{ width: 24 }} />
-                </View>
+                    <Text style={styles.headerTitle}>Edit Profile</Text>
+                    <View style={{ width: 36 }} />
+                </LinearGradient>
 
                 <View style={styles.content}>
+                    {/* ── Avatar Section ── */}
                     <View style={styles.avatarSection}>
                         <View style={styles.avatar}>
-                            <Ionicons name="person" size={50} color={COLORS.white} />
+                            <Ionicons name="person" size={40} color={C.white} />
+                            <TouchableOpacity style={styles.editBadge}>
+                                <Ionicons name="camera" size={14} color={C.navyMid} />
+                            </TouchableOpacity>
                         </View>
-                        <TouchableOpacity style={styles.changePhotoButton}>
-                            <Text style={styles.changePhotoText}>Change Photo</Text>
-                        </TouchableOpacity>
                     </View>
 
-                    <View style={styles.form}>
+                    {/* ── Form ── */}
+                    <View style={styles.formContainer}>
                         <Input
                             label="Full Name"
                             placeholder="Enter your full name"
@@ -69,51 +90,176 @@ export default function EditProfile({ navigation }) {
                             onChangeText={setFullName}
                         />
 
+                        {/* Read-only fields */}
                         <View style={styles.readOnlyContainer}>
-                            <Text style={styles.readOnlyLabel}>Phone Number (Cannot be changed)</Text>
+                            <Text style={styles.readOnlyLabel}>Phone Number</Text>
                             <View style={styles.readOnlyInput}>
+                                <Ionicons name="call-outline" size={18} color={C.textTertiary} />
                                 <Text style={styles.readOnlyText}>{phone || 'Not set'}</Text>
+                                <Ionicons name="lock-closed" size={14} color={C.textTertiary} style={styles.lockIcon} />
                             </View>
+                            <Text style={styles.readOnlyHelp}>This cannot be changed</Text>
                         </View>
 
                         <View style={styles.readOnlyContainer}>
-                            <Text style={styles.readOnlyLabel}>Email (Cannot be changed)</Text>
+                            <Text style={styles.readOnlyLabel}>Email Address</Text>
                             <View style={styles.readOnlyInput}>
+                                <Ionicons name="mail-outline" size={18} color={C.textTertiary} />
                                 <Text style={styles.readOnlyText}>{user?.email}</Text>
+                                <Ionicons name="lock-closed" size={14} color={C.textTertiary} style={styles.lockIcon} />
                             </View>
+                            <Text style={styles.readOnlyHelp}>Contact support to change email</Text>
                         </View>
 
-                        <Button
+                        {/* Save Button */}
+                        <TouchableOpacity
+                            style={[styles.saveButton, loading && { opacity: 0.6 }]}
                             onPress={handleSave}
                             disabled={loading}
-                            style={styles.saveButton}
+                            activeOpacity={0.88}
                         >
-                            {loading ? (
-                                <ActivityIndicator size="small" color={COLORS.white} />
-                            ) : (
-                                'Save Changes'
-                            )}
-                        </Button>
+                            <LinearGradient
+                                colors={[C.navy, C.navyMid]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={styles.saveGradient}
+                            >
+                                {loading ? (
+                                    <ActivityIndicator color={C.white} />
+                                ) : (
+                                    <Text style={styles.saveText}>Save Changes</Text>
+                                )}
+                            </LinearGradient>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </SafeAreaView>
-        </MobileContainer>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: COLORS.background },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md },
-    title: { fontSize: FONT_SIZES.lg, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary },
-    content: { flex: 1, paddingHorizontal: SPACING.lg, paddingTop: SPACING.xl },
-    avatarSection: { alignItems: 'center', marginBottom: SPACING.xl },
-    avatar: { width: 100, height: 100, borderRadius: 50, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', marginBottom: SPACING.sm, ...SHADOWS.md },
-    changePhotoButton: { padding: SPACING.xs },
-    changePhotoText: { color: COLORS.primary, fontWeight: FONT_WEIGHTS.semibold, fontSize: FONT_SIZES.sm },
-    form: { gap: SPACING.md },
-    saveButton: { marginTop: SPACING.lg },
-    readOnlyContainer: { marginBottom: SPACING.md },
-    readOnlyLabel: { fontSize: FONT_SIZES.sm, fontWeight: FONT_WEIGHTS.semibold, color: COLORS.textSecondary, marginBottom: SPACING.xs },
-    readOnlyInput: { backgroundColor: COLORS.gray100, padding: SPACING.md, borderRadius: BORDER_RADIUS.md, borderWidth: 1, borderColor: COLORS.gray200 },
-    readOnlyText: { color: COLORS.textTertiary, fontSize: FONT_SIZES.md },
+    container: { flex: 1, backgroundColor: C.offWhite },
+    safeArea: { flex: 1 },
+
+    // Header
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        paddingBottom: 24,
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
+    },
+    backButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    headerTitle: {
+        fontSize: 20,
+        fontFamily: 'Nunito-Bold',
+        color: C.white,
+        letterSpacing: -0.3,
+    },
+
+    // Content
+    content: {
+        flex: 1,
+        paddingHorizontal: 24,
+    },
+
+    // Avatar
+    avatarSection: {
+        alignItems: 'center',
+        marginTop: 24,
+        marginBottom: 32,
+    },
+    avatar: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: C.navyMid,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: C.navyMid,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 10,
+        elevation: 6,
+    },
+    editBadge: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: C.amber,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 3,
+        borderColor: C.offWhite,
+    },
+
+    // Form
+    formContainer: { gap: 12 },
+    readOnlyContainer: { marginBottom: 12 },
+    readOnlyLabel: {
+        fontSize: 12,
+        fontFamily: 'Nunito-SemiBold',
+        color: C.navyMid,
+        marginBottom: 8,
+    },
+    readOnlyInput: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#E5E7EB',
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        gap: 10,
+    },
+    readOnlyText: {
+        flex: 1,
+        color: C.textSecondary,
+        fontSize: 15,
+        fontFamily: 'Nunito-Medium',
+    },
+    lockIcon: { marginLeft: 'auto' },
+    readOnlyHelp: {
+        fontSize: 11,
+        color: C.textTertiary,
+        marginTop: 6,
+        marginLeft: 4,
+    },
+
+    // Submit
+    saveButton: {
+        borderRadius: 14,
+        overflow: 'hidden',
+        marginTop: 24,
+        shadowColor: C.navy,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.22,
+        shadowRadius: 12,
+        elevation: 6,
+    },
+    saveGradient: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 16,
+    },
+    saveText: {
+        fontSize: 16,
+        fontFamily: 'Nunito-Bold',
+        color: C.white,
+    },
 });

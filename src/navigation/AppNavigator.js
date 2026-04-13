@@ -45,6 +45,7 @@ const ProfileLoadingScreen = () => (
 
 export default function AppNavigator() {
     const { hasSeenOnboarding, showSplash } = useAppContext();
+<<<<<<< HEAD
     const { isAuthenticated, loading, profile } = useAuth();
     const [hasConfirmedRole, setHasConfirmedRole] = React.useState(false);
 
@@ -56,6 +57,17 @@ export default function AppNavigator() {
     // hasConfirmedRole is always false until they click a role on the RoleSelection screen.
     // If they click the correct role, and have an active session, they see the Dashboard.
 
+=======
+    const { isAuthenticated, loading, profile, signOut } = useAuth();
+    const [hasConfirmedRole, setHasConfirmedRole] = React.useState(false);
+
+    // We enforce a strict funnel on every launch. User must flow through:
+    // Splash -> Onboarding -> Role Selection -> Login OR User Dashboard.
+    // hasSeenOnboarding is always false on app start now (AppContext modification).
+    // hasConfirmedRole is always false until they click a role on the RoleSelection screen.
+    // If they click the correct role, and have an active session, they see the Dashboard.
+
+>>>>>>> 52f946b590637f20164074f60bf1748be0a7421a
     return (
         <NavigationContainer linking={linking}>
             <Stack.Navigator

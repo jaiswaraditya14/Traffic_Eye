@@ -11,8 +11,19 @@ export function AuthProvider({ children }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+<<<<<<< HEAD
 <<<<<<< Updated upstream
         checkSession();
+=======
+        // Enterprise Security Requirement: Clear any cached session on app launch
+        // to strictly enforce the "Sign In -> User Dashboard" flow every time.
+        const enforceStrictAuth = async () => {
+            await supabase.auth.signOut();
+            setLoading(false);
+        };
+        
+        enforceStrictAuth();
+>>>>>>> 52f946b590637f20164074f60bf1748be0a7421a
 
 =======
         // We simplified the strict auth enforcement to prevent startup hangs
@@ -21,13 +32,18 @@ export function AuthProvider({ children }) {
 >>>>>>> Stashed changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
-                setUser(session?.user ?? null);
-                if (session?.user) {
-                    await fetchProfile(session.user.id);
-                } else {
-                    setProfile(null);
+                try {
+                    setUser(session?.user ?? null);
+                    if (session?.user) {
+                        await fetchProfile(session.user.id);
+                    } else {
+                        setProfile(null);
+                    }
+                } catch (error) {
+                    console.error('Auth state change error:', error);
+                } finally {
+                    setLoading(false);
                 }
-                setLoading(false);
             }
         );
 
@@ -49,8 +65,47 @@ export function AuthProvider({ children }) {
     };
 
     const fetchProfile = async (userId) => {
-        const { data, error } = await authService.getProfile(userId);
-        if (!error) setProfile(data);
+        try {
+            const { data, error } = await authService.getProfile(userId);
+            if (error || !data) {
+                // If profile doesn't exist, check if user is logged in and create a default one
+                const { data: { user }, error: userError } = await supabase.auth.getUser();
+                if (userError || !user) {
+                    console.error('User not found or session invalid', userError);
+                    setUser(null);
+                    setProfile(null);
+                    await supabase.auth.signOut();
+                    return;
+                }
+                
+                const newProfile = {
+                    id: user.id,
+                    full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+                    email: user.email,
+                    role: 'citizen', // Default to citizen for OAuth
+                    points_balance: 0,
+                    created_at: new Date().toISOString(),
+                };
+                
+                // Use upsert to ensure it correctly creates the profile if missing
+                const { error: insertError } = await supabase.from('profiles').upsert(newProfile);
+                if (!insertError) {
+                    setProfile(newProfile);
+                } else {
+                    console.error('Failed to create profile:', insertError);
+                    setUser(null);
+                    setProfile(null);
+                    await supabase.auth.signOut();
+                }
+            } else {
+                setProfile(data);
+            }
+        } catch (err) {
+            console.error('Fatal error fetching profile:', err);
+            setUser(null);
+            setProfile(null);
+            await supabase.auth.signOut();
+        }
     };
 
     const signUpCitizen = async (...args) => authService.signUpCitizen(...args);

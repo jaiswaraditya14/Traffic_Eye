@@ -1,36 +1,45 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Modal, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Modal, Alert, TextInput, StatusBar, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MobileContainer, Button, Input } from '../../components';
-import { useAppContext } from '../../context';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS } from '../../utils';
+import { useAppContext } from '../../context/AppContext';
+import { LinearGradient } from 'expo-linear-gradient';
+import { supabase, rewardService } from '../../services';
+import * as FileSystem from 'expo-file-system/legacy';
+const { EncodingType } = FileSystem;
+import { decode } from 'base64-arraybuffer';
+
+const C = {
+    navy: '#002452',
+    navyMid: '#1B3A6B',
+    amber: '#F59E0B',
+    white: '#FFFFFF',
+    offWhite: '#F8F9FB',
+    surface: '#FFFFFF',
+    textPrimary: '#191C1E',
+    textSecondary: '#44474F',
+    border: '#E5E7EB',
+    error: '#BA1A1A',
+    success: '#059669',
+    successSurface: '#D1FAE5',
+    warning: '#D97706',
+};
 
 export default function AIResultsVerification({ navigation, route }) {
     const { currentReport } = useAppContext();
     const { aiResults } = route.params || {};
 
-    // Editable fields with AI-detected values
     const [vehicleNumber, setVehicleNumber] = useState(aiResults?.vehicleNumber || '');
     const [violationType, setViolationType] = useState(aiResults?.violationType || '');
-    const [confidence, setConfidence] = useState(aiResults?.confidence?.toString() || '0');
+    const [address, setAddress] = useState(currentReport?.address || '');
+    const [confidence] = useState(aiResults?.confidence?.toString() || '0');
     const [imageModalVisible, setImageModalVisible] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
 
     const severity = aiResults?.severity || 'Unknown';
-    const allViolations = aiResults?.allViolations || [];
     const violationDetected = aiResults?.violationDetected !== false;
 
-    const getSeverityColor = (sev) => {
-        switch (sev) {
-            case 'Critical': return '#dc2626';
-            case 'High': return '#ea580c';
-            case 'Medium': return '#eab308';
-            case 'Low': return '#22c55e';
-            default: return COLORS.textSecondary;
-        }
-    };
-
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (!vehicleNumber.trim()) {
             Alert.alert('Error', 'Please enter a vehicle number');
             return;
@@ -40,93 +49,144 @@ export default function AIResultsVerification({ navigation, route }) {
             return;
         }
 
-        // Navigate to success screen with verified data
-        navigation.navigate('ReportSuccess', {
-            verifiedData: {
-                vehicleNumber,
-                violationType,
-                severity,
-                allViolations,
-                confidence: `${confidence}%`,
-                ...currentReport
+        setSubmitting(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('User not authenticated');
+
+            // 1. Upload image to Storage
+            let publicUrl = null;
+            let storagePath = null;
+
+            if (currentReport?.image) {
+                const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+                storagePath = `${user.id}/${fileName}`;
+
+                // Convert URI to Base64 and then to ArrayBuffer
+                const base64 = await FileSystem.readAsStringAsync(currentReport.image, {
+                    encoding: EncodingType?.Base64 || 'base64',
+                });
+
+                const { error: uploadError } = await supabase.storage
+                    .from('report-media')
+                    .upload(storagePath, decode(base64), {
+                        contentType: 'image/jpeg',
+                        upsert: true
+                    });
+
+                if (uploadError) throw uploadError;
+
+                const { data: { publicUrl: url } } = supabase.storage
+                    .from('report-media')
+                    .getPublicUrl(storagePath);
+                
+                publicUrl = url;
             }
-        });
+
+            let imgReportId = null;
+
+            // Save to new image_reports table (officer queue + transparency layer)
+            const severityLower = (aiResults?.severity || 'medium').toLowerCase();
+            const normSeverity = ['low', 'medium', 'high', 'critical'].includes(severityLower) ? severityLower : 'medium';
+            const { data: imgReport, error: imgReportError } = await supabase.from('image_reports').insert({
+                user_id:               user.id,
+                image_url:             publicUrl || '',
+                image_storage_path:    storagePath,
+                location_address:      address || currentReport?.address || null,
+                violation_type:        violationType,
+                violation_description: aiResults?.description || null,
+                severity:              normSeverity,
+                ai_confidence:         parseFloat(confidence) / 100,
+                ai_raw_result:         aiResults,
+                vehicle_number:        vehicleNumber,
+                status:                'pending',
+            }).select().single();
+
+            if (imgReportError) throw imgReportError;
+            imgReportId = imgReport.id;
+
+            // Link evidence to report_media table (for gallery display)
+            if (imgReportId && publicUrl) {
+                await supabase.from('report_media').insert({
+                    report_id:    imgReportId,
+                    file_url:     publicUrl,
+                    file_type:    'image',
+                    storage_path: storagePath,
+                    file_name:    storagePath?.split('/').pop(),
+                    mime_type:    'image/jpeg',
+                });
+            }
+
+            // No points awarded at submission time.
+            // Points are awarded by the officer via submit_officer_review DB function upon approval.
+
+            navigation.navigate('ReportSuccess', {
+                verifiedData: {
+                    vehicleNumber,
+                    violationType,
+                    severity,
+                    confidence: `${confidence}%`,
+                    ...currentReport,
+                    address, // Use edited address
+                    reportId: imgReportId
+                }
+            });
+        } catch (error) {
+            console.error('Error saving report:', error);
+            Alert.alert('Submission Failed', error.message || 'Could not save report. Please try again.');
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     return (
-        <MobileContainer>
-            <SafeAreaView style={styles.container} edges={['top']}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()}>
-                        <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+        <View style={styles.container}>
+            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+            <SafeAreaView style={styles.safeArea} edges={['top']}>
+                {/* ── Header ── */}
+                <LinearGradient colors={[C.navy, C.navyMid]} style={styles.header}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                        <Ionicons name="arrow-back" size={20} color={C.white} />
                     </TouchableOpacity>
-                    <Text style={styles.title}>Verify AI Results</Text>
-                    <View style={{ width: 24 }} />
-                </View>
+                    <Text style={styles.headerTitle}>Review AI Results</Text>
+                    <View style={{ width: 36 }} />
+                </LinearGradient>
 
-                <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                    
                     {/* Media Preview */}
                     <View style={styles.mediaContainer}>
                         {currentReport?.image ? (
-                            <TouchableOpacity
-                                onPress={() => setImageModalVisible(true)}
-                                activeOpacity={0.9}
-                            >
-                                <Image source={{ uri: currentReport.image }} style={styles.mediaPreview} />
-                                <View style={styles.zoomIndicator}>
-                                    <Ionicons name="expand" size={20} color={COLORS.white} />
-                                </View>
+                            <TouchableOpacity onPress={() => setImageModalVisible(true)} activeOpacity={0.9}>
+                                <Image source={{ uri: currentReport.image }} style={styles.mediaPreview} resizeMode="cover" />
+                                <View style={styles.zoomBtn}><Ionicons name="expand" size={16} color={C.navyMid} /></View>
                             </TouchableOpacity>
                         ) : (
-                            <View style={styles.placeholder}>
-                                <Ionicons name="image" size={64} color={COLORS.gray400} />
-                            </View>
+                            <View style={styles.placeholder}><Ionicons name="image" size={48} color={C.border} /></View>
                         )}
                     </View>
 
-                    {/* AI Results Card */}
-                    <View style={styles.card}>
+                    {/* AI Insights Card */}
+                    <View style={styles.aiCard}>
                         <View style={styles.aiHeader}>
-                            <Ionicons name="sparkles" size={24} color={COLORS.secondary} />
-                            <Text style={styles.sectionTitle}>AI Detection Results</Text>
-                            <View style={[styles.confidenceBadge, { backgroundColor: parseInt(confidence) >= 80 ? COLORS.success : COLORS.warning }]}>
-                                <Text style={styles.confidenceBadgeText}>{confidence}% Confidence</Text>
+                            <Ionicons name="sparkles" size={18} color={violationDetected ? C.success : C.warning} />
+                            <Text style={[styles.aiTitle, { color: violationDetected ? C.success : C.warning }]}>AI Detection</Text>
+                            <View style={styles.confidenceBadge}>
+                                <Text style={styles.confidenceText}>{confidence}% Match</Text>
                             </View>
                         </View>
-
-                        {/* Severity Badge */}
-                        {violationDetected && (
-                            <View style={[styles.severityBadge, { backgroundColor: getSeverityColor(severity) + '20', borderColor: getSeverityColor(severity) }]}>
-                                <Ionicons name="alert-circle" size={16} color={getSeverityColor(severity)} />
-                                <Text style={[styles.severityText, { color: getSeverityColor(severity) }]}>
-                                    Severity: {severity}
-                                </Text>
+                        {violationDetected ? (
+                            <View style={styles.aiAlertBox}>
+                                <Text style={styles.aiAlertText}>A potential <Text style={{fontFamily: 'Nunito-Bold'}}>{violationType}</Text> violation has been detected. Please verify the accuracy of the extracted details below.</Text>
+                            </View>
+                        ) : (
+                            <View style={styles.aiAlertBox}>
+                                <Text style={styles.aiAlertText}>No clear violations detected automatically. You may still submit the report manually by filling out the details.</Text>
                             </View>
                         )}
-
-                        {/* All Violations List (when multiple) */}
-                        {allViolations.length > 1 && (
-                            <View style={styles.allViolationsBox}>
-                                <Text style={styles.allViolationsTitle}>All Violations Detected ({allViolations.length}):</Text>
-                                {allViolations.map((v, i) => (
-                                    <Text key={i} style={styles.allViolationItem}>
-                                        {i === 0 ? '🔴' : '🟡'} {v} {i === 0 ? '(Most Severe)' : ''}
-                                    </Text>
-                                ))}
-                            </View>
-                        )}
-
-                        {aiResults?.description && (
-                            <View style={styles.descriptionBox}>
-                                <Ionicons name="information-circle" size={16} color={COLORS.primary} />
-                                <Text style={styles.descriptionText}>{aiResults.description}</Text>
-                            </View>
-                        )}
-                        <Text style={styles.aiSubtitle}>
-                            Please review and correct the information below if needed
-                        </Text>
                     </View>
 
+<<<<<<< HEAD
                     {/* Editable Fields */}
                     <View style={styles.formSection}>
                         <Text style={styles.sectionTitle}>Detected Information</Text>
@@ -258,77 +318,229 @@ export default function AIResultsVerification({ navigation, route }) {
                             source={{ uri: currentReport?.image }}
                             style={styles.modalImage}
                             resizeMode="contain"
+=======
+                    {/* Input Forms */}
+                    <Text style={styles.sectionHeader}>Detected Details</Text>
+                    
+                    <View style={styles.inputBox}>
+                        <Text style={styles.inputLabel}>Vehicle Registration Plate</Text>
+                        <TextInput
+                            style={styles.textInput}
+                            placeholder="e.g. MH12AB1234"
+                            value={vehicleNumber}
+                            onChangeText={setVehicleNumber}
+                            autoCapitalize="characters"
+                            placeholderTextColor={C.textTertiary}
+>>>>>>> 52f946b590637f20164074f60bf1748be0a7421a
                         />
                     </View>
-                </Modal>
+
+                    <View style={styles.inputBox}>
+                        <Text style={styles.inputLabel}>Violation Type</Text>
+                        <TextInput
+                            style={styles.textInput}
+                            placeholder="e.g. Red Light Running"
+                            value={violationType}
+                            onChangeText={setViolationType}
+                            placeholderTextColor={C.textTertiary}
+                        />
+                        <View style={styles.chipsRow}>
+                            {['Speeding', 'Red Light', 'No Helmet', 'Wrong Way', 'Illegal Parking', 'Phone Use', 'Triple Riding', 'No Seatbelt', 'Footpath Driving', 'Overloading'].map(type => (
+                                <TouchableOpacity key={type} style={styles.chip} onPress={() => setViolationType(type)}>
+                                    <Text style={styles.chipText}>{type}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </View>
+
+                    <View style={styles.inputBox}>
+                        <Text style={styles.inputLabel}>Incident Location Address</Text>
+                        <TextInput
+                            style={[styles.textInput, styles.addressInput]}
+                            placeholder="Location details..."
+                            value={address}
+                            onChangeText={setAddress}
+                            multiline
+                            numberOfLines={4}
+                            placeholderTextColor={C.textTertiary}
+                        />
+                    </View>
+
+                </ScrollView>
+
+                {/* Footer Action */}
+                <View style={styles.footer}>
+                    <TouchableOpacity 
+                        style={[styles.primaryBtn, (submitting || !violationDetected) && { opacity: 0.7 }]} 
+                        onPress={handleSubmit} 
+                        disabled={submitting}
+                        activeOpacity={0.88}
+                    >
+                        <LinearGradient colors={[C.navy, C.navyMid]} style={styles.primaryBtnGradient} start={{x:0,y:0}} end={{x:1,y:0}}>
+                            {submitting ? (
+                                <ActivityIndicator color={C.white} size="small" />
+                            ) : (
+                                <>
+                                    <Text style={styles.primaryBtnText}>Confirm & Submit</Text>
+                                    <Ionicons name="checkmark-circle" size={18} color={C.white} />
+                                </>
+                            )}
+                        </LinearGradient>
+                    </TouchableOpacity>
+                </View>
+
             </SafeAreaView>
-        </MobileContainer>
+
+            {/* Modal */}
+            <Modal visible={imageModalVisible} transparent={true} animationType="fade" onRequestClose={() => setImageModalVisible(false)}>
+                <View style={styles.modalBg}>
+                    <TouchableOpacity style={styles.modalClose} onPress={() => setImageModalVisible(false)}>
+                        <Ionicons name="close" size={28} color={C.white} />
+                    </TouchableOpacity>
+                    <Image source={{ uri: currentReport?.image }} style={styles.modalImg} resizeMode="contain" />
+                </View>
+            </Modal>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1 },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md },
-    title: { fontSize: FONT_SIZES.lg, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary },
-    content: { flex: 1, paddingHorizontal: SPACING.lg },
-    mediaContainer: { width: '100%', height: 200, borderRadius: BORDER_RADIUS.xl, overflow: 'hidden', marginBottom: SPACING.lg, ...SHADOWS.md },
+    container: { flex: 1, backgroundColor: C.offWhite },
+    safeArea: { flex: 1 },
+
+    // Header
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+    backButton: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)', justifyContent: 'center', alignItems: 'center' },
+    headerTitle: { fontSize: 20, fontFamily: 'Nunito-Bold', color: C.white },
+
+    content: { flex: 1 },
+    scrollContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
+
+    // Media
+    mediaContainer: { 
+        width: '100%', 
+        height: 240, 
+        borderRadius: 24, 
+        overflow: 'hidden', 
+        backgroundColor: C.surface, 
+        marginBottom: 24, 
+        shadowColor: '#1B3A6B', 
+        shadowOffset: { width: 0, height: 12 }, 
+        shadowOpacity: 0.12, 
+        shadowRadius: 20, 
+        elevation: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.05)',
+    },
     mediaPreview: { width: '100%', height: '100%' },
-    zoomIndicator: { position: 'absolute', bottom: SPACING.sm, right: SPACING.sm, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: BORDER_RADIUS.md, padding: 4 },
-    placeholder: { flex: 1, backgroundColor: COLORS.gray100, justifyContent: 'center', alignItems: 'center' },
-    card: { backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.lg, padding: SPACING.md, marginBottom: SPACING.lg, ...SHADOWS.sm, borderWidth: 1, borderColor: COLORS.gray100 },
-    aiHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.sm },
-    sectionTitle: { fontSize: FONT_SIZES.md, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary, flex: 1 },
-    confidenceBadge: { paddingHorizontal: SPACING.sm, paddingVertical: 2, borderRadius: BORDER_RADIUS.md },
-    confidenceBadgeText: { color: COLORS.white, fontSize: FONT_SIZES.xs, fontWeight: FONT_WEIGHTS.bold },
-    descriptionBox: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        gap: SPACING.xs,
-        backgroundColor: COLORS.gray50,
-        padding: SPACING.sm,
-        borderRadius: BORDER_RADIUS.md,
-        marginVertical: SPACING.sm,
-        borderLeftWidth: 3,
-        borderLeftColor: COLORS.primary
+    placeholder: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    zoomBtn: { 
+        position: 'absolute', 
+        bottom: 16, 
+        right: 16, 
+        backgroundColor: 'rgba(255,255,255,0.92)', 
+        padding: 10, 
+        borderRadius: 14,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
     },
-    descriptionText: {
-        flex: 1,
-        fontSize: FONT_SIZES.xs,
-        color: COLORS.textSecondary,
-        lineHeight: 16
+
+    // AI Card
+    aiCard: { 
+        backgroundColor: '#FFFFFF', 
+        borderRadius: 24, 
+        padding: 20, 
+        marginBottom: 28, 
+        borderWidth: 1, 
+        borderColor: 'rgba(5,150,105,0.1)',
+        shadowColor: C.success,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 12,
+        elevation: 2,
     },
-    aiSubtitle: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary },
-    formSection: { marginBottom: SPACING.xl },
-    inputWrapper: { marginBottom: SPACING.lg },
-    inputHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, marginBottom: SPACING.xs },
-    inputLabel: { fontSize: FONT_SIZES.sm, fontWeight: FONT_WEIGHTS.semibold, color: COLORS.textPrimary },
-    quickOptions: { flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.sm },
-    quickOption: { backgroundColor: COLORS.gray100, paddingHorizontal: SPACING.md, paddingVertical: 6, borderRadius: BORDER_RADIUS.md },
-    quickOptionText: { fontSize: FONT_SIZES.xs, color: COLORS.textPrimary, fontWeight: FONT_WEIGHTS.medium },
-    lockBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.gray100, paddingHorizontal: 6, paddingVertical: 2, borderRadius: BORDER_RADIUS.sm, marginLeft: 'auto' },
-    lockText: { fontSize: 10, color: COLORS.textSecondary, fontWeight: FONT_WEIGHTS.medium },
-    confidenceContainer: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-    readOnlyInput: { flex: 1, backgroundColor: COLORS.gray100, opacity: 0.8 },
-    percentSymbol: { fontSize: FONT_SIZES.lg, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary },
-    confidenceBar: { height: 6, backgroundColor: COLORS.gray200, borderRadius: BORDER_RADIUS.sm, marginTop: SPACING.sm, overflow: 'hidden' },
-    confidenceFill: { height: '100%', borderRadius: BORDER_RADIUS.sm },
-    severityBadge: {
-        flexDirection: 'row', alignItems: 'center', gap: SPACING.xs,
-        paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs,
-        borderRadius: BORDER_RADIUS.md, borderWidth: 1.5,
-        marginBottom: SPACING.sm, alignSelf: 'flex-start',
+    aiHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+    aiTitle: { fontSize: 16, fontFamily: 'Nunito-Bold', marginLeft: 8, flex: 1 },
+    confidenceBadge: { 
+        backgroundColor: C.successSurface, 
+        paddingHorizontal: 12, 
+        paddingVertical: 6, 
+        borderRadius: 100,
+        borderWidth: 1,
+        borderColor: 'rgba(5,150,105,0.2)',
     },
-    severityText: { fontSize: FONT_SIZES.sm, fontWeight: FONT_WEIGHTS.bold },
-    allViolationsBox: {
-        backgroundColor: COLORS.gray50, borderRadius: BORDER_RADIUS.md,
-        padding: SPACING.sm, marginBottom: SPACING.sm,
-        borderLeftWidth: 3, borderLeftColor: COLORS.warning,
+    confidenceText: { fontSize: 12, fontFamily: 'Nunito-ExtraBold', color: C.success, letterSpacing: 0.2 },
+    aiAlertBox: { 
+        marginTop: 4,
+        paddingLeft: 4,
     },
-    allViolationsTitle: { fontSize: FONT_SIZES.xs, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary, marginBottom: SPACING.xs },
-    allViolationItem: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: 2 },
-    footer: { flexDirection: 'row', gap: SPACING.md, padding: SPACING.lg, borderTopWidth: 1, borderTopColor: COLORS.gray200 },
-    footerButton: { flex: 1 },
-    modalContainer: { flex: 1, backgroundColor: 'black', justifyContent: 'center', alignItems: 'center' },
-    closeButton: { position: 'absolute', top: 50, right: 20, zIndex: 1 },
-    modalImage: { width: '100%', height: '80%' }
+    aiAlertText: { fontSize: 14, color: C.textSecondary, lineHeight: 22, fontFamily: 'Nunito-Medium' },
+
+    sectionHeader: { 
+        fontSize: 17, 
+        fontFamily: 'Nunito-Bold', 
+        color: C.navy, 
+        marginBottom: 20, 
+        letterSpacing: -0.2,
+        marginLeft: 4,
+    },
+
+    inputBox: { marginBottom: 24 },
+    inputLabel: { fontSize: 13, fontFamily: 'Nunito-Bold', color: C.navyMid, marginBottom: 10, marginLeft: 6 },
+    textInput: { 
+        backgroundColor: C.surface, 
+        borderWidth: 1.5, 
+        borderColor: '#E5E7EB', 
+        borderRadius: 16, 
+        paddingHorizontal: 18, 
+        paddingVertical: 14, 
+        fontSize: 16, 
+        color: C.textPrimary, 
+        fontFamily: 'Nunito-SemiBold',
+        shadowColor: C.navyMid, 
+        shadowOffset: { width: 0, height: 2 }, 
+        shadowOpacity: 0.02, 
+        shadowRadius: 6, 
+    },
+    addressInput: {
+        minHeight: 120,
+        textAlignVertical: 'top',
+        paddingTop: 14,
+    },
+    chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 14 },
+    chip: { 
+        backgroundColor: '#F3F4F6', 
+        borderWidth: 1, 
+        borderColor: 'rgba(0,0,0,0.05)', 
+        paddingHorizontal: 16, 
+        paddingVertical: 10, 
+        borderRadius: 14 
+    },
+    chipText: { fontSize: 13, fontFamily: 'Nunito-Bold', color: C.navyMid },
+
+    footer: { 
+        paddingHorizontal: 24, 
+        paddingTop: 20,
+        paddingBottom: 40, 
+        backgroundColor: C.surface, 
+        borderTopWidth: 1, 
+        borderTopColor: 'rgba(0,0,0,0.05)',
+    },
+    primaryBtn: { 
+        borderRadius: 18, 
+        overflow: 'hidden', 
+        shadowColor: C.navy, 
+        shadowOffset: { width: 0, height: 8 }, 
+        shadowOpacity: 0.25, 
+        shadowRadius: 16, 
+        elevation: 8 
+    },
+    primaryBtnGradient: { flexDirection: 'row', paddingVertical: 18, alignItems: 'center', justifyContent: 'center', gap: 12 },
+    primaryBtnText: { fontSize: 17, fontFamily: 'Nunito-ExtraBold', color: C.white, letterSpacing: 0.5 },
+
+    modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
+    modalClose: { position: 'absolute', top: 60, right: 24, zIndex: 10, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
+    modalImg: { width: '100%', height: '85%' },
 });

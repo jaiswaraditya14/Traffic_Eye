@@ -1,0 +1,9 @@
+=== SYNTAX ERRORS FOUND ===
+File: d:\Traffic_Eye\src\screens\auth\CitizenSignIn.js
+Error: Expected corresponding JSX closing tag for <View>. (231:20)
+
+File: d:\Traffic_Eye\src\screens\citizen\CitizenHome.js
+Error: Expected corresponding JSX closing tag for <View>. (78:20)
+
+File: d:\Traffic_Eye\src\screens\citizen\Rewards.js
+Error: Expected corresponding JSX closing tag for <Animated.View>. (36:16)

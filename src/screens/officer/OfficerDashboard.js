@@ -1,342 +1,671 @@
-// OfficerDashboard.js
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import {
+    View, Text, StyleSheet, ScrollView, TouchableOpacity,
+    Image, Animated, StatusBar, ActivityIndicator
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MobileContainer } from '../../components';
 import { useAuth } from '../../context';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, GRADIENTS } from '../../utils/theme';
+import { useFocusEffect } from '@react-navigation/native';
+import { supabase } from '../../services';
+
+// ── Design Tokens (Civic Authority — Officer Side) ──
+const C = {
+    navy: '#002452',
+    navyMid: '#1B3A6B',
+    navyLight: '#2C4E80',
+    amber: '#F59E0B',
+    amberDark: '#D97706',
+    amberSurface: '#FEF3C7',
+    white: '#FFFFFF',
+    offWhite: '#F8F9FB',
+    surface: '#FFFFFF',
+    surfaceLow: '#F2F4F6',
+    textPrimary: '#191C1E',
+    textSecondary: '#44474F',
+    textTertiary: '#747780',
+    border: '#C4C6D0',
+    success: '#059669',
+    successSurface: '#D1FAE5',
+    warning: '#D97706',
+    warningSurface: '#FEF3C7',
+    error: '#BA1A1A',
+    errorSurface: '#FFDAD6',
+    critical: '#DC2626',
+    primarySurface: '#D7E2FF',
+};
 
 export default function OfficerDashboard({ navigation }) {
     const { profile } = useAuth();
     const officerName = profile?.full_name?.split(' ')[0] || 'Officer';
+    const officerTitle = profile?.badge_title || 'Traffic Inspector';
+    const officerZone = 'Mumbai Central';
+    const insets = useSafeAreaInsets();
+
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(30)).current;
+
+    const [pendingReports, setPendingReports] = useState([]);
+    const [approvedCount, setApprovedCount] = useState(0);
+    const [loadingData, setLoadingData] = useState(true);
+
+    const fetchData = useCallback(async () => {
+        setLoadingData(true);
+        try {
+            // Fetch all pending reports
+            const { data: pending } = await supabase
+                .from('image_reports')
+                .select(`
+                    id, violation_type, vehicle_number, location_address,
+                    severity, submitted_at, status, image_url,
+                    submitter:user_id ( full_name )
+                `)
+                .eq('status', 'pending')
+                .order('submitted_at', { ascending: false })
+                .limit(10);
+
+            // Fetch approved count
+            const { count } = await supabase
+                .from('image_reports')
+                .select('id', { count: 'exact', head: true })
+                .eq('status', 'approved');
+
+            setPendingReports(pending || []);
+            setApprovedCount(count || 0);
+        } catch (e) {
+            console.error('Officer dashboard fetch error:', e);
+        } finally {
+            setLoadingData(false);
+        }
+    }, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            fetchData();
+        }, [fetchData])
+    );
+
+    // Subscribe to realtime changes on image_reports
+    useFocusEffect(
+        useCallback(() => {
+            const ch = supabase
+                .channel('officer_dashboard')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'image_reports' },
+                    () => fetchData()
+                )
+                .subscribe();
+            return () => ch.unsubscribe();
+        }, [fetchData])
+    );
+
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+            Animated.spring(slideAnim, { toValue: 0, tension: 70, friction: 12, useNativeDriver: true }),
+        ]).start();
+    }, []);
 
     const stats = [
-        { label: 'Pending', value: '24', icon: 'time', gradient: GRADIENTS.warning, color: COLORS.warning },
-        { label: 'Verified', value: '156', icon: 'checkmark-circle', gradient: GRADIENTS.success, color: COLORS.success },
-        { label: 'Today', value: '12', icon: 'calendar', gradient: GRADIENTS.info, color: COLORS.info },
+        { label: 'Pending', value: pendingReports.length.toString(), icon: 'time-outline', color: C.warning, bg: C.warningSurface },
+        { label: 'Verified', value: approvedCount.toString(), icon: 'checkmark-circle-outline', color: C.success, bg: C.successSurface },
     ];
 
-    const recentReports = [
-        { id: 1, type: 'Speeding', location: 'Main St & 5th Ave', time: '15 min ago', priority: 'high' },
-        { id: 2, type: 'Red Light', location: 'Oak Rd & Elm St', time: '1h ago', priority: 'medium' },
-        { id: 3, type: 'No Helmet', location: 'Park Avenue', time: '2h ago', priority: 'low' },
-    ];
+    const formatDate = (dateStr) => {
+        if (!dateStr) return '—';
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) +
+            ' ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    };
 
-    const getPriorityConfig = (priority) => ({
-        high: { color: COLORS.error, bg: COLORS.errorSurface, label: 'HIGH' },
-        medium: { color: COLORS.warning, bg: COLORS.warningSurface, label: 'MED' },
-        low: { color: COLORS.textTertiary, bg: COLORS.gray100, label: 'LOW' },
-    }[priority]);
+    const getPriorityConfig = (severity) => ({
+        critical: { color: C.critical, bg: C.errorSurface, label: 'CRITICAL', barColor: C.critical },
+        high:     { color: C.error, bg: '#FFE4E4', label: 'HIGH', barColor: C.error },
+        medium:   { color: C.warning, bg: C.warningSurface, label: 'MEDIUM', barColor: C.amber },
+        low:      { color: C.textTertiary, bg: C.surfaceLow, label: 'LOW', barColor: C.border },
+    }[severity] || { color: C.warning, bg: C.warningSurface, label: 'MEDIUM', barColor: C.amber });
 
     return (
-        <MobileContainer>
-            <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.container}>
+            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
+            <SafeAreaView style={styles.safeArea} edges={['bottom']}>
                 <ScrollView showsVerticalScrollIndicator={false}>
-                    {/* Header */}
-                    <View style={styles.header}>
-                        <View>
-                            <Text style={styles.greeting}>Hello, {officerName}</Text>
-                            <Text style={styles.subtitle}>Manage violation reports</Text>
-                        </View>
-                        <TouchableOpacity style={styles.notificationBtn}>
-                            <Ionicons name="notifications-outline" size={22} color={COLORS.textPrimary} />
-                        </TouchableOpacity>
-                    </View>
 
-                    {/* Stats */}
-                    <View style={styles.statsContainer}>
-                        {stats.map((stat, index) => (
-                            <View key={index} style={styles.statCard}>
-                                <LinearGradient
-                                    colors={stat.gradient}
-                                    style={styles.statGradient}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 1 }}
-                                >
-                                    <View style={styles.statIconBg}>
-                                        <Ionicons name={stat.icon} size={24} color={COLORS.white} />
+                    {/* ── Navy Officer Header ── */}
+                    <LinearGradient
+                        colors={[C.navy, C.navyMid]}
+                        style={[styles.header, { paddingTop: insets.top + 16 }]}
+                    >
+                        <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+                            <View style={styles.headerTop}>
+                                <View style={styles.headerLeft}>
+                                    {/* Badge */}
+                                    <View style={styles.officerBadge}>
+                                        <Ionicons name="shield-checkmark" size={16} color={C.amber} />
                                     </View>
-                                    <Text style={styles.statValue}>{stat.value}</Text>
-                                    <Text style={styles.statLabel}>{stat.label}</Text>
-                                </LinearGradient>
+                                    <View>
+                                        <Text style={styles.officerName}>{officerTitle} {officerName}</Text>
+                                        <Text style={styles.officerZone}>Traffic Authority, {officerZone}</Text>
+                                    </View>
+                                </View>
+                                <View style={styles.headerRight}>
+                                    <TouchableOpacity style={styles.headerIconBtn}>
+                                        <Ionicons name="settings-outline" size={20} color={C.white} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.headerIconBtn}>
+                                        <Ionicons name="notifications-outline" size={20} color={C.white} />
+                                        <View style={styles.notifDot} />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            {/* Priority Alert Banner */}
+                            <TouchableOpacity
+                                style={styles.alertBanner}
+                                onPress={() => navigation.navigate('Pending')}
+                                activeOpacity={0.85}
+                            >
+                                <View style={styles.alertIconBg}>
+                                    <Ionicons name="warning" size={18} color={C.amberDark} />
+                                </View>
+                                <View style={styles.alertContent}>
+                                    <Text style={styles.alertTitle}>{pendingReports.length} Pending Report{pendingReports.length !== 1 ? 's' : ''}</Text>
+                                    <Text style={styles.alertSubtitle}>Require immediate review</Text>
+                                </View>
+                                <View style={styles.alertButton}>
+                                    <Text style={styles.alertButtonText}>Review</Text>
+                                    <Ionicons name="arrow-forward" size={14} color={C.navy} />
+                                </View>
+                            </TouchableOpacity>
+                        </Animated.View>
+                    </LinearGradient>
+
+                    {/* ── Stats Row ── */}
+                    <Animated.View
+                        style={[
+                            styles.statsRow,
+                            { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+                        ]}
+                    >
+                        {stats.map((stat, idx) => (
+                            <View key={idx} style={styles.statCard}>
+                                <View style={[styles.statIconBg, { backgroundColor: stat.bg }]}>
+                                    <Ionicons name={stat.icon} size={20} color={stat.color} />
+                                </View>
+                                <Text style={styles.statValue}>{stat.value}</Text>
+                                <Text style={styles.statLabel}>{stat.label}</Text>
                             </View>
                         ))}
-                    </View>
+                    </Animated.View>
 
-                    {/* Quick Actions */}
-                    <View style={styles.section}>
+                    {/* ── Quick Actions ── */}
+                    <Animated.View
+                        style={[styles.section, { opacity: fadeAnim }]}
+                    >
                         <Text style={styles.sectionTitle}>Quick Actions</Text>
 
                         <TouchableOpacity
                             style={styles.actionCard}
                             onPress={() => navigation.navigate('Pending')}
-                            activeOpacity={0.7}
+                            activeOpacity={0.8}
                         >
-                            <View style={[styles.actionIcon, { backgroundColor: COLORS.warningSurface }]}>
-                                <Ionicons name="time" size={26} color={COLORS.warning} />
+                            <View style={[styles.actionIconCircle, { backgroundColor: C.warningSurface }]}>
+                                <Ionicons name="time" size={22} color={C.warning} />
                             </View>
-                            <View style={styles.actionContent}>
-                                <Text style={styles.actionTitle}>Review Pending Reports</Text>
-                                <Text style={styles.actionDesc}>24 reports waiting for verification</Text>
+                            <View style={styles.actionCardContent}>
+                                <Text style={styles.actionCardTitle}>Review Pending Reports</Text>
+                                <Text style={styles.actionCardDesc}>{pendingReports.length} report{pendingReports.length !== 1 ? 's' : ''} waiting for verification</Text>
                             </View>
-                            <View style={styles.actionChevron}>
-                                <Ionicons name="chevron-forward" size={18} color={COLORS.textTertiary} />
+                            <View style={styles.amberCountBadge}>
+                                <Text style={styles.amberCountText}>{pendingReports.length}</Text>
                             </View>
                         </TouchableOpacity>
 
                         <TouchableOpacity
                             style={styles.actionCard}
                             onPress={() => navigation.navigate('Verified')}
-                            activeOpacity={0.7}
+                            activeOpacity={0.8}
                         >
-                            <View style={[styles.actionIcon, { backgroundColor: COLORS.successSurface }]}>
-                                <Ionicons name="checkmark-circle" size={26} color={COLORS.success} />
+                            <View style={[styles.actionIconCircle, { backgroundColor: C.successSurface }]}>
+                                <Ionicons name="checkmark-circle" size={22} color={C.success} />
                             </View>
-                            <View style={styles.actionContent}>
-                                <Text style={styles.actionTitle}>Verified Reports</Text>
-                                <Text style={styles.actionDesc}>View all verified violations</Text>
+                            <View style={styles.actionCardContent}>
+                                <Text style={styles.actionCardTitle}>Verified Reports</Text>
+                                <Text style={styles.actionCardDesc}>View all verified violations history</Text>
                             </View>
-                            <View style={styles.actionChevron}>
-                                <Ionicons name="chevron-forward" size={18} color={COLORS.textTertiary} />
-                            </View>
+                            <Ionicons name="chevron-forward" size={18} color={C.textTertiary} />
                         </TouchableOpacity>
-                    </View>
+                    </Animated.View>
 
-                    {/* Recent Reports Section with Images */}
-                    <View style={[styles.section, { marginBottom: SPACING.xxl }]}>
+                    {/* ── Recent Reports Queue ── */}
+                    <Animated.View
+                        style={[styles.section, { opacity: fadeAnim, marginBottom: 36 }]}
+                    >
                         <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Recent Reports</Text>
+                            <Text style={styles.sectionTitle}>Pending Queue</Text>
                             <TouchableOpacity onPress={() => navigation.navigate('Pending')}>
                                 <Text style={styles.seeAll}>See All</Text>
                             </TouchableOpacity>
                         </View>
 
-                        {recentReports.map((report) => {
-                            const priorityConfig = getPriorityConfig(report.priority);
-                            return (
-                                <TouchableOpacity
-                                    key={report.id}
-                                    style={styles.reportCard}
-                                    activeOpacity={0.7}
-                                    onPress={() => navigation.getParent()?.navigate('ReportVerification', { reportId: report.id }) ?? navigation.navigate('ReportVerification', { reportId: report.id })}
-                                >
-                                    <Image
-                                        source={require('../../../assets/images/traffic_violation.jpg')}
-                                        style={styles.reportThumbnail}
-                                        resizeMode="cover"
-                                    />
-                                    <View style={styles.reportContent}>
-                                        <View style={styles.reportTopRow}>
-                                            <Text style={styles.reportType}>{report.type}</Text>
-                                            <View style={[styles.priorityBadge, { backgroundColor: priorityConfig.bg }]}>
-                                                <Text style={[styles.priorityText, { color: priorityConfig.color }]}>
-                                                    {priorityConfig.label}
-                                                </Text>
+                        {loadingData ? (
+                            <ActivityIndicator size="small" color={C.navyMid} style={{ marginTop: 20 }} />
+                        ) : pendingReports.length === 0 ? (
+                            <View style={{alignItems: 'center', marginTop: 20, marginBottom: 20}}>
+                                <Ionicons name="checkmark-circle-outline" size={40} color={C.success} />
+                                <Text style={{color: C.textSecondary, marginTop: 8, fontFamily: 'Nunito-Medium'}}>All caught up! No pending reports.</Text>
+                            </View>
+                        ) : (
+                            pendingReports.map((report) => {
+                                const config = getPriorityConfig(report.severity);
+                                return (
+                                    <TouchableOpacity
+                                        key={report.id}
+                                        style={styles.reportCard}
+                                        activeOpacity={0.8}
+                                        onPress={() =>
+                                            navigation.navigate('ImageReportReview', { reportId: report.id })
+                                        }
+                                    >
+                                        {/* Priority left bar */}
+                                        <View style={[styles.reportBar, { backgroundColor: config.barColor }]} />
+
+                                        {/* Thumbnail */}
+                                        <View style={styles.thumbnailFrame}>
+                                            {report.image_url ? (
+                                                <Image
+                                                    source={{ uri: report.image_url }}
+                                                    style={styles.reportThumbnail}
+                                                    resizeMode="cover"
+                                                />
+                                            ) : (
+                                                <View style={[styles.reportThumbnail, { justifyContent: 'center', alignItems: 'center', backgroundColor: C.surfaceLow }]}>
+                                                    <Ionicons name="videocam-outline" size={22} color={C.textTertiary} />
+                                                </View>
+                                            )}
+                                            <View style={styles.thumbnailOverlay}>
+                                                <Ionicons name="scan" size={14} color={C.white} />
                                             </View>
                                         </View>
-                                        <View style={styles.reportInfoRow}>
-                                            <Ionicons name="location" size={14} color={COLORS.textTertiary} />
-                                            <Text style={styles.reportInfoText}>{report.location}</Text>
+
+                                        {/* Content */}
+                                        <View style={styles.reportContent}>
+                                            <View style={styles.reportTopRow}>
+                                                <Text style={styles.reportType} numberOfLines={1}>
+                                                    {report.violation_type || 'Traffic Violation'}
+                                                </Text>
+                                                <View style={[styles.priorityChip, { backgroundColor: config.bg }]}>
+                                                    <Text style={[styles.priorityChipText, { color: config.color }]}>
+                                                        {config.label}
+                                                    </Text>
+                                                </View>
+                                            </View>
+
+                                            {!!report.vehicle_number && (
+                                                <Text style={styles.reportVehicle}>{report.vehicle_number}</Text>
+                                            )}
+
+                                            <View style={styles.metaRow}>
+                                                {!!report.location_address && (
+                                                    <View style={styles.reportMeta}>
+                                                        <Ionicons name="location" size={11} color={C.textTertiary} />
+                                                        <Text style={styles.reportMetaText} numberOfLines={1}>{report.location_address}</Text>
+                                                    </View>
+                                                )}
+                                                <View style={styles.reportMeta}>
+                                                    <Ionicons name="time" size={11} color={C.textTertiary} />
+                                                    <Text style={styles.reportMetaText}>{formatDate(report.submitted_at)}</Text>
+                                                </View>
+                                            </View>
                                         </View>
-                                        <View style={styles.reportInfoRow}>
-                                            <Ionicons name="time" size={14} color={COLORS.textTertiary} />
-                                            <Text style={styles.reportInfoText}>{report.time}</Text>
+
+                                        {/* Review Action */}
+                                        <View style={styles.actionArrow}>
+                                            <Ionicons name="chevron-forward" size={18} color={C.navyMid} />
                                         </View>
-                                    </View>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </View>
+                                    </TouchableOpacity>
+                                );
+                            })
+                        )}
+                    </Animated.View>
                 </ScrollView>
             </SafeAreaView>
-        </MobileContainer>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: C.offWhite,
     },
+    safeArea: {
+        flex: 1,
+    },
+
+    // ── Header ──
     header: {
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        paddingBottom: 24,
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28,
+    },
+    headerTop: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        paddingHorizontal: SPACING.xl,
-        paddingVertical: SPACING.lg,
+        alignItems: 'center',
+        marginBottom: 16,
     },
-    greeting: {
-        fontSize: FONT_SIZES.xxl,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
-        letterSpacing: -0.3,
+    headerLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
     },
-    subtitle: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.textSecondary,
-        marginTop: SPACING.xxs,
-    },
-    notificationBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: BORDER_RADIUS.lg,
-        backgroundColor: COLORS.surface,
+    officerBadge: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.1)',
         borderWidth: 1,
-        borderColor: COLORS.border,
+        borderColor: 'rgba(255,255,255,0.15)',
         justifyContent: 'center',
         alignItems: 'center',
     },
-    statsContainer: {
+    officerName: {
+        fontSize: 16,
+        fontFamily: 'Nunito-Bold',
+        color: C.white,
+        letterSpacing: -0.3,
+    },
+    officerZone: {
+        fontSize: 11,
+        color: 'rgba(255,255,255,0.6)',
+        fontFamily: 'Nunito-Medium',
+        marginTop: 2,
+    },
+    headerRight: {
         flexDirection: 'row',
-        paddingHorizontal: SPACING.xl,
-        gap: SPACING.md,
-        marginBottom: SPACING.xl,
+        gap: 8,
+    },
+    headerIconBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        position: 'relative',
+    },
+    notifDot: {
+        position: 'absolute',
+        top: 6,
+        right: 6,
+        width: 7,
+        height: 7,
+        borderRadius: 4,
+        backgroundColor: C.amber,
+        borderWidth: 1,
+        borderColor: C.navyMid,
+    },
+
+    // Alert banner
+    alertBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: C.amberSurface,
+        borderRadius: 14,
+        padding: 12,
+        gap: 10,
+    },
+    alertIconBg: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        backgroundColor: 'rgba(217,119,6,0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    alertContent: {
+        flex: 1,
+    },
+    alertTitle: {
+        fontSize: 14,
+        fontFamily: 'Nunito-Bold',
+        color: C.amberDark,
+    },
+    alertSubtitle: {
+        fontSize: 11,
+        color: C.textSecondary,
+        marginTop: 2,
+    },
+    alertButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: C.amber,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+    },
+    alertButtonText: {
+        fontSize: 12,
+        fontFamily: 'Nunito-Bold',
+        color: C.navy,
+    },
+
+    // ── Stats Row ──
+    statsRow: {
+        flexDirection: 'row',
+        paddingHorizontal: 20,
+        paddingTop: 20,
+        gap: 12,
+        marginBottom: 20,
     },
     statCard: {
         flex: 1,
-        borderRadius: BORDER_RADIUS.xl,
-        overflow: 'hidden',
-        ...SHADOWS.md,
-    },
-    statGradient: {
-        borderRadius: BORDER_RADIUS.xl,
-        padding: SPACING.lg,
+        backgroundColor: C.surface,
+        borderRadius: 14,
+        padding: 14,
         alignItems: 'center',
+        shadowColor: C.navyMid,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.07,
+        shadowRadius: 8,
+        elevation: 2,
     },
     statIconBg: {
         width: 40,
         height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(255,255,255,0.2)',
+        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: SPACING.sm,
+        marginBottom: 8,
     },
     statValue: {
-        fontSize: FONT_SIZES.xxl,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.white,
+        fontSize: 20,
+        fontFamily: 'Nunito-Bold',
+        color: C.textPrimary,
+        letterSpacing: -0.5,
     },
     statLabel: {
-        fontSize: FONT_SIZES.xxs,
-        color: 'rgba(255,255,255,0.85)',
-        fontWeight: FONT_WEIGHTS.medium,
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
+        fontSize: 10,
+        color: C.textTertiary,
+        fontFamily: 'Nunito-SemiBold',
+        letterSpacing: 0.3,
         marginTop: 2,
+        textTransform: 'uppercase',
     },
+
+    // ── Section ──
     section: {
-        paddingHorizontal: SPACING.xl,
+        paddingHorizontal: 20,
+        marginBottom: 20,
     },
     sectionHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: SPACING.lg,
+        marginBottom: 14,
     },
     sectionTitle: {
-        fontSize: FONT_SIZES.lg,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
-        marginBottom: SPACING.lg,
+        fontSize: 17,
+        fontFamily: 'Nunito-Bold',
+        color: C.textPrimary,
         letterSpacing: -0.2,
+        marginBottom: 14,
     },
     seeAll: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.secondary,
-        fontWeight: FONT_WEIGHTS.semibold,
+        fontSize: 13,
+        color: C.amber,
+        fontFamily: 'Nunito-SemiBold',
     },
+
+    // Action cards
     actionCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.surface,
-        borderRadius: BORDER_RADIUS.xl,
-        padding: SPACING.lg,
-        marginBottom: SPACING.md,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        ...SHADOWS.xs,
+        backgroundColor: C.surface,
+        borderRadius: 14,
+        padding: 14,
+        marginBottom: 10,
+        shadowColor: C.navyMid,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        elevation: 2,
+        gap: 14,
     },
-    actionIcon: {
-        width: 52,
-        height: 52,
-        borderRadius: BORDER_RADIUS.lg,
+    actionIconCircle: {
+        width: 46,
+        height: 46,
+        borderRadius: 13,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: SPACING.lg,
     },
-    actionContent: {
+    actionCardContent: {
         flex: 1,
     },
-    actionTitle: {
-        fontSize: FONT_SIZES.md,
-        fontWeight: FONT_WEIGHTS.semibold,
-        color: COLORS.textPrimary,
-        marginBottom: 2,
-        letterSpacing: -0.1,
+    actionCardTitle: {
+        fontSize: 15,
+        fontFamily: 'Nunito-SemiBold',
+        color: C.textPrimary,
+        letterSpacing: -0.2,
     },
-    actionDesc: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.textSecondary,
+    actionCardDesc: {
+        fontSize: 12,
+        color: C.textSecondary,
+        marginTop: 2,
     },
-    actionChevron: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: COLORS.gray50,
-        justifyContent: 'center',
-        alignItems: 'center',
+    amberCountBadge: {
+        backgroundColor: C.amberSurface,
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
     },
+    amberCountText: {
+        fontSize: 13,
+        fontFamily: 'Nunito-Bold',
+        color: C.amberDark,
+    },
+
     // ── Report Cards ──
     reportCard: {
         flexDirection: 'row',
-        backgroundColor: COLORS.surface,
-        borderRadius: BORDER_RADIUS.xl,
-        marginBottom: SPACING.md,
-        borderWidth: 1,
-        borderColor: COLORS.border,
+        backgroundColor: C.surface,
+        borderRadius: 20,
+        marginBottom: 12,
         overflow: 'hidden',
-        ...SHADOWS.xs,
+        shadowColor: C.navyMid,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 2,
+        alignItems: 'center',
+        paddingRight: 12,
+    },
+    reportBar: {
+        width: 4,
+        alignSelf: 'stretch',
+    },
+    thumbnailFrame: {
+        width: 82,
+        height: 82,
+        borderRadius: 14,
+        margin: 12,
+        overflow: 'hidden',
+        backgroundColor: C.surfaceLow,
+        position: 'relative',
     },
     reportThumbnail: {
-        width: 80,
+        width: '100%',
         height: '100%',
-        minHeight: 90,
+    },
+    thumbnailOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,36,82,0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     reportContent: {
         flex: 1,
-        padding: SPACING.lg,
+        paddingVertical: 12,
     },
     reportTopRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: SPACING.sm,
+        marginBottom: 4,
     },
     reportType: {
-        fontSize: FONT_SIZES.md,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
+        fontSize: 15,
+        fontFamily: 'Nunito-Bold',
+        color: C.textPrimary,
     },
-    priorityBadge: {
-        paddingHorizontal: SPACING.sm,
+    priorityChip: {
+        paddingHorizontal: 8,
         paddingVertical: 3,
-        borderRadius: BORDER_RADIUS.sm,
+        borderRadius: 6,
     },
-    priorityText: {
-        fontSize: FONT_SIZES.xxs,
-        fontWeight: FONT_WEIGHTS.bold,
+    priorityChipText: {
+        fontSize: 9,
+        fontFamily: 'Nunito-ExtraBold',
         letterSpacing: 0.5,
     },
-    reportInfoRow: {
+    reportVehicle: {
+        fontSize: 14,
+        color: C.navyMid,
+        fontFamily: 'Nunito-Bold',
+        letterSpacing: 0.8,
+        marginBottom: 6,
+        textTransform: 'uppercase',
+    },
+    metaRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: SPACING.xs,
-        marginBottom: 3,
+        gap: 12,
     },
-    reportInfoText: {
-        fontSize: FONT_SIZES.xs,
-        color: COLORS.textSecondary,
+    reportMeta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    reportMetaText: {
+        fontSize: 11,
+        color: C.textSecondary,
+        fontFamily: 'Nunito-Medium',
+    },
+    actionArrow: {
+        width: 32,
+        height: 32,
+        borderRadius: 10,
+        backgroundColor: C.primarySurface,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });

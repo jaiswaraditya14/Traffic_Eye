@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, BORDER_RADIUS, SHADOWS, FONT_SIZES, FONT_WEIGHTS, SPACING } from '../utils';
 
 // Import Screens from barrel
@@ -22,7 +23,15 @@ import {
     FineInformation,
     PermissionsRequest,
     TrafficSigns,
-    SafetyTips
+    SafetyTips,
+    FineCalculator,
+    SpeedLimits,
+    EmergencyContacts,
+    VerificationReports,
+    VideoReport,
+    VideoReportSuccess,
+    VideoReportStatus,
+    ImageReportStatus,
 } from '../screens';
 
 const Tab = createBottomTabNavigator();
@@ -36,6 +45,9 @@ const TAB_CONFIG = {
 };
 
 function CitizenTabNavigator() {
+    const insets = useSafeAreaInsets();
+    const bottomTabHeight = Platform.OS === 'ios' ? 88 : 68;
+
     return (
         <Tab.Navigator
             screenOptions={({ route }) => ({
@@ -63,7 +75,13 @@ function CitizenTabNavigator() {
 
 export default function CitizenNavigator() {
     return (
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Navigator
+            screenOptions={{
+                headerShown: false,
+                animation: 'slide_from_right',
+                animationDuration: 250,
+            }}
+        >
             <Stack.Screen name="CitizenMain" component={CitizenTabNavigator} />
             <Stack.Screen name="PermissionsRequest" component={PermissionsRequest} />
             <Stack.Screen name="NewReport" component={NewReport} />
@@ -77,6 +95,16 @@ export default function CitizenNavigator() {
             <Stack.Screen name="FineInformation" component={FineInformation} />
             <Stack.Screen name="TrafficSigns" component={TrafficSigns} />
             <Stack.Screen name="SafetyTips" component={SafetyTips} />
+            <Stack.Screen name="FineCalculator" component={FineCalculator} />
+            <Stack.Screen name="SpeedLimits" component={SpeedLimits} />
+            <Stack.Screen name="EmergencyContacts" component={EmergencyContacts} />
+            <Stack.Screen name="VerificationReports" component={VerificationReports} />
+            <Stack.Screen name="VideoReport" component={VideoReport} />
+            <Stack.Screen name="VideoReportSuccess" component={VideoReportSuccess} />
+            <Stack.Screen name="VideoReportStatus" component={VideoReportStatus} />
+            <Stack.Screen name="ImageReportStatus" component={ImageReportStatus} />
+            <Stack.Screen name="ImageReportDetail" component={ReportDetail} />
+            <Stack.Screen name="MyReports" component={MyReports} />
         </Stack.Navigator>
     );
 }
@@ -94,7 +122,7 @@ const styles = StyleSheet.create({
     },
     tabLabel: {
         fontSize: 11,
-        fontWeight: '600',
+        fontFamily: 'Nunito-SemiBold',
         marginBottom: Platform.OS === 'ios' ? 0 : 4,
     },
 });

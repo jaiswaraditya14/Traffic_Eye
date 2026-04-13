@@ -5,12 +5,12 @@
     "scheme": "trafficeye",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/images/image copy.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "image": "./assets/images/image copy.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#050309"
     },
     "ios": {
       "supportsTablet": true,
@@ -21,12 +21,18 @@
       }
     },
     "android": {
-      "package": "com.trafficeye.app",
+      "package": "com.anonymous.TrafficEye",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/images/image copy.png",
         "backgroundColor": "#ffffff"
       },
       "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_MEDIA_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "CAMERA",
@@ -36,10 +42,12 @@
       "edgeToEdgeEnabled": true
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/images/image copy.png"
     },
     "plugins": [
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-font",
+      "@react-native-community/datetimepicker"
     ]
   }
 }

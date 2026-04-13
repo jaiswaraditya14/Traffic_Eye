@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
     },
     message: {
         fontSize: FONT_SIZES.md,
-        fontWeight: FONT_WEIGHTS.semibold,
+        fontFamily: 'Nunito-SemiBold',
         letterSpacing: 0.1,
     },
     subtitle: {

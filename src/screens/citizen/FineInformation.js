@@ -1,634 +1,268 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Image } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+    View, Text, StyleSheet, ScrollView, TextInput,
+    TouchableOpacity, StatusBar, Animated,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MobileContainer } from '../../components';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS } from '../../utils/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { OFFENCES_FINES } from '../../data/trafficData';
 
-const FINE_DATA = [
-    {
-        id: 1,
-        offense: "Permit without authorization / vehicle other than 2–3 wheelers / without helmet",
-        section: "Sec: 129/177 MV Act",
-        fine: "1st time Rs. 1,000 & then Rs. 2,000"
-    },
-    {
-        id: 2,
-        offense: "Excess passengers – 2 (Owner or person in authorized possession of the vehicle)",
-        section: "Sec: 194A MV Act – (Extra 2)",
-        fine: "Rs. 400"
-    },
-    {
-        id: 3,
-        offense: "Driver & Motor vehicle which makes use of a other than prescribed glasses are released",
-        section: "Sec: 194F (B) MV Act",
-        fine: "1st time Rs. 1,000 & then Rs. 2,000"
-    },
-    {
-        id: 4,
-        offense: "Sounding the horn in an area with a traffic sign prohibiting use of it",
-        section: "Sec: 194F (G) MV Act",
-        fine: "1st time Rs. 1,000 & then Rs. 2,000"
-    },
-    {
-        id: 5,
-        offense: "Unsafe goods beyond body / No white reflector disc & additional Red lamp attached at the rear",
-        section: "MVMR 222(2)/177 MV Act",
-        fine: "Rs. 2,000"
-    },
-    {
-        id: 6,
-        offense: "Custody of Motor Vehicle without consent of Owner / Removal of Vehicle without legal authority",
-        section: "Sec: 197 MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 7,
-        offense: "Not slowing down at Junction and Zebra Crossing",
-        section: "MVDR 9/177A MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 8,
-        offense: "Excess number of persons sitting in cabin of goods carriage",
-        section: "MMVR 23(1)/177 MV Act",
-        fine: "1st time Rs. 500 & then Rs. 1,500"
-    },
-    {
-        id: 9,
-        offense: "Overtaking obstructed",
-        section: "MVDR 14(9)/177A MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 10,
-        offense: "No use of mobile phone by trainer while training learner driver",
-        section: "MVDR 37(2) /177A MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 11,
-        offense: "Misbehaviour towards passenger & others (PSV other than AC)",
-        section: "MMVR 20(3)(ii)/177 MV Act",
-        fine: "1st time Rs. 500 & then Rs. 1,500"
-    },
-    {
-        id: 12,
-        offense: "Unnecessarily delay the journey (PSV other than AC)",
-        section: "MMVR 20(3)(iii)/177 MV Act",
-        fine: "1st time Rs. 500 & then Rs. 1,500"
-    },
-    {
-        id: 13,
-        offense: "Motor Vehicle with left hand drive without displaying mechanical or signaling device board at the rear side (owner & driver both)",
-        section: "Sec: 120/177 MV Act",
-        fine: "1st time Rs. 500 & then Rs. 1,500"
-    },
-    {
-        id: 14,
-        offense: "Failure to display Badge (HMV passenger)",
-        section: "MMVR 24(2)/177 MV Act",
-        fine: "1st time Rs. 500 & then Rs. 1,500"
-    },
-    {
-        id: 15,
-        offense: "Form No. 19 duplicate copy not produced",
-        section: "CMVR 43/177 MV Act",
-        fine: "1st time Rs. 500 & then Rs. 1,500"
-    },
-    {
-        id: 16,
-        offense: "Turning for/near vehicle at round about from normal side",
-        section: "MVDR 11(3)/177A MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 17,
-        offense: "Driving slowly without good and sufficient reason to interfere normal traffic flow",
-        section: "MVDR 16(3)/177A MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 18,
-        offense: "Applying brakes or stopping without genuine reason",
-        section: "MVDR 18/177A MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 19,
-        offense: "Parking the vehicle opposite another MV or as obstacle to other vehicle",
-        section: "MVDR 22(3)(a)/177A MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 20,
-        offense: "No Parking",
-        section: "MVDR 22(2)(s)/177A MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 21,
-        offense: "Refusal to ply taxi / bus or to carry passenger",
-        section: "Sec: 178(3) MV Act",
-        fine: "Rs. 200"
-    },
-    {
-        id: 22,
-        offense: "Using word / figure / drawing / sticker on vehicle (Minister/Police/Politician/Advocate / press address etc.)",
-        section: "MMVR 31A/177 MV Act",
-        fine: "1st time Rs. 500 & then Rs. 1,500"
-    },
-    {
-        id: 23,
-        offense: "Excess passenger 1 (Owner or person in authorized possession of the Vehicle)",
-        section: "Sec: 194A MV Act – (Extra 1)",
-        fine: "Rs. 200"
-    },
-    {
-        id: 24,
-        offense: "Excess passengers 2 (Driver)",
-        section: "Sec: 194A MV Act – (Extra 2)",
-        fine: "Rs. 400"
-    },
-    {
-        id: 25,
-        offense: "Not stopping before stop line",
-        section: "MMVR 23(7)/177 MV Act",
-        fine: "1st time Rs. 500 & then Rs. 1,500"
-    },
-    {
-        id: 26,
-        offense: "Dangerous driving",
-        section: "Sec: 184 MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 27,
-        offense: "Excess passengers 7 (Owner or person in authorized possession of the vehicle)",
-        section: "Sec: 194A MV Act – (Extra 7)",
-        fine: "Rs. 1,400"
-    },
-    {
-        id: 28,
-        offense: "Excess passengers 8 (Driver)",
-        section: "Sec: 194A MV Act – (Extra 8)",
-        fine: "Rs. 1,600"
-    },
-    {
-        id: 29,
-        offense: "Parking the vehicle in a tunnel",
-        section: "MVDR 22(2)(g)/177A MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 30,
-        offense: "Parking the vehicle in bus lane",
-        section: "MVDR 22(2)(h)/177A MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 31,
-        offense: "Parking the vehicle in front of entrance or exit of property",
-        section: "MVDR 22(2)(i)/177A MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 32,
-        offense: "Parking the vehicle obstructing other vehicle or cause inconvenience to any person",
-        section: "MVDR 22(2)(m)/177A MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 33,
-        offense: "Parked vehicle in other than permitted specified category",
-        section: "MVDR 22(2)(c)/177A MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 34,
-        offense: "No Parking Vehicle as designated in parking lot",
-        section: "MVDR 22(2)(f)/177A MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 35,
-        offense: "Stopping Vehicle on Pedestrian Crossing",
-        section: "MVDR 22(2)(w)/177A MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 36,
-        offense: "Causing danger / obstructions or undue inconvenience to others by allowing the vehicle to be towed or pushed from a public place or parking area",
-        section: "Sec: 127/177 MV Act",
-        fine: "Rs. 1,000"
-    },
-    {
-        id: 37,
-        offense: "Not providing way for emergency vehicles (Fire service / Ambulance & any other emergency vehicle specified by State govt.)",
-        section: "Sec: 194E MV Act",
-        fine: "Rs. 10,000"
-    },
-    {
-        id: 38,
-        offense: "Driving the vehicle by a person who is disqualified for holding or obtaining driving license",
-        section: "Sec: 182(1) MV Act",
-        fine: "Rs. 10,000"
-    },
-    {
-        id: 39,
-        offense: "Driving without DL",
-        section: "Sec: 3/181 MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 40,
-        offense: "Driving backwards/in reverse direction on road/in a parking/any other public place",
-        section: "MMVR 23(3)/177 MV Act",
-        fine: "1st time Rs. 500 & then Rs. 1,500"
-    },
-    {
-        id: 41,
-        offense: "Parking the vehicle on footpath / cycle track & zebra crossing",
-        section: "MVDR 22(2)(j)/177A MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 42,
-        offense: "Child up to 14 years age not provided seat with appropriate child restraint system (Driver)",
-        section: "Sec: 194B(2) MV Act",
-        fine: "Rs. 1,000"
-    },
-    {
-        id: 43,
-        offense: "Child up to 14 years age not provided seat with appropriate child restraint system (Owner or person in authorized possession of the Vehicle)",
-        section: "Sec: 194B(1) MV Act",
-        fine: "Rs. 1,000"
-    },
-    {
-        id: 44,
-        offense: "Without valid fitness certificate (Driver)",
-        section: "Sec: 56/39/192 MV Act",
-        fine: "1st time Rs. 2,000 & then Rs. 5,000"
-    },
-    {
-        id: 45,
-        offense: "Without valid fitness certificate (Owner)",
-        section: "Sec: 56/39/192 MV Act",
-        fine: "1st time Rs. 2,000 & then Rs. 5,000"
-    },
-    {
-        id: 46,
-        offense: "Unclean vehicle (Motor Cab)",
-        section: "MMVR 21(9)/177 MV Act",
-        fine: "1st time Rs. 500 & then Rs. 1,500"
-    },
-    {
-        id: 47,
-        offense: "Driving vehicle with parking light on",
-        section: "CMVR 109/177 MV Act",
-        fine: "1st time Rs. 500 & then Rs. 1,500"
-    },
-    {
-        id: 48,
-        offense: "Number Plate Broken",
-        section: "CMVR 50/177 MV Act",
-        fine: "1st time Rs. 500 & then Rs. 1,500"
-    },
-    {
-        id: 49,
-        offense: "Number Plate of Transport Vehicle Not Displayed at Four Places",
-        section: "CMVR 50/177 MV Act",
-        fine: "1st time Rs. 500 & then Rs. 1,500"
-    },
-    {
-        id: 50,
-        offense: "Identification card issued by Dealer not produced",
-        section: "CMVR 44/177 MV Act",
-        fine: "1st time Rs. 500 & then Rs. 1,500"
-    },
-    {
-        id: 51,
-        offense: "Original T.C. Not produced",
-        section: "CMVR 39(2)/177 MV Act",
-        fine: "1st time Rs. 500 & then Rs. 1,500"
-    },
-    {
-        id: 52,
-        offense: "Speed violating by driver (MMV – HMV)",
-        section: "Sec: 112/183(1) MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 53,
-        offense: "Driving old defective motor vehicle",
-        section: "Sec: 190(1) MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 54,
-        offense: "Carrying Hazardous or Dangerous Goods without adherence to the MV Act and CMVR Provision",
-        section: "Sec: 190(3) MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 55,
-        offense: "Wrong side driving",
-        section: "MVDR 3/122/177A MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 56,
-        offense: "Lane cutting",
-        section: "MVDR 6/177A MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 57,
-        offense: "Use of multi-coloured red & blue flash light shall be permitted only on Vehicles specified specially for emergency duties and shall be designated specified by State Government",
-        section: "CMVR 108(4)/177 MV Act",
-        fine: "1st time Rs. 500 & then Rs. 1,500"
-    },
-    {
-        id: 58,
-        offense: "Parking the vehicle where stopping prohibited / vehicle abandoned on road",
-        section: "MVDR 22(2)(a)/177A MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 59,
-        offense: "Restrictions to carry unpacked dangerous substances/explosive/highly inflammable substances on public service vehicle",
-        section: "MMVR 23(7)/177 MV Act",
-        fine: "1st time Rs. 500 & then Rs. 1,500"
-    },
-    {
-        id: 60,
-        offense: "NO PARKING (Camping)",
-        section: "MVDR 22(2)(s)/177A MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 61,
-        offense: "Stopping the vehicle at mandatory \"NO STOPPING\" sign",
-        section: "MVDR 22(2)(o)/177A MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 62,
-        offense: "Parking/Stopping vehicle in a tunnel without genuine reason",
-        section: "MVDR 20 (3)/177A MV Act",
-        fine: "Will be sent to court"
-    },
-    {
-        id: 63,
-        offense: "Riding without helmet (2/3 wheeler)",
-        section: "Sec: 129/177 MV Act",
-        fine: "Rs. 1,000 & then Rs. 2,000"
-    },
-    {
-        id: 64,
-        offense: "Overspeeding",
-        section: "Sec: 183(1) MV Act",
-        fine: "Rs. 1,000 & then Rs. 2,000"
-    },
-    {
-        id: 65,
-        offense: "Driving by a minor",
-        section: "Sec: 199A MV Act",
-        fine: "Rs. 25,000"
-    },
-    {
-        id: 66,
-        offense: "Drunk driving",
-        section: "Sec: 185 MV Act",
-        fine: "Rs. 10,000"
-    },
-    {
-        id: 67,
-        offense: "Rash driving",
-        section: "Sec: 184 MV Act",
-        fine: "Will be sent to court"
-    }
-];
+const C = {
+    navy: '#002452', navyMid: '#1B3A6B', navyLight: '#2C4E80',
+    amber: '#F59E0B', amberDark: '#D97706', amberSurface: '#FEF3C7',
+    white: '#FFFFFF', offWhite: '#F8F9FB', surface: '#FFFFFF',
+    textPrimary: '#191C1E', textSecondary: '#44474F', textTertiary: '#747780',
+    border: '#EAECEF',
+    success: '#059669', successSurface: '#D1FAE5',
+    warning: '#D97706', warningSurface: '#FEF3C7',
+    error: '#BA1A1A', errorSurface: '#FFDAD6',
+    info: '#1D4ED8', infoSurface: '#DBEAFE',
+    purple: '#7C3AED', purpleSurface: '#EDE9FE',
+};
+
+const SEVERITY = {
+    low:      { label: 'Low',      color: C.success,  bg: C.successSurface,  bar: '#34D399' },
+    medium:   { label: 'Moderate', color: C.warning,  bg: C.warningSurface,  bar: C.amber   },
+    high:     { label: 'High',     color: '#EA580C',  bg: '#FFEDD5',         bar: '#F97316' },
+    critical: { label: 'Critical', color: C.error,    bg: C.errorSurface,    bar: C.error   },
+};
+
+const CATEGORY_META = {
+    All:        { icon: 'grid',            color: C.navy     },
+    Safety:     { icon: 'shield-checkmark',color: C.success  },
+    Speeding:   { icon: 'speedometer',     color: C.info     },
+    Signals:    { icon: 'radio-button-on', color: C.amber    },
+    Dangerous:  { icon: 'warning',         color: C.error    },
+    Distraction:{ icon: 'phone-portrait',  color: '#7C3AED'  },
+    Documents:  { icon: 'document-text',   color: C.navyMid  },
+    Overloading:{ icon: 'people',          color: '#EA580C'  },
+};
+
+const CATEGORIES = ['All', ...Object.keys(CATEGORY_META).filter(k => k !== 'All')];
 
 export default function FineInformation({ navigation }) {
-    const [searchQuery, setSearchQuery] = useState('');
-    const [filteredData, setFilteredData] = useState(FINE_DATA);
+    const [search, setSearch] = useState('');
+    const [activeCategory, setActiveCategory] = useState('All');
+    const fadeAnim = useRef(new Animated.Value(0)).current;
 
-    const handleSearch = (text) => {
-        setSearchQuery(text);
-        if (text.trim() === '') {
-            setFilteredData(FINE_DATA);
-        } else {
-            const filtered = FINE_DATA.filter(item =>
-                item.offense.toLowerCase().includes(text.toLowerCase()) ||
-                item.section.toLowerCase().includes(text.toLowerCase())
-            );
-            setFilteredData(filtered);
-        }
-    };
+    useEffect(() => {
+        Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
+    }, []);
+
+    const filtered = OFFENCES_FINES.filter(item => {
+        const matchCat = activeCategory === 'All' || item.category === activeCategory;
+        const q = search.toLowerCase();
+        const matchSearch = !q || item.offence.toLowerCase().includes(q) || item.category.toLowerCase().includes(q) || item.section.toLowerCase().includes(q);
+        return matchCat && matchSearch;
+    });
 
     return (
-        <MobileContainer>
-            <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={s.root}>
+            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+            <SafeAreaView style={s.safe} edges={['top']}>
+
                 {/* Header */}
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                        <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+                <LinearGradient colors={[C.navy, C.navyMid]} style={s.header}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
+                        <Ionicons name="arrow-back" size={20} color={C.white} />
                     </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Fine Amount</Text>
-                    <View style={styles.placeholder} />
+                    <View style={s.headerCenter}>
+                        <Text style={s.headerTitle}>Offences &amp; Fines</Text>
+                        <Text style={s.headerSub}>Motor Vehicles Act, Maharashtra</Text>
+                    </View>
+                    <View style={s.headerBadge}>
+                        <Text style={s.headerBadgeText}>{OFFENCES_FINES.length}</Text>
+                        <Text style={s.headerBadgeLabel}>Listed</Text>
+                    </View>
+                </LinearGradient>
+
+                {/* Search */}
+                <View style={s.searchWrap}>
+                    <View style={s.searchBox}>
+                        <Ionicons name="search" size={18} color={C.textTertiary} />
+                        <TextInput
+                            style={s.searchInput}
+                            placeholder="Search offence, section, category…"
+                            placeholderTextColor={C.textTertiary}
+                            value={search}
+                            onChangeText={setSearch}
+                        />
+                        {search.length > 0 && (
+                            <TouchableOpacity onPress={() => setSearch('')}>
+                                <Ionicons name="close-circle" size={18} color={C.textTertiary} />
+                            </TouchableOpacity>
+                        )}
+                    </View>
                 </View>
 
-                {/* Search Bar */}
-                <View style={styles.searchContainer}>
-                    <Ionicons name="search" size={20} color={COLORS.textSecondary} style={styles.searchIcon} />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Search by offense or section..."
-                        placeholderTextColor={COLORS.textSecondary}
-                        value={searchQuery}
-                        onChangeText={handleSearch}
-                    />
-                    {searchQuery.length > 0 && (
-                        <TouchableOpacity onPress={() => handleSearch('')}>
-                            <Ionicons name="close-circle" size={20} color={COLORS.textSecondary} />
-                        </TouchableOpacity>
-                    )}
+                {/* Category Chips */}
+                <View style={s.chipRow}>
+                    <View style={s.chipContent}>
+                        {CATEGORIES.map(cat => {
+                            const meta = CATEGORY_META[cat] || CATEGORY_META.All;
+                            const active = cat === activeCategory;
+                            return (
+                                <TouchableOpacity
+                                    key={cat}
+                                    style={[s.chip, active && { backgroundColor: meta.color, borderColor: meta.color }]}
+                                    onPress={() => setActiveCategory(cat)}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name={meta.icon} size={13} color={active ? C.white : meta.color} />
+                                    <Text style={[s.chipText, active && { color: C.white }]}>{cat}</Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
                 </View>
 
-                {/* Fine List */}
-                <ScrollView
-                    style={styles.scrollView}
+                {/* Results count */}
+                <Text style={s.resultCount}>{filtered.length} {filtered.length === 1 ? 'offence' : 'offences'} found</Text>
+
+                {/* List */}
+                <Animated.ScrollView
+                    style={{ opacity: fadeAnim }}
                     showsVerticalScrollIndicator={false}
-                    contentContainerStyle={styles.scrollContent}
+                    contentContainerStyle={s.listContent}
                 >
-                    {filteredData.map((item) => (
-                        <View key={item.id} style={styles.fineCard}>
-                            <View style={styles.fineHeader}>
-                                <View style={styles.fineIconContainer}>
-                                    <Ionicons name="alert-circle" size={24} color={COLORS.primary} />
+                    {filtered.map((item, idx) => {
+                        const sev = SEVERITY[item.severity] || SEVERITY.medium;
+                        const catMeta = CATEGORY_META[item.category] || CATEGORY_META.All;
+                        return (
+                            <View key={idx} style={s.card}>
+                                {/* Severity bar */}
+                                <View style={[s.severityBar, { backgroundColor: sev.bar }]} />
+
+                                <View style={s.cardInner}>
+                                    {/* Top row */}
+                                    <View style={s.cardTop}>
+                                        <View style={[s.catIconBox, { backgroundColor: catMeta.color + '18' }]}>
+                                            <Ionicons name={catMeta.icon} size={16} color={catMeta.color} />
+                                        </View>
+                                        <View style={s.cardTopMid}>
+                                            <Text style={s.sectionCode}>{item.section}</Text>
+                                            <View style={[s.severityChip, { backgroundColor: sev.bg }]}>
+                                                <Text style={[s.severityText, { color: sev.color }]}>{sev.label}</Text>
+                                            </View>
+                                        </View>
+                                    </View>
+
+                                    {/* Offence name */}
+                                    <Text style={s.offenceName}>{item.offence}</Text>
+                                    <Text style={s.offenceDesc}>{item.description}</Text>
+
+                                    {/* Footer */}
+                                    <View style={s.cardFooter}>
+                                        <View style={s.fineRow}>
+                                            <Text style={s.fineLabel}>FINE</Text>
+                                            <Text style={s.fineAmount}>{item.fine}</Text>
+                                        </View>
+                                        {item.penalty && (
+                                            <View style={s.penaltyRow}>
+                                                <Ionicons name="alert-circle-outline" size={13} color={C.error} />
+                                                <Text style={s.penaltyText}>{item.penalty}</Text>
+                                            </View>
+                                        )}
+                                    </View>
                                 </View>
                             </View>
+                        );
+                    })}
 
-                            <Text style={styles.offense}>{item.offense}</Text>
-
-                            <View style={styles.detailRow}>
-                                <Ionicons name="document-text" size={16} color={COLORS.textSecondary} />
-                                <Text style={styles.section}>{item.section}</Text>
-                            </View>
-
-                            <View style={styles.fineAmountContainer}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <Image
-                                        source={require('../../../assets/images/image.png')}
-                                        style={{ width: 16, height: 16, marginRight: 4 }}
-                                        resizeMode="contain"
-                                    />
-                                    <Text style={styles.fineAmount}>{item.fine}</Text>
-                                </View>
-                            </View>
-                        </View>
-                    ))}
-
-                    {filteredData.length === 0 && (
-                        <View style={styles.noResultsContainer}>
-                            <Ionicons name="search" size={64} color={COLORS.textTertiary} />
-                            <Text style={styles.noResultsText}>No results found</Text>
-                            <Text style={styles.noResultsSubtext}>
-                                Try searching with different keywords
-                            </Text>
+                    {filtered.length === 0 && (
+                        <View style={s.empty}>
+                            <Ionicons name="search-outline" size={44} color={C.border} />
+                            <Text style={s.emptyTitle}>No offences found</Text>
+                            <Text style={s.emptySub}>Try a different search term or category</Text>
                         </View>
                     )}
-                </ScrollView>
+                    <View style={{ height: 40 }} />
+                </Animated.ScrollView>
             </SafeAreaView>
-        </MobileContainer>
+        </View>
     );
 }
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: COLORS.background,
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: SPACING.lg,
-        paddingVertical: SPACING.md,
-        backgroundColor: COLORS.white,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.gray200,
-    },
-    backButton: {
-        padding: SPACING.xs,
-    },
-    headerTitle: {
-        fontSize: FONT_SIZES.xl,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
-    },
-    placeholder: {
-        width: 40,
-    },
-    searchContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: COLORS.white,
-        marginHorizontal: SPACING.lg,
-        marginTop: SPACING.md,
-        marginBottom: SPACING.sm,
-        paddingHorizontal: SPACING.md,
-        paddingVertical: SPACING.sm,
-        borderRadius: BORDER_RADIUS.lg,
-        ...SHADOWS.sm,
-    },
-    searchIcon: {
-        marginRight: SPACING.sm,
-    },
-    searchInput: {
-        flex: 1,
-        fontSize: FONT_SIZES.md,
-        color: COLORS.textPrimary,
-        padding: 0,
-    },
-    scrollView: {
-        flex: 1,
-    },
-    scrollContent: {
-        paddingHorizontal: SPACING.lg,
-        paddingBottom: SPACING.xl,
-        paddingTop: SPACING.md,
-    },
-    fineCard: {
-        backgroundColor: COLORS.white,
-        borderRadius: BORDER_RADIUS.lg,
-        padding: SPACING.md,
-        marginBottom: SPACING.md,
-        ...SHADOWS.sm,
-    },
-    fineHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: SPACING.sm,
-    },
-    fineIconContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: `${COLORS.primary}15`,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: SPACING.sm,
-    },
-    offense: {
-        fontSize: FONT_SIZES.md,
-        fontWeight: FONT_WEIGHTS.semibold,
-        color: COLORS.textPrimary,
-        marginBottom: SPACING.sm,
-        lineHeight: 22,
-    },
-    detailRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: SPACING.xs,
-    },
-    section: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.textSecondary,
-        marginLeft: SPACING.xs,
-        fontWeight: FONT_WEIGHTS.medium,
-    },
-    fineAmountContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: SPACING.sm,
-        paddingTop: SPACING.sm,
-        borderTopWidth: 1,
-        borderTopColor: COLORS.gray200,
-    },
-    fineAmount: {
-        fontSize: FONT_SIZES.md,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.success,
-        marginLeft: SPACING.xs,
-    },
-    noResultsContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingVertical: SPACING.xxl * 2,
-    },
-    noResultsText: {
-        fontSize: FONT_SIZES.lg,
-        fontWeight: FONT_WEIGHTS.semibold,
-        color: COLORS.textSecondary,
-        marginTop: SPACING.md,
-    },
-    noResultsSubtext: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.textTertiary,
-        marginTop: SPACING.xs,
-    },
-});
+const s = StyleSheet.create({
+    root: { flex: 1, backgroundColor: C.offWhite },
+    safe: { flex: 1 },
 
+    // Header
+    header: {
+        flexDirection: 'row', alignItems: 'center',
+        paddingHorizontal: 18, paddingTop: 14, paddingBottom: 20,
+        borderBottomLeftRadius: 24, borderBottomRightRadius: 24,
+        gap: 12,
+    },
+    backBtn: {
+        width: 36, height: 36, borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        justifyContent: 'center', alignItems: 'center',
+    },
+    headerCenter: { flex: 1 },
+    headerTitle: { fontSize: 19, fontFamily: 'Nunito-Bold', color: C.white, letterSpacing: -0.3 },
+    headerSub: { fontSize: 11, fontFamily: 'Nunito-Medium', color: 'rgba(255,255,255,0.65)', marginTop: 2 },
+    headerBadge: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
+    headerBadgeText: { fontSize: 18, fontFamily: 'Nunito-Bold', color: C.amber, lineHeight: 22 },
+    headerBadgeLabel: { fontSize: 9, fontFamily: 'Nunito-Bold', color: 'rgba(255,255,255,0.6)', letterSpacing: 0.5 },
+
+    // Search
+    searchWrap: { paddingHorizontal: 18, paddingTop: 16, paddingBottom: 4 },
+    searchBox: {
+        flexDirection: 'row', alignItems: 'center', gap: 10,
+        backgroundColor: C.surface, borderRadius: 14,
+        paddingHorizontal: 14, paddingVertical: 12,
+        shadowColor: C.navy, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+    },
+    searchInput: { flex: 1, fontSize: 14, fontFamily: 'Nunito-Medium', color: C.textPrimary },
+
+    // Chips
+    chipRow: { marginTop: 10 },
+    chipContent: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 18, gap: 8, paddingBottom: 4 },
+    chip: {
+        flexDirection: 'row', alignItems: 'center', gap: 5,
+        backgroundColor: C.surface,
+        borderWidth: 1.5, borderColor: C.border,
+        paddingHorizontal: 12, paddingVertical: 7,
+        borderRadius: 20,
+    },
+    chipText: { fontSize: 13, fontFamily: 'Nunito-Bold', color: C.textSecondary },
+
+    resultCount: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4, fontSize: 12, fontFamily: 'Nunito-SemiBold', color: C.textTertiary },
+
+    // List
+    listContent: { paddingHorizontal: 18, paddingTop: 8 },
+
+    card: {
+        flexDirection: 'row',
+        backgroundColor: C.surface,
+        borderRadius: 18,
+        marginBottom: 12,
+        overflow: 'hidden',
+        shadowColor: C.navy, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 3,
+    },
+    severityBar: { width: 5 },
+    cardInner: { flex: 1, padding: 14 },
+
+    cardTop: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+    catIconBox: { width: 34, height: 34, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+    cardTopMid: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    sectionCode: { fontSize: 11, fontFamily: 'Nunito-Bold', color: C.navyMid },
+    severityChip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+    severityText: { fontSize: 10, fontFamily: 'Nunito-ExtraBold', letterSpacing: 0.3 },
+
+    offenceName: { fontSize: 15, fontFamily: 'Nunito-Bold', color: C.textPrimary, lineHeight: 21 },
+    offenceDesc: { fontSize: 12, fontFamily: 'Nunito-Medium', color: C.textSecondary, marginTop: 4, lineHeight: 17 },
+
+    cardFooter: { marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: C.border, gap: 6 },
+    fineRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    fineLabel: { fontSize: 10, fontFamily: 'Nunito-ExtraBold', color: C.textTertiary, letterSpacing: 0.5 },
+    fineAmount: { fontSize: 17, fontFamily: 'Nunito-Bold', color: C.success },
+    penaltyRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: C.errorSurface, padding: 8, borderRadius: 8 },
+    penaltyText: { flex: 1, fontSize: 12, fontFamily: 'Nunito-SemiBold', color: C.error, lineHeight: 16 },
+
+    empty: { alignItems: 'center', paddingVertical: 60 },
+    emptyTitle: { fontSize: 17, fontFamily: 'Nunito-Bold', color: C.textPrimary, marginTop: 12 },
+    emptySub: { fontSize: 13, color: C.textTertiary, marginTop: 6, fontFamily: 'Nunito-Medium' },
+});

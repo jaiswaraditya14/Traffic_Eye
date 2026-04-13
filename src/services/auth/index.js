@@ -1,4 +1,10 @@
+import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
+import * as Linking from 'expo-linking';
 import { supabase } from '../supabase';
+
+// Ensure WebBrowser session clears
+WebBrowser.maybeCompleteAuthSession();
 
 export const authService = {
     /**
@@ -13,7 +19,7 @@ export const authService = {
                 email,
                 password,
                 options: {
-                    emailRedirectTo: undefined, // Disable email confirmation redirect
+                    emailRedirectTo: Linking.createURL('signup-success'), // Redirects back to app -> signup-success
                     data: {
                         full_name: fullName,
                         phone: phone,
@@ -123,6 +129,7 @@ export const authService = {
             password,
         });
     },
+
 
     /**
      * Sign in with badge ID (for officers)

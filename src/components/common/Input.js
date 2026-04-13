@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { TextInput, View, Text, StyleSheet, Animated } from 'react-native';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS } from '../../utils/theme';
+import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, FONT_FAMILIES, BORDER_RADIUS, SHADOWS } from '../../utils/theme';
 
 export const Input = ({
     label,
@@ -77,10 +77,10 @@ const styles = StyleSheet.create({
         marginBottom: SPACING.sm,
     },
     label: {
+        fontFamily: FONT_FAMILIES.medium,
         fontSize: FONT_SIZES.sm,
         color: COLORS.textSecondary,
-        fontWeight: FONT_WEIGHTS.medium,
-        letterSpacing: 0.1,
+        letterSpacing: 0.3,
     },
     labelError: {
         color: COLORS.error,
@@ -109,9 +109,9 @@ const styles = StyleSheet.create({
     input: {
         paddingHorizontal: SPACING.lg,
         paddingVertical: SPACING.md + 2,
+        fontFamily: FONT_FAMILIES.regular,
         fontSize: FONT_SIZES.md,
         color: COLORS.textPrimary,
-        fontWeight: FONT_WEIGHTS.regular,
     },
     multiline: {
         minHeight: 100,
@@ -123,11 +123,12 @@ const styles = StyleSheet.create({
         paddingHorizontal: SPACING.xs,
     },
     errorText: {
+        fontFamily: FONT_FAMILIES.medium,
         color: COLORS.error,
         fontSize: FONT_SIZES.xs,
-        fontWeight: FONT_WEIGHTS.medium,
     },
     helperText: {
+        fontFamily: FONT_FAMILIES.regular,
         color: COLORS.textTertiary,
         fontSize: FONT_SIZES.xs,
         marginTop: SPACING.xs,

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, BORDER_RADIUS, SHADOWS, FONT_SIZES, FONT_WEIGHTS, SPACING } from '../utils';
 
 // Import Screens from barrel
@@ -12,8 +13,10 @@ import {
     VerifiedReports,
     OfficerProfile,
     ReportVerification,
+    ImageReportReview,
     OfficerSettings,
-    PermissionsRequest
+    PermissionsRequest,
+    VerifiedReportDetail,
 } from '../screens';
 
 const Tab = createBottomTabNavigator();
@@ -27,6 +30,9 @@ const TAB_CONFIG = {
 };
 
 function OfficerTabNavigator() {
+    const insets = useSafeAreaInsets();
+    const bottomTabHeight = Platform.OS === 'ios' ? 88 : 68;
+
     return (
         <Tab.Navigator
             screenOptions={({ route }) => ({
@@ -54,10 +60,18 @@ function OfficerTabNavigator() {
 
 export default function OfficerNavigator() {
     return (
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Navigator
+            screenOptions={{
+                headerShown: false,
+                animation: 'slide_from_right',
+                animationDuration: 250,
+            }}
+        >
             <Stack.Screen name="OfficerMain" component={OfficerTabNavigator} />
             <Stack.Screen name="PermissionsRequest" component={PermissionsRequest} />
             <Stack.Screen name="ReportVerification" component={ReportVerification} />
+            <Stack.Screen name="ImageReportReview" component={ImageReportReview} />
+            <Stack.Screen name="VerifiedReportDetail" component={VerifiedReportDetail} />
             <Stack.Screen name="OfficerSettings" component={OfficerSettings} />
         </Stack.Navigator>
     );
@@ -76,7 +90,7 @@ const styles = StyleSheet.create({
     },
     tabLabel: {
         fontSize: 11,
-        fontWeight: '600',
+        fontFamily: 'Nunito-SemiBold',
         marginBottom: Platform.OS === 'ios' ? 0 : 4,
     },
 });

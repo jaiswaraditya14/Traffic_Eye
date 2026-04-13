@@ -253,6 +253,7 @@ export const SPEED_LIMITS = [
   { zone: 'School Zones', limit: '25 km/h', desc: 'Near schools, 8 AM – 4 PM', icon: 'school', color: '#F59E0B' },
   { zone: 'Residential', limit: '30 km/h', desc: 'Colonies and housing areas', icon: 'home', color: '#7C3AED' },
 ];
+<<<<<<< HEAD
 
 // ── Points Configuration ───────────────────────────────────────
 export const SEVERITY_POINTS = {
@@ -276,3 +277,5 @@ export const REWARD_CATALOG = [
   { id: 'cat-004', title: 'Eye Goggles', pts: 300, imageKey: 'goggles', type: 'physical' },
   { id: 'cat-005', title: 'Good Citizen Certificate', pts: 100, imageKey: 'certificate', type: 'digital' },
 ];
+=======
+>>>>>>> 52f946b590637f20164074f60bf1748be0a7421a
