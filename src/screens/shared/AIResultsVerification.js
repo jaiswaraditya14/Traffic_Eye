@@ -211,7 +211,7 @@ export default function AIResultsVerification({ navigation, route }) {
                             placeholderTextColor={C.textTertiary}
                         />
                         <View style={styles.chipsRow}>
-                            {['Speeding', 'Red Light', 'No Helmet', 'Wrong Way'].map(type => (
+                            {['Speeding', 'Red Light', 'No Helmet', 'Wrong Way', 'Illegal Parking', 'Phone Use', 'Triple Riding', 'No Seatbelt', 'Footpath Driving', 'Overloading'].map(type => (
                                 <TouchableOpacity key={type} style={styles.chip} onPress={() => setViolationType(type)}>
                                     <Text style={styles.chipText}>{type}</Text>
                                 </TouchableOpacity>

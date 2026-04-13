@@ -1,6 +1,7 @@
 export const AI_CONFIG = {
     // Dual API keys — rotated to maximise quota availability
     geminiApiKeys: [
+        process.env.EXPO_PUBLIC_GEMINI_API_KEY,
         process.env.EXPO_PUBLIC_GEMINI_API_KEY_1,
         process.env.EXPO_PUBLIC_GEMINI_API_KEY_2,
     ].filter(Boolean), // drop any undefined keys
