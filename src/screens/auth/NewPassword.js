@@ -98,23 +98,43 @@ export default function NewPassword({ navigation, route }) {
 
         setLoading(true);
         try {
+            // Check if session exists; updateUser will hang/fail silently without one
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            if (sessionError || !session) {
+                setError('Your session expired or is missing. Please verify your code again.');
+                setLoading(false);
+                setTimeout(() => {
+                    if (navigation.canGoBack()) {
+                        navigation.goBack();
+                    } else {
+                        navigation.replace('OtpVerification', { email: route.params?.email });
+                    }
+                }, 2500);
+                return;
+            }
+
             const { error: updateError } = await supabase.auth.updateUser({ password });
             if (updateError) {
                 setError(updateError.message || 'Failed to update password. Please try again.');
+                setLoading(false);
                 return;
             }
 
             // Sign out so user re-authenticates cleanly
             await supabase.auth.signOut();
 
+            setLoading(false);
             setDone(true);
             Animated.parallel([
                 Animated.spring(successScaleAnim, { toValue: 1, tension: 60, friction: 7, useNativeDriver: true }),
                 Animated.timing(successOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
             ]).start();
         } catch (err) {
+            console.error('[NewPassword] update error:', err);
             setError('Something went wrong. Please try again.');
+            setLoading(false);
         } finally {
+            // Safety fallback, though explicitly called above in branches
             setLoading(false);
         }
     };

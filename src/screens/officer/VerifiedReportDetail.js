@@ -274,7 +274,7 @@ export default function VerifiedReportDetail({ route, navigation }) {
 
     const sevCfg = SEVERITY_CFG[report?.severity] || SEVERITY_CFG.medium;
     const allMedia   = report?.media || [];
-    const imageMedia = allMedia.filter(m => m.file_type === 'image');
+    const imageMedia = allMedia.filter(m => m.file_type === 'image' && m.file_url !== report?.image_url);
     const fileMedia  = allMedia.filter(m => m.file_type !== 'image');
 
     const dateSubmitted = report?.submitted_at
@@ -348,13 +348,13 @@ export default function VerifiedReportDetail({ route, navigation }) {
                     ) : null}
 
                     {/* ── Evidence Gallery ── */}
-                    {imageMedia.length > 0 && (
+                    {(imageMedia.length > 0 || fileMedia.length > 0) && (
                         <View style={s.card}>
                             <View style={s.cardHeader}>
                                 <Ionicons name="images" size={16} color={C.navyMid} />
-                                <Text style={s.cardTitle}>Evidence Gallery</Text>
+                                <Text style={s.cardTitle}>Additional Evidence</Text>
                                 <View style={s.countChip}>
-                                    <Text style={s.countChipText}>{allMedia.length} file{allMedia.length > 1 ? 's' : ''}</Text>
+                                    <Text style={s.countChipText}>{imageMedia.length + fileMedia.length} file{(imageMedia.length + fileMedia.length) > 1 ? 's' : ''}</Text>
                                 </View>
                             </View>
                             {imageMedia.map(img => (
