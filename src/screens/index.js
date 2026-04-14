@@ -40,6 +40,7 @@ export { default as ImageReportReview } from './officer/ImageReportReview';
 export { default as OfficerProfile } from './officer/OfficerProfile';
 export { default as OfficerSettings } from './officer/OfficerSettings';
 export { default as VerifiedReportDetail } from './officer/VerifiedReportDetail';
+export { default as ViolationHeatmap } from './officer/ViolationHeatmap';
 
 // Shared Screens
 export { default as SplashScreen } from './shared/SplashScreen';
