@@ -67,7 +67,7 @@ const ir = StyleSheet.create({
 
 // ── Main screen ───────────────────────────────────────────────────────────
 export default function VerifiedReportDetail({ route, navigation }) {
-    const { reportId } = route.params ?? {};
+    const { reportId, mockData } = route.params ?? {};
 
     const [report,         setReport]         = useState(null);
     const [loading,        setLoading]        = useState(true);
@@ -77,10 +77,17 @@ export default function VerifiedReportDetail({ route, navigation }) {
 
     useEffect(() => {
         loadReport();
-    }, [reportId]);
+    }, [reportId, mockData]);
 
     const loadReport = async () => {
         setLoading(true);
+        if (mockData) {
+            setReport(mockData);
+            Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+            setLoading(false);
+            return;
+        }
+
         const { data, error } = await fetchReportById(reportId);
         if (!error && data) {
             setReport(data);

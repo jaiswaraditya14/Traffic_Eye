@@ -26,7 +26,7 @@ const Stack = createNativeStackNavigator();
 const TAB_CONFIG = {
     Dashboard: { icon: 'grid', label: 'Dashboard' },
     Pending: { icon: 'time', label: 'Pending' },
-    Heatmap: { icon: 'map', label: 'Heatmap' },
+    LiveMap: { icon: 'map', label: 'Live Map' },
     Verified: { icon: 'checkmark-circle', label: 'Verified' },
     OfficerProfileTab: { icon: 'person', label: 'Profile' },
 };
@@ -54,7 +54,7 @@ function OfficerTabNavigator() {
         >
             <Tab.Screen name="Dashboard" component={OfficerDashboard} />
             <Tab.Screen name="Pending" component={PendingQueue} />
-            <Tab.Screen name="Heatmap" component={ViolationHeatmap} />
+            <Tab.Screen name="LiveMap" component={ViolationHeatmap} />
             <Tab.Screen name="Verified" component={VerifiedReports} />
             <Tab.Screen name="OfficerProfileTab" component={OfficerProfile} options={{ title: 'Profile' }} />
         </Tab.Navigator>

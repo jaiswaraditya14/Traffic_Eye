@@ -27,6 +27,17 @@ const { width, height } = Dimensions.get('window');
 const BASE_LAT = 19.0760;
 const BASE_LNG = 72.8777;
 
+const VEHICLE_IMAGES = [
+    'https://images.unsplash.com/photo-1549317661-bc32c58a1ce7?auto=format&fit=crop&w=400&q=80',
+    'https://images.unsplash.com/photo-1510166089176-b57564a5f782?auto=format&fit=crop&w=400&q=80',
+    'https://images.unsplash.com/photo-1544620347-19eb79f42b3b?auto=format&fit=crop&w=400&q=80',
+    'https://images.unsplash.com/photo-1544160455-ce711ac3cc3d?auto=format&fit=crop&w=400&q=80',
+    'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&w=400&q=80',
+    'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=400&q=80',
+    'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=400&q=80',
+    'https://images.unsplash.com/photo-1511216335778-7cb8f49fa7a3?auto=format&fit=crop&w=400&q=80',
+];
+
 const generateMockData = (count) => {
     const types = ['Speeding', 'Red Light', 'Wrong Way', 'No Helmet', 'Illegal Parking'];
     const severities = ['High', 'Medium', 'Low'];
@@ -70,7 +81,7 @@ const generateMockData = (count) => {
             violationType: types[Math.floor(Math.random() * types.length)],
             timestamp: new Date(Date.now() - Math.floor(Math.random() * 30) * 86400000).toISOString(),
             severity: severity,
-            imageUrl: `https://picsum.photos/seed/${i}/400/300`,
+            imageUrl: VEHICLE_IMAGES[Math.floor(Math.random() * VEHICLE_IMAGES.length)],
             weight: weight
         });
     }
@@ -79,10 +90,13 @@ const generateMockData = (count) => {
 
 const ALL_MOCK_DATA = generateMockData(800);
 
-export default function ViolationHeatmap() {
+export default function ViolationHeatmap({ navigation }) {
     const [violations, setViolations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [timeFilter, setTimeFilter] = useState('30_days'); // 'today', '7_days', '30_days'
+    
+    // Toggle for Heatmap Layer
+    const [showHeatmap, setShowHeatmap] = useState(false);
     
     // Zoom control
     const [isZoomedIn, setIsZoomedIn] = useState(false);
@@ -185,8 +199,8 @@ export default function ViolationHeatmap() {
                 mapType="standard"
                 customMapStyle={[]} // Can add custom dark theme map styles if desired
             >
-                {/* Render Heatmap only when zoomed out and data exists */}
-                {!isZoomedIn && heatmapPoints.length > 0 && (
+                {/* Render Heatmap only when layer is toggled and we are zoomed out */}
+                {showHeatmap && !isZoomedIn && heatmapPoints.length > 0 && (
                     <Heatmap
                         points={heatmapPoints}
                         radius={Platform.OS === 'ios' ? 40 : 40}
@@ -199,8 +213,8 @@ export default function ViolationHeatmap() {
                     />
                 )}
 
-                {/* Render Markers when zoomed in */}
-                {isZoomedIn && violations.map(v => (
+                {/* Render Markers when heatmap is off OR we have zoomed in */}
+                {(!showHeatmap || isZoomedIn) && violations.map(v => (
                     <Marker
                         key={v.id}
                         coordinate={{ latitude: v.latitude, longitude: v.longitude }}
@@ -213,10 +227,20 @@ export default function ViolationHeatmap() {
                 ))}
             </MapView>
 
+            {/* Map Layers Tool (Floating Action Button) */}
+            <TouchableOpacity 
+                style={styles.floatingLayersBtn}
+                activeOpacity={0.9}
+                onPress={() => setShowHeatmap(!showHeatmap)}
+            >
+                <Ionicons name="layers" size={24} color={showHeatmap ? COLORS.primary : COLORS.textSecondary} />
+                {showHeatmap && <View style={styles.activeDot} />}
+            </TouchableOpacity>
+
             {/* Top Bar Overflow Overlay */}
             <SafeAreaView edges={['top']} style={styles.topOverlay} pointerEvents="box-none">
                 <View style={styles.headerContainer}>
-                    <Text style={styles.headerTitle}>Violation Heatmap</Text>
+                    <Text style={styles.headerTitle}>Live Map</Text>
                     
                     <View style={styles.filterContainer}>
                         {renderFilterButton('Today', 'today')}
@@ -225,16 +249,16 @@ export default function ViolationHeatmap() {
                     </View>
                 </View>
 
-                {/* Zoom Hint Tooltip */}
-                <View style={styles.zoomHintContainer}>
+                {/* Zoom/Layer Hint Tooltip */}
+                <View style={styles.zoomHintContainer} pointerEvents="none">
                     <View style={styles.zoomHint}>
                         <Ionicons 
-                            name={isZoomedIn ? "map" : "search"} 
+                            name={showHeatmap && !isZoomedIn ? "flame" : "search"} 
                             size={16} 
                             color={COLORS.textSecondary} 
                         />
                         <Text style={styles.zoomHintText}>
-                            {isZoomedIn ? "Showing individual markers" : "Zoom in to see reports"}
+                            {showHeatmap && !isZoomedIn ? "Heatmap View active. Zoom for details." : "Showing individual markers"}
                         </Text>
                     </View>
                 </View>
@@ -299,7 +323,28 @@ export default function ViolationHeatmap() {
                                 </View>
 
                                 <View style={styles.sheetFooter}>
-                                    <TouchableOpacity style={styles.actionButton} onPress={() => {}}>
+                                    <TouchableOpacity style={styles.actionButton} onPress={() => {
+                                        const mockReportDetails = {
+                                            id: selectedMarker.id,
+                                            violation_type: selectedMarker.violationType,
+                                            vehicle_number: "TEST-1234",
+                                            location_address: "Live Map Hotspot",
+                                            latitude: selectedMarker.latitude,
+                                            longitude: selectedMarker.longitude,
+                                            submitted_at: selectedMarker.timestamp,
+                                            reviewed_at: new Date().toISOString(),
+                                            severity: selectedMarker.severity.toLowerCase(),
+                                            image_url: selectedMarker.imageUrl,
+                                            reward_amount: 15,
+                                            submitter: { full_name: "Hotspot Tracker", email: "system@trafficeye.gov", phone: "—" },
+                                            officer_review: {
+                                                officer: { full_name: "System Auto-Flag" },
+                                                remarks: "This is a virtual hotspot alert representing a cluster of violations in this area."
+                                            }
+                                        };
+                                        setSelectedMarker(null);
+                                        navigation.navigate('VerifiedReportDetail', { mockData: mockReportDetails });
+                                    }}>
                                         <Text style={styles.actionButtonText}>View Full Report</Text>
                                     </TouchableOpacity>
                                 </View>
@@ -319,6 +364,29 @@ const styles = StyleSheet.create({
     },
     map: {
         ...StyleSheet.absoluteFillObject,
+    },
+    floatingLayersBtn: {
+        position: 'absolute',
+        right: SPACING.md,
+        bottom: 100, // keep clear of bottom sheet/tab bar
+        backgroundColor: COLORS.surface,
+        width: 50,
+        height: 50,
+        borderRadius: BORDER_RADIUS.full,
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...SHADOWS.md,
+    },
+    activeDot: {
+        position: 'absolute',
+        top: 12,
+        right: 12,
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: COLORS.primary,
+        borderWidth: 2,
+        borderColor: COLORS.surface,
     },
     topOverlay: {
         position: 'absolute',
