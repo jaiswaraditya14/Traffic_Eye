@@ -156,10 +156,12 @@ function StepDetails({
     violationType, setViolationType,
     description, setDescription,
     address, setAddress,
+    vehiclePlate, setVehiclePlate,
     onDetectLocation, onOpenMap,
     loadingLocation, video,
 }) {
     const [focusedDesc, setFocusedDesc] = useState(false);
+    const [focusedPlate, setFocusedPlate] = useState(false);
     const filename = video ? video.split('/').pop() : null;
     const descLen = description.length;
 
@@ -221,6 +223,22 @@ function StepDetails({
                 </Text>
             </View>
 
+            {/* Vehicle Plate */}
+            <Text style={styles.fieldLabel}>Vehicle Reg. / Plate No. (Optional)</Text>
+            <View style={[styles.plateBox, focusedPlate && { borderColor: C.navyMid }]}>
+                <Ionicons name="car-outline" size={18} color={focusedPlate ? C.navyMid : C.textTertiary} />
+                <TextInput
+                    style={styles.plateInput}
+                    placeholder="e.g. MH 02 AB 1234"
+                    value={vehiclePlate}
+                    onChangeText={setVehiclePlate}
+                    autoCapitalize="characters"
+                    onFocus={() => setFocusedPlate(true)}
+                    onBlur={() => setFocusedPlate(false)}
+                    placeholderTextColor={C.textTertiary}
+                />
+            </View>
+
             {/* Location */}
             <Text style={styles.fieldLabel}>Incident Location</Text>
             <View style={styles.locationBtnRow}>
@@ -262,7 +280,7 @@ function StepDetails({
 }
 
 // ── Step 3: Review & Submit ──
-function StepReview({ video, violationType, description, address, onSubmit, submitting }) {
+function StepReview({ video, violationType, description, address, vehiclePlate, onSubmit, submitting }) {
     const filename = video ? video.split('/').pop() : null;
     const violationLabel = VIOLATION_TYPES.find(v => v.id === violationType)?.label || 'Not selected';
 
@@ -294,6 +312,7 @@ function StepReview({ video, violationType, description, address, onSubmit, subm
                 {/* Info rows */}
                 {[
                     { icon: 'flag', label: 'Violation Type', value: violationLabel, valColor: C.amber },
+                    { icon: 'car-outline', label: 'Vehicle Plate', value: vehiclePlate || 'Not provided', valColor: C.textSecondary },
                     { icon: 'document-text', label: 'Description', value: description || 'Not provided', valColor: C.textSecondary },
                     { icon: 'location', label: 'Location', value: address || 'Not specified', valColor: C.textSecondary },
                     { icon: 'time', label: 'Date & Time', value: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }), valColor: C.textSecondary },
@@ -348,6 +367,7 @@ export default function VideoReport({ navigation }) {
     const [currentStep, setCurrentStep] = useState(1);
     const [violationType, setViolationType] = useState(null);
     const [description, setDescription] = useState('');
+    const [vehiclePlate, setVehiclePlate] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [isMapVisible, setIsMapVisible] = useState(false);
     const [selectedCoordinate, setSelectedCoordinate] = useState(null);
@@ -444,6 +464,7 @@ export default function VideoReport({ navigation }) {
                 location_address: address,
                 violation_type: violationLabel,
                 violation_description: description,
+                vehicle_number: vehiclePlate.trim().toUpperCase() || null,
                 severity: 'medium', // Default for video reports before officer review
                 ai_confidence: 0,
                 status: 'pending',
@@ -466,7 +487,13 @@ export default function VideoReport({ navigation }) {
             // No points awarded at submission time.
             // Points are awarded on approval by the DB function submit_officer_review.
 
-            navigation.navigate('VideoReportSuccess');
+            navigation.navigate('VideoReportSuccess', {
+                reportId: report.id,
+                displayId: `VR-${report.id.slice(-6).toUpperCase()}`,
+                violationType: violationLabel,
+                location: address || 'Location not specified',
+                submittedAt: new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+            });
         } catch (error) {
             console.error('Video submission error:', error);
             Alert.alert('Submission Failed', error.message || 'Could not submit your video report.');
@@ -539,6 +566,8 @@ export default function VideoReport({ navigation }) {
                             setDescription={setDescription}
                             address={address}
                             setAddress={setAddress}
+                            vehiclePlate={vehiclePlate}
+                            setVehiclePlate={setVehiclePlate}
                             onDetectLocation={handleDetectLocation}
                             onOpenMap={() => setIsMapVisible(true)}
                             loadingLocation={loadingLocation}
@@ -551,6 +580,7 @@ export default function VideoReport({ navigation }) {
                             violationType={violationType}
                             description={description}
                             address={address}
+                            vehiclePlate={vehiclePlate}
                             onSubmit={handleSubmit}
                             submitting={submitting}
                         />
@@ -797,6 +827,26 @@ const styles = StyleSheet.create({
         textAlignVertical: 'top',
     },
     charCounter: { fontSize: 10, color: C.textTertiary, textAlign: 'right', marginTop: 6, fontFamily: 'Nunito-Medium' },
+
+    plateBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        backgroundColor: C.surface,
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderWidth: 1.5,
+        borderColor: C.border,
+        marginBottom: 8,
+    },
+    plateInput: {
+        flex: 1,
+        fontSize: 14,
+        fontFamily: 'Nunito-Bold',
+        color: C.textPrimary,
+        letterSpacing: 1.5,
+    },
 
     locationBtnRow: { flexDirection: 'row', gap: 12 },
     locBtnOutline: {

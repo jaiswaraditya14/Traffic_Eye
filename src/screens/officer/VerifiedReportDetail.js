@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import * as FileSystem from 'expo-file-system/legacy';
 import { fetchReportById } from '../../services/reports';
 
@@ -274,8 +275,13 @@ export default function VerifiedReportDetail({ route, navigation }) {
 
     const sevCfg = SEVERITY_CFG[report?.severity] || SEVERITY_CFG.medium;
     const allMedia   = report?.media || [];
-    const imageMedia = allMedia.filter(m => m.file_type === 'image' && m.file_url !== report?.image_url);
-    const fileMedia  = allMedia.filter(m => m.file_type !== 'image');
+    let imageMedia = allMedia.filter(m => m.file_type === 'image');
+    const videoMedia = allMedia.filter(m => m.file_type === 'video');
+    // Only fall back to image_url for pre-media-table reports (no media records at all)
+    if (imageMedia.length === 0 && videoMedia.length === 0 && report?.image_url) {
+        imageMedia = [{ id: 'legacy-img', file_url: report.image_url, file_type: 'image' }];
+    }
+    const fileMedia = allMedia.filter(m => m.file_type !== 'image' && m.file_type !== 'video');
 
     const dateSubmitted = report?.submitted_at
         ? new Date(report.submitted_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -335,28 +341,25 @@ export default function VerifiedReportDetail({ route, navigation }) {
                         </View>
                     </View>
 
-                    {/* ── Main Evidence Image ── */}
-                    {report?.image_url ? (
-                        <TouchableOpacity onPress={() => setFullscreenImg(report.image_url)} activeOpacity={0.9}>
-                            <View style={s.imgCard}>
-                                <Image source={{ uri: report.image_url }} style={s.evidenceImg} resizeMode="cover" />
-                                <View style={s.imgBadge}>
-                                    <Ionicons name="expand" size={14} color={C.white} />
-                                </View>
-                            </View>
-                        </TouchableOpacity>
-                    ) : null}
+
 
                     {/* ── Evidence Gallery ── */}
-                    {(imageMedia.length > 0 || fileMedia.length > 0) && (
+                    {(imageMedia.length > 0 || videoMedia.length > 0 || fileMedia.length > 0) && (
                         <View style={s.card}>
                             <View style={s.cardHeader}>
                                 <Ionicons name="images" size={16} color={C.navyMid} />
                                 <Text style={s.cardTitle}>Additional Evidence</Text>
                                 <View style={s.countChip}>
-                                    <Text style={s.countChipText}>{imageMedia.length + fileMedia.length} file{(imageMedia.length + fileMedia.length) > 1 ? 's' : ''}</Text>
+                                    <Text style={s.countChipText}>{imageMedia.length + videoMedia.length + fileMedia.length} file{(imageMedia.length + videoMedia.length + fileMedia.length) > 1 ? 's' : ''}</Text>
                                 </View>
                             </View>
+                            
+                            {/* Videos */}
+                            {videoMedia.map(vid => (
+                                <VideoItem key={vid.id} uri={vid.file_url} style={s.galleryImg} containerStyle={s.galleryImgFrame} />
+                            ))}
+
+                            {/* Images */}
                             {imageMedia.map(img => (
                                 <TouchableOpacity key={img.id} onPress={() => setFullscreenImg(img.file_url)} activeOpacity={0.9}>
                                     <View style={s.galleryImgFrame}>
@@ -589,3 +592,13 @@ const s = StyleSheet.create({
     },
     modalImg: { width: '100%', height: '85%' },
 });
+
+// Helper component for playable video
+function VideoItem({ uri, style, containerStyle }) {
+    const player = useVideoPlayer(uri, p => { p.loop = false; });
+    return (
+        <View style={containerStyle}>
+            <VideoView player={player} style={style} allowsFullscreen allowsPictureInPicture />
+        </View>
+    );
+}

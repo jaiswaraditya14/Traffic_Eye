@@ -29,7 +29,10 @@ export default function AIResultsVerification({ navigation, route }) {
     const { currentReport } = useAppContext();
     const { aiResults } = route.params || {};
 
-    const [vehicleNumber, setVehicleNumber] = useState(aiResults?.vehicleNumber || '');
+    const [vehicleNumber, setVehicleNumber] = useState(
+        aiResults?.vehicleNumber || currentReport?.vehiclePlate || ''
+    );
+
     const [violationType, setViolationType] = useState(aiResults?.violationType || '');
     const [address, setAddress] = useState(currentReport?.address || '');
     const [confidence] = useState(aiResults?.confidence?.toString() || '0');

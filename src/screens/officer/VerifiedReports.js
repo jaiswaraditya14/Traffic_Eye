@@ -34,7 +34,12 @@ const SEV_CFG = {
 };
 const getSev = (s) => SEV_CFG[s] || SEV_CFG.medium;
 
-export default function VerifiedReports({ navigation }) {
+export default function VerifiedReports({ route, navigation }) {
+    const statusFilter = route?.params?.status || 'approved';
+    const pageTitle = statusFilter === 'rejected' ? 'Rejected Queue' : 'Verified Queue';
+    const emptyTitle = statusFilter === 'rejected' ? 'No Rejected Reports' : 'No Verified Reports';
+    const emptySub = statusFilter === 'rejected' ? 'There are no rejected reports yet.' : 'There are no verified reports yet.';
+
     const [verifiedReports, setVerifiedReports] = useState([]);
     const [loading, setLoading] = useState(true);
     const hasLoadedRef = React.useRef(false);
@@ -71,7 +76,7 @@ export default function VerifiedReports({ navigation }) {
                     officer_reviews ( officer_id, decision, remarks ),
                     submitter:user_id ( full_name )
                 `)
-                .eq('status', 'approved')
+                .eq('status', statusFilter)
                 .order('reviewed_at', { ascending: false });
             
             if (!error) {
@@ -83,7 +88,7 @@ export default function VerifiedReports({ navigation }) {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [statusFilter]);
 
     useFocusEffect(
         useCallback(() => {
@@ -186,7 +191,7 @@ export default function VerifiedReports({ navigation }) {
                             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                                 <Ionicons name="arrow-back" size={20} color={C.white} />
                             </TouchableOpacity>
-                            <Text style={styles.headerTitle}>Verified Queue</Text>
+                            <Text style={styles.headerTitle}>{pageTitle}</Text>
                         </View>
                         <View style={styles.badge}>
                             <Text style={styles.badgeText}>{filteredReports.length}</Text>
@@ -227,8 +232,8 @@ export default function VerifiedReports({ navigation }) {
                     ) : filteredReports.length === 0 ? (
                         <View style={styles.empty}>
                             <Ionicons name="checkmark-done-circle-outline" size={52} color={C.textTertiary} />
-                            <Text style={styles.emptyTitle}>No Verified Reports</Text>
-                            <Text style={styles.emptySub}>{(search || activeFiltersCount > 0) ? 'No reports match your filters.' : 'There are no verified reports yet.'}</Text>
+                            <Text style={styles.emptyTitle}>{emptyTitle}</Text>
+                            <Text style={styles.emptySub}>{(search || activeFiltersCount > 0) ? 'No reports match your filters.' : emptySub}</Text>
                         </View>
                     ) : (
                         filteredReports.map((report) => {

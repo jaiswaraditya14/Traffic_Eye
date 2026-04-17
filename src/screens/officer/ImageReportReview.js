@@ -15,7 +15,7 @@ import {
     TextInput, Image, StatusBar, ActivityIndicator,
     Alert, Animated, Keyboard, Dimensions, Modal,
 } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -100,6 +100,7 @@ export default function ImageReportReview({ route, navigation }) {
     const [submitting, setSubmitting] = useState(false);
     const [alreadyReviewed, setAlreadyReviewed] = useState(false);
     const [fullscreenImage, setFullscreenImage] = useState(null);
+    const [decisionType, setDecisionType] = useState('approved');
 
     // Success animation
     const successScale = useRef(new Animated.Value(0)).current;
@@ -163,6 +164,8 @@ export default function ImageReportReview({ route, navigation }) {
             return;
         }
 
+        setDecisionType(decision);
+
         // Animate success
         Animated.parallel([
             Animated.spring(successScale,   { toValue: 1, useNativeDriver: true }),
@@ -183,8 +186,13 @@ export default function ImageReportReview({ route, navigation }) {
 
     const sevCfg = SEVERITY_CFG[report?.severity] || SEVERITY_CFG.medium;
     const allMedia = report?.media || [];
-    const mediaImages = allMedia.filter(m => m.file_type === 'image');
+    let mediaImages = allMedia.filter(m => m.file_type === 'image');
     const mediaVideos = allMedia.filter(m => m.file_type === 'video');
+    const isVideoReport = mediaVideos.length > 0;
+    // Only fall back to image_url for pre-media-table reports (no media records at all)
+    if (mediaImages.length === 0 && mediaVideos.length === 0 && report?.image_url) {
+        mediaImages = [{ id: 'legacy-img', file_url: report.image_url, file_type: 'image' }];
+    }
     const submitted = report?.submitted_at
         ? new Date(report.submitted_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
         : '—';
@@ -211,15 +219,22 @@ export default function ImageReportReview({ route, navigation }) {
 
                 {/* Already reviewed banner */}
                 {alreadyReviewed && (
-                    <View style={[s.reviewedBanner, { backgroundColor: report.status === 'approved' ? C.successSurface : C.errorSurface }]}>
-                        <Ionicons
-                            name={report.status === 'approved' ? 'checkmark-circle' : 'close-circle'}
-                            size={18}
-                            color={report.status === 'approved' ? C.success : C.error}
-                        />
-                        <Text style={[s.reviewedText, { color: report.status === 'approved' ? C.success : C.error }]}>
-                            This report was already {report.status}. You can update the decision below.
-                        </Text>
+                    <View style={[s.reviewedBanner, { backgroundColor: report.status === 'approved' ? C.successSurface : C.errorSurface, flexDirection: 'column' }]}>
+                        <View style={{flexDirection: 'row', alignItems: 'center', gap: 6}}>
+                            <Ionicons
+                                name={report.status === 'approved' ? 'checkmark-circle' : 'close-circle'}
+                                size={18}
+                                color={report.status === 'approved' ? C.success : C.error}
+                            />
+                            <Text style={[s.reviewedText, { color: report.status === 'approved' ? C.success : C.error }]}>
+                                This report is already {report.status}.
+                            </Text>
+                        </View>
+                        {report.status === 'rejected' && report.officer_review?.[0]?.remarks && (
+                            <Text style={{ marginTop: 8, fontSize: 13, fontFamily: 'Nunito-Medium', color: '#7F1D1D' }}>
+                                Reason: {report.officer_review[0].remarks}
+                            </Text>
+                        )}
                     </View>
                 )}
 
@@ -229,33 +244,16 @@ export default function ImageReportReview({ route, navigation }) {
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
                 >
-                    {/* ── Main Evidence Image ── */}
-                    <TouchableOpacity onPress={() => report?.image_url && setFullscreenImage(report.image_url)} activeOpacity={0.9}>
-                        <View style={s.imgCard}>
-                            {report?.image_url ? (
-                                <Image source={{ uri: report.image_url }} style={s.evidenceImg} resizeMode="cover" />
-                            ) : (
-                                <View style={[s.evidenceImg, s.imgPlaceholder]}>
-                                    <Ionicons name="image-outline" size={40} color={C.textTertiary} />
-                                    <Text style={{ fontFamily: 'Nunito-Medium', color: C.textTertiary, marginTop: 6 }}>No image provided</Text>
-                                </View>
-                            )}
-                            <View style={s.imgOverlay}>
-                                <View style={[s.sevPill, { backgroundColor: sevCfg.color }]}>
-                                    <Text style={s.sevPillText}>{sevCfg.label.toUpperCase()} PRIORITY</Text>
-                                </View>
-                            </View>
-                        </View>
-                    </TouchableOpacity>
 
-                    {/* ── Media Gallery (additional images + videos) ── */}
-                    {allMedia.length > 0 && (
+
+                    {/* ── Media Gallery ── */}
+                    {(mediaImages.length > 0 || mediaVideos.length > 0) && (
                         <View style={s.card}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                                 <Ionicons name="images" size={16} color={C.navyMid} />
                                 <Text style={s.cardTitle}>Evidence Gallery</Text>
                                 <View style={{ backgroundColor: C.surfaceLow, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
-                                    <Text style={{ fontSize: 11, fontFamily: 'Nunito-Bold', color: C.textSecondary }}>{allMedia.length} file{allMedia.length > 1 ? 's' : ''}</Text>
+                                    <Text style={{ fontSize: 11, fontFamily: 'Nunito-Bold', color: C.textSecondary }}>{mediaImages.length + mediaVideos.length} file{(mediaImages.length + mediaVideos.length) > 1 ? 's' : ''}</Text>
                                 </View>
                             </View>
 
@@ -273,55 +271,49 @@ export default function ImageReportReview({ route, navigation }) {
 
                             {/* Playable video players */}
                             {mediaVideos.map((vid) => (
-                                <View key={vid.id} style={s.galleryVideoContainer}>
-                                    <Video
-                                        source={{ uri: vid.file_url }}
-                                        style={s.galleryVideo}
-                                        useNativeControls
-                                        resizeMode={ResizeMode.CONTAIN}
-                                        shouldPlay={false}
-                                    />
-                                </View>
+                                <VideoItem key={vid.id} uri={vid.file_url} style={s.galleryVideo} containerStyle={s.galleryVideoContainer} />
                             ))}
                         </View>
                     )}
 
                     {/* ── AI Analysis Card ── */}
-                    <LinearGradient colors={['#F0FDF4', '#DCFCE7']} style={s.aiCard}>
-                        <View style={s.aiCardHeader}>
-                            <Ionicons name="sparkles" size={18} color={C.success} />
-                            <Text style={s.aiCardTitle}>AI Analysis</Text>
-                            <View style={{ backgroundColor: C.success, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 }}>
-                                <Text style={{ fontSize: 10, fontFamily: 'Nunito-Bold', color: C.white }}>
-                                    {Math.round((report?.ai_confidence ?? 0) * 100)}% Confidence
-                                </Text>
+                    {!isVideoReport && (
+                        <LinearGradient colors={['#F0FDF4', '#DCFCE7']} style={s.aiCard}>
+                            <View style={s.aiCardHeader}>
+                                <Ionicons name="sparkles" size={18} color={C.success} />
+                                <Text style={s.aiCardTitle}>AI Analysis</Text>
+                                <View style={{ backgroundColor: C.success, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 }}>
+                                    <Text style={{ fontSize: 10, fontFamily: 'Nunito-Bold', color: C.white }}>
+                                        {Math.round((report?.ai_confidence ?? 0) * 100)}% Confidence
+                                    </Text>
+                                </View>
                             </View>
-                        </View>
 
-                        <View style={s.aiRow}>
-                            <Text style={s.aiLabel}>Violation Type</Text>
-                            <Text style={s.aiValue}>{report?.violation_type || '—'}</Text>
-                        </View>
-
-                        {report?.vehicle_number && (
                             <View style={s.aiRow}>
-                                <Text style={s.aiLabel}>Vehicle Plate</Text>
-                                <Text style={[s.aiValue, { fontFamily: 'Nunito-ExtraBold', letterSpacing: 1, fontSize: 14 }]}>
-                                    {report.vehicle_number}
-                                </Text>
+                                <Text style={s.aiLabel}>Violation Type</Text>
+                                <Text style={s.aiValue}>{report?.violation_type || '—'}</Text>
                             </View>
-                        )}
 
-                        <View style={{ marginTop: 4 }}>
-                            <ConfBar score={report?.ai_confidence} />
-                        </View>
+                            {report?.vehicle_number && (
+                                <View style={s.aiRow}>
+                                    <Text style={s.aiLabel}>Vehicle Plate</Text>
+                                    <Text style={[s.aiValue, { fontFamily: 'Nunito-ExtraBold', letterSpacing: 1, fontSize: 14 }]}>
+                                        {report.vehicle_number}
+                                    </Text>
+                                </View>
+                            )}
 
-                        {report?.violation_description && (
-                            <View style={s.aiDescBox}>
-                                <Text style={s.aiDescText}>{report.violation_description}</Text>
+                            <View style={{ marginTop: 4 }}>
+                                <ConfBar score={report?.ai_confidence} />
                             </View>
-                        )}
-                    </LinearGradient>
+
+                            {report?.violation_description && (
+                                <View style={s.aiDescBox}>
+                                    <Text style={s.aiDescText}>{report.violation_description}</Text>
+                                </View>
+                            )}
+                        </LinearGradient>
+                    )}
 
                     {/* ── Reward Preview ── */}
                     <View style={s.rewardPreview}>
@@ -389,9 +381,9 @@ export default function ImageReportReview({ route, navigation }) {
                 {/* Footer action buttons */}
                 <View style={s.footer}>
                     <TouchableOpacity
-                        style={[s.actionBtn, s.rejectBtn, submitting && { opacity: 0.6 }]}
+                        style={[s.actionBtn, s.rejectBtn, (submitting || alreadyReviewed) && { opacity: alreadyReviewed ? 0.4 : 0.6 }]}
                         onPress={() => handleDecision('rejected')}
-                        disabled={submitting}
+                        disabled={submitting || alreadyReviewed}
                         activeOpacity={0.8}
                     >
                         <Ionicons name="close-circle" size={20} color={C.error} />
@@ -399,9 +391,9 @@ export default function ImageReportReview({ route, navigation }) {
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                        style={[s.actionBtn, s.approveBtn, submitting && { opacity: 0.6 }]}
+                        style={[s.actionBtn, s.approveBtn, (submitting || alreadyReviewed) && { opacity: alreadyReviewed ? 0.4 : 0.6 }]}
                         onPress={() => handleDecision('approved')}
-                        disabled={submitting}
+                        disabled={submitting || alreadyReviewed}
                         activeOpacity={0.85}
                     >
                         {submitting ? (
@@ -416,14 +408,23 @@ export default function ImageReportReview({ route, navigation }) {
                 </View>
             </SafeAreaView>
 
-            {/* Success overlay */}
+            {/* Success/Reject overlay */}
             <Animated.View
                 pointerEvents="none"
                 style={[s.successOverlay, { opacity: successOpacity, transform: [{ scale: successScale }] }]}
             >
-                <LinearGradient colors={[C.success, '#047857']} style={s.successContent}>
-                    <Ionicons name="checkmark-circle" size={56} color={C.white} />
-                    <Text style={s.successTitle}>Decision Submitted!</Text>
+                <LinearGradient 
+                    colors={decisionType === 'approved' ? [C.success, '#047857'] : [C.error, '#991B1B']} 
+                    style={s.successContent}
+                >
+                    <Ionicons 
+                        name={decisionType === 'approved' ? "checkmark-circle" : "close-circle"} 
+                        size={56} 
+                        color={C.white} 
+                    />
+                    <Text style={s.successTitle}>
+                        {decisionType === 'approved' ? 'Report Approved!' : 'Report Rejected'}
+                    </Text>
                     <Text style={s.successSub}>Citizen has been notified in real-time.</Text>
                 </LinearGradient>
             </Animated.View>
@@ -439,6 +440,15 @@ export default function ImageReportReview({ route, navigation }) {
                     )}
                 </View>
             </Modal>
+        </View>
+    );
+}
+
+function VideoItem({ uri, style, containerStyle }) {
+    const player = useVideoPlayer(uri, p => { p.loop = false; });
+    return (
+        <View style={containerStyle}>
+            <VideoView player={player} style={style} allowsFullscreen allowsPictureInPicture />
         </View>
     );
 }

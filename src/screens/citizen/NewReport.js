@@ -515,6 +515,27 @@ const styles = StyleSheet.create({
     },
     descInput: { fontSize: 14, color: C.textPrimary, textAlignVertical: 'top', height: 90, fontFamily: 'Nunito-Medium' },
 
+    plateBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        backgroundColor: C.surface,
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.08)',
+        marginBottom: 32,
+    },
+    plateInput: {
+        flex: 1,
+        fontSize: 15,
+        fontFamily: 'Nunito-Bold',
+        color: C.textPrimary,
+        letterSpacing: 1.5,
+    },
+
+
     submitBtn: { 
         borderRadius: 18, 
         overflow: 'hidden', 

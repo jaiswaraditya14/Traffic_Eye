@@ -48,7 +48,9 @@ export default function OfficerDashboard({ navigation }) {
     const slideAnim = useRef(new Animated.Value(30)).current;
 
     const [pendingReports, setPendingReports] = useState([]);
+    const [rejectedReports, setRejectedReports] = useState([]);
     const [approvedCount, setApprovedCount] = useState(0);
+    const [rejectedCount, setRejectedCount] = useState(0);
     const [loadingData, setLoadingData] = useState(true);
 
     const fetchData = useCallback(async () => {
@@ -67,13 +69,33 @@ export default function OfficerDashboard({ navigation }) {
                 .limit(10);
 
             // Fetch approved count
-            const { count } = await supabase
+            const { count: aCount } = await supabase
                 .from('image_reports')
                 .select('id', { count: 'exact', head: true })
                 .eq('status', 'approved');
 
+            // Fetch rejected recent
+            const { data: rejected } = await supabase
+                .from('image_reports')
+                .select(`
+                    id, violation_type, vehicle_number, location_address,
+                    severity, submitted_at, status, image_url,
+                    submitter:user_id ( full_name )
+                `)
+                .eq('status', 'rejected')
+                .order('submitted_at', { ascending: false })
+                .limit(5);
+
+            // Fetch rejected count
+            const { count: rCount } = await supabase
+                .from('image_reports')
+                .select('id', { count: 'exact', head: true })
+                .eq('status', 'rejected');
+
             setPendingReports(pending || []);
-            setApprovedCount(count || 0);
+            setRejectedReports(rejected || []);
+            setApprovedCount(aCount || 0);
+            setRejectedCount(rCount || 0);
         } catch (e) {
             console.error('Officer dashboard fetch error:', e);
         } finally {
@@ -108,8 +130,9 @@ export default function OfficerDashboard({ navigation }) {
     }, []);
 
     const stats = [
-        { label: 'Pending', value: pendingReports.length.toString(), icon: 'time-outline', color: C.warning, bg: C.warningSurface },
-        { label: 'Verified', value: approvedCount.toString(), icon: 'checkmark-circle-outline', color: C.success, bg: C.successSurface },
+        { label: 'Pending', value: pendingReports.length.toString(), icon: 'time-outline', color: C.warning, bg: C.warningSurface, target: 'Pending' },
+        { label: 'Verified', value: approvedCount.toString(), icon: 'checkmark-circle-outline', color: C.success, bg: C.successSurface, target: 'Verified', params: { status: 'approved' } },
+        { label: 'Rejected', value: rejectedCount.toString(), icon: 'close-circle-outline', color: C.error, bg: C.errorSurface, target: 'Verified', params: { status: 'rejected' } },
     ];
 
     const formatDate = (dateStr) => {
@@ -189,13 +212,18 @@ export default function OfficerDashboard({ navigation }) {
                         ]}
                     >
                         {stats.map((stat, idx) => (
-                            <View key={idx} style={styles.statCard}>
+                            <TouchableOpacity 
+                                key={idx} 
+                                style={styles.statCard}
+                                activeOpacity={0.8}
+                                onPress={() => navigation.navigate(stat.target, stat.params)}
+                            >
                                 <View style={[styles.statIconBg, { backgroundColor: stat.bg }]}>
                                     <Ionicons name={stat.icon} size={20} color={stat.color} />
                                 </View>
                                 <Text style={styles.statValue}>{stat.value}</Text>
                                 <Text style={styles.statLabel}>{stat.label}</Text>
-                            </View>
+                            </TouchableOpacity>
                         ))}
                     </Animated.View>
 
@@ -321,6 +349,75 @@ export default function OfficerDashboard({ navigation }) {
                                         </View>
 
                                         {/* Review Action */}
+                                        <View style={styles.actionArrow}>
+                                            <Ionicons name="chevron-forward" size={18} color={C.navyMid} />
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            })
+                        )}
+                    </Animated.View>
+
+                    {/* ── Rejected Reports Queue ── */}
+                    <Animated.View style={[styles.section, { opacity: fadeAnim, marginBottom: 36 }]}>
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>Recently Rejected</Text>
+                            <TouchableOpacity onPress={() => navigation.navigate('Verified', { status: 'rejected' })}>
+                                <Text style={[styles.seeAll, { color: C.error }]}>See All</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {loadingData ? (
+                            <ActivityIndicator size="small" color={C.navyMid} style={{ marginTop: 20 }} />
+                        ) : rejectedReports.length === 0 ? (
+                            <View style={{alignItems: 'center', marginTop: 20, marginBottom: 20}}>
+                                <Ionicons name="document-text-outline" size={40} color={C.textTertiary} />
+                                <Text style={{color: C.textSecondary, marginTop: 8, fontFamily: 'Nunito-Medium'}}>No rejected reports recently.</Text>
+                            </View>
+                        ) : (
+                            rejectedReports.map((report) => {
+                                const config = getPriorityConfig(report.severity);
+                                return (
+                                    <TouchableOpacity
+                                        key={report.id}
+                                        style={styles.reportCard}
+                                        activeOpacity={0.8}
+                                        onPress={() => navigation.navigate('ImageReportReview', { reportId: report.id })}
+                                    >
+                                        <View style={[styles.reportBar, { backgroundColor: C.error }]} />
+                                        <View style={styles.thumbnailFrame}>
+                                            {report.image_url ? (
+                                                <Image source={{ uri: report.image_url }} style={styles.reportThumbnail} resizeMode="cover" />
+                                            ) : (
+                                                <View style={[styles.reportThumbnail, { justifyContent: 'center', alignItems: 'center', backgroundColor: C.surfaceLow }]}>
+                                                    <Ionicons name="videocam-outline" size={22} color={C.textTertiary} />
+                                                </View>
+                                            )}
+                                            <View style={styles.thumbnailOverlay}>
+                                                <Ionicons name="scan" size={14} color={C.white} />
+                                            </View>
+                                        </View>
+                                        <View style={styles.reportContent}>
+                                            <View style={styles.reportTopRow}>
+                                                <Text style={styles.reportType} numberOfLines={1}>{report.violation_type || 'Traffic Violation'}</Text>
+                                                <View style={[styles.priorityChip, { backgroundColor: C.errorSurface }]}>
+                                                    <Text style={[styles.priorityChipText, { color: C.error }]}>REJECTED</Text>
+                                                </View>
+                                            </View>
+                                            {!!report.vehicle_number && <Text style={styles.reportVehicle}>{report.vehicle_number}</Text>}
+                                            <View style={styles.metaRow}>
+                                                {!!report.location_address && (
+                                                    <View style={styles.reportMeta}>
+                                                        <Ionicons name="location" size={11} color={C.textTertiary} />
+                                                        <Text style={styles.reportMetaText} numberOfLines={1}>{report.location_address}</Text>
+                                                    </View>
+                                                )}
+                                                <View style={styles.reportMeta}>
+                                                    <Ionicons name="time" size={11} color={C.textTertiary} />
+                                                    <Text style={styles.reportMetaText}>{formatDate(report.submitted_at)}</Text>
+                                                </View>
+                                            </View>
+                                        </View>
                                         <View style={styles.actionArrow}>
                                             <Ionicons name="chevron-forward" size={18} color={C.navyMid} />
                                         </View>

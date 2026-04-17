@@ -23,24 +23,7 @@ const STATUS_CONFIG = {
 const FILTERS = ['All', 'Pending', 'Reviewed', 'Action Taken'];
 
 // Sample data — will be replaced with Supabase fetch
-const SAMPLE_REPORTS = [
-    {
-        id: 'VR-001', type: 'Red Light Violation', location: 'MG Road Junction, Mumbai',
-        date: 'Apr 4, 2026', status: 'pending', points: 0,
-    },
-    {
-        id: 'VR-002', type: 'Wrong Parking', location: 'Bandra West Link Road',
-        date: 'Mar 28, 2026', status: 'reviewed', points: 0,
-    },
-    {
-        id: 'VR-003', type: 'Speeding', location: 'Linking Road, Andheri',
-        date: 'Mar 15, 2026', status: 'action_taken', points: 15,
-    },
-    {
-        id: 'VR-004', type: 'Lane Violation', location: 'Western Express Highway',
-        date: 'Mar 10, 2026', status: 'pending', points: 0,
-    },
-];
+const SAMPLE_REPORTS = [];
 
 function StatusLegend() {
     return (
@@ -59,13 +42,24 @@ function StatusLegend() {
     );
 }
 
-export default function VideoReportStatus({ navigation }) {
+export default function VideoReportStatus({ navigation, route }) {
     const [activeFilter, setActiveFilter] = useState('All');
+    const [reports, setReports] = useState(SAMPLE_REPORTS);
     const insets = useSafeAreaInsets();
+    
+    // Extract passed params if any
+    const { newReport, highlightId } = route?.params || {};
+
+    // Prepend newly submitted report if present
+    React.useEffect(() => {
+        if (newReport && !reports.some(r => r.id === newReport.id)) {
+            setReports(prev => [newReport, ...prev]);
+        }
+    }, [newReport]);
 
     const filtered = activeFilter === 'All'
-        ? SAMPLE_REPORTS
-        : SAMPLE_REPORTS.filter(r => {
+        ? reports
+        : reports.filter(r => {
             const label = STATUS_CONFIG[r.status]?.label;
             return label === activeFilter;
         });
@@ -82,7 +76,7 @@ export default function VideoReportStatus({ navigation }) {
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>My Video Reports</Text>
                     <View style={styles.countBadge}>
-                        <Text style={styles.countBadgeText}>{SAMPLE_REPORTS.length}</Text>
+                        <Text style={styles.countBadgeText}>{reports.length}</Text>
                     </View>
                 </LinearGradient>
 
@@ -120,12 +114,13 @@ export default function VideoReportStatus({ navigation }) {
                     ) : (
                         filtered.map(report => {
                             const config = STATUS_CONFIG[report.status];
+                            const isHighlighted = report.id === highlightId;
                             return (
                                 <TouchableOpacity
                                     key={report.id}
-                                    style={styles.card}
+                                    style={[styles.card, isHighlighted && styles.cardHighlighted]}
                                     activeOpacity={0.8}
-                                    onPress={() => {}} // navigate to detail in future
+                                    onPress={() => navigation.navigate('ReportDetail', { reportId: report.id })}
                                 >
                                     {/* Left status bar */}
                                     <View style={[styles.cardBar, { backgroundColor: config.bar }]} />
@@ -151,7 +146,7 @@ export default function VideoReportStatus({ navigation }) {
                                                 </Text>
                                             </View>
                                         </View>
-                                        <Text style={styles.cardId}>{report.id}</Text>
+                                        <Text style={styles.cardId}>{report.displayId || report.id}</Text>
                                         <View style={styles.metaRow}>
                                             <Ionicons name="location" size={11} color={C.textTertiary} />
                                             <Text style={styles.metaText} numberOfLines={1}>{report.location}</Text>
@@ -235,12 +230,16 @@ const styles = StyleSheet.create({
     list: { flex: 1 },
     listContent: { paddingHorizontal: 20, paddingTop: 8 },
 
-    // Card
     card: {
         flexDirection: 'row', alignItems: 'center',
         backgroundColor: C.surface, borderRadius: 20, marginBottom: 14,
         overflow: 'hidden',
         shadowColor: C.navyMid, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 2,
+        borderWidth: 2, borderColor: 'transparent',
+    },
+    cardHighlighted: {
+        borderColor: C.navy,
+        backgroundColor: '#F8F9FA',
     },
     cardBar: { width: 4, alignSelf: 'stretch' },
     thumbWrap: { position: 'relative', margin: 12 },

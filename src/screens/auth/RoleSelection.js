@@ -203,21 +203,6 @@ export default function RoleSelection({ navigation, onConfirm }) {
                                         <Ionicons name="arrow-forward" size={18} color={C.navyMid} />
                                     </View>
                                 </View>
-
-                                {/* Description */}
-                                <Text style={styles.cardDesc}>
-                                    Report traffic violations and earn rewards for making roads safer.
-                                </Text>
-
-                                {/* Feature chips */}
-                                <View style={styles.chipRow}>
-                                    {['AI Reports', 'Track Status', 'Earn Points'].map((label, i) => (
-                                        <View key={i} style={[styles.chip, { backgroundColor: C.successSurface }]}>
-                                            <Ionicons name="checkmark-circle" size={13} color={C.success} />
-                                            <Text style={[styles.chipText, { color: C.success }]}>{label}</Text>
-                                        </View>
-                                    ))}
-                                </View>
                             </View>
                         </TouchableOpacity>
                     </Animated.View>
@@ -255,21 +240,6 @@ export default function RoleSelection({ navigation, onConfirm }) {
                                     <View style={[styles.arrowCircle, { backgroundColor: C.amberSurface }]}>
                                         <Ionicons name="arrow-forward" size={18} color={C.amberDark} />
                                     </View>
-                                </View>
-
-                                {/* Description */}
-                                <Text style={styles.cardDesc}>
-                                    Verify reports, manage violations, and maintain road safety.
-                                </Text>
-
-                                {/* Feature chips */}
-                                <View style={styles.chipRow}>
-                                    {['Verify Reports', 'Manage Queue', 'Track Stats'].map((label, i) => (
-                                        <View key={i} style={[styles.chip, { backgroundColor: C.amberSurface }]}>
-                                            <Ionicons name="checkmark-circle" size={13} color={C.amberDark} />
-                                            <Text style={[styles.chipText, { color: C.amberDark }]}>{label}</Text>
-                                        </View>
-                                    ))}
                                 </View>
                             </View>
                         </TouchableOpacity>
@@ -408,7 +378,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 14,
-        marginBottom: 14,
     },
     iconCircle: {
         width: 54,

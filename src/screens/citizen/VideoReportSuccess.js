@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, StatusBar, BackHandler } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,23 +12,64 @@ const C = {
     success: '#059669', successSurface: '#D1FAE5', primarySurface: '#D7E2FF', border: '#C4C6D0',
 };
 
-export default function VideoReportSuccess({ navigation }) {
+export default function VideoReportSuccess({ navigation, route }) {
     const scaleAnim = useRef(new Animated.Value(0)).current;
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const insets = useSafeAreaInsets();
+
+    // Real report data passed from VideoReport.js after successful DB insert
+    const {
+        reportId,
+        displayId,
+        violationType,
+        location,
+        submittedAt,
+    } = route.params ?? {};
+
+    // Fallback display ID if params are missing (e.g. dev/test navigation)
+    const shownId = displayId ?? `VR-${Date.now().toString().slice(-6)}`;
 
     useEffect(() => {
         Animated.sequence([
             Animated.spring(scaleAnim, { toValue: 1, tension: 60, friction: 8, useNativeDriver: true }),
             Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
         ]).start();
-    }, []);
+
+        const onBackPress = () => {
+            navigation.reset({ index: 0, routes: [{ name: 'CitizenMain' }] });
+            return true;
+        };
+        const backSub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+        return () => backSub.remove();
+    }, [navigation]);
 
     const steps = [
         { icon: 'cloud-upload', label: 'Report Submitted', desc: 'Your video has been uploaded successfully', done: true },
         { icon: 'eye', label: 'Under Review', desc: 'Officer will review within 48 hours', done: false },
         { icon: 'shield-checkmark', label: 'Action Taken', desc: 'Fine issued or case will be closed', done: false },
     ];
+
+    // Build the new report object to inject into the status list
+    const newReportEntry = reportId ? {
+        id: reportId,
+        displayId: shownId,
+        type: violationType || 'Video Report',
+        location: location || 'Location not specified',
+        date: submittedAt || new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        status: 'pending',
+        points: 0,
+        isNew: true, // flag for the status screen to highlight
+    } : null;
+
+    const handleTrackStatus = () => {
+        // Go straight to the detail screen for this specific report
+        if (reportId) {
+            navigation.navigate('ReportDetail', { reportId });
+        } else {
+            // Failsafe in case reportId is missing
+            navigation.navigate('VideoReportStatus');
+        }
+    };
 
     return (
         <View style={styles.container}>
@@ -48,7 +89,7 @@ export default function VideoReportSuccess({ navigation }) {
                         <Text style={styles.sub}>Your video report is now in the review queue. A certified officer will review it within 48 hours.</Text>
                         <View style={styles.idRow}>
                             <Ionicons name="barcode-outline" size={16} color={C.navyMid} />
-                            <Text style={styles.idText}>Report ID: <Text style={styles.idVal}>VR-{Date.now().toString().slice(-6)}</Text></Text>
+                            <Text style={styles.idText}>Report ID: <Text style={styles.idVal}>{shownId}</Text></Text>
                         </View>
                     </Animated.View>
                     <Animated.View style={[styles.timelineCard, { opacity: fadeAnim }]}>
@@ -73,13 +114,13 @@ export default function VideoReportSuccess({ navigation }) {
                     </Animated.View>
                 </View>
                 <View style={styles.actions}>
-                    <TouchableOpacity style={styles.primaryBtn} onPress={() => navigation.navigate('VideoReportStatus')} activeOpacity={0.88}>
+                    <TouchableOpacity style={styles.primaryBtn} onPress={handleTrackStatus} activeOpacity={0.88}>
                         <LinearGradient colors={[C.amberDark, C.amber]} style={styles.primaryBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
                             <Ionicons name="list" size={18} color={C.navy} />
                             <Text style={styles.primaryBtnText}>Track Report Status</Text>
                         </LinearGradient>
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => navigation.navigate('CitizenMain')} style={styles.ghostBtn}>
+                    <TouchableOpacity onPress={() => navigation.reset({ index: 0, routes: [{ name: 'CitizenMain' }] })} style={styles.ghostBtn}>
                         <Text style={styles.ghostBtnText}>Back to Home</Text>
                     </TouchableOpacity>
                 </View>

@@ -9,7 +9,7 @@ import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity, Image,
     StatusBar, ActivityIndicator, Dimensions, Modal,
 } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -98,13 +98,14 @@ export default function ReportDetail({ navigation, route }) {
     const statusConfig = getStatusConfig(report.status);
     const sevCfg = SEVERITY_MAP[report.severity] || SEVERITY_MAP.medium;
     const review = Array.isArray(report.officer_review) ? report.officer_review[0] : report.officer_review;
-    const hasMainImage = !!report.image_url;
     const allMedia = report.media || [];
-    // Include all media in gallery; main image shown above, report_media for extra evidence
-    const images = allMedia.filter(m => m.file_type === 'image');
+    let images = allMedia.filter(m => m.file_type === 'image');
     const videos = allMedia.filter(m => m.file_type === 'video');
-    // Extra gallery images are those whose URL differs from main image_url
-    const galleryImages = images.filter(m => m.file_url !== report.image_url);
+    // Only use legacy image_url if there are no media records AT ALL (old reports before the media table)
+    if (images.length === 0 && videos.length === 0 && report.image_url) {
+        images = [{ id: 'legacy_img', file_type: 'image', file_url: report.image_url }];
+    }
+    const galleryImages = images;
     const rewardAmount = report.status === 'approved'
         ? (report.reward_amount || rewardService.getPointsForViolation(report.violation_type))
         : 0;
@@ -134,26 +135,7 @@ export default function ReportDetail({ navigation, route }) {
 
                 <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
 
-                    {/* ── Main Evidence Image ── */}
-                    {hasMainImage && (
-                        <TouchableOpacity onPress={() => setFullscreenImage(report.image_url)} activeOpacity={0.9}>
-                            <View style={styles.imageContainer}>
-                                <Image source={{ uri: report.image_url }} style={styles.evidenceImage} resizeMode="cover" />
-                                <LinearGradient colors={['transparent', 'rgba(0,0,0,0.85)']} style={styles.imageOverlay}>
-                                    <View style={styles.imageTag}>
-                                        <Ionicons name="camera" size={12} color={C.navy} />
-                                        <Text style={styles.imageTagText}>
-                                            {report.ai_confidence ? `${Math.round(report.ai_confidence * 100)}% Confidence` : 'AI Analyzed'}
-                                        </Text>
-                                    </View>
-                                    <Text style={styles.imageDate}>{submitted}</Text>
-                                </LinearGradient>
-                                <View style={styles.expandBtn}>
-                                    <Ionicons name="expand" size={16} color={C.navyMid} />
-                                </View>
-                            </View>
-                        </TouchableOpacity>
-                    )}
+
 
                     {/* ── Status + Reward Row ── */}
                     <View style={styles.statusSection}>
@@ -177,25 +159,6 @@ export default function ReportDetail({ navigation, route }) {
                         )}
                     </View>
 
-                    {/* ── Details Card ── */}
-                    <View style={styles.detailCard}>
-                        <View style={styles.detailCardHeader}>
-                            <Ionicons name="document-text-outline" size={18} color={C.navyMid} />
-                            <Text style={styles.detailCardTitle}>Violation Record</Text>
-                        </View>
-                        <DetailRow label="Violation Type" value={report.violation_type || 'Unknown'} />
-                        <DetailRow label="Location" value={report.location_address || 'Unknown'} />
-                        <DetailRow label="Vehicle Reg." value={report.vehicle_number} mono />
-                        <DetailRow label="Severity" value={sevCfg.label} />
-                        <DetailRow label="Reported At" value={submitted} />
-                        {report.violation_description && (
-                            <View style={[styles.detailRow, { flexDirection: 'column', alignItems: 'flex-start', borderBottomWidth: 0 }]}>
-                                <Text style={styles.detailLabel}>AI Description</Text>
-                                <Text style={[styles.detailValue, { marginTop: 4, lineHeight: 20 }]}>{report.violation_description}</Text>
-                            </View>
-                        )}
-                    </View>
-
                     {/* ── Media Gallery (additional evidence beyond main photo) ── */}
                     {(galleryImages.length > 0 || videos.length > 0) && (
                         <View style={styles.detailCard}>
@@ -203,7 +166,7 @@ export default function ReportDetail({ navigation, route }) {
                                 <Ionicons name="images-outline" size={18} color={C.navyMid} />
                                 <Text style={styles.detailCardTitle}>Evidence Media</Text>
                                 <View style={styles.mediaBadge}>
-                                    <Text style={styles.mediaBadgeText}>{galleryImages.length + videos.length + (hasMainImage ? 1 : 0)} file{(galleryImages.length + videos.length + (hasMainImage ? 1 : 0)) > 1 ? 's' : ''}</Text>
+                                    <Text style={styles.mediaBadgeText}>{galleryImages.length + videos.length} file{(galleryImages.length + videos.length) > 1 ? 's' : ''}</Text>
                                 </View>
                             </View>
 
@@ -221,18 +184,29 @@ export default function ReportDetail({ navigation, route }) {
 
                             {/* Videos */}
                             {videos.map((vid) => (
-                                <View key={vid.id} style={styles.videoContainer}>
-                                    <Video
-                                        source={{ uri: vid.file_url }}
-                                        style={styles.videoPlayer}
-                                        useNativeControls
-                                        resizeMode={ResizeMode.CONTAIN}
-                                        shouldPlay={false}
-                                    />
-                                </View>
+                                <VideoItem key={vid.id} uri={vid.file_url} style={styles.videoPlayer} containerStyle={styles.videoContainer} />
                             ))}
                         </View>
                     )}
+
+                    {/* ── Details Card ── */}
+                    <View style={styles.detailCard}>
+                        <View style={styles.detailCardHeader}>
+                            <Ionicons name="document-text-outline" size={18} color={C.navyMid} />
+                            <Text style={styles.detailCardTitle}>Violation Record</Text>
+                        </View>
+                        <DetailRow label="Violation Type" value={report.violation_type || 'Unknown'} />
+                        <DetailRow label="Location" value={report.location_address || 'Unknown'} />
+                        <DetailRow label="Vehicle Reg." value={report.vehicle_number} mono />
+                        <DetailRow label="Severity" value={sevCfg.label} />
+                        <DetailRow label="Reported At" value={submitted} />
+                        {!!report.ai_confidence && !!report.violation_description && (
+                            <View style={[styles.detailRow, { flexDirection: 'column', alignItems: 'flex-start', borderBottomWidth: 0 }]}>
+                                <Text style={styles.detailLabel}>AI Description</Text>
+                                <Text style={[styles.detailValue, { marginTop: 4, lineHeight: 20 }]}>{report.violation_description}</Text>
+                            </View>
+                        )}
+                    </View>
 
                     {/* ── Officer Review ── */}
                     {review && (
@@ -301,6 +275,15 @@ function DetailRow({ label, value, mono }) {
         <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>{label}</Text>
             <Text style={[styles.detailValue, mono && styles.monoValue]}>{value || '—'}</Text>
+        </View>
+    );
+}
+
+function VideoItem({ uri, style, containerStyle }) {
+    const player = useVideoPlayer(uri, p => { p.loop = false; });
+    return (
+        <View style={containerStyle}>
+            <VideoView player={player} style={style} allowsFullscreen allowsPictureInPicture />
         </View>
     );
 }

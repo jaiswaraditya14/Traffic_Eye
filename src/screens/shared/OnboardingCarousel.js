@@ -31,11 +31,6 @@ const slides = [
         title: 'Report Violations',
         description: 'Capture traffic violations with your phone camera. Help keep roads safe and earn rewards for your community.',
         accent: C.navyMid,
-        pills: [
-            { icon: 'camera-outline', label: 'Photo & Video' },
-            { icon: 'location-outline', label: 'GPS Tagged' },
-            { icon: 'flash-outline', label: 'Instant' },
-        ],
     },
     {
         image: require('../../../assets/images/onboarding_ai.jpg'),
@@ -45,11 +40,6 @@ const slides = [
         title: 'AI Verification',
         description: 'Gemini AI instantly analyzes license plates, violation types, and location with government-grade accuracy.',
         accent: '#047857',
-        pills: [
-            { icon: 'sparkles-outline', label: 'Gemini AI' },
-            { icon: 'car-outline', label: 'Plate Scan' },
-            { icon: 'shield-outline', label: 'Validated' },
-        ],
     },
     {
         image: require('../../../assets/images/onboarding_rewards.jpg'),
@@ -59,22 +49,10 @@ const slides = [
         title: 'Earn Rewards',
         description: 'Get recognition for verified reports. Accumulate points, unlock achievements and make a real difference.',
         accent: C.amberDark,
-        pills: [
-            { icon: 'trophy-outline', label: 'Points' },
-            { icon: 'gift-outline', label: 'Rewards' },
-            { icon: 'ribbon-outline', label: 'Rankings' },
-        ],
     },
 ];
 
-function FeaturePill({ icon, label, color }) {
-    return (
-        <View style={[pillStyles.pill, { borderColor: color + '40', backgroundColor: color + '12' }]}>
-            <Ionicons name={icon} size={13} color={color} />
-            <Text style={[pillStyles.label, { color }]}>{label}</Text>
-        </View>
-    );
-}
+
 
 export default function OnboardingCarousel({ navigation }) {
     const [currentSlide, setCurrentSlide] = useState(0);
@@ -141,15 +119,10 @@ export default function OnboardingCarousel({ navigation }) {
                             <Ionicons name={s.icon} size={32} color={s.iconColor} />
                         </View>
 
-                        {/* ── Text + feature pills ── */}
+                        {/* ── Text ── */}
                         <View style={styles.textSection}>
                             <Text style={styles.slideTitle}>{s.title}</Text>
                             <Text style={styles.slideDescription}>{s.description}</Text>
-                            <View style={styles.pillRow}>
-                                {s.pills.map((p, i) => (
-                                    <FeaturePill key={i} icon={p.icon} label={p.label} color={s.accent} />
-                                ))}
-                            </View>
                         </View>
                     </View>
                 ))}
@@ -219,22 +192,6 @@ export default function OnboardingCarousel({ navigation }) {
         </View>
     );
 }
-
-const pillStyles = StyleSheet.create({
-    pill: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-        paddingHorizontal: 12,
-        paddingVertical: 7,
-        borderRadius: 99,
-        borderWidth: 1,
-    },
-    label: {
-        fontSize: 12,
-        fontFamily: 'Nunito-Bold',
-    },
-});
 
 const styles = StyleSheet.create({
     container: {
@@ -324,12 +281,7 @@ const styles = StyleSheet.create({
         maxWidth: 320,
         marginBottom: 18,
     },
-    pillRow: {
-        flexDirection: 'row',
-        gap: 8,
-        flexWrap: 'wrap',
-        justifyContent: 'center',
-    },
+
 
     // ── Bottom controls ──
     bottomSection: {

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, StatusBar, BackHandler } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -25,7 +25,14 @@ export default function ReportSuccess({ navigation }) {
             Animated.spring(scaleAnim, { toValue: 1, tension: 50, friction: 7, useNativeDriver: true }),
             Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
         ]).start();
-    }, []);
+
+        const onBackPress = () => {
+            navigation.reset({ index: 0, routes: [{ name: 'CitizenMain' }] });
+            return true;
+        };
+        const backSub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+        return () => backSub.remove();
+    }, [navigation]);
 
     return (
         <View style={styles.container}>
@@ -56,7 +63,7 @@ export default function ReportSuccess({ navigation }) {
                 <View style={styles.buttonGroup}>
                     <TouchableOpacity
                         style={styles.primaryButton}
-                        onPress={() => navigation.navigate('CitizenMain')}
+                        onPress={() => navigation.reset({ index: 0, routes: [{ name: 'CitizenMain' }] })}
                         activeOpacity={0.88}
                     >
                         <LinearGradient
