@@ -2,36 +2,26 @@ import { AI_CONFIG } from '../../config';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 
-/**
- * Severity ranking for violations (higher = more severe)
- * Used to pick the most severe violation when multiple are detected
- */
+// ─── Violation severity ranking ───────────────────────────────────────────────
 const VIOLATION_SEVERITY = {
-    'Drunk Driving': 10,
-    'Dangerous Driving': 9,
-    'Red Light Violation': 8,
-    'Wrong Side Driving': 7,
-    'Speeding': 6,
-    'Triple Riding': 5,
-    'Overloading': 5,
-    'No Helmet': 4,
-    'No Seat Belt': 4,
-    'Mobile Phone Use': 3,
+    'Drunk Driving':        10,
+    'Dangerous Driving':     9,
+    'Red Light Violation':   8,
+    'Wrong Side Driving':    7,
+    'Speeding':              6,
+    'Triple Riding':         5,
+    'Overloading':           5,
+    'No Helmet':             4,
+    'No Seat Belt':          4,
+    'Mobile Phone Use':      3,
     'No Registration Plate': 3,
-    'Lane Cutting': 2,
-    'Wrong Parking': 1,
-    'Other': 0,
+    'Lane Cutting':          2,
+    'Wrong Parking':         1,
+    'Other':                 0,
 };
 
-/**
- * Build a list of { model, apiKey } attempt pairs.
- *
- * Strategy: for every model we try ALL keys before moving to the next model.
- *   Model A → Key1, Key A → Key2, Model B → Key1, Model B → Key2, …
- *
- * This means a quota hit on Key1 is immediately healed by Key2 on the same
- * model — we almost never fall back to a slower/worse model.
- */
+// ─── Attempt queue builder ─────────────────────────────────────────────────────
+// Strategy: exhaust ALL keys for Model A before trying Model B.
 const buildAttemptQueue = () => {
     const queue = [];
     for (const model of AI_CONFIG.models) {
@@ -42,138 +32,210 @@ const buildAttemptQueue = () => {
     return queue;
 };
 
-/** Diagnostic — logs loaded key count so env issues are immediately visible */
 const logDiagnostics = () => {
     const keyCount = AI_CONFIG.geminiApiKeys.length;
-    const maskedKeys = AI_CONFIG.geminiApiKeys.map((k) =>
+    const masked = AI_CONFIG.geminiApiKeys.map(k =>
         k ? `${k.slice(0, 8)}…${k.slice(-4)}` : 'UNDEFINED'
     );
-    console.log(`[AI] Keys loaded: ${keyCount} — ${maskedKeys.join(', ')}`);
-    console.log(`[AI] Models queued: ${AI_CONFIG.models.join(', ')}`);
-    if (keyCount === 0) {
-        console.error('[AI] ⚠️  No API keys found! Check .env and restart the bundler.');
-    }
+    console.log(`[AI] Keys: ${keyCount} — ${masked.join(', ')}`);
+    console.log(`[AI] Models: ${AI_CONFIG.models.join(', ')}`);
+    if (keyCount === 0)
+        console.error('[AI] ⚠️  No API keys! Check .env and restart the bundler.');
 };
 
-/** Shared prompt text — extracted so it is not re-allocated per loop iteration */
-const ANALYSIS_PROMPT = `
-You are an expert Indian Traffic Enforcement AI.
-Your task is to identify traffic violations in images that may contain MULTIPLE vehicles.
+// ─── Stage 1 prompt: Violation detection ─────────────────────────────────────
+// Kept deliberately wide-angle — give full scene context, don't over-zoom.
+const VIOLATION_PROMPT = `
+You are an Indian traffic enforcement AI system analysing a dashcam or phone photograph.
 
-STRICT INSTRUCTIONS:
-1. IDENTIFY ALL VEHICLES: Look at every vehicle in the image separately.
-2. DETECT VIOLATIONS: For each vehicle, check for: No Helmet, Triple Riding, Red Light, Wrong Side, Wrong Parking, etc.
-3. PICK PRIMARY VIOLATOR: If multiple vehicles have violations, pick the MOST SEVERE one.
-4. TARGET VEHICLE ISOLATION: Once you pick the primary violator, extract ONLY the number plate of THAT specific vehicle.
-   - DO NOT combine parts of multiple plates.
-   - DO NOT report a plate from a different vehicle even if it is clearer.
-   - Plate format: MH12AB1234.
-5. CONFIDENCE: Rate 0-100 based on the primary detection.
+STEP 1 — SCENE UNDERSTANDING (think step-by-step, internally):
+  • Count every visible vehicle (cars, bikes, autos, trucks, buses, cycles).
+  • For each vehicle, note its type, position, and any rider/passenger details.
 
-Return ONLY valid JSON:
+STEP 2 — VIOLATION DETECTION:
+  Check EVERY vehicle for these Indian traffic violations:
+  - No Helmet (riders/pillion without helmet)
+  - Triple Riding (VERY STRICT: 3 or more people physically and clearly sitting ON the same 2-wheeler simultaneously. You MUST see 3 clearly distinct bodies physically riding together on the SAME vehicle. People walking, standing, parked, or in the background do NOT count. If in any doubt, do NOT flag this.)
+  - Red Light Violation (vehicle clearly past stop line at red signal)
+  - Wrong Side Driving / Wrong Way (driving against traffic flow)
+  - No Registration Plate (plate missing or completely obscured)
+  - Speeding (blurred motion, context clues)
+  - Mobile Phone Use (driver visibly on phone)
+  - No Seat Belt (driver/front passenger without seat belt)
+  - Wrong Parking (on footpath, no-parking zone, obstruction)
+  - Overloading (goods or passengers beyond legal capacity)
+  - Lane Cutting (abrupt unsafe lane change)
+  - Dangerous Driving / Drunk Driving (visually evident erratic behaviour)
+
+  CRITICAL RULE AGAINST FALSE POSITIVES (HALLUCINATIONS):
+  - Do NOT guess, assume, or hallucinate violations!
+  - If you are not 100% physically seeing the violation, you MUST assume the driver is following the rules.
+  - "No violation detected" is an extremely common, valid, and expected answer. Do NOT accuse a vehicle without undeniable visual proof.
+
+STEP 3 — PRIMARY VIOLATOR SELECTION:
+  • Focus primarily on the clear FOREGROUND vehicle.
+  • Do NOT penalise a vehicle for having pedestrians walking behind it (depth perspective trick).
+  • If multiple violations, pick the vehicle with the MOST SEVERE violation.
+  • If a tie, pick the one whose plate is most readable.
+
+STEP 4 — PLATE READING (rough pass — OCR will verify in the next step):
+  • Read the number plate of the PRIMARY violator ONLY.
+  • Indian plate format examples: MH12AB1234, KA01MF7890, DL8CAK0001, UP32ET5678
+  • If completely unreadable, write "Not detected".
+  • DO NOT read a bystander vehicle's plate.
+
+STEP 5 — CONFIDENCE:
+  • 90-100: Plate clearly visible, violation obvious.
+  • 70-89: Good confidence but minor ambiguity.
+  • 50-69: Partial evidence of violation.
+  • 0-49: Low quality or ambiguous.
+
+Return ONLY this exact JSON (no markdown, no explanation):
 {
-    "violationDetected": boolean,
-    "vehicleNumber": "MH12AB1234" or "Not detected",
-    "violationType": "Primary violation type",
-    "allViolations": ["violation1", "violation2"],
-    "severity": "Critical/High/Medium/Low",
-    "confidence": number,
-    "description": "Explain WHICH vehicle was chosen as the primary violator and why, then describe its plate and violation."
+  "violationDetected": true,
+  "vehicleNumber": "MH12AB1234",
+  "violationType": "No Helmet",
+  "allViolations": ["No Helmet", "Triple Riding"],
+  "severity": "High",
+  "confidence": 85,
+  "description": "A red Honda Activa with 3 riders, none wearing helmets. Plate partially visible."
+}
+
+If NO violation at all:
+{
+  "violationDetected": false,
+  "vehicleNumber": "Not applicable",
+  "violationType": "None",
+  "allViolations": [],
+  "severity": "None",
+  "confidence": 90,
+  "description": "No traffic violation detected in this image."
 }
 `;
 
-/**
- * Call the Gemini REST API with a specific model + key combination.
- * Throws on any non-2xx response or missing candidates.
- */
-const callGeminiAPI = async (model, apiKey, base64Image) => {
-    if (!apiKey) throw new Error('API key is undefined — restart the Expo bundler after updating .env');
+// ─── Stage 2 prompt: High-accuracy plate OCR ─────────────────────────────────
+// Use the higher-resolution image. This pass ONLY reads the plate — nothing else.
+const PLATE_OCR_PROMPT = `
+You are a specialist license plate OCR system for Indian vehicles.
+Your ONLY job is to read the number plate text as accurately as possible.
+
+MANDATORY RULES:
+1. Read EVERY character individually — do not guess or infer.
+2. Common lookalike pairs to distinguish carefully:
+     0 vs O  (zero has slightly different shape)
+     1 vs I vs l  (one, capital-i, lowercase-L)
+     8 vs B  (eight vs capital-B) 
+     5 vs S  (five vs S — very common mistake!)
+     6 vs G  (six vs capital-G)
+     2 vs Z  (two vs capital-Z)
+     4 vs A  (four vs capital-A in stylized fonts)
+     7 vs T  (seven vs capital-T)
+3. If a character is genuinely unreadable, use "?" for that position.
+4. Focus ONLY on the PRIMARY vehicle's plate — the one with a violation.
+   Ignore plates from background vehicles.
+
+INDIAN PLATE FORMAT REFERENCE:
+  Standard:     [STATE 2-LTR][DISTRICT 2-NUM][SERIES 1-2-LTR][NUM 4-DIGIT]
+  Examples:     MH12AB1234   KA04MF0099   DL8CAK0001   UP32ET5678
+                TN09BE4567   GJ01AB2345   RJ14CD7890   HR26AK3456
+  BH series:    23BH1234AA
+  Temporary:    TEMP plates may have full words
+
+OUTPUT — Return ONLY this JSON, nothing else:
+{
+  "plate_text": "MH12AB1234",
+  "confidence_percent": 92,
+  "uncertain_characters": ["position 5: could be B or 8", "position 8: could be 0 or O"],
+  "notes": "Plate clearly lit, minor blur on last two digits"
+}
+
+If no plate is visible at all:
+{
+  "plate_text": "Not detected",
+  "confidence_percent": 0,
+  "uncertain_characters": [],
+  "notes": "Plate not visible or completely obscured"
+}
+`;
+
+// ─── Low-level Gemini API caller ───────────────────────────────────────────────
+const callGemini = async ({ model, apiKey, prompt, base64Image, timeoutMs = 60000 }) => {
+    if (!apiKey) throw new Error('API key undefined — restart bundler after .env change');
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
     const body = JSON.stringify({
         contents: [{
             parts: [
-                { text: ANALYSIS_PROMPT },
-                {
-                    inline_data: {
-                        mime_type: 'image/jpeg',
-                        data: base64Image,
-                    },
-                },
+                { text: prompt },
+                { inline_data: { mime_type: 'image/jpeg', data: base64Image } },
             ],
         }],
         generationConfig: {
-            temperature: 0.2,
+            temperature: 0.1,          // Low = deterministic; better for structured extraction
+            responseMimeType: 'text/plain',
         },
     });
 
-    // 15-second timeout — prevents silent hangs on slow networks
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
-
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-        const response = await fetch(url, {
+        const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body,
             signal: controller.signal,
         });
-
-        if (!response.ok) {
-            const text = await response.text();
-            throw new Error(`HTTP ${response.status}: ${text}`);
+        if (!res.ok) {
+            const txt = await res.text();
+            throw new Error(`HTTP ${res.status}: ${txt.slice(0, 200)}`);
         }
-
-        const json = await response.json();
-
-        if (!json.candidates || json.candidates.length === 0) {
-            throw new Error('No candidates returned from Gemini API');
-        }
-
+        const json = await res.json();
+        if (!json.candidates?.length) throw new Error('No candidates in Gemini response');
         return json.candidates[0].content.parts[0].text;
     } finally {
-        clearTimeout(timeoutId);
+        clearTimeout(timer);
     }
 };
 
-/** Parse and normalise a raw Gemini text response into our result shape */
-const parseGeminiResponse = (responseText) => {
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('Invalid JSON format in Gemini response');
+// ─── JSON extractor ────────────────────────────────────────────────────────────
+const extractJSON = (text) => {
+    // Strip markdown fences if present
+    const stripped = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+    const match = stripped.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('No JSON object found in response');
+    return JSON.parse(match[0]);
+};
 
-    const parsed = JSON.parse(jsonMatch[0]);
+// ─── Parse violation response ───────────────────────────────────────────────
+const parseViolationResult = (raw) => {
+    const parsed = extractJSON(raw);
 
-    // No violation detected
-    if (parsed.violationDetected === false) {
+    if (!parsed.violationDetected) {
         return {
             violationDetected: false,
             vehicleNumber: 'Not applicable',
             violationType: 'None',
             allViolations: [],
             severity: 'None',
-            confidence: parsed.confidence ?? 95,
+            confidence: parsed.confidence ?? 90,
             description: parsed.description || 'No traffic violation detected.',
         };
     }
 
-    // Severity ranking logic — pick the most severe from allViolations
-    let primaryViolation = parsed.violationType || 'Other';
-    const allViolations = parsed.allViolations?.length ? parsed.allViolations : [primaryViolation];
+    // Pick the highest-severity violation across allViolations
+    const allViolations = parsed.allViolations?.length
+        ? parsed.allViolations
+        : [parsed.violationType || 'Other'];
 
-    if (allViolations.length > 1) {
-        const sorted = [...allViolations].sort(
-            (a, b) => (VIOLATION_SEVERITY[b] ?? 0) - (VIOLATION_SEVERITY[a] ?? 0)
-        );
-        primaryViolation = sorted[0];
-    }
+    const primaryViolation = [...allViolations].sort(
+        (a, b) => (VIOLATION_SEVERITY[b] ?? 0) - (VIOLATION_SEVERITY[a] ?? 0)
+    )[0];
 
     const score = VIOLATION_SEVERITY[primaryViolation] ?? 0;
-    let severityLabel;
-    if (score >= 8) severityLabel = 'Critical';
-    else if (score >= 5) severityLabel = 'High';
-    else if (score >= 3) severityLabel = 'Medium';
-    else severityLabel = 'Low';
+    const severityLabel =
+        score >= 8 ? 'Critical' :
+        score >= 5 ? 'High'     :
+        score >= 3 ? 'Medium'   : 'Low';
 
     return {
         violationDetected: true,
@@ -182,81 +244,153 @@ const parseGeminiResponse = (responseText) => {
         allViolations,
         severity: severityLabel,
         confidence: parsed.confidence ?? 60,
-        description: parsed.description || 'AI analysis completed.',
+        description: parsed.description || 'Violation detected.',
     };
 };
 
-/**
- * Service to handle all AI-related features using Google Gemini.
- */
+// ─── Run one stage with key/model rotation ────────────────────────────────────
+const runWithRotation = async (prompt, base64Image, attempts, label) => {
+    let lastError = null;
+    for (const { model, apiKey } of attempts) {
+        const keyIdx = AI_CONFIG.geminiApiKeys.indexOf(apiKey) + 1;
+        const tag = `[${label}] model=${model} key${keyIdx}`;
+        console.log(`${tag} → trying`);
+        try {
+            const text = await callGemini({ model, apiKey, prompt, base64Image });
+            console.log(`${tag} → ✅ success`);
+            return text;
+        } catch (err) {
+            lastError = err;
+            const isQuota   = err.message.includes('429') || err.message.toLowerCase().includes('quota');
+            const isNetwork = err.name === 'AbortError' || err.message.toLowerCase().includes('network');
+            console.warn(`${tag} → ✗ ${isQuota ? 'QUOTA' : isNetwork ? 'TIMEOUT' : 'ERROR'}: ${err.message}`);
+        }
+    }
+    throw lastError ?? new Error(`${label}: all attempts failed`);
+};
+
+// ─── Image preparation ────────────────────────────────────────────────────────
+const prepareImages = async (imageUri) => {
+    // Violation image: high resolution for complex scene understanding
+    const violationImg = await ImageManipulator.manipulateAsync(
+        imageUri,
+        [{ resize: { width: 1600 } }], // Increased from 1024 to 1600
+        { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
+    );
+
+    // OCR image: ULTRA HIGH resolution — needs crisp plate text pixels for Pro models
+    const ocrImg = await ImageManipulator.manipulateAsync(
+        imageUri,
+        [{ resize: { width: 2400 } }], // Increased from 1600 to 2400
+        { compress: 1.0, format: ImageManipulator.SaveFormat.JPEG } // 1.0 = Max quality
+    );
+
+    const [violationB64, ocrB64] = await Promise.all([
+        FileSystem.readAsStringAsync(violationImg.uri, { encoding: 'base64' }),
+        FileSystem.readAsStringAsync(ocrImg.uri,       { encoding: 'base64' }),
+    ]);
+
+    return { violationB64, ocrB64 };
+};
+
+// ─── Main service ─────────────────────────────────────────────────────────────
 export const aiService = {
     /**
-     * Analyzes a traffic violation image.
+     * Two-stage analysis:
+     *   Stage 1 — Violation detection  (scene-context image, 1024px)
+     *   Stage 2 — Plate OCR            (high-res image, 1600px, ALWAYS runs when violation found)
      *
-     * Rotation strategy:
-     *   For each model, we try every available API key before moving to a
-     *   slower/lower-priority model.  Quota errors (429) trigger an immediate
-     *   switch to the next API key; only when ALL keys are exhausted for a
-     *   model do we move to the next model.
-     *
-     * @param {string} imageUri - Local URI of the image to analyse
-     * @returns {Promise<Object>} AI detection results
+     * Stage 2 plate text ALWAYS overrides Stage 1 plate when OCR confidence ≥ 45%.
      */
     analyzeViolationImage: async (imageUri) => {
         try {
-            // ── Step 1: Compress the image ──────────────────────────────────
-            const manipulated = await ImageManipulator.manipulateAsync(
-                imageUri,
-                [{ resize: { width: 600 } }],
-                { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG }
-            );
-
-            const base64Image = await FileSystem.readAsStringAsync(manipulated.uri, {
-                encoding: 'base64',
-            });
-
-            // ── Step 2: Diagnostics + build attempt queue (model × key) ───
             logDiagnostics();
+
+            // ── Prepare two resolution variants in parallel ─────────────────
+            console.log('[AI] Preparing images…');
+            const { violationB64, ocrB64 } = await prepareImages(imageUri);
+
             const attempts = buildAttemptQueue();
-            let lastError = null;
 
-            // ── Step 3: Try each combination ────────────────────────────────
-            for (const { model, apiKey } of attempts) {
-                const keyIdx = AI_CONFIG.geminiApiKeys.indexOf(apiKey) + 1;
-                const label = `model=${model} Key${keyIdx}`;
-                console.log(`[AI] ▶ Trying ${label}`);
+            // ── Stage 1: Violation detection ────────────────────────────────
+            console.log('[AI] Stage 1 — violation detection');
+            const rawViolation = await runWithRotation(
+                VIOLATION_PROMPT, violationB64, attempts, 'S1-VIOLATION'
+            );
+            const violationResult = parseViolationResult(rawViolation);
+            console.log('[AI] S1 result:', JSON.stringify({
+                detected: violationResult.violationDetected,
+                type: violationResult.violationType,
+                plate: violationResult.vehicleNumber,
+                confidence: violationResult.confidence,
+            }));
 
+            // ── Stage 2: Plate OCR (runs whenever violation was detected) ───
+            if (violationResult.violationDetected) {
+                console.log('[AI] Stage 2 — plate OCR');
                 try {
-                    const responseText = await callGeminiAPI(model, apiKey, base64Image);
-                    console.log(`[AI] ✅ Success — ${label}`);
-                    return parseGeminiResponse(responseText);
+                    const rawOCR = await runWithRotation(
+                        PLATE_OCR_PROMPT, ocrB64, attempts, 'S2-OCR'
+                    );
+                    const ocr = extractJSON(rawOCR);
+                    console.log(`[AI] S2 OCR result: "${ocr.plate_text}" @ ${ocr.confidence_percent}%`);
 
-                } catch (err) {
-                    lastError = err;
-                    const isQuota = err.message.includes('429') || err.message.toLowerCase().includes('quota');
-                    const isNetwork = err.name === 'AbortError' || err.message.toLowerCase().includes('network');
-                    const reason = isQuota ? 'QUOTA' : isNetwork ? 'NETWORK/TIMEOUT' : 'ERROR';
-                    console.warn(`[AI] ✗ ${label} → ${reason}: ${err.message}`);
-                    // Always continue to next attempt
+                    const ocrConf = ocr.confidence_percent ?? 0;
+                    const plateValid =
+                        ocr.plate_text &&
+                        ocr.plate_text !== 'Not detected' &&
+                        ocr.plate_text.trim().length >= 4;
+
+                    if (plateValid && ocrConf >= 45) {
+                        // Normalize: strip spaces → "MH12AB1234"
+                        const normalized = ocr.plate_text.replace(/\s+/g, '').toUpperCase();
+                        console.log(`[AI] Plate upgraded: "${violationResult.vehicleNumber}" → "${normalized}"`);
+                        violationResult.vehicleNumber = normalized;
+                        violationResult.plateOCR = {
+                            raw: ocr.plate_text,
+                            confidence: ocrConf,
+                            uncertainCharacters: ocr.uncertain_characters ?? [],
+                            notes: ocr.notes ?? '',
+                        };
+                    } else {
+                        console.log(`[AI] OCR plate rejected (conf=${ocrConf}, text="${ocr.plate_text}") — keeping S1 plate`);
+                    }
+                } catch (ocrErr) {
+                    // OCR failure is non-fatal — Stage 1 plate is kept
+                    console.warn('[AI] Stage 2 OCR failed (non-fatal):', ocrErr.message);
                 }
             }
 
-            // ── Step 4: All attempts exhausted ──────────────────────────────
-            throw lastError ?? new Error('All Gemini API key+model combinations failed');
-
+            return violationResult;
         } catch (error) {
-            console.error('AI Analysis Final Failure:', error);
-            const isQuota = error?.message?.includes('429') || error?.message?.toLowerCase().includes('quota');
+            console.error('[AI] Fatal failure:', error);
+            
+            // EMERGENCY SAFETY FALLBACK (for development/demos)
+            // If every key and model returns 429 (Quota) or 404 (Missing),
+            // return a smart mock so the user isn't stuck.
+            if (__DEV__) {
+                console.warn('[AI] 🛡️ SAFETY FALLBACK: Generating simulated result due to API outage/quota.');
+                return {
+                    violationDetected: true,
+                    vehicleNumber: "MH02CZ7784", 
+                    violationType: "No Helmet",
+                    allViolations: ["No Helmet"],
+                    severity: "High",
+                    confidence: 80,
+                    description: "AI analysis simulated: Rider detected without helmet. (Fallback active due to API Outage)",
+                    isMock: true
+                };
+            }
+            
+            // Production fallback
             return {
                 violationDetected: false,
-                vehicleNumber: 'Manual entry required',
-                violationType: 'Other',
+                vehicleNumber: 'Not detected',
+                violationType: 'None',
                 allViolations: [],
-                severity: 'Unknown',
+                severity: 'None',
                 confidence: 0,
-                description: isQuota
-                    ? 'Error: AI Quota Exceeded across all keys. Please try again in 1 minute.'
-                    : 'Error: AI analysis failed. Please enter details manually.',
+                description: 'AI analysis encountered an error. Please fill details manually.'
             };
         }
     },

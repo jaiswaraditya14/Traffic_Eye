@@ -51,12 +51,19 @@ const TAG_COLORS = {
 };
 
 export default function Rewards() {
-    const { profile, checkAuth } = useAuth();
-    const userPoints = profile?.points_balance || 0;
-    
+    const { profile, refreshProfile } = useAuth();
+    const [userPoints, setUserPoints] = useState(profile?.points_balance || 0);
+    // Keep local points in sync with freshly fetched profile
+    useEffect(() => {
+        if (profile?.points_balance !== undefined) {
+            setUserPoints(profile.points_balance);
+        }
+    }, [profile?.points_balance]);
+
     const [activeTab, setActiveTab] = useState('Gifts');
     const [history, setHistory] = useState([]);
-    const [loadingHistory, setLoadingHistory] = useState(true);
+    const [redeemedItems, setRedeemedItems] = useState({}); // { itemId: { couponCode, expiresAt } }
+    const [loadingData, setLoadingData] = useState(true);
     const [redeeming, setRedeeming] = useState(false);
     
     // Coupon Modal State
@@ -73,10 +80,19 @@ export default function Rewards() {
     const cardAnims = useRef(REDEEM_CATALOG.map(() => new Animated.Value(0))).current;
 
     const loadData = async () => {
-        if (checkAuth) await checkAuth();
-        const res = await rewardService.getUserReportHistory(15);
-        if (res.success) setHistory(res.history);
-        setLoadingHistory(false);
+        setLoadingData(true);
+        // Re-fetch profile from DB so points_balance is always current
+        if (refreshProfile) await refreshProfile();
+        
+        // 1. Fetch unified activity history
+        const historyRes = await rewardService.getActivityHistory(30);
+        if (historyRes.success) setHistory(historyRes.history);
+        
+        // 2. Fetch redeemed (unlocked) items
+        const redeemedRes = await rewardService.getRedeemedItems();
+        if (redeemedRes.success) setRedeemedItems(redeemedRes.redeemed);
+        
+        setLoadingData(false);
     };
 
     const animateCardEntries = () => {
@@ -109,34 +125,37 @@ export default function Rewards() {
         }, [])
     );
 
-    const handleClearHistory = () => {
-        Alert.alert(
-            "Clear History",
-            "Are you sure you want to clear all your activity records? This action cannot be undone.",
-            [
-                { text: "Cancel", style: "cancel" },
-                { 
-                    text: "Clear All", 
-                    style: "destructive",
-                    onPress: async () => {
-                        const res = await rewardService.clearUserHistory();
-                        if (res.success) {
-                            setHistory([]);
-                            Alert.alert("Cleared", "Your activity record has been cleared successfully.");
-                        } else {
-                            Alert.alert("Error", res.error || "Failed to clear history.");
-                        }
-                    }
-                }
-            ]
-        );
-    };
 
     const handleRedeem = (item) => {
+        // 1. Check if already unlocked (Persistent Unlock)
+        const redeemedData = redeemedItems[item.id];
+        if (redeemedData) {
+            const now = new Date();
+            const expiry = new Date(redeemedData.expiresAt);
+            
+            // Check if expired
+            if (now >= expiry) {
+                Alert.alert(
+                    "Coupon Expired",
+                    "This reward coupon has expired. It was valid for 15 days from the unlock date.",
+                    [{ text: "OK" }]
+                );
+                return;
+            }
+
+            // Show existing coupon
+            setRedeemedItemTitle(item.title);
+            setCurrentCoupon(redeemedData.couponCode);
+            setCouponModalVisible(true);
+            return;
+        }
+
+        // 2. Normal redemption flow
         if (userPoints < item.pts) {
             Alert.alert("Locked", `Earn ${item.pts - userPoints} more points to unlock this reward.`);
             return;
         }
+
         Alert.alert("Confirm Redemption", `Redeem ${item.pts} points for: ${item.title}?`, [
             { text: "Cancel", style: "cancel" },
             { 
@@ -149,7 +168,7 @@ export default function Rewards() {
                         setRedeemedItemTitle(item.title);
                         setCurrentCoupon(res.couponCode);
                         setCouponModalVisible(true);
-                        loadData();
+                        loadData(); // Refresh balance, history and redeemed state
                     } else {
                         Alert.alert("Redemption Failed", res.error || "Please try again.");
                     }
@@ -259,7 +278,7 @@ export default function Rewards() {
 
             <View style={styles.grid}>
                 {REDEEM_CATALOG.map((item, index) => {
-                    const isLocked = userPoints < item.pts;
+                    const isLocked = !redeemedItems[item.id] && userPoints < item.pts;
                     const animValue = cardAnims[index] || new Animated.Value(1);
                     
                     return (
@@ -344,7 +363,6 @@ export default function Rewards() {
                                                 <Ionicons name="lock-closed" size={10} color={C.textTertiary} />
                                                 <Text style={styles.lockedPtsText}>{item.pts - userPoints} pts to go</Text>
                                             </View>
-                                            {/* Progress Bar */}
                                             <View style={styles.progressBarBg}>
                                                 <View style={[styles.progressBarFill, { width: `${Math.min((userPoints / item.pts) * 100, 100)}%` }]} />
                                             </View>
@@ -356,13 +374,15 @@ export default function Rewards() {
                                             activeOpacity={0.8}
                                         >
                                             <LinearGradient
-                                                colors={[C.navy, C.navyDeep]}
+                                                colors={redeemedItems[item.id] ? [C.success, '#047857'] : [C.navy, C.navyDeep]}
                                                 style={styles.redeemBtnGrad}
                                                 start={{ x: 0, y: 0 }}
                                                 end={{ x: 1, y: 1 }}
                                             >
-                                                <Ionicons name="gift-outline" size={12} color="#FFF" />
-                                                <Text style={styles.redeemBtnText}>REDEEM</Text>
+                                                <Ionicons name={redeemedItems[item.id] ? "ticket-outline" : "gift-outline"} size={12} color="#FFF" />
+                                                <Text style={styles.redeemBtnText}>
+                                                    {redeemedItems[item.id] ? 'VIEW CODE' : 'REDEEM'}
+                                                </Text>
                                             </LinearGradient>
                                         </TouchableOpacity>
                                     )}
@@ -498,23 +518,15 @@ export default function Rewards() {
     // ── MY ACTIVITY TAB ──
     const renderActivity = () => (
         <View>
-             {history.length > 0 && !loadingHistory && (
+             {history.length > 0 && !loadingData && (
                  <View style={styles.activityHeader}>
                      <View>
                         <Text style={styles.sectionTitle}>Recent Activity</Text>
                         <Text style={styles.sectionSub}>Your detailed reward & reporting logs</Text>
                      </View>
-                     <TouchableOpacity 
-                        style={styles.clearBtn} 
-                        onPress={handleClearHistory}
-                        activeOpacity={0.7}
-                     >
-                         <Ionicons name="trash-outline" size={14} color={C.error} />
-                         <Text style={styles.clearBtnText}>Clear All</Text>
-                     </TouchableOpacity>
                  </View>
              )}
-             {loadingHistory ? (
+             {loadingData ? (
                 <ActivityIndicator color={C.navyMid} style={{marginTop: 40}} size="large" />
             ) : history.length === 0 ? (
                 <View style={styles.emptyActivity}>
@@ -526,49 +538,29 @@ export default function Rewards() {
                 </View>
             ) : (
                 history.map((item, idx) => {
-                    const awardedPts = rewardService.getPointsForViolation(item.ai_verdict);
-                    const isSuccess = ['completed', 'verified'].includes(item.status?.toLowerCase());
-                    const isFailed = item.status === 'failed';
-                    
-                    let bgCol = '#ECF1F9';
-                    let iconName = 'time';
-                    let iconCol = C.textTertiary;
-                    let ptsLabel = 'Pending';
-                    let ptsCol = C.textTertiary;
-                    let statusLabel = 'In Review';
-
-                    if (isSuccess) {
-                        bgCol = C.successSurface;
-                        iconName = 'checkmark-circle';
-                        iconCol = C.success;
-                        ptsLabel = `+${awardedPts}`;
-                        ptsCol = C.success;
-                        statusLabel = 'Verified';
-                    } else if (isFailed) {
-                        bgCol = C.errorSurface;
-                        iconName = 'close-circle';
-                        iconCol = C.error;
-                        ptsLabel = '0';
-                        ptsCol = C.textTertiary;
-                        statusLabel = 'Rejected';
-                    }
+                    const isSpent = item.type === 'spent';
+                    const bgCol = isSpent ? C.errorSurface : C.successSurface;
+                    const iconName = isSpent ? 'gift' : 'checkmark-circle';
+                    const iconCol = isSpent ? C.error : C.success;
+                    const ptsLabel = isSpent ? `${item.points}` : `+${item.points}`;
+                    const ptsCol = isSpent ? C.error : C.success;
 
                     return (
-                        <View key={idx} style={styles.activityRow}>
+                        <View key={item.id || idx} style={styles.activityRow}>
                             <View style={[styles.activityIconBox, { backgroundColor: bgCol }]}>
                                 <Ionicons name={iconName} size={20} color={iconCol} />
                             </View>
                             <View style={{flex: 1}}>
-                                <Text style={styles.activityName} numberOfLines={1}>{item.ai_verdict || 'Violation Report'}</Text>
+                                <Text style={styles.activityName} numberOfLines={1}>{item.label}</Text>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                    <Text style={styles.activityDate}>{new Date(item.created_at).toLocaleDateString()}</Text>
-                                    <View style={[styles.statusDot, { backgroundColor: iconCol }]} />
-                                    <Text style={[styles.activityDate, { color: iconCol }]}>{statusLabel}</Text>
+                                    <Text style={styles.activityDate}>{new Date(item.date).toLocaleDateString()}</Text>
+                                    <View style={[styles.statusDot, { backgroundColor: C.outlineVariant }]} />
+                                    <Text style={styles.activityDate}>{item.sublabel}</Text>
                                 </View>
                             </View>
                             <View style={{alignItems: 'flex-end'}}>
                                 <Text style={[styles.activityPts, { color: ptsCol }]}>{ptsLabel}</Text>
-                                {isSuccess && <Text style={styles.activityPtsLabel}>PTS</Text>}
+                                <Text style={styles.activityPtsLabel}>PTS</Text>
                             </View>
                         </View>
                     );

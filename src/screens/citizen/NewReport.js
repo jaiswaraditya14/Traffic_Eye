@@ -152,9 +152,12 @@ export default function NewReport({ navigation }) {
 
     const handleCropCancel = async () => {
         setShowCropModal(false);
-        if (pendingCropUri) setImage(pendingCropUri);
+        // BUG FIX: Do NOT call setImage(pendingCropUri) here.
+        // Promoting the original uncropped URI into 'image' state would cause
+        // the uncropped image to be displayed and sent to AI analysis.
+        // On cancel we simply discard the pending pick — image stays null
+        // (or retains its previous cropped value if the user had one already).
         setPendingCropUri(null);
-        await handleLocationExtraction(pendingExif, pendingMediaSource);
         setPendingExif(null); setPendingMediaSource(null);
     };
 

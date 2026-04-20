@@ -38,7 +38,7 @@ const slides = [
         iconColor: '#047857',
         iconBg: '#D1FAE5',
         title: 'AI Verification',
-        description: 'Gemini AI instantly analyzes license plates, violation types, and location with government-grade accuracy.',
+        description: 'AI instantly analyzes license plates, violation types, and location with government-grade accuracy.',
         accent: '#047857',
     },
     {

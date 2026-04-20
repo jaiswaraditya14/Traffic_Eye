@@ -10,6 +10,7 @@ import { MobileContainer } from '../../components';
 import { useAuth } from '../../context';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../services';
+import { fetchPendingReports, fetchReviewedReports } from '../../services/reports';
 
 // ── Design Tokens (Civic Authority — Officer Side) ──
 const C = {
@@ -41,7 +42,9 @@ export default function OfficerDashboard({ navigation }) {
     const { profile } = useAuth();
     const officerName = profile?.full_name?.split(' ')[0] || 'Officer';
     const officerTitle = profile?.badge_title || 'Traffic Inspector';
-    const officerZone = 'Mumbai Central';
+    const officerZone = profile?.jurisdiction 
+        ? `Station: ${profile.jurisdiction}` 
+        : 'Traffic Authority';
     const insets = useSafeAreaInsets();
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -56,35 +59,19 @@ export default function OfficerDashboard({ navigation }) {
     const fetchData = useCallback(async () => {
         setLoadingData(true);
         try {
-            // Fetch all pending reports
-            const { data: pending } = await supabase
-                .from('image_reports')
-                .select(`
-                    id, violation_type, vehicle_number, location_address,
-                    severity, submitted_at, status, image_url,
-                    submitter:user_id ( full_name )
-                `)
-                .eq('status', 'pending')
-                .order('submitted_at', { ascending: false })
-                .limit(10);
+            // Fetch routed pending reports & slice for dashboard top 10
+            const { data: activePending } = await fetchPendingReports(profile);
+            const pending = activePending ? activePending.slice(0, 10) : [];
 
-            // Fetch approved count
+            // Fetch approved count (global for now, can apply routing if needed)
             const { count: aCount } = await supabase
                 .from('image_reports')
                 .select('id', { count: 'exact', head: true })
                 .eq('status', 'approved');
 
-            // Fetch rejected recent
-            const { data: rejected } = await supabase
-                .from('image_reports')
-                .select(`
-                    id, violation_type, vehicle_number, location_address,
-                    severity, submitted_at, status, image_url,
-                    submitter:user_id ( full_name )
-                `)
-                .eq('status', 'rejected')
-                .order('submitted_at', { ascending: false })
-                .limit(5);
+            // Fetch routed reviewed reports (filtered to rejected in UI logic)
+            const { data: allReviewed } = await fetchReviewedReports(profile);
+            const rejected = allReviewed ? allReviewed.filter(r => r.status === 'rejected').slice(0, 5) : [];
 
             // Fetch rejected count
             const { count: rCount } = await supabase

@@ -186,8 +186,8 @@ export async function fetchReportById(reportId) {
  * Fetch all pending reports for the officer queue, newest-first.
  * Includes submitter profile and media.
  */
-export async function fetchPendingReports() {
-    const { data, error } = await supabase
+export async function fetchPendingReports(officerProfile = null) {
+    let query = supabase
         .from('image_reports')
         .select(`
             *,
@@ -199,16 +199,42 @@ export async function fetchPendingReports() {
                 mime_type
             )
         `)
-        .eq('status', 'pending')
-        .order('submitted_at', { ascending: false });
+        .eq('status', 'pending');
+
+    // Location routing logic (Pincode + Jurisdiction Keyword)
+    if (officerProfile && officerProfile.role === 'officer') {
+        let filters = [];
+        
+        // 1. Badge Pincode mapping ('EYE-055' -> '400055')
+        if (officerProfile.badge_id) {
+            const digits = officerProfile.badge_id.match(/\d+$/);
+            if (digits) {
+                // Pad to 3 digits (e.g. 55 -> 055)
+                const suffix = digits[0].padStart(3, '0');
+                const pincode = `400${suffix}`;
+                filters.push(`location_address.ilike.%${pincode}%`);
+            }
+        }
+        
+        // 2. Keyword mapping ('Vakola')
+        if (officerProfile.jurisdiction) {
+            filters.push(`location_address.ilike.%${officerProfile.jurisdiction}%`);
+        }
+        
+        if (filters.length > 0) {
+            query = query.or(filters.join(','));
+        }
+    }
+
+    const { data, error } = await query.order('submitted_at', { ascending: false });
     return { data, error };
 }
 
 /**
  * Fetch all reviewed (approved | rejected) reports for officer history view.
  */
-export async function fetchReviewedReports() {
-    const { data, error } = await supabase
+export async function fetchReviewedReports(officerProfile = null) {
+    let query = supabase
         .from('image_reports')
         .select(`
             *,
@@ -226,8 +252,28 @@ export async function fetchReviewedReports() {
                 mime_type
             )
         `)
-        .in('status', ['approved', 'rejected'])
-        .order('reviewed_at', { ascending: false });
+        .in('status', ['approved', 'rejected']);
+
+    // Location routing logic (same as pending)
+    if (officerProfile && officerProfile.role === 'officer') {
+        let filters = [];
+        if (officerProfile.badge_id) {
+            const digits = officerProfile.badge_id.match(/\d+$/);
+            if (digits) {
+                const suffix = digits[0].padStart(3, '0');
+                const pincode = `400${suffix}`;
+                filters.push(`location_address.ilike.%${pincode}%`);
+            }
+        }
+        if (officerProfile.jurisdiction) {
+            filters.push(`location_address.ilike.%${officerProfile.jurisdiction}%`);
+        }
+        if (filters.length > 0) {
+            query = query.or(filters.join(','));
+        }
+    }
+
+    const { data, error } = await query.order('reviewed_at', { ascending: false });
     return { data, error };
 }
 

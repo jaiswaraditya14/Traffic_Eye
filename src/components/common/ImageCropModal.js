@@ -106,33 +106,105 @@ export default function ImageCropModal({ visible, imageUri, onCropDone, onCancel
         ]).start();
     };
 
-    // Finalize with processing (compress/resize)
+    // Extracts the exact region the user framed via pan + zoom and saves it
     const handleCropAndSave = async () => {
         if (!imageUri) return;
         try {
             setProcessing(true);
 
+            // ── Step 1: Get natural image dimensions ────────────────────────
+            const { natW, natH } = await new Promise((resolve, reject) => {
+                Image.getSize(
+                    imageUri,
+                    (w, h) => resolve({ natW: w, natH: h }),
+                    (err) => reject(new Error(`Image.getSize failed: ${err}`))
+                );
+            });
+
+            console.log(`[Crop] Input: ${natW}×${natH}`);
+
+            // ── Step 2: Compute rendered dimensions (contain mode) ───────────
+            // Image is centered in a CROP_SIZE × CROP_SIZE viewport
+            const renderedAspect = natW / natH;
+            let renderedW, renderedH;
+            if (renderedAspect >= 1) {
+                // Landscape: width is exactly CROP_SIZE
+                renderedW = CROP_SIZE;
+                renderedH = CROP_SIZE / renderedAspect;
+            } else {
+                // Portrait: height is exactly CROP_SIZE
+                renderedH = CROP_SIZE;
+                renderedW = CROP_SIZE * renderedAspect;
+            }
+
+            // ── Step 3: Map pan+scale to unscaled rendered coords ────────────
+            const panX = pan.x._value;
+            const panY = pan.y._value;
+            const s = scale;
+
+            // Viewport size in unscaled rendered pixels:
+            const viewInRenderedW = CROP_SIZE / s;
+            const viewInRenderedH = CROP_SIZE / s;
+
+            // The origin (top-left) of the viewport relative to the image top-left
+            // in unscaled rendered pixels:
+            // Math: Viewport center in image is (renderedW/2 - panX/s)
+            //       So origin is that minus half of viewport-in-rendered
+            const originXRendered = (renderedW / 2) - (panX / s) - (viewInRenderedW / 2);
+            const originYRendered = (renderedH / 2) - (panY / s) - (viewInRenderedH / 2);
+
+            // ── Step 4: Convert to natural image pixels ──────────────────────
+            const pxPerRendered = natW / renderedW;
+
+            // Clamp and adjust if user panned to empty space
+            let cropX = Math.max(0, originXRendered * pxPerRendered);
+            let cropY = Math.max(0, originYRendered * pxPerRendered);
+            
+            let cropW = (viewInRenderedW * pxPerRendered);
+            let cropH = (viewInRenderedH * pxPerRendered);
+
+            // If we clamped X/Y, we must reduce W/H by the amount shifted
+            if (originXRendered < 0) cropW += (originXRendered * pxPerRendered);
+            if (originYRendered < 0) cropH += (originYRendered * pxPerRendered);
+
+            // Final bounds check
+            cropX = Math.round(Math.min(natW - 10, cropX));
+            cropY = Math.round(Math.min(natH - 10, cropY));
+            cropW = Math.round(Math.min(natW - cropX, cropW));
+            cropH = Math.round(Math.min(natH - cropY, cropH));
+
+            console.log(`[Crop] Calcs: x=${cropX}, y=${cropY}, w=${cropW}, h=${cropH}`);
+
+            // ── Step 5: Execute manipulation ─────────────────────────────────
+            const actions = [];
+            // Only crop if actually necessary
+            if (s > 1.05 || Math.abs(panX) > 5 || Math.abs(panY) > 5) {
+                if (cropW > 20 && cropH > 20) {
+                    actions.push({ crop: { originX: cropX, originY: cropY, width: cropW, height: cropH } });
+                }
+            }
+            // Consistently resize for backend processing
+            actions.push({ resize: { width: 1200 } });
+
             const manipResult = await ImageManipulator.manipulateAsync(
                 imageUri,
-                [{ resize: { width: 1200 } }],
+                actions,
                 { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
             );
 
+            console.log(`[Crop] Success: ${manipResult.uri}`);
             onCropDone(manipResult.uri);
+
         } catch (error) {
-            console.error('Error cropping image:', error);
-            // If crop fails, just use original
+            console.error('[Crop] Process failed:', error);
             onCropDone(imageUri);
         } finally {
             setProcessing(false);
         }
     };
 
-    // Use image as-is without any processing
     const handleUseAsIs = () => {
-        if (imageUri) {
-            onCropDone(imageUri);
-        }
+        handleCropAndSave();
     };
 
     if (!visible) return null;

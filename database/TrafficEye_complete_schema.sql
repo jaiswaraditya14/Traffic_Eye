@@ -8,13 +8,15 @@
 -- ✅ Dependency order — no forward references
 -- ✅ RLS enabled     — every public table is protected
 --
--- Generated: 2026-04-12
+-- Updated: 2026-04-20
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 
 -- ── 1. EXTENSIONS ───────────────────────────────────────────────────────────
 -- gen_random_uuid() is built-in on PG 13+, but pgcrypto is a safe fallback.
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+-- pg_trgm enables fast ILIKE '%keyword%' searches on location_address
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 
 
 -- ── 2. TABLES (dependency order) ────────────────────────────────────────────
@@ -191,6 +193,11 @@ CREATE INDEX IF NOT EXISTS idx_point_transactions_user    ON public.point_transa
 CREATE INDEX IF NOT EXISTS idx_point_transactions_created ON public.point_transactions(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_point_transactions_action  ON public.point_transactions(action);
 
+-- Dedicated partial index for gift_redeemed lookups (used by getRedeemedItems)
+CREATE INDEX IF NOT EXISTS idx_point_transactions_gift_redeemed
+    ON public.point_transactions(user_id, created_at DESC)
+    WHERE action = 'gift_redeemed';
+
 -- image_reports
 CREATE INDEX IF NOT EXISTS idx_image_reports_user_id    ON public.image_reports(user_id);
 CREATE INDEX IF NOT EXISTS idx_image_reports_status     ON public.image_reports(status);
@@ -218,6 +225,12 @@ CREATE INDEX IF NOT EXISTS idx_verification_reports_status ON public.verificatio
 -- verification_images
 CREATE INDEX IF NOT EXISTS idx_verification_images_report  ON public.verification_images(report_id);
 CREATE INDEX IF NOT EXISTS idx_verification_images_user    ON public.verification_images(user_id);
+
+-- Jurisdiction-based routing indexes (for officer area-level filtering)
+CREATE INDEX IF NOT EXISTS idx_image_reports_location_address
+    ON public.image_reports USING gin (location_address gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_profiles_jurisdiction
+    ON public.profiles(jurisdiction) WHERE jurisdiction IS NOT NULL;
 
 
 -- ── 4. ROW-LEVEL SECURITY — ENABLE ─────────────────────────────────────────
@@ -277,6 +290,14 @@ CREATE POLICY "Users can view own transactions"
 CREATE POLICY "System can insert transactions"
     ON public.point_transactions FOR INSERT
     WITH CHECK (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "Citizens can insert own redemption transactions" ON public.point_transactions;
+CREATE POLICY "Citizens can insert own redemption transactions"
+    ON public.point_transactions FOR INSERT
+    WITH CHECK (
+        auth.role() = 'authenticated'
+        AND auth.uid() = user_id
+    );
 
 -- ── image_reports ──
 DROP POLICY IF EXISTS "Citizens view own reports"          ON public.image_reports;
@@ -816,6 +837,31 @@ DROP FUNCTION IF EXISTS public.update_updated_at() CASCADE;
 
 -- Remove the dangerous open-access policy if it exists
 DROP POLICY IF EXISTS "Enable read access for all users during login" ON public.profiles;
+
+-- Ensure Vakola officer has correct badge + jurisdiction
+-- (Safe: updates 0 rows if the officer doesn't exist yet)
+UPDATE public.profiles
+    SET badge_id = 'EYE-055', jurisdiction = 'Vakola'
+    WHERE badge_id IN ('EYE-001', 'EYE-055');
+
+
+-- ── 12. JURISDICTION-BASED ROUTING CONVENTION ────────────────────────────────
+--
+-- Officer Badge ID → Area Pincode Mapping:
+--   Badge format:   EYE-{pincode_suffix}
+--   Pincode format: 400{pincode_suffix}  (Mumbai metro area)
+--
+-- Examples:
+--   EYE-055  →  400055  (Vakola / Santacruz East)
+--   EYE-071  →  400071  (Chembur)
+--   EYE-053  →  400053  (Andheri East)
+--
+-- The app extracts trailing digits from badge_id, pads to 3 digits,
+-- prepends '400', and searches location_address with ILIKE.
+-- Additionally, profiles.jurisdiction stores area keywords like 'Vakola'
+-- which are also matched via ILIKE.
+-- Both conditions are combined with OR.
+-- ─────────────────────────────────────────────────────────────────────────────
 
 
 -- ═══════════════════════════════════════════════════════════════════════════════

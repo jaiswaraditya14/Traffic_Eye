@@ -33,9 +33,9 @@ export default function SplashScreen({ navigation }) {
     const bgBurst = useRef(new Animated.Value(0)).current;
 
     // Logo entrance
-    const logoScale   = useRef(new Animated.Value(0.3)).current;
+    const logoScale = useRef(new Animated.Value(0.3)).current;
     const logoOpacity = useRef(new Animated.Value(0)).current;
-    const logoRotate  = useRef(new Animated.Value(-0.05)).current;
+    const logoRotate = useRef(new Animated.Value(-0.05)).current;
 
     // Ambient pulse rings (continuous)
     const pulse1 = useRef(new Animated.Value(0.8)).current;
@@ -48,19 +48,19 @@ export default function SplashScreen({ navigation }) {
 
     // Brand text
     const titleOpacity = useRef(new Animated.Value(0)).current;
-    const titleY       = useRef(new Animated.Value(20)).current;
+    const titleY = useRef(new Animated.Value(20)).current;
     const titleSpacing = useRef(new Animated.Value(8)).current;
 
     // Version subtitle
     const subtitleOpacity = useRef(new Animated.Value(0)).current;
-    const subtitleY       = useRef(new Animated.Value(10)).current;
+    const subtitleY = useRef(new Animated.Value(10)).current;
 
     // Tagline
     const taglineOpacity = useRef(new Animated.Value(0)).current;
 
     // Loading bar
-    const barWidth  = useRef(new Animated.Value(0)).current;
-    const barGlow   = useRef(new Animated.Value(0.3)).current;
+    const barWidth = useRef(new Animated.Value(0)).current;
+    const barGlow = useRef(new Animated.Value(0.3)).current;
     const loadLabelOpacity = useRef(new Animated.Value(0)).current;
 
     // Decorative floating particles
@@ -353,13 +353,13 @@ export default function SplashScreen({ navigation }) {
                             },
                         ]}
                     >
-                        1.0 | Civic Intelligence Platform
+
                     </Animated.Text>
                 </Animated.View>
 
                 {/* ── Tagline ── */}
                 <Animated.Text style={[styles.tagline, { opacity: taglineOpacity }]}>
-                    Smart Civic Traffic Enforcement
+
                 </Animated.Text>
             </View>
 

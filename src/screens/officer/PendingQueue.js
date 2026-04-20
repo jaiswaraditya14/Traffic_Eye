@@ -179,7 +179,7 @@ export default function PendingQueue({ navigation }) {
 
     const load = useCallback(async (isRefresh = false) => {
         if (!hasLoadedRef.current && !isRefresh) setLoading(true);
-        const { data, error } = await fetchPendingReports();
+        const { data, error } = await fetchPendingReports(profile);
         if (!error && data) {
             setReports(data);
             hasLoadedRef.current = true;

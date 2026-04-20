@@ -309,7 +309,8 @@ export const rewardService = {
     },
 
     /**
-     * Handle item redemption — generates coupon code and deducts points
+     * Handle item redemption — generates coupon code, deducts points,
+     * and persists the redemption (couponCode + expiresAt) to point_transactions
      */
     async redeemItem(item) {
         try {
@@ -340,14 +341,144 @@ export const rewardService = {
 
             if (updateError) throw updateError;
 
-            // 3. Generate coupon code
+            // 3. Generate coupon code + 15-day expiry
             const couponCode = generateCouponCode();
+            const unlockedAt = new Date().toISOString();
+            const expiresAt = new Date(
+                Date.now() + 15 * 24 * 60 * 60 * 1000
+            ).toISOString();
 
-            return { success: true, newBalance, itemRedeemed: item, couponCode };
+            // 4. Persist redemption as a point_transaction (type: redeemed)
+            await supabase.from('point_transactions').insert({
+                user_id: user.id,
+                amount: item.pts,
+                type: 'redeemed',
+                action: 'gift_redeemed',
+                description: JSON.stringify({
+                    itemId: item.id,
+                    itemTitle: item.title,
+                    couponCode,
+                    unlockedAt,
+                    expiresAt,
+                }),
+            });
+
+            return { success: true, newBalance, itemRedeemed: item, couponCode, unlockedAt, expiresAt };
 
         } catch (error) {
             console.error('Error redeeming item:', error);
             return { success: false, error: error.message };
+        }
+    },
+
+    /**
+     * Fetch all gifts the user has already redeemed (for persistent unlock state)
+     * Returns a map: { [itemId]: { couponCode, unlockedAt, expiresAt } }
+     */
+    async getRedeemedItems() {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return { success: true, redeemed: {} };
+
+            const { data, error } = await supabase
+                .from('point_transactions')
+                .select('description, created_at')
+                .eq('user_id', user.id)
+                .eq('action', 'gift_redeemed')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            const redeemed = {};
+            (data || []).forEach((row) => {
+                try {
+                    const parsed = JSON.parse(row.description);
+                    // Keep only the FIRST (latest) redemption per item
+                    if (parsed.itemId && !redeemed[parsed.itemId]) {
+                        redeemed[parsed.itemId] = {
+                            couponCode: parsed.couponCode,
+                            unlockedAt: parsed.unlockedAt,
+                            expiresAt: parsed.expiresAt,
+                            itemTitle: parsed.itemTitle,
+                        };
+                    }
+                } catch (_) { /* skip malformed rows */ }
+            });
+
+            return { success: true, redeemed };
+        } catch (error) {
+            console.error('Error fetching redeemed items:', error);
+            return { success: false, redeemed: {} };
+        }
+    },
+
+    /**
+     * Fetch a unified activity timeline:
+     *  - Earned points: from point_transactions (type=earned) joined with image_report title
+     *  - Spent points : from point_transactions (type=redeemed)
+     * Returns array sorted newest-first.
+     */
+    async getActivityHistory(limit = 40) {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return { success: true, history: [] };
+
+            const { data, error } = await supabase
+                .from('point_transactions')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false })
+                .limit(limit);
+
+            if (error) throw error;
+
+            // For earned rows that reference a report, fetch the report title
+            const reportIds = (data || [])
+                .filter(t => t.reference_id && t.type === 'earned')
+                .map(t => t.reference_id);
+
+            let reportMap = {};
+            if (reportIds.length > 0) {
+                const { data: reports } = await supabase
+                    .from('image_reports')
+                    .select('id, violation_type, severity')
+                    .in('id', reportIds);
+                (reports || []).forEach(r => (reportMap[r.id] = r));
+            }
+
+            const history = (data || []).map(t => {
+                if (t.type === 'redeemed') {
+                    let meta = {};
+                    try { meta = JSON.parse(t.description); } catch (_) {}
+                    return {
+                        id: t.id,
+                        type: 'spent',
+                        points: -t.amount,
+                        label: meta.itemTitle ? `Unlocked ${meta.itemTitle}` : 'Gift Redeemed',
+                        sublabel: `Spent ${t.amount} pts`,
+                        date: t.created_at,
+                    };
+                }
+                // earned
+                const report = reportMap[t.reference_id] || null;
+                const violationLabel = report?.violation_type || 'Violation Report';
+                return {
+                    id: t.id,
+                    type: 'earned',
+                    points: t.amount,
+                    label: `Earned ${t.amount} pts from ${violationLabel}`,
+                    sublabel: report?.severity
+                        ? `${report.severity.charAt(0).toUpperCase() + report.severity.slice(1)} severity`
+                        : t.description || 'Points credited',
+                    date: t.created_at,
+                    reportId: t.reference_id,
+                };
+            });
+
+            return { success: true, history };
+        } catch (error) {
+            console.error('Error fetching activity history:', error);
+            return { success: false, history: [], error: error.message };
         }
     },
 

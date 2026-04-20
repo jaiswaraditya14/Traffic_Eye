@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../services';
+import { useAuth } from '../../context';
 
 const C = {
     navy: '#002452',
@@ -40,6 +41,7 @@ export default function VerifiedReports({ route, navigation }) {
     const emptyTitle = statusFilter === 'rejected' ? 'No Rejected Reports' : 'No Verified Reports';
     const emptySub = statusFilter === 'rejected' ? 'There are no rejected reports yet.' : 'There are no verified reports yet.';
 
+    const { profile } = useAuth();
     const [verifiedReports, setVerifiedReports] = useState([]);
     const [loading, setLoading] = useState(true);
     const hasLoadedRef = React.useRef(false);
@@ -68,7 +70,7 @@ export default function VerifiedReports({ route, navigation }) {
     const loadReports = useCallback(async () => {
         if (!hasLoadedRef.current) setLoading(true);
         try {
-            const { data, error } = await supabase
+            let query = supabase
                 .from('image_reports')
                 .select(`
                     id, violation_type, vehicle_number, location_address,
@@ -76,8 +78,26 @@ export default function VerifiedReports({ route, navigation }) {
                     officer_reviews ( officer_id, decision, remarks ),
                     submitter:user_id ( full_name )
                 `)
-                .eq('status', statusFilter)
-                .order('reviewed_at', { ascending: false });
+                .eq('status', statusFilter);
+
+            if (profile && profile.role === 'officer') {
+                let filters = [];
+                if (profile.badge_id) {
+                    const digits = profile.badge_id.match(/\d+$/);
+                    if (digits) {
+                        const suffix = digits[0].padStart(3, '0');
+                        filters.push(`location_address.ilike.%400${suffix}%`);
+                    }
+                }
+                if (profile.jurisdiction) {
+                    filters.push(`location_address.ilike.%${profile.jurisdiction}%`);
+                }
+                if (filters.length > 0) {
+                    query = query.or(filters.join(','));
+                }
+            }
+
+            const { data, error } = await query.order('reviewed_at', { ascending: false });
             
             if (!error) {
                 setVerifiedReports(data || []);

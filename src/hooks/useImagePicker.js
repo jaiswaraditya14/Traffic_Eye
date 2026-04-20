@@ -23,14 +23,16 @@ export default function useImagePicker() {
 
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ['images'],
-                allowsEditing: true,
-                quality: 0.8,
+                allowsEditing: false, // Disabling native crop to use our custom modal
+                quality: 0.9,       // Higher quality for OCR processing
                 exif: true,
             });
 
             if (!result.canceled && result.assets?.length > 0) {
                 const asset = result.assets[0];
-                setImage(asset.uri);
+                // BUG FIX: Do NOT call setImage here. NewReport opens the crop
+                // modal after this returns. image is only committed once the user
+                // confirms crop via handleCropDone → setImage(croppedUri).
                 setExifData(asset.exif || null);
                 return { uri: asset.uri, exif: asset.exif || null };
             }
@@ -55,14 +57,16 @@ export default function useImagePicker() {
 
             const result = await ImagePicker.launchCameraAsync({
                 mediaTypes: ['images'],
-                allowsEditing: true,
-                quality: 0.8,
+                allowsEditing: false, // Disabling native crop to use our custom modal
+                quality: 0.9,       // Higher quality for OCR processing
                 exif: true,
             });
 
             if (!result.canceled && result.assets?.length > 0) {
                 const asset = result.assets[0];
-                setImage(asset.uri);
+                // BUG FIX: Do NOT set image here — the caller (NewReport) opens
+                // the crop modal first. image is only set after crop is confirmed
+                // via handleCropDone → setImage(croppedUri).
                 setExifData(asset.exif || null);
                 return { uri: asset.uri, exif: asset.exif || null };
             }
