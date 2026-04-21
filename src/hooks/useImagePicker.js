@@ -23,8 +23,8 @@ export default function useImagePicker() {
 
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ['images'],
-                allowsEditing: false, // Disabling native crop to use our custom modal
-                quality: 0.9,       // Higher quality for OCR processing
+                allowsEditing: true,  // Native OS crop — accurate & reliable
+                quality: 0.92,
                 exif: true,
             });
 
@@ -57,8 +57,8 @@ export default function useImagePicker() {
 
             const result = await ImagePicker.launchCameraAsync({
                 mediaTypes: ['images'],
-                allowsEditing: false, // Disabling native crop to use our custom modal
-                quality: 0.9,       // Higher quality for OCR processing
+                allowsEditing: true,  // Native OS crop — accurate & reliable
+                quality: 0.92,
                 exif: true,
             });
 

@@ -7,7 +7,7 @@ import MapView, { Marker } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MobileContainer, ImageCropModal } from '../../components';
+import { MobileContainer } from '../../components';
 import { useAppContext } from '../../context';
 import { useImagePicker, useLocation } from '../../hooks';
 
@@ -60,11 +60,8 @@ export default function NewReport({ navigation }) {
     const [mediaType, setMediaType] = useState(null);
     const [description, setDescription] = useState('');
     const [focusedDesc, setFocusedDesc] = useState(false);
+    const [fullscreenImage, setFullscreenImage] = useState(null);
 
-    const [showCropModal, setShowCropModal] = useState(false);
-    const [pendingCropUri, setPendingCropUri] = useState(null);
-    const [pendingExif, setPendingExif] = useState(null);
-    const [pendingMediaSource, setPendingMediaSource] = useState(null);
 
     const [autoFillStatus, setAutoFillStatus] = useState(null);
     const bannerAnim = useRef(new Animated.Value(0)).current;
@@ -126,39 +123,27 @@ export default function NewReport({ navigation }) {
 
     const handleTakePhoto = async () => {
         const result = await captureFromCamera();
-        if (result) {
+        if (result?.uri) {
             setVideo(null); setMediaType('image');
-            setPendingCropUri(result.uri); setPendingExif(result.exif || null);
-            setPendingMediaSource('camera');
-            setShowCropModal(true);
+            // Native OS crop already applied — use the URI directly
+            await handleCropDone(result.uri, result.exif || null, 'camera');
         }
     };
 
     const handlePickImage = async () => {
         const result = await pickFromGallery();
-        if (result) {
+        if (result?.uri) {
             setVideo(null); setMediaType('image');
-            setPendingCropUri(result.uri); setPendingExif(result.exif || null);
-            setPendingMediaSource('gallery');
-            setShowCropModal(true);
+            // Native OS crop already applied — use the URI directly
+            await handleCropDone(result.uri, result.exif || null, 'gallery');
         }
     };
 
-    const handleCropDone = async (croppedUri) => {
-        setShowCropModal(false); setImage(croppedUri); setPendingCropUri(null);
-        await handleLocationExtraction(pendingExif, pendingMediaSource);
-        setPendingExif(null); setPendingMediaSource(null);
-    };
-
-    const handleCropCancel = async () => {
-        setShowCropModal(false);
-        // BUG FIX: Do NOT call setImage(pendingCropUri) here.
-        // Promoting the original uncropped URI into 'image' state would cause
-        // the uncropped image to be displayed and sent to AI analysis.
-        // On cancel we simply discard the pending pick — image stays null
-        // (or retains its previous cropped value if the user had one already).
-        setPendingCropUri(null);
-        setPendingExif(null); setPendingMediaSource(null);
+    const handleCropDone = async (uri, exif, source) => {
+        // Add cache-buster to force refresh
+        const uriWithCache = `${uri}?t=${new Date().getTime()}`;
+        setImage(uriWithCache);
+        await handleLocationExtraction(exif, source);
     };
 
     const handleDetectLocation = async () => {
@@ -232,37 +217,53 @@ export default function NewReport({ navigation }) {
                     </View>
                     <Text style={styles.stepHeader}>Step 1: Capture Evidence</Text>
 
-                    {/* ── Media Preview with Sentinel Frame ── */}
-                    <View style={styles.imageContainer}>
+                    {/* ── Media Preview ── */}
+                    <TouchableOpacity
+                        style={styles.imageContainer}
+                        onPress={() => image ? setFullscreenImage(image) : undefined}
+                        activeOpacity={image ? 0.9 : 1}
+                    >
                         {image ? (
-                            <Image source={{ uri: image }} style={styles.mediaImage} />
+                            <>
+                                <Image
+                                    key={image}
+                                    source={{ uri: image }}
+                                    style={styles.mediaImage}
+                                />
+                                {/* Tap-to-preview hint badge */}
+                                <View style={styles.changeImgBadge}>
+                                    <Ionicons name="expand" size={14} color={C.white} />
+                                    <Text style={styles.changeImgText}>Tap to preview</Text>
+                                </View>
+                            </>
                         ) : (
                             <View style={styles.cameraPlaceholder}>
                                 <Ionicons name="camera-outline" size={48} color={C.textTertiary} />
                                 <Text style={styles.placeholderText}>Capture Evidence</Text>
                                 <Text style={styles.placeholderSub}>AI will auto-detect plate & violation</Text>
-
-                                {/* Guide lines */}
                                 <View style={styles.scannerOverlay}>
                                     <View style={styles.scannerCorners} />
                                 </View>
                             </View>
                         )}
-                    </View>
+                    </TouchableOpacity>
 
                     {/* ── Action Buttons ── */}
                     <View style={styles.mediaBtnRow}>
-                        <TouchableOpacity style={styles.mediaBtn} onPress={handleTakePhoto} activeOpacity={0.8}>
-                            <LinearGradient colors={[C.navy, C.navyMid]} style={styles.mediaBtnGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                                <Ionicons name="camera" size={18} color={C.white} />
-                                <Text style={styles.mediaBtnText}>Photo</Text>
-                            </LinearGradient>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.mediaBtnOutline} onPress={handlePickImage} activeOpacity={0.8}>
-                            <Ionicons name="images" size={18} color={C.navyMid} />
-                            <Text style={styles.mediaBtnOutlineText}>Gallery</Text>
+                        {!image && (
+                            <TouchableOpacity style={styles.mediaBtn} onPress={handleTakePhoto} activeOpacity={0.8}>
+                                <LinearGradient colors={[C.navy, C.navyMid]} style={styles.mediaBtnGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                                    <Ionicons name="camera" size={18} color={C.white} />
+                                    <Text style={styles.mediaBtnText}>Photo</Text>
+                                </LinearGradient>
+                            </TouchableOpacity>
+                        )}
+                        <TouchableOpacity style={image ? styles.retakeBtn : styles.mediaBtnOutline} onPress={handlePickImage} activeOpacity={0.8}>
+                            <Ionicons name={image ? "refresh" : "images"} size={18} color={image ? C.textSecondary : C.navyMid} />
+                            <Text style={image ? styles.retakeBtnText : styles.mediaBtnOutlineText}>{image ? 'Choose Another' : 'Gallery'}</Text>
                         </TouchableOpacity>
                     </View>
+
 
                     {/* ── Auto Fill Banner ── */}
                     {autoFillStatus && (
@@ -358,7 +359,18 @@ export default function NewReport({ navigation }) {
                     </TouchableOpacity>
                 </View>
             </Modal>
-            <ImageCropModal visible={showCropModal} imageUri={pendingCropUri} onCropDone={handleCropDone} onCancel={handleCropCancel} />
+
+            {/* Fullscreen Image Modal */}
+            <Modal visible={!!fullscreenImage} transparent={true} animationType="fade" onRequestClose={() => setFullscreenImage(null)}>
+                <View style={styles.modalBg}>
+                    <TouchableOpacity style={styles.modalClose} onPress={() => setFullscreenImage(null)}>
+                        <Ionicons name="close" size={28} color={C.white} />
+                    </TouchableOpacity>
+                    {fullscreenImage && (
+                        <Image source={{ uri: fullscreenImage }} style={styles.modalImg} resizeMode="contain" />
+                    )}
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -420,18 +432,62 @@ const styles = StyleSheet.create({
     imageContainer: {
         width: '100%',
         height: 280,
-        backgroundColor: '#0A0F14', // Dark themed background for better contrast
-
-        borderRadius: 24, // High rounding
+        backgroundColor: '#111827',
+        borderRadius: 24,
         overflow: 'hidden',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: 16,
         position: 'relative',
-        borderWidth: 1,
-        borderColor: 'rgba(0,0,0,0.05)',
+        borderWidth: 1.5,
+        borderColor: '#E5E7EB',
     },
     mediaImage: { width: '100%', height: '100%', resizeMode: 'contain' },
+    changeImgBadge: {
+        position: 'absolute',
+        bottom: 14,
+        right: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: 'rgba(0,0,0,0.55)',
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderRadius: 20,
+    },
+    changeImgText: {
+        color: C.white,
+        fontSize: 12,
+        fontFamily: 'Nunito-Bold',
+    },
+    retakeBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 14,
+        borderRadius: 16,
+        borderWidth: 1.5,
+        borderColor: C.border,
+        borderStyle: 'dashed',
+    },
+    retakeBtnText: {
+        fontSize: 14,
+        fontFamily: 'Nunito-Bold',
+        color: C.textSecondary,
+    },
+    // Fullscreen Modal
+    modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
+    modalClose: {
+        position: 'absolute', top: 60, right: 24, zIndex: 10,
+        width: 44, height: 44, borderRadius: 22,
+        backgroundColor: 'rgba(255,255,255,0.25)',
+        justifyContent: 'center', alignItems: 'center',
+    },
+    modalImg: { width: '100%', height: '85%' },
+
+
 
     scannerOverlay: {
         ...StyleSheet.absoluteFillObject,

@@ -18,7 +18,7 @@ import {
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context';
 import { fetchReportById, submitOfficerDecision } from '../../services/reports';
 import { rewardService } from '../../services';
@@ -92,6 +92,7 @@ const ir = StyleSheet.create({
 export default function ImageReportReview({ route, navigation }) {
     const { reportId } = route.params ?? {};
     const { user }     = useAuth();
+    const insets       = useSafeAreaInsets();
 
     const [report,   setReport]   = useState(null);
     const [loading,  setLoading]  = useState(true);
@@ -378,8 +379,8 @@ export default function ImageReportReview({ route, navigation }) {
                     <View style={{ height: 100 }} />
                 </ScrollView>
 
-                {/* Footer action buttons */}
-                <View style={s.footer}>
+                {/* Footer action buttons - sits above system nav bar */}
+                <View style={[s.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
                     <TouchableOpacity
                         style={[s.actionBtn, s.rejectBtn, (submitting || alreadyReviewed) && { opacity: alreadyReviewed ? 0.4 : 0.6 }]}
                         onPress={() => handleDecision('rejected')}
@@ -457,6 +458,7 @@ const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: C.offWhite },
 
     header:    { paddingTop: 52, paddingBottom: 16, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
+
     backBtn:   { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)', justifyContent: 'center', alignItems: 'center' },
     headerTitle: { fontSize: 18, fontFamily: 'Nunito-Bold', color: C.white },
     headerSub:   { fontSize: 12, fontFamily: 'Nunito-Medium', color: 'rgba(255,255,255,0.6)' },
