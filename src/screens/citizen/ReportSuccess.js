@@ -53,12 +53,6 @@ export default function ReportSuccess({ navigation }) {
                     Our AI has successfully analyzed your report. It is now under review by an officer.
                 </Text>
 
-                {/* ── Points Badge ── */}
-                <View style={styles.pointsBadge}>
-                    <Ionicons name="trophy" size={20} color={C.amber} />
-                    <Text style={styles.pointsText}>+10 Points Earned</Text>
-                </View>
-
                 {/* ── Action Buttons ── */}
                 <View style={styles.buttonGroup}>
                     <TouchableOpacity
@@ -72,9 +66,10 @@ export default function ReportSuccess({ navigation }) {
                             end={{ x: 1, y: 0 }}
                             style={styles.primaryGradient}
                         >
+                            <Ionicons name="home" size={20} color={C.amber} style={{ marginRight: 4 }} />
                             <Text style={styles.primaryText}>Back to Home</Text>
-                            <Ionicons name="home" size={16} color={C.white} />
                         </LinearGradient>
+
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -82,10 +77,12 @@ export default function ReportSuccess({ navigation }) {
                         onPress={() => navigation.navigate('CitizenMain', { screen: 'Reports' })}
                         activeOpacity={0.8}
                     >
-                        <Ionicons name="document-text" size={16} color={C.navyMid} />
-                        <Text style={styles.secondaryText}>View My Reports</Text>
+                        <Ionicons name="document-text" size={18} color={C.navyMid} />
+                        <Text style={styles.secondaryText}>View My Reports Status</Text>
                     </TouchableOpacity>
                 </View>
+
+
             </Animated.View>
         </View>
     );

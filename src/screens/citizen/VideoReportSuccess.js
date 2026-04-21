@@ -114,16 +114,33 @@ export default function VideoReportSuccess({ navigation, route }) {
                     </Animated.View>
                 </View>
                 <View style={styles.actions}>
-                    <TouchableOpacity style={styles.primaryBtn} onPress={handleTrackStatus} activeOpacity={0.88}>
-                        <LinearGradient colors={[C.amberDark, C.amber]} style={styles.primaryBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                            <Ionicons name="list" size={18} color={C.navy} />
-                            <Text style={styles.primaryBtnText}>Track Report Status</Text>
+                    <TouchableOpacity 
+                        style={styles.primaryBtn} 
+                        onPress={() => navigation.reset({ index: 0, routes: [{ name: 'CitizenMain' }] })} 
+                        activeOpacity={0.88}
+                    >
+                        <LinearGradient colors={[C.navy, C.navyMid]} style={styles.primaryBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                            <Ionicons name="home" size={18} color={C.amber} />
+                            <Text style={styles.primaryBtnText}>Back to Home</Text>
+
                         </LinearGradient>
+
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => navigation.reset({ index: 0, routes: [{ name: 'CitizenMain' }] })} style={styles.ghostBtn}>
-                        <Text style={styles.ghostBtnText}>Back to Home</Text>
+
+
+                    <TouchableOpacity 
+                        onPress={() => handleTrackStatus()} 
+                        style={styles.secondaryBtn}
+                        activeOpacity={0.7}
+                    >
+                        <View style={styles.secondaryBtnContent}>
+                             <Ionicons name="list-outline" size={18} color={C.navyMid} />
+                             <Text style={styles.secondaryBtnText}>Track Report Status</Text>
+                        </View>
                     </TouchableOpacity>
+
                 </View>
+
             </SafeAreaView>
         </View>
     );
@@ -157,9 +174,28 @@ const styles = StyleSheet.create({
     doneBadge: { backgroundColor: C.successSurface, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, alignSelf: 'center' },
     doneBadgeText: { fontSize: 10, fontFamily: 'Nunito-Bold', color: C.success },
     actions: { paddingHorizontal: 20, paddingBottom: 20, gap: 10 },
-    primaryBtn: { borderRadius: 18, overflow: 'hidden', shadowColor: C.amberDark, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6 },
+    primaryBtn: { borderRadius: 18, overflow: 'hidden', shadowColor: C.navy, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6 },
+
     primaryBtnGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16 },
-    primaryBtnText: { fontSize: 16, fontFamily: 'Nunito-ExtraBold', color: C.navy },
-    ghostBtn: { alignItems: 'center', paddingVertical: 10 },
-    ghostBtnText: { fontSize: 14, fontFamily: 'Nunito-Medium', color: C.textTertiary },
+    primaryBtnText: { fontSize: 16, fontFamily: 'Nunito-ExtraBold', color: C.white },
+
+    secondaryBtn: { 
+        borderRadius: 18, 
+        overflow: 'hidden', 
+        borderWidth: 1.5,
+        borderColor: C.navyMid,
+        backgroundColor: C.white,
+    },
+    secondaryBtnContent: { 
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        gap: 10, 
+        paddingVertical: 16 
+    },
+    secondaryBtnText: { 
+        fontSize: 16, 
+        fontFamily: 'Nunito-Bold', 
+        color: C.navyMid 
+    },
 });

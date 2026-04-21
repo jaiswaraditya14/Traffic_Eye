@@ -197,7 +197,7 @@ export default function NewReport({ navigation }) {
                     <View style={styles.reportTypeToggle}>
                         <View style={styles.reportTypeActiveTab}>
                             <Ionicons name="flash" size={14} color={C.navy} />
-                            <Text style={styles.reportTypeActiveText}>AI Analysis</Text>
+                            <Text style={styles.reportTypeActiveText}>AI Powered</Text>
                         </View>
                         <TouchableOpacity
                             style={styles.reportTypeInactiveTab}
@@ -241,7 +241,7 @@ export default function NewReport({ navigation }) {
                                 <Ionicons name="camera-outline" size={48} color={C.textTertiary} />
                                 <Text style={styles.placeholderText}>Capture Evidence</Text>
                                 <Text style={styles.placeholderSub}>AI will auto-detect plate & violation</Text>
-                                
+
                                 {/* Guide lines */}
                                 <View style={styles.scannerOverlay}>
                                     <View style={styles.scannerCorners} />
@@ -419,8 +419,9 @@ const styles = StyleSheet.create({
     },
     imageContainer: {
         width: '100%',
-        height: 240,
-        backgroundColor: '#E5E7EB',
+        height: 280,
+        backgroundColor: '#0A0F14', // Dark themed background for better contrast
+
         borderRadius: 24, // High rounding
         overflow: 'hidden',
         justifyContent: 'center',
@@ -430,7 +431,8 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(0,0,0,0.05)',
     },
-    mediaImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+    mediaImage: { width: '100%', height: '100%', resizeMode: 'contain' },
+
     scannerOverlay: {
         ...StyleSheet.absoluteFillObject,
         justifyContent: 'space-between',
@@ -446,7 +448,7 @@ const styles = StyleSheet.create({
     cameraPlaceholder: { alignItems: 'center', padding: 32 },
     placeholderText: { fontSize: 15, fontFamily: 'Nunito-Bold', color: C.textSecondary, marginTop: 12 },
     placeholderSub: { fontSize: 13, color: C.textTertiary, marginTop: 6, textAlign: 'center' },
-    
+
     videoPlaceholder: { alignItems: 'center', flex: 1, width: '100%', justifyContent: 'center', backgroundColor: '#FEE2E2' },
     videoText: { fontSize: 15, fontFamily: 'Nunito-Bold', color: '#BA1A1A', marginTop: 10 },
 
@@ -454,41 +456,41 @@ const styles = StyleSheet.create({
     mediaBtn: { flex: 1, borderRadius: 16, overflow: 'hidden' },
     mediaBtnGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
     mediaBtnText: { fontSize: 15, fontFamily: 'Nunito-Bold', color: C.white },
-    mediaBtnOutline: { 
-        flex: 1, 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        gap: 8, 
-        paddingVertical: 14, 
-        borderRadius: 16, 
-        borderWidth: 1.5, 
-        borderColor: '#C4C6D0', 
-        backgroundColor: C.surface 
+    mediaBtnOutline: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 14,
+        borderRadius: 16,
+        borderWidth: 1.5,
+        borderColor: '#C4C6D0',
+        backgroundColor: C.surface
     },
     mediaBtnOutlineText: { fontSize: 15, fontFamily: 'Nunito-Bold', color: C.navyMid },
 
-    banner: { 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        gap: 12, 
-        padding: 14, 
-        backgroundColor: '#E0E7FF', 
-        borderRadius: 16, 
-        borderWidth: 1, 
-        borderColor: 'rgba(27,58,107,0.1)', 
-        marginBottom: 24 
+    banner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        padding: 14,
+        backgroundColor: '#E0E7FF',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(27,58,107,0.1)',
+        marginBottom: 24
     },
     bannerText: { fontSize: 13, fontFamily: 'Nunito-Bold' },
 
     fieldLabel: { fontSize: 13, fontFamily: 'Nunito-Bold', color: C.navy, marginBottom: 10, marginTop: 12 },
-    addressBox: { 
-        flexDirection: 'column', 
+    addressBox: {
+        flexDirection: 'column',
         backgroundColor: '#F1F5F9', // Subtle distinct color 
-        borderRadius: 20, 
-        paddingLeft: 18, 
-        paddingRight: 18, 
-        paddingTop: 14, 
+        borderRadius: 20,
+        paddingLeft: 18,
+        paddingRight: 18,
+        paddingTop: 14,
         paddingBottom: 14,
         minHeight: 150, // Massive box
         borderWidth: 1.5,
@@ -503,13 +505,13 @@ const styles = StyleSheet.create({
     addrBtnWithText: { flexDirection: 'row', gap: 6, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, backgroundColor: C.navyMid, justifyContent: 'center', alignItems: 'center' },
     addrBtnText: { color: C.white, fontSize: 13, fontFamily: 'Nunito-Bold' },
 
-    descBox: { 
-        backgroundColor: C.surface, 
-        borderRadius: 16, 
-        paddingHorizontal: 16, 
-        paddingVertical: 12, 
-        borderWidth: 1, 
-        borderColor: 'rgba(0,0,0,0.08)', 
+    descBox: {
+        backgroundColor: C.surface,
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.08)',
         marginBottom: 32,
         shadowColor: '#1B3A6B',
         shadowOffset: { width: 0, height: 2 },
@@ -539,13 +541,13 @@ const styles = StyleSheet.create({
     },
 
 
-    submitBtn: { 
-        borderRadius: 18, 
-        overflow: 'hidden', 
-        shadowColor: C.amberDark, 
-        shadowOffset: { width: 0, height: 8 }, 
-        shadowOpacity: 0.4, 
-        shadowRadius: 12, 
+    submitBtn: {
+        borderRadius: 18,
+        overflow: 'hidden',
+        shadowColor: C.amberDark,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.4,
+        shadowRadius: 12,
         elevation: 8,
         marginBottom: 20,
     },

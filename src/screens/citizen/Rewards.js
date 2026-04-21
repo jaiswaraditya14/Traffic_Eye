@@ -8,7 +8,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useAuth } from '../../context';
-import { rewardService, VIOLATION_SEVERITY, REDEEM_CATALOG } from '../../services';
+import { rewardService, REDEEM_CATALOG } from '../../services';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Clipboard from 'expo-clipboard';
 
@@ -438,43 +438,6 @@ export default function Rewards() {
                 </View>
             </View>
 
-            {/* Points Basis (Violation Severity) */}
-            <Text style={styles.subSectionTitle}>Violation Severity & Rewards</Text>
-            {Object.entries(VIOLATION_SEVERITY).map(([key, tier]) => (
-                <View key={key} style={styles.tierContainer}>
-                    <View style={styles.tierHeader}>
-                        <View style={[styles.tierIconBox, { backgroundColor: tier.surface }]}>
-                            <Ionicons name={tier.icon} size={20} color={tier.color} />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                            <Text style={styles.tierTitle}>{tier.label} Severity</Text>
-                            <Text style={styles.tierSubtitle}>
-                                {key === 'LOW' ? 'Minor infractions' : key === 'MEDIUM' ? 'Moderate offenses' : 'Serious violations'}
-                            </Text>
-                        </View>
-                        <View style={[styles.tierPointsPill, { backgroundColor: tier.surface }]}>
-                            <Text style={[styles.tierPointsPillText, { color: tier.color }]}>
-                                Up to +{tier.items[0]?.points} pts
-                            </Text>
-                        </View>
-                    </View>
-                    
-                    <View style={styles.tierGrid}>
-                        {tier.items.map((item, idx) => (
-                            <View key={idx} style={styles.tierCard}>
-                                <View style={[styles.tierCardIcon, { backgroundColor: tier.surface }]}>
-                                    <Ionicons name={item.icon} size={26} color={tier.color} />
-                                </View>
-                                <Text style={styles.tierItemName}>{item.name}</Text>
-                                <View style={[styles.tierPointsBadge, { backgroundColor: `${tier.color}12` }]}>
-                                    <Ionicons name="add-circle" size={12} color={tier.color} />
-                                    <Text style={[styles.tierPointsText, { color: tier.color }]}>{item.points} pts</Text>
-                                </View>
-                            </View>
-                        ))}
-                    </View>
-                </View>
-            ))}
 
             {/* Redemption Guide */}
             <View style={styles.redemptionGuide}>
@@ -491,28 +454,10 @@ export default function Rewards() {
                     </Text>
                 </LinearGradient>
             </View>
-
-            {/* Bottom CTA */}
-            <TouchableOpacity 
-                style={styles.earnCTA} 
-                activeOpacity={0.8}
-                onPress={() => navigation.getParent()?.navigate('NewReport') ?? navigation.navigate('NewReport')}
-            >
-                <LinearGradient
-                    colors={[C.navy, C.navyMid]}
-                    style={styles.earnCTAGrad}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                >
-                    <Ionicons name="camera" size={22} color="#FFF" />
-                    <View style={{ flex: 1, marginLeft: 14 }}>
-                        <Text style={styles.earnCTATitle}>Report a Violation</Text>
-                        <Text style={styles.earnCTASub}>Start earning points today</Text>
-                    </View>
-                    <Ionicons name="arrow-forward-circle" size={28} color={C.amber} />
-                </LinearGradient>
-            </TouchableOpacity>
         </View>
+
+
+
     );
 
     // ── MY ACTIVITY TAB ──
@@ -806,50 +751,7 @@ const styles = StyleSheet.create({
     redeemBtnText: { fontSize: 11, fontFamily: 'Nunito-ExtraBold', color: '#FFF', letterSpacing: 0.8 },
 
     // ── Earn Points ──
-    infoBanner: { borderRadius: 16, overflow: 'hidden', marginBottom: 24 },
-    infoBannerGrad: { 
-        flexDirection: 'row', alignItems: 'center', 
-        paddingHorizontal: 16, paddingVertical: 14, gap: 12,
-    },
-    infoBannerText: { flex: 1, fontSize: 12, fontFamily: 'Nunito-Medium', color: C.navy, lineHeight: 18 },
-    
-    tierContainer: { marginBottom: 28 },
-    tierHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 14, gap: 12 },
-    tierIconBox: { width: 42, height: 42, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-    tierTitle: { fontSize: 16, fontFamily: 'Nunito-Bold', color: C.textPrimary },
-    tierSubtitle: { fontSize: 11, fontFamily: 'Nunito-Medium', color: C.textTertiary, marginTop: 1 },
-    tierPointsPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
-    tierPointsPillText: { fontSize: 12, fontFamily: 'Nunito-ExtraBold' },
-    
-    tierGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-    tierCard: { 
-        width: (width - 54) / 2, 
-        backgroundColor: '#FFF', 
-        borderRadius: 18, 
-        padding: 16,
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 10,
-        ...Platform.select({
-            ios: { shadowColor: C.navy, shadowOpacity: 0.04, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
-            android: { elevation: 2 },
-        }),
-    },
-    tierCardIcon: { width: 52, height: 52, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-    tierItemName: { fontSize: 13, fontFamily: 'Nunito-SemiBold', color: C.textSecondary, textAlign: 'center' },
-    tierPointsBadge: { 
-        flexDirection: 'row', alignItems: 'center', gap: 4,
-        paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
-    },
-    tierPointsText: { fontSize: 12, fontFamily: 'Nunito-ExtraBold' },
 
-    earnCTA: { borderRadius: 20, overflow: 'hidden', marginTop: 30 },
-    earnCTAGrad: { 
-        flexDirection: 'row', alignItems: 'center', 
-        paddingHorizontal: 20, paddingVertical: 18,
-    },
-    earnCTATitle: { fontSize: 16, fontFamily: 'Nunito-Bold', color: '#FFF' },
-    earnCTASub: { fontSize: 12, fontFamily: 'Nunito-Medium', color: 'rgba(255,255,255,0.7)', marginTop: 2 },
 
     // ── Earn Points Enhancement ──
     subSectionTitle: { fontSize: 16, fontFamily: 'Nunito-Bold', color: C.textPrimary, marginBottom: 16, marginTop: 10 },
@@ -867,6 +769,7 @@ const styles = StyleSheet.create({
     guideText: { fontSize: 13, fontFamily: 'Nunito-Medium', color: C.textSecondary, lineHeight: 22 },
 
     // ── Activity List ──
+
     activityHeader: { 
         flexDirection: 'row', 
         justifyContent: 'space-between', 

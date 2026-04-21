@@ -123,67 +123,72 @@ export default function ImageCropModal({ visible, imageUri, onCropDone, onCancel
 
             console.log(`[Crop] Input: ${natW}×${natH}`);
 
-            // ── Step 2: Compute rendered dimensions (contain mode) ───────────
-            // Image is centered in a CROP_SIZE × CROP_SIZE viewport
-            const renderedAspect = natW / natH;
+            // ── Step 2: Compute how the image renders inside the square
+            //           CROP_SIZE × CROP_SIZE viewport (contain mode) ─────────
+            const imgAspect = natW / natH;
             let renderedW, renderedH;
-            if (renderedAspect >= 1) {
-                // Landscape: width is exactly CROP_SIZE
+            if (imgAspect >= 1) {
                 renderedW = CROP_SIZE;
-                renderedH = CROP_SIZE / renderedAspect;
+                renderedH = CROP_SIZE / imgAspect;
             } else {
-                // Portrait: height is exactly CROP_SIZE
                 renderedH = CROP_SIZE;
-                renderedW = CROP_SIZE * renderedAspect;
+                renderedW = CROP_SIZE * imgAspect;
             }
 
-            // ── Step 3: Map pan+scale to unscaled rendered coords ────────────
+            // ── Step 3: Back-project the viewport window into rendered coords ─
+            // The scaled image center is at viewport point:
+            //   cx = CROP_SIZE/2 + panX
+            //   cy = CROP_SIZE/2 + panY
+            // So the rendered image occupies viewport coords:
+            //   left  = cx - (renderedW * s / 2)
+            //   top   = cy - (renderedH * s / 2)
             const panX = pan.x._value;
             const panY = pan.y._value;
-            const s = scale;
+            const s = Math.max(scale, 1);
 
-            // Viewport size in unscaled rendered pixels:
-            const viewInRenderedW = CROP_SIZE / s;
-            const viewInRenderedH = CROP_SIZE / s;
+            const imgLeft = (CROP_SIZE / 2 + panX) - (renderedW * s) / 2;
+            const imgTop  = (CROP_SIZE / 2 + panY) - (renderedH * s) / 2;
 
-            // The origin (top-left) of the viewport relative to the image top-left
-            // in unscaled rendered pixels:
-            // Math: Viewport center in image is (renderedW/2 - panX/s)
-            //       So origin is that minus half of viewport-in-rendered
-            const originXRendered = (renderedW / 2) - (panX / s) - (viewInRenderedW / 2);
-            const originYRendered = (renderedH / 2) - (panY / s) - (viewInRenderedH / 2);
+            // Viewport edges [0, CROP_SIZE] in rendered (unscaled) image coords:
+            const rLeft   = (0          - imgLeft) / s;
+            const rRight  = (CROP_SIZE  - imgLeft) / s;
+            const rTop    = (0          - imgTop)  / s;
+            const rBottom = (CROP_SIZE  - imgTop)  / s;
 
-            // ── Step 4: Convert to natural image pixels ──────────────────────
-            const pxPerRendered = natW / renderedW;
+            // Clamp to the actual rendered image bounds [0, renderedW/H]
+            const cl = Math.max(0, Math.min(renderedW, rLeft));
+            const cr = Math.max(0, Math.min(renderedW, rRight));
+            const ct = Math.max(0, Math.min(renderedH, rTop));
+            const cb = Math.max(0, Math.min(renderedH, rBottom));
 
-            // Clamp and adjust if user panned to empty space
-            let cropX = Math.max(0, originXRendered * pxPerRendered);
-            let cropY = Math.max(0, originYRendered * pxPerRendered);
-            
-            let cropW = (viewInRenderedW * pxPerRendered);
-            let cropH = (viewInRenderedH * pxPerRendered);
+            // ── Step 4: Convert rendered coords → natural pixel coords ───────
+            // Use SEPARATE scale factors for X and Y — critical for portrait images
+            const scaleX = natW / renderedW;
+            const scaleY = natH / renderedH;
 
-            // If we clamped X/Y, we must reduce W/H by the amount shifted
-            if (originXRendered < 0) cropW += (originXRendered * pxPerRendered);
-            if (originYRendered < 0) cropH += (originYRendered * pxPerRendered);
+            const cropX = Math.round(cl * scaleX);
+            const cropY = Math.round(ct * scaleY);
+            const cropW = Math.round((cr - cl) * scaleX);
+            const cropH = Math.round((cb - ct) * scaleY);
 
-            // Final bounds check
-            cropX = Math.round(Math.min(natW - 10, cropX));
-            cropY = Math.round(Math.min(natH - 10, cropY));
-            cropW = Math.round(Math.min(natW - cropX, cropW));
-            cropH = Math.round(Math.min(natH - cropY, cropH));
-
-            console.log(`[Crop] Calcs: x=${cropX}, y=${cropY}, w=${cropW}, h=${cropH}`);
+            console.log(`[Crop] Rendered region: (${cl.toFixed(1)},${ct.toFixed(1)}) → (${cr.toFixed(1)},${cb.toFixed(1)})`);
+            console.log(`[Crop] NaturalCrop: x=${cropX}, y=${cropY}, w=${cropW}, h=${cropH}`);
 
             // ── Step 5: Execute manipulation ─────────────────────────────────
             const actions = [];
-            // Only crop if actually necessary
-            if (s > 1.05 || Math.abs(panX) > 5 || Math.abs(panY) > 5) {
-                if (cropW > 20 && cropH > 20) {
-                    actions.push({ crop: { originX: cropX, originY: cropY, width: cropW, height: cropH } });
-                }
+
+            // Always apply crop — at scale=1 this trims letterbox bars so the
+            // preview matches exactly what was shown in the frame
+            const safeX = Math.max(0, cropX);
+            const safeY = Math.max(0, cropY);
+            const safeW = Math.min(natW - safeX, Math.max(1, cropW));
+            const safeH = Math.min(natH - safeY, Math.max(1, cropH));
+
+            if (safeW > 20 && safeH > 20 &&
+                (safeX > 0 || safeY > 0 || safeW < natW || safeH < natH)) {
+                actions.push({ crop: { originX: safeX, originY: safeY, width: safeW, height: safeH } });
             }
-            // Consistently resize for backend processing
+
             actions.push({ resize: { width: 1200 } });
 
             const manipResult = await ImageManipulator.manipulateAsync(

@@ -155,12 +155,7 @@ export default function VideoReportStatus({ navigation, route }) {
                                             <Ionicons name="calendar-outline" size={11} color={C.textTertiary} />
                                             <Text style={styles.metaText}>{report.date}</Text>
                                         </View>
-                                        {report.points > 0 && (
-                                            <View style={styles.pointsBadge}>
-                                                <Ionicons name="trophy" size={10} color={C.amberDark} />
-                                                <Text style={styles.pointsText}>+{report.points} Points Earned</Text>
-                                            </View>
-                                        )}
+
                                     </View>
 
                                     {/* Arrow */}

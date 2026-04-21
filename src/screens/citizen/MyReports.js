@@ -290,23 +290,20 @@ export default function MyReports({ navigation }) {
                                                     </View>
                                                 </View>
 
-                                                {/* Reward badge — only shown for approved/rejected */}
-                                                {report.status === 'approved' ? (
-                                                    <View style={styles.pointsBadge}>
-                                                        <Ionicons name="trophy" size={10} color={C.amberDark} />
-                                                        <Text style={styles.pointsText}>{getRewardLabel(report)} Reward Earned</Text>
-                                                    </View>
-                                                ) : report.status === 'pending' ? (
+                                                {/* Status badge footer message */}
+                                                {report.status === 'pending' && (
                                                     <View style={[styles.pointsBadge, { backgroundColor: C.warningSurface }]}>
                                                         <Ionicons name="time" size={10} color={C.warning} />
                                                         <Text style={[styles.pointsText, { color: C.warning }]}>Awaiting Review</Text>
                                                     </View>
-                                                ) : (
+                                                )}
+                                                {report.status === 'rejected' && (
                                                     <View style={[styles.pointsBadge, { backgroundColor: C.errorSurface }]}>
                                                         <Ionicons name="close-circle" size={10} color={C.error} />
                                                         <Text style={[styles.pointsText, { color: C.error }]}>Not Approved</Text>
                                                     </View>
                                                 )}
+
                                             </View>
 
                                             <View style={styles.entryArrow}>
