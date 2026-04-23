@@ -10,6 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MobileContainer } from '../../components';
 import { useAppContext } from '../../context';
 import { useImagePicker, useLocation } from '../../hooks';
+import * as MediaLibrary from 'expo-media-library';
 
 // ── Design Tokens ──
 const C = {
@@ -84,7 +85,7 @@ export default function NewReport({ navigation }) {
     }, [bannerAnim]);
 
     useEffect(() => {
-        if (autoFillStatus === 'extracting' || autoFillStatus === 'fallback-gps') {
+        if (autoFillStatus === 'extracting' || autoFillStatus === 'fallback-gps' || autoFillStatus === 'reading') {
             const pulse = Animated.loop(
                 Animated.sequence([
                     Animated.timing(pulseAnim, { toValue: 0.6, duration: 600, useNativeDriver: true }),
@@ -100,23 +101,129 @@ export default function NewReport({ navigation }) {
 
     useEffect(() => { return () => { if (bannerTimer.current) clearTimeout(bannerTimer.current); }; }, []);
 
-    const handleLocationExtraction = useCallback(async (exif, source) => {
+    const handleLocationExtraction = useCallback(async (exif, source, assetId) => {
         if (source === 'camera') {
+            // Camera images: fall back to live GPS (EXIF is stripped after native crop)
             showBanner('fallback-gps');
             const gpsResult = await detectLocation();
             if (gpsResult) { showBanner('success'); hideBanner(4000); }
-            else { showBanner('no-gps'); hideBanner(3000); }
+            else { setAutoFillStatus(null); }
         } else {
-            const lat = exif?.GPSLatitude;
-            const lng = exif?.GPSLongitude;
-            if (lat && lng && lat !== 0 && lng !== 0) {
+            // Gallery images—show reading banner immediately for instant feedback
+            showBanner('reading');
+
+            let lat = null;
+            let lng = null;
+
+            // ── Strategy 1: MediaLibrary.getAssetInfoAsync (bypasses Android EXIF strip) ──
+            if (assetId) {
+                try {
+                    console.log('[GPS] Trying MediaLibrary for assetId:', assetId);
+                    // REQUEST BOTH permissions — ACCESS_MEDIA_LOCATION is required on
+                    // Android 10+ to read GPS coordinates from media assets in a dev build.
+                    const { status } = await MediaLibrary.requestPermissionsAsync();
+                    const locPerm = await MediaLibrary.requestPermissionsAsync(true); // writeOnly=true also grants ACCESS_MEDIA_LOCATION
+                    console.log('[GPS] MediaLibrary permission status:', status, '| loc access:', locPerm.accessPrivileges);
+                    if (status === 'granted') {
+                        const info = await MediaLibrary.getAssetInfoAsync(assetId, { shouldDownloadFromNetwork: false });
+                        console.log('[GPS] MediaLibrary location:', JSON.stringify(info?.location));
+                        const mlLat = info?.location?.latitude;
+                        const mlLng = info?.location?.longitude;
+                        // Guard: reject null-island (0,0), NaN, and non-finite values
+                        if (
+                            mlLat != null && mlLng != null &&
+                            isFinite(mlLat) && isFinite(mlLng) &&
+                            !(mlLat === 0 && mlLng === 0)
+                        ) {
+                            lat = mlLat;
+                            lng = mlLng;
+                            console.log('[GPS] Got coords from MediaLibrary:', lat, lng);
+                        } else {
+                            console.log('[GPS] MediaLibrary returned invalid/empty location — falling back to EXIF');
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[GPS] MediaLibrary lookup failed:', e.message);
+                }
+            }
+
+            // ── Strategy 2: EXIF GPS parsing (iOS + some Android devices) ──
+            if (lat === null && exif) {
+                console.log('[EXIF] Raw keys:', Object.keys(exif).join(', '));
+                let rawLat, rawLng, latRef, lngRef;
+
+                // Format 1: Flat Android keys
+                if (exif.GPSLatitude !== undefined) {
+                    rawLat = exif.GPSLatitude;
+                    rawLng = exif.GPSLongitude;
+                    latRef = exif.GPSLatitudeRef;
+                    lngRef = exif.GPSLongitudeRef;
+                    console.log('[EXIF] Android flat format detected');
+                }
+
+                // Format 2: iOS nested {GPS} object
+                const gpsBlock = exif['{GPS}'] || exif['GPS'] || exif.gps;
+                if (rawLat === undefined && gpsBlock) {
+                    rawLat = gpsBlock.Latitude ?? gpsBlock.GPSLatitude;
+                    rawLng = gpsBlock.Longitude ?? gpsBlock.GPSLongitude;
+                    latRef = gpsBlock.LatitudeRef ?? gpsBlock.GPSLatitudeRef;
+                    lngRef = gpsBlock.LongitudeRef ?? gpsBlock.GPSLongitudeRef;
+                    console.log('[EXIF] iOS {GPS} block format detected');
+                }
+
+                const dmsToDecimal = (val) => {
+                    if (typeof val === 'number') return val;
+                    if (Array.isArray(val) && val.length === 3)
+                        return val[0] + val[1] / 60 + val[2] / 3600;
+                    return null;
+                };
+
+                let parsedLat = dmsToDecimal(rawLat);
+                let parsedLng = dmsToDecimal(rawLng);
+                if (parsedLat !== null && (latRef === 'S' || latRef === 'South')) parsedLat = -parsedLat;
+                if (parsedLng !== null && (lngRef === 'W' || lngRef === 'West')) parsedLng = -parsedLng;
+
+                console.log(`[EXIF] Final coords: lat=${parsedLat}, lng=${parsedLng}`);
+
+                // Guard: reject null-island (0,0), NaN, non-finite, and values outside valid ranges
+                const isValidCoord = (
+                    parsedLat !== null && parsedLng !== null &&
+                    isFinite(parsedLat) && isFinite(parsedLng) &&
+                    !(parsedLat === 0 && parsedLng === 0) &&
+                    Math.abs(parsedLat) <= 90 && Math.abs(parsedLng) <= 180
+                );
+
+                if (isValidCoord) {
+                    lat = parsedLat;
+                    lng = parsedLng;
+                }
+            }
+
+            // ── Reverse geocode if we have coords from either strategy ──
+            if (lat !== null && lng !== null) {
                 showBanner('extracting');
-                const result = await reverseGeocodeFromCoords(lat, lng);
-                if (result) { showBanner('success'); hideBanner(4000); }
-                else { showBanner('no-gps'); hideBanner(3000); }
+                try {
+                    const result = await reverseGeocodeFromCoords(lat, lng);
+                    if (result) { showBanner('success'); hideBanner(4000); }
+                    else { showBanner('no-gps'); hideBanner(3000); }
+                } catch (e) {
+                    console.warn('[GPS] Reverse geocoding failed:', e.message);
+                    showBanner('no-gps'); hideBanner(3000);
+                }
             } else {
-                // For gallery images with no location, do not auto-detect. User can choose manually.
-                setAutoFillStatus(null);
+                // ── Strategy 3: fallback to live device GPS ──
+                // This fires when both MediaLibrary and EXIF fail (e.g. screenshot, WhatsApp
+                // forward, or any image without embedded GPS). In a dev build this will work
+                // reliably; in Expo Go it may also work for device GPS.
+                console.log('[GPS] No coords from MediaLibrary or EXIF — falling back to live GPS');
+                showBanner('fallback-gps');
+                const gpsResult = await detectLocation();
+                if (gpsResult) { showBanner('success'); hideBanner(4000); }
+                else {
+                    console.log('[GPS] Live GPS also unavailable — user must enter manually');
+                    showBanner('no-gps');
+                    hideBanner(3000);
+                }
             }
         }
     }, [reverseGeocodeFromCoords, detectLocation, showBanner, hideBanner]);
@@ -134,16 +241,15 @@ export default function NewReport({ navigation }) {
         const result = await pickFromGallery();
         if (result?.uri) {
             setVideo(null); setMediaType('image');
-            // Native OS crop already applied — use the URI directly
-            await handleCropDone(result.uri, result.exif || null, 'gallery');
+            await handleCropDone(result.uri, result.exif || null, 'gallery', result.assetId || null);
         }
     };
 
-    const handleCropDone = async (uri, exif, source) => {
+    const handleCropDone = async (uri, exif, source, assetId = null) => {
         // Add cache-buster to force refresh
         const uriWithCache = `${uri}?t=${new Date().getTime()}`;
         setImage(uriWithCache);
-        await handleLocationExtraction(exif, source);
+        await handleLocationExtraction(exif, source, assetId);
     };
 
     const handleDetectLocation = async () => {
@@ -275,13 +381,24 @@ export default function NewReport({ navigation }) {
                                 { opacity: bannerAnim, transform: [{ scale: bannerAnim.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1] }) }] }
                             ]}
                         >
-                            <Ionicons
-                                name={autoFillStatus === 'success' ? 'checkmark-circle' : autoFillStatus === 'no-gps' ? 'warning' : 'navigate'}
-                                size={20}
-                                color={autoFillStatus === 'success' ? C.success : autoFillStatus === 'no-gps' ? C.warning : C.navyMid}
-                            />
-                            <Text style={[styles.bannerText, { color: autoFillStatus === 'success' ? C.success : autoFillStatus === 'no-gps' ? C.warning : C.navyMid }]}>
-                                {autoFillStatus === 'success' ? 'Location auto-detected!' : autoFillStatus === 'no-gps' ? 'Could not detect location' : 'Detecting location...'}
+                            {(autoFillStatus === 'extracting' || autoFillStatus === 'reading' || autoFillStatus === 'fallback-gps') && (
+                                <ActivityIndicator size="small" color={C.navyMid} style={{ marginRight: 4 }} />
+                            )}
+                            {(autoFillStatus === 'success') && (
+                                <Ionicons name="checkmark-circle" size={20} color={C.success} />
+                            )}
+                            {(autoFillStatus === 'no-gps') && (
+                                <Ionicons name="warning" size={20} color={C.warning} />
+                            )}
+                            <Text style={[
+                                styles.bannerText,
+                                { color: autoFillStatus === 'success' ? C.success : autoFillStatus === 'no-gps' ? C.warning : C.navyMid }
+                            ]}>
+                                {autoFillStatus === 'reading' && 'Reading image metadata...'}
+                                {autoFillStatus === 'extracting' && 'Detecting location from photo...'}
+                                {autoFillStatus === 'fallback-gps' && 'Getting your current location...'}
+                                {autoFillStatus === 'success' && 'Location auto-detected!'}
+                                {autoFillStatus === 'no-gps' && 'No GPS data in this photo — enter manually'}
                             </Text>
                         </Animated.View>
                     )}
@@ -291,6 +408,13 @@ export default function NewReport({ navigation }) {
 
                     <Text style={styles.fieldLabel}>Location Address</Text>
                     <View style={styles.addressBox}>
+                        {/* Inline geocoding spinner — visible only while reverse geocoding */}
+                        {autoFillStatus === 'extracting' && (
+                            <View style={styles.inlineGeocodeRow}>
+                                <ActivityIndicator size="small" color={C.navyMid} />
+                                <Text style={styles.inlineGeocodeText}>Detecting location from image…</Text>
+                            </View>
+                        )}
                         <TextInput
                             style={styles.addressInput}
                             placeholder="Enter address..."
@@ -560,6 +684,21 @@ const styles = StyleSheet.create({
     addressBtns: { flexDirection: 'row', gap: 8, alignSelf: 'flex-end', marginTop: 10 },
     addrBtnWithText: { flexDirection: 'row', gap: 6, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, backgroundColor: C.navyMid, justifyContent: 'center', alignItems: 'center' },
     addrBtnText: { color: C.white, fontSize: 13, fontFamily: 'Nunito-Bold' },
+    // Inline geocoding spinner inside the address box
+    inlineGeocodeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingBottom: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0,0,0,0.05)',
+        marginBottom: 8,
+    },
+    inlineGeocodeText: {
+        fontSize: 12,
+        fontFamily: 'Nunito-SemiBold',
+        color: C.navyMid,
+    },
 
     descBox: {
         backgroundColor: C.surface,

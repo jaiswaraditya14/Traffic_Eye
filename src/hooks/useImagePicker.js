@@ -34,7 +34,8 @@ export default function useImagePicker() {
                 // modal after this returns. image is only committed once the user
                 // confirms crop via handleCropDone → setImage(croppedUri).
                 setExifData(asset.exif || null);
-                return { uri: asset.uri, exif: asset.exif || null };
+                // Return assetId so NewReport can use MediaLibrary for GPS lookup
+                return { uri: asset.uri, exif: asset.exif || null, assetId: asset.assetId || null };
             }
             return { uri: null, location: null };
         } catch (error) {
@@ -68,7 +69,7 @@ export default function useImagePicker() {
                 // the crop modal first. image is only set after crop is confirmed
                 // via handleCropDone → setImage(croppedUri).
                 setExifData(asset.exif || null);
-                return { uri: asset.uri, exif: asset.exif || null };
+                return { uri: asset.uri, exif: asset.exif || null, assetId: asset.assetId || null };
             }
             return { uri: null, location: null };
         } catch (error) {

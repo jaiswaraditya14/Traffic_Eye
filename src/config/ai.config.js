@@ -7,14 +7,19 @@ export const AI_CONFIG = {
         process.env.EXPO_PUBLIC_GEMINI_API_KEY_3,
     ].filter(Boolean),
 
-    // Models in priority order — best vision capability first.
-    // Adjusted for 'Top Tier' Pro intelligence. Note that Pro models use
-    // more quota, but provide the absolute deepest OCR and scene analysis.
-    models: [
-        'gemini-2.5-flash',      // Latest robust model
-        'gemini-2.0-flash',      // Confirmed active model
-        'gemini-2.5-pro',        // Testing newest pro model
-        'gemini-1.5-pro-002',    // Hardcoded model ID
-        'gemini-1.5-flash-002',  // Hardcoded model ID
+    groqApiKeys: [
+        process.env.EXPO_PUBLIC_GROQ_API_KEY_1,
+        process.env.EXPO_PUBLIC_GROQ_API_KEY_2,
+        process.env.EXPO_PUBLIC_GROQ_API_KEY,
+    ].filter(Boolean),
+
+    visionModels: [
+        'meta-llama/llama-4-scout-17b-16e-instruct', 
+        'llama-3.2-90b-vision',         // Groq Production High-Res Vision (Fallback)
+        'gemini-1.5-flash',             // Gemini Stable
+        'gemini-1.5-pro-latest',        // Gemini Stable Pro
+    ],
+    reasoningModels: [
+        'openai/gpt-oss-120b',          // Final decision maker
     ],
 };

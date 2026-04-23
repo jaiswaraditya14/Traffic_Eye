@@ -1,5 +1,14 @@
 import { supabase } from '../supabase';
 
+// ── Severity → Points mapping (single source of truth) ──
+export const SEVERITY_POINTS = {
+    'Low':      50,
+    'Medium':   70,
+    'High':     100,
+    'Critical': 100,  // treated same as High
+    'None':     0,
+};
+
 // ── Violation Severity Tiers ──
 export const VIOLATION_SEVERITY = {
     LOW: {
@@ -7,10 +16,11 @@ export const VIOLATION_SEVERITY = {
         color: '#059669',
         surface: '#D1FAE5',
         icon: 'shield-outline',
+        points: SEVERITY_POINTS['Low'],
         items: [
-            { name: 'No Helmet', points: 50, icon: 'bicycle-outline' },
-            { name: 'No Seatbelt', points: 50, icon: 'car-outline' },
-            { name: 'Parking Violation', points: 50, icon: 'location-outline' },
+            { name: 'No Helmet', points: SEVERITY_POINTS['Low'], icon: 'bicycle-outline' },
+            { name: 'No Seatbelt', points: SEVERITY_POINTS['Low'], icon: 'car-outline' },
+            { name: 'Parking Violation', points: SEVERITY_POINTS['Low'], icon: 'location-outline' },
         ],
     },
     MEDIUM: {
@@ -18,11 +28,12 @@ export const VIOLATION_SEVERITY = {
         color: '#D97706',
         surface: '#FEF3C7',
         icon: 'warning-outline',
+        points: SEVERITY_POINTS['Medium'],
         items: [
-            { name: 'Signal Jump', points: 100, icon: 'stop-circle-outline' },
-            { name: 'Wrong Lane Driving', points: 100, icon: 'swap-horizontal-outline' },
-            { name: 'Overloading', points: 100, icon: 'people-outline' },
-            { name: 'Triple Seat Riding', points: 100, icon: 'people-circle-outline' },
+            { name: 'Signal Jump', points: SEVERITY_POINTS['Medium'], icon: 'stop-circle-outline' },
+            { name: 'Wrong Lane Driving', points: SEVERITY_POINTS['Medium'], icon: 'swap-horizontal-outline' },
+            { name: 'Overloading', points: SEVERITY_POINTS['Medium'], icon: 'people-outline' },
+            { name: 'Triple Seat Riding', points: SEVERITY_POINTS['Medium'], icon: 'people-circle-outline' },
         ],
     },
     HIGH: {
@@ -30,10 +41,11 @@ export const VIOLATION_SEVERITY = {
         color: '#DC2626',
         surface: '#FEE2E2',
         icon: 'alert-circle-outline',
+        points: SEVERITY_POINTS['High'],
         items: [
-            { name: 'Rash Driving', points: 200, icon: 'speedometer-outline' },
-            { name: 'Over Speeding', points: 200, icon: 'flash-outline' },
-            { name: 'Drunk Driving', points: 200, icon: 'wine-outline' },
+            { name: 'Rash Driving', points: SEVERITY_POINTS['High'], icon: 'speedometer-outline' },
+            { name: 'Over Speeding', points: SEVERITY_POINTS['High'], icon: 'flash-outline' },
+            { name: 'Drunk Driving', points: SEVERITY_POINTS['High'], icon: 'wine-outline' },
         ],
     },
 };
@@ -195,12 +207,29 @@ function generateCouponCode() {
 // ── Reward Service Logic ──
 export const rewardService = {
     /**
-     * Get the points a specific violation type is worth
+     * Get the points a specific severity level is worth.
+     * This is the preferred lookup — severity is always reliable.
+     * @param {'Low'|'Medium'|'High'|'Critical'|'None'} severity
      */
-    getPointsForViolation(violationType) {
+    getPointsForSeverity(severity) {
+        return SEVERITY_POINTS[severity] ?? SEVERITY_POINTS['Low'];
+    },
+
+    /**
+     * Get the points a specific violation type is worth.
+     * If severity is provided, it takes priority over the violation name lookup.
+     * @param {string} violationType
+     * @param {string} [severity]  - optional: 'Low' | 'Medium' | 'High' | 'Critical'
+     */
+    getPointsForViolation(violationType, severity = null) {
+        // Severity-based lookup takes priority (more reliable)
+        if (severity && SEVERITY_POINTS[severity] !== undefined) {
+            return SEVERITY_POINTS[severity];
+        }
+
         if (!violationType) return VIOLATION_POINTS_MAP.Default;
 
-        // Find exact or partial match
+        // Fallback: violation name lookup
         for (const [key, pts] of Object.entries(VIOLATION_POINTS_MAP)) {
             if (violationType.toLowerCase().includes(key.toLowerCase())) {
                 return pts;
@@ -233,11 +262,13 @@ export const rewardService = {
     },
 
     /**
-     * Instantly award points to the user profile
+     * Instantly award points to the user profile.
+     * @param {string} violationType
+     * @param {string} [severity] - preferred: awards correct tier points directly
      */
-    async awardPointsForReport(violationType) {
+    async awardPointsForReport(violationType, severity = null) {
         try {
-            const pointsToAward = this.getPointsForViolation(violationType);
+            const pointsToAward = this.getPointsForViolation(violationType, severity);
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error('Not authenticated');
 

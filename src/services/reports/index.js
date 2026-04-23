@@ -201,28 +201,15 @@ export async function fetchPendingReports(officerProfile = null) {
         `)
         .eq('status', 'pending');
 
-    // Location routing logic (Pincode + Jurisdiction Keyword)
-    if (officerProfile && officerProfile.role === 'officer') {
-        let filters = [];
-        
-        // 1. Badge Pincode mapping ('EYE-055' -> '400055')
-        if (officerProfile.badge_id) {
-            const digits = officerProfile.badge_id.match(/\d+$/);
-            if (digits) {
-                // Pad to 3 digits (e.g. 55 -> 055)
-                const suffix = digits[0].padStart(3, '0');
-                const pincode = `400${suffix}`;
-                filters.push(`location_address.ilike.%${pincode}%`);
-            }
-        }
-        
-        // 2. Keyword mapping ('Vakola')
-        if (officerProfile.jurisdiction) {
-            filters.push(`location_address.ilike.%${officerProfile.jurisdiction}%`);
-        }
-        
-        if (filters.length > 0) {
-            query = query.or(filters.join(','));
+    // Location routing logic (Strict Pincode mapping)
+    if (officerProfile && officerProfile.role === 'officer' && officerProfile.badge_id) {
+        // Badge Pincode mapping ('EYE-055' -> '400055')
+        const digits = officerProfile.badge_id.match(/\d+$/);
+        if (digits) {
+            // Pad to 3 digits (e.g. 55 -> 055)
+            const suffix = digits[0].padStart(3, '0');
+            const pincode = `400${suffix}`;
+            query = query.ilike('location_address', `%${pincode}%`);
         }
     }
 
@@ -254,22 +241,13 @@ export async function fetchReviewedReports(officerProfile = null) {
         `)
         .in('status', ['approved', 'rejected']);
 
-    // Location routing logic (same as pending)
-    if (officerProfile && officerProfile.role === 'officer') {
-        let filters = [];
-        if (officerProfile.badge_id) {
-            const digits = officerProfile.badge_id.match(/\d+$/);
-            if (digits) {
-                const suffix = digits[0].padStart(3, '0');
-                const pincode = `400${suffix}`;
-                filters.push(`location_address.ilike.%${pincode}%`);
-            }
-        }
-        if (officerProfile.jurisdiction) {
-            filters.push(`location_address.ilike.%${officerProfile.jurisdiction}%`);
-        }
-        if (filters.length > 0) {
-            query = query.or(filters.join(','));
+    // Location routing logic (Strict Pincode mapping)
+    if (officerProfile && officerProfile.role === 'officer' && officerProfile.badge_id) {
+        const digits = officerProfile.badge_id.match(/\d+$/);
+        if (digits) {
+            const suffix = digits[0].padStart(3, '0');
+            const pincode = `400${suffix}`;
+            query = query.ilike('location_address', `%${pincode}%`);
         }
     }
 
@@ -394,5 +372,37 @@ export function subscribeToNotifications(userId, onInsert) {
             table: 'notifications',
             filter: `user_id=eq.${userId}`,
         }, onInsert)
+        .subscribe();
+}
+
+/**
+ * Fetch all approved reports for the live map view.
+ * Joins officer_reviews to get the approving officer's details.
+ */
+export async function fetchApprovedMapReports() {
+    const { data, error } = await supabase
+        .from('image_reports')
+        .select(`
+            id, latitude, longitude, violation_type, severity, vehicle_number, submitted_at, reviewed_at, image_url,
+            officer_review:officer_reviews (
+                officer:officer_id ( full_name, badge_id )
+            )
+        `)
+        .eq('status', 'approved');
+    return { data, error };
+}
+
+/**
+ * Subscribe to realtime changes on image_reports for the live map.
+ */
+export function subscribeToApprovedMapReports(onChange) {
+    return supabase
+        .channel('image_reports_map_updates')
+        .on('postgres_changes', {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'image_reports',
+            filter: 'status=eq.approved',
+        }, onChange)
         .subscribe();
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
     View,
     Text,
@@ -8,11 +8,15 @@ import {
     Platform,
     Modal,
     Image,
-    ActivityIndicator
+    ActivityIndicator,
+    Alert
 } from 'react-native';
 import MapView, { Heatmap, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { fetchApprovedMapReports, subscribeToApprovedMapReports } from '../../services/reports';
+import { supabase } from '../../services/supabase';
+import * as Location from 'expo-location';
 import {
     COLORS,
     SPACING,
@@ -23,77 +27,16 @@ import {
 
 const { width, height } = Dimensions.get('window');
 
-// Base location for mock data (Mumbai City)
+// Base location for map initialization (Mumbai City)
 const BASE_LAT = 19.0760;
 const BASE_LNG = 72.8777;
-
-const VEHICLE_IMAGES = [
-    'https://images.unsplash.com/photo-1549317661-bc32c58a1ce7?auto=format&fit=crop&w=400&q=80',
-    'https://images.unsplash.com/photo-1510166089176-b57564a5f782?auto=format&fit=crop&w=400&q=80',
-    'https://images.unsplash.com/photo-1544620347-19eb79f42b3b?auto=format&fit=crop&w=400&q=80',
-    'https://images.unsplash.com/photo-1544160455-ce711ac3cc3d?auto=format&fit=crop&w=400&q=80',
-    'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&w=400&q=80',
-    'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=400&q=80',
-    'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=400&q=80',
-    'https://images.unsplash.com/photo-1511216335778-7cb8f49fa7a3?auto=format&fit=crop&w=400&q=80',
-];
-
-const generateMockData = (count) => {
-    const types = ['Speeding', 'Red Light', 'Wrong Way', 'No Helmet', 'Illegal Parking'];
-    const severities = ['High', 'Medium', 'Low'];
-    const data = [];
-    
-    // Define some "hotspots" or busy intersections to make density realistic
-    const hotspots = [
-        { lat: BASE_LAT, lng: BASE_LNG },
-        { lat: BASE_LAT + 0.05, lng: BASE_LNG - 0.02 },
-        { lat: BASE_LAT - 0.03, lng: BASE_LNG + 0.04 },
-        { lat: BASE_LAT + 0.08, lng: BASE_LNG + 0.01 },
-    ];
-
-    for (let i = 0; i < count; i++) {
-        // 70% of points around hotspots, 30% random
-        const isHotspot = Math.random() < 0.7;
-        let lat, lng;
-        
-        if (isHotspot) {
-            const spot = hotspots[Math.floor(Math.random() * hotspots.length)];
-            // Cluster tightly around the hotspot
-            lat = spot.lat + (Math.random() - 0.5) * 0.03;
-            lng = spot.lng + (Math.random() - 0.5) * 0.03;
-        } else {
-            // Randomly scattered
-            lat = BASE_LAT + (Math.random() - 0.5) * 0.28;
-            lng = BASE_LNG + (Math.random() - 0.5) * 0.12;
-        }
-
-        const severity = severities[Math.floor(Math.random() * severities.length)];
-        
-        // Weight determines heat. Avoid random 0-100 so individual points don't max the color gradient.
-        let weight = 1;
-        if (severity === 'High') weight = 3;
-        else if (severity === 'Medium') weight = 2;
-
-        data.push({
-            id: `v-${i}`,
-            latitude: lat,
-            longitude: lng,
-            violationType: types[Math.floor(Math.random() * types.length)],
-            timestamp: new Date(Date.now() - Math.floor(Math.random() * 30) * 86400000).toISOString(),
-            severity: severity,
-            imageUrl: VEHICLE_IMAGES[Math.floor(Math.random() * VEHICLE_IMAGES.length)],
-            weight: weight
-        });
-    }
-    return data;
-};
-
-const ALL_MOCK_DATA = generateMockData(800);
 
 export default function ViolationHeatmap({ navigation }) {
     const [violations, setViolations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [timeFilter, setTimeFilter] = useState('30_days'); // 'today', '7_days', '30_days'
+    
+    const mapRef = useRef(null);
     
     // Toggle for Heatmap Layer
     const [showHeatmap, setShowHeatmap] = useState(false);
@@ -104,46 +47,106 @@ export default function ViolationHeatmap({ navigation }) {
     // Details Sheet
     const [selectedMarker, setSelectedMarker] = useState(null);
 
-    // Initial load
+    // Fetch on mount and subscribe to realtime updates
     useEffect(() => {
-        fetchViolations(timeFilter);
-    }, [timeFilter]);
+        loadData();
 
-    // Data fetching wrapper (easy to replace with Supabase)
-    const fetchViolations = async (filter) => {
-        setLoading(true);
-        try {
-            // Mocking network delay
-            await new Promise(resolve => setTimeout(resolve, 600));
+        const channel = subscribeToApprovedMapReports(() => {
+            console.log('[Live Map] Received update from DB, refreshing map...');
+            loadData(false); // Refresh without showing main loading spinner
+        });
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, []);
+
+    const loadData = async (showSpinner = true) => {
+        if (showSpinner) setLoading(true);
+        const { data, error } = await fetchApprovedMapReports();
+        if (error) {
+            console.error("Failed to fetch live map reports", error);
+            Alert.alert("Error", "Could not load live reports on map.");
+        } else if (data) {
+            let processedData = [];
             
-            const now = new Date().getTime();
-            let daysCutoff = 30;
-            if (filter === 'today') daysCutoff = 1;
-            else if (filter === '7_days') daysCutoff = 7;
+            // Process the data to add 'weight' for the heatmap and fallback to geocoding if coordinates are missing
+            for (let v of data) {
+                let lat = v.latitude;
+                let lng = v.longitude;
+                
+                // If missing coordinates but has an address, try to forward-geocode
+                if ((lat == null || lng == null) && v.location_address) {
+                    try {
+                        const geo = await Location.geocodeAsync(v.location_address);
+                        if (geo && geo.length > 0) {
+                            lat = geo[0].latitude;
+                            lng = geo[0].longitude;
+                        }
+                    } catch (err) {
+                        console.log("Geocode failed for", v.location_address);
+                    }
+                }
+                
+                // Only keep reports with valid coordinates
+                if (lat != null && lng != null && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lng))) {
+                    const sv = (v.severity || '').toLowerCase();
+                    let weight = 1;
+                    if (sv === 'critical' || sv === 'high') weight = 3;
+                    else if (sv === 'medium') weight = 2;
+                    
+                    // Add random jitter (~5-10 meters) so overlapping markers separate visually
+                    const jitterLat = (Math.random() - 0.5) * 0.00015;
+                    const jitterLng = (Math.random() - 0.5) * 0.00015;
 
-            const cutoffTime = now - (daysCutoff * 86400000);
+                    processedData.push({ 
+                        ...v, 
+                        latitude: parseFloat(lat) + jitterLat, 
+                        longitude: parseFloat(lng) + jitterLng, 
+                        weight 
+                    });
+                }
+            }
+                
+            setViolations(processedData);
 
-            const filteredData = ALL_MOCK_DATA.filter(v => {
-                const vTime = new Date(v.timestamp).getTime();
-                return vTime >= cutoffTime;
-            });
-
-            setViolations(filteredData);
-        } catch (error) {
-            console.error("Failed to fetch violations", error);
-        } finally {
-            setLoading(false);
+            // Auto-fit to new coordinates if there are any
+            if (processedData.length > 0 && mapRef.current) {
+                setTimeout(() => {
+                    mapRef.current?.fitToCoordinates(
+                        processedData.map(v => ({ latitude: v.latitude, longitude: v.longitude })),
+                        { edgePadding: { top: 100, right: 80, bottom: 80, left: 80 }, animated: true }
+                    );
+                }, 500);
+            }
         }
+        if (showSpinner) setLoading(false);
     };
+
+    // Derived filtered data based on selected time window
+    const displayViolations = useMemo(() => {
+        if (!violations) return [];
+        const now = new Date().getTime();
+        let daysCutoff = 30;
+        if (timeFilter === 'today') daysCutoff = 1;
+        else if (timeFilter === '7_days') daysCutoff = 7;
+
+        const cutoffTime = now - (daysCutoff * 86400000);
+
+        return violations.filter(v => {
+            const vTime = new Date(v.reviewed_at || v.submitted_at).getTime();
+            return vTime >= cutoffTime;
+        });
+    }, [violations, timeFilter]);
 
     // Prepare Heatmap Data
     const heatmapPoints = useMemo(() => {
-        return violations.map(v => ({
+        return displayViolations.map(v => ({
             latitude: v.latitude,
             longitude: v.longitude,
             weight: v.weight,
         }));
-    }, [violations]);
+    }, [displayViolations]);
 
     // Track Zoom level
     const onRegionChangeComplete = useCallback((region) => {
@@ -162,10 +165,13 @@ export default function ViolationHeatmap({ navigation }) {
     };
 
     const getSeverityColor = (severity) => {
-        switch (severity) {
-            case 'High': return COLORS.danger;
-            case 'Medium': return COLORS.warning;
-            default: return COLORS.success;
+        const sv = (severity || '').toLowerCase();
+        switch (sv) {
+            case 'critical':
+            case 'high': return COLORS.error || COLORS.danger;
+            case 'medium': return COLORS.amber || COLORS.warning;
+            case 'low': return COLORS.success || COLORS.info;
+            default: return COLORS.textSecondary;
         }
     };
 
@@ -187,6 +193,7 @@ export default function ViolationHeatmap({ navigation }) {
         <View style={styles.container}>
             {/* Map View */}
             <MapView
+                ref={mapRef}
                 style={styles.map}
                 provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
                 initialRegion={{
@@ -214,7 +221,7 @@ export default function ViolationHeatmap({ navigation }) {
                 )}
 
                 {/* Render Markers when heatmap is off OR we have zoomed in */}
-                {(!showHeatmap || isZoomedIn) && violations.map(v => (
+                {(!showHeatmap || isZoomedIn) && displayViolations.map(v => (
                     <Marker
                         key={v.id}
                         coordinate={{ latitude: v.latitude, longitude: v.longitude }}
@@ -291,31 +298,31 @@ export default function ViolationHeatmap({ navigation }) {
                                     <View style={styles.sheetTopRow}>
                                         <View style={styles.typeContainer}>
                                             <Ionicons name="car-sport" size={24} color={COLORS.primary} />
-                                            <Text style={styles.sheetTitle}>{selectedMarker.violationType}</Text>
+                                            <Text style={styles.sheetTitle}>{selectedMarker.violation_type}</Text>
                                         </View>
                                         <View style={[styles.severityBadge, { backgroundColor: getSeverityColor(selectedMarker.severity) }]}>
-                                            <Text style={styles.severityText}>{selectedMarker.severity}</Text>
+                                            <Text style={styles.severityText}>{String(selectedMarker.severity).toUpperCase()}</Text>
                                         </View>
                                     </View>
                                 </View>
 
                                 <View style={styles.sheetContent}>
                                     <View style={styles.detailRow}>
-                                        <Ionicons name="time-outline" size={20} color={COLORS.textTertiary} />
+                                        <Ionicons name="shield-checkmark" size={20} color={COLORS.success} />
                                         <Text style={styles.detailText}>
-                                            {new Date(selectedMarker.timestamp).toLocaleString()}
+                                            Verified by: {selectedMarker.officer_review?.[0]?.officer?.full_name || 'System'} ({selectedMarker.officer_review?.[0]?.officer?.badge_id || 'AUTO'})
                                         </Text>
                                     </View>
                                     <View style={styles.detailRow}>
-                                        <Ionicons name="location-outline" size={20} color={COLORS.textTertiary} />
+                                        <Ionicons name="time-outline" size={20} color={COLORS.textTertiary} />
                                         <Text style={styles.detailText}>
-                                            {selectedMarker.latitude.toFixed(5)}, {selectedMarker.longitude.toFixed(5)}
+                                            {new Date(selectedMarker.reviewed_at || selectedMarker.submitted_at).toLocaleString()}
                                         </Text>
                                     </View>
                                     
-                                    {selectedMarker.imageUrl && (
+                                    {selectedMarker.image_url && (
                                         <Image 
-                                            source={{ uri: selectedMarker.imageUrl }} 
+                                            source={{ uri: selectedMarker.image_url }} 
                                             style={styles.thumbnail} 
                                             resizeMode="cover"
                                         />
@@ -324,28 +331,12 @@ export default function ViolationHeatmap({ navigation }) {
 
                                 <View style={styles.sheetFooter}>
                                     <TouchableOpacity style={styles.actionButton} onPress={() => {
-                                        const mockReportDetails = {
-                                            id: selectedMarker.id,
-                                            violation_type: selectedMarker.violationType,
-                                            vehicle_number: "TEST-1234",
-                                            location_address: "Live Map Hotspot",
-                                            latitude: selectedMarker.latitude,
-                                            longitude: selectedMarker.longitude,
-                                            submitted_at: selectedMarker.timestamp,
-                                            reviewed_at: new Date().toISOString(),
-                                            severity: selectedMarker.severity.toLowerCase(),
-                                            image_url: selectedMarker.imageUrl,
-                                            reward_amount: 15,
-                                            submitter: { full_name: "Hotspot Tracker", email: "system@trafficeye.gov", phone: "—" },
-                                            officer_review: {
-                                                officer: { full_name: "System Auto-Flag" },
-                                                remarks: "This is a virtual hotspot alert representing a cluster of violations in this area."
-                                            }
-                                        };
+                                        const markerData = { ...selectedMarker };
                                         setSelectedMarker(null);
-                                        navigation.navigate('VerifiedReportDetail', { mockData: mockReportDetails });
+                                        // Optional: Navigate to Full Report view if needed
+                                        // navigation.navigate('VerifiedReportDetail', { reportData: markerData });
                                     }}>
-                                        <Text style={styles.actionButtonText}>View Full Report</Text>
+                                        <Text style={styles.actionButtonText}>Close Overlay</Text>
                                     </TouchableOpacity>
                                 </View>
                             </>

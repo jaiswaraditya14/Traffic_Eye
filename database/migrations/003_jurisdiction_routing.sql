@@ -12,7 +12,7 @@
 -- Convention:
 --   Badge ID "EYE-055" → Pincode "400055" (Vakola)
 --   Badge ID "EYE-071" → Pincode "400071" (Chembur)
---   App searches: location_address ILIKE '%400055%' OR ILIKE '%Vakola%'
+--   App strictly searches: location_address ILIKE '%400055%'
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 

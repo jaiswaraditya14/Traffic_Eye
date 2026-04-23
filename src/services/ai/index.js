@@ -11,7 +11,7 @@ const VIOLATION_SEVERITY = {
     'Speeding':              6,
     'Triple Riding':         5,
     'Overloading':           5,
-    'No Helmet':             4,
+    'No Helmet':             2,
     'No Seat Belt':          4,
     'Mobile Phone Use':      3,
     'No Registration Plate': 3,
@@ -22,87 +22,124 @@ const VIOLATION_SEVERITY = {
 
 // ─── Attempt queue builder ─────────────────────────────────────────────────────
 // Strategy: exhaust ALL keys for Model A before trying Model B.
-const buildAttemptQueue = () => {
+// Strategy: exhaust ALL keys for Model A before trying Model B.
+const buildAttemptQueue = (modelsArray) => {
     const queue = [];
-    for (const model of AI_CONFIG.models) {
-        for (const apiKey of AI_CONFIG.geminiApiKeys) {
-            queue.push({ model, apiKey });
+    for (const model of modelsArray) {
+        if (model.includes('llama') || model.includes('openai') || model.includes('gpt')) {
+            // Groq model
+            for (const apiKey of (AI_CONFIG.groqApiKeys || [])) {
+                queue.push({ model, apiKey, provider: 'groq' });
+            }
+        } else {
+            // Gemini model
+            for (const apiKey of AI_CONFIG.geminiApiKeys) {
+                queue.push({ model, apiKey, provider: 'gemini' });
+            }
         }
     }
     return queue;
 };
 
 const logDiagnostics = () => {
-    const keyCount = AI_CONFIG.geminiApiKeys.length;
-    const masked = AI_CONFIG.geminiApiKeys.map(k =>
-        k ? `${k.slice(0, 8)}…${k.slice(-4)}` : 'UNDEFINED'
-    );
-    console.log(`[AI] Keys: ${keyCount} — ${masked.join(', ')}`);
-    console.log(`[AI] Models: ${AI_CONFIG.models.join(', ')}`);
-    if (keyCount === 0)
-        console.error('[AI] ⚠️  No API keys! Check .env and restart the bundler.');
+    const geminiKeyCount = AI_CONFIG.geminiApiKeys?.length || 0;
+    const groqKeyCount = AI_CONFIG.groqApiKeys?.length || 0;
+    console.log(`[AI] Keys: Gemini(${geminiKeyCount}), Groq(${groqKeyCount})`);
+    console.log(`[AI] Vision Models: ${AI_CONFIG.visionModels?.join(', ') || 'None'}`);
+    console.log(`[AI] Reasoning Models: ${AI_CONFIG.reasoningModels?.join(', ') || 'None'}`);
+    if (geminiKeyCount === 0 && groqKeyCount === 0)
+        console.error('[AI] ⚠️ No API keys! Check .env and restart.');
 };
 
 // ─── Stage 1 prompt: Violation detection ─────────────────────────────────────
 // Kept deliberately wide-angle — give full scene context, don't over-zoom.
 const VIOLATION_PROMPT = `
 You are an Indian traffic enforcement AI system analysing a dashcam or phone photograph.
+Your responses directly lead to legal action. Accuracy is paramount. False accusations are UNACCEPTABLE.
 
 STEP 1 — SCENE UNDERSTANDING (think step-by-step, internally):
   • Count every visible vehicle (cars, bikes, autos, trucks, buses, cycles).
-  • For each vehicle, note its type, position, and any rider/passenger details.
+  • For each vehicle, carefully count the number of people PHYSICALLY SEATED ON IT.
+  • Note each rider/passenger's position, helmet status, and any visible goods.
 
 STEP 2 — VIOLATION DETECTION:
   Check EVERY vehicle for these Indian traffic violations:
-  - No Helmet (riders/pillion without helmet)
-  - Triple Riding (VERY STRICT: 3 or more people physically and clearly sitting ON the same 2-wheeler simultaneously. You MUST see 3 clearly distinct bodies physically riding together on the SAME vehicle. People walking, standing, parked, or in the background do NOT count. If in any doubt, do NOT flag this.)
-  - Red Light Violation (vehicle clearly past stop line at red signal)
-  - Wrong Side Driving / Wrong Way (driving against traffic flow)
-  - No Registration Plate (plate missing or completely obscured)
-  - Speeding (blurred motion, context clues)
-  - Mobile Phone Use (driver visibly on phone)
-  - No Seat Belt (driver/front passenger without seat belt)
-  - Wrong Parking (on footpath, no-parking zone, obstruction)
-  - Overloading (goods or passengers beyond legal capacity)
-  - Lane Cutting (abrupt unsafe lane change)
-  - Dangerous Driving / Drunk Driving (visually evident erratic behaviour)
 
-  CRITICAL RULE AGAINST FALSE POSITIVES (HALLUCINATIONS):
-  - Do NOT guess, assume, or hallucinate violations!
-  - If you are not 100% physically seeing the violation, you MUST assume the driver is following the rules.
-  - "No violation detected" is an extremely common, valid, and expected answer. Do NOT accuse a vehicle without undeniable visual proof.
+  ── COUNTING-BASED VIOLATIONS (EXTREME CAUTION REQUIRED) ──
+  - Triple Riding: ONLY flag if you can EXPLICITLY COUNT 3 or more DISTINCT human bodies
+    ALL physically on the SAME 2-wheeler AT THE SAME TIME in the FOREGROUND.
+    ★ Count: 1 body = driver only. 2 bodies = driver + 1 pillion (NORMAL, NOT a violation).
+    ★ You need to see 3 SEPARATE bodies. If you see only 1 or 2 people on the bike → DO NOT flag.
+    ★ People walking/standing near the bike, on other vehicles, or in the BACKGROUND do NOT count.
+    ★ If there is ANY doubt about the exact count → DO NOT FLAG. Doubt = no violation.
+
+  - Overloading: ONLY flag for goods vehicles (trucks/tempos/autos) when cargo is VISIBLY
+    spilling over the sides or stacked dangerously beyond the vehicle body.
+    ★ DO NOT flag overloading for motorcycles/scooters unless 3+ people are literally on it.
+    ★ A rider carrying a backpack or small bag is NOT overloading.
+    ★ If you cannot see obvious overflowing goods → DO NOT FLAG.
+
+  ── OTHER VIOLATIONS ──
+  - No Helmet: rider or pillion is clearly NOT wearing a helmet
+  - Red Light Violation: vehicle clearly past stop line at a red signal
+  - Wrong Side Driving / Wrong Way: driving visibly against traffic flow
+  - No Registration Plate: plate is fully missing or completely unreadable/obscured
+  - Speeding: clear motion blur or strong context clues
+  - Mobile Phone Use: driver is visibly holding/using a phone while riding
+  - No Seat Belt: car driver/front passenger without seat belt clearly visible
+  - Wrong Parking: parked on footpath, no-parking zone, or causing obstruction
+  - Lane Cutting: abrupt unsafe lane change captured in the moment
+  - Dangerous Driving / Drunk Driving: visually evident erratic behaviour
+
+  ══════════════════════════════════════════════════════════════════
+  ZERO-TOLERANCE HALLUCINATION POLICY — READ CAREFULLY:
+  • You MUST only report what you can PHYSICALLY and UNAMBIGUOUSLY see.
+  • Do NOT infer, assume, or guess any violation.
+  • Do NOT report Triple Riding unless you can clearly count THREE bodies on the vehicle.
+  • Do NOT report Overloading unless goods are visibly spilling beyond the vehicle frame.
+  • A single rider without a helmet → ONLY "No Helmet". Nothing else unless separately verified.
+  • "No violation" is always valid and often the correct answer.
+  • When in doubt about ANY violation → DO NOT include it. Silence is better than false accusation.
+  ══════════════════════════════════════════════════════════════════
 
 STEP 3 — PRIMARY VIOLATOR SELECTION:
   • Focus primarily on the clear FOREGROUND vehicle.
-  • Do NOT penalise a vehicle for having pedestrians walking behind it (depth perspective trick).
-  • If multiple violations, pick the vehicle with the MOST SEVERE violation.
-  • If a tie, pick the one whose plate is most readable.
+  • Do NOT penalise a vehicle for pedestrians walking behind it (depth perspective illusion).
+  • If multiple violations on same vehicle, pick the most severe one as primary.
+  • If multiple vehicles violated, pick the one with the most readable plate.
 
-STEP 4 — PLATE READING (rough pass — OCR will verify in the next step):
+STEP 4 — PLATE READING (rough pass — OCR will verify in next step):
   • Read the number plate of the PRIMARY violator ONLY.
   • Indian plate format examples: MH12AB1234, KA01MF7890, DL8CAK0001, UP32ET5678
   • If completely unreadable, write "Not detected".
   • DO NOT read a bystander vehicle's plate.
 
 STEP 5 — CONFIDENCE:
-  • 90-100: Plate clearly visible, violation obvious.
-  • 70-89: Good confidence but minor ambiguity.
+  • 90-100: Plate clearly visible, violation obvious and unambiguous.
+  • 70-89: Good confidence but minor ambiguity exists.
   • 50-69: Partial evidence of violation.
-  • 0-49: Low quality or ambiguous.
+  • 0-49: Low quality or significantly ambiguous image.
 
-Return ONLY this exact JSON (no markdown, no explanation):
+MANDATORY OUTPUT FORMAT — Return ONLY this exact JSON (no markdown, no explanation):
 {
+  "vehicleType": "motorcycle",
+  "primaryVehiclePersonCount": 1,
   "violationDetected": true,
-  "vehicleNumber": "MH12AB1234",
+  "vehicleNumber": "AP28R8104",
   "violationType": "No Helmet",
-  "allViolations": ["No Helmet", "Triple Riding"],
-  "severity": "High",
-  "confidence": 85,
-  "description": "A red Honda Activa with 3 riders, none wearing helmets. Plate partially visible."
+  "allViolations": ["No Helmet"],
+  "severity": "Medium",
+  "confidence": 92,
+  "description": "Rider on a black motorcycle is not wearing a helmet. Only this single violation is visible."
 }
+
+IMPORTANT: vehicleType must be one of: motorcycle, scooter, car, truck, bus, auto, cycle, other.
+primaryVehiclePersonCount = exact number of people you can see ON the primary vehicle (integer).
 
 If NO violation at all:
 {
+  "vehicleType": "motorcycle",
+  "primaryVehiclePersonCount": 1,
   "violationDetected": false,
   "vehicleNumber": "Not applicable",
   "violationType": "None",
@@ -111,6 +148,24 @@ If NO violation at all:
   "confidence": 90,
   "description": "No traffic violation detected in this image."
 }
+`;
+
+// ─── Stage 1.5 prompt: Reasoning validation ──────────────────────────────────
+const REASONING_PROMPT = `
+You are a senior traffic police officer evaluating a preliminary traffic violation report generated by a vision AI.
+Review the following initial detection data carefully and determine if it constitutes a definitive, legally binding traffic violation.
+Apply strict logic based on Indian traffic rules.
+
+Initial Report:
+__RAW_JSON__
+
+MANDATORY RULES:
+1. Triple Riding requires exactly 3 or more people ON the vehicle. 1 or 2 people is NOT a violation.
+2. Overloading only applies to goods clearly spilling out of goods vehicles, not passenger bags.
+3. If the violation is doubtful based on the description, mark violationDetected as false and violationType as "None".
+4. Ensure the output is strictly valid JSON matching the exact schema of the input.
+
+Output ONLY the final evaluated JSON. No markdown, no explanations.
 `;
 
 // ─── Stage 2 prompt: High-accuracy plate OCR ─────────────────────────────────
@@ -159,39 +214,70 @@ If no plate is visible at all:
 `;
 
 // ─── Low-level Gemini API caller ───────────────────────────────────────────────
-const callGemini = async ({ model, apiKey, prompt, base64Image, timeoutMs = 60000 }) => {
-    if (!apiKey) throw new Error('API key undefined — restart bundler after .env change');
+// ─── Universal AI Caller (Gemini & Groq) ──────────────────────────────────────
+const callAI = async ({ model, apiKey, provider, prompt, base64Image, timeoutMs = 60000 }) => {
+    if (!apiKey) throw new Error(`${provider} API key undefined — check .env`);
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-    const body = JSON.stringify({
-        contents: [{
-            parts: [
-                { text: prompt },
-                { inline_data: { mime_type: 'image/jpeg', data: base64Image } },
-            ],
-        }],
-        generationConfig: {
-            temperature: 0.1,          // Low = deterministic; better for structured extraction
-            responseMimeType: 'text/plain',
-        },
-    });
+    const isGroq = provider === 'groq';
+    const isTextOnly = !base64Image;
+    const url = isGroq 
+        ? 'https://api.groq.com/openai/v1/chat/completions'
+        : `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    const body = isGroq 
+        ? JSON.stringify({
+            model,
+            messages: [{
+                role: 'user',
+                content: isTextOnly
+                    ? prompt
+                    : [
+                        { type: 'text', text: prompt },
+                        { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
+                    ]
+            }],
+            temperature: 0.1,
+            max_completion_tokens: 8192,
+            ...(model.includes('gpt-oss-120b') ? { reasoning_effort: 'medium' } : {})
+        })
+        : JSON.stringify({
+            contents: [{
+                parts: isTextOnly
+                    ? [{ text: prompt }]
+                    : [
+                        { text: prompt },
+                        { inline_data: { mime_type: 'image/jpeg', data: base64Image } },
+                    ],
+            }],
+            generationConfig: { temperature: 0.1, responseMimeType: 'text/plain' },
+        });
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
         const res = await fetch(url, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                ...(isGroq ? { 'Authorization': `Bearer ${apiKey}` } : {})
+            },
             body,
             signal: controller.signal,
         });
+
         if (!res.ok) {
             const txt = await res.text();
-            throw new Error(`HTTP ${res.status}: ${txt.slice(0, 200)}`);
+            throw new Error(`${provider} HTTP ${res.status}: ${txt.slice(0, 200)}`);
         }
+
         const json = await res.json();
-        if (!json.candidates?.length) throw new Error('No candidates in Gemini response');
-        return json.candidates[0].content.parts[0].text;
+        if (isGroq) {
+            if (!json.choices?.length) throw new Error('No choices in Groq response');
+            return json.choices[0].message.content;
+        } else {
+            if (!json.candidates?.length) throw new Error('No candidates in Gemini response');
+            return json.candidates[0].content.parts[0].text;
+        }
     } finally {
         clearTimeout(timer);
     }
@@ -204,6 +290,48 @@ const extractJSON = (text) => {
     const match = stripped.match(/\{[\s\S]*\}/);
     if (!match) throw new Error('No JSON object found in response');
     return JSON.parse(match[0]);
+};
+
+// ─── Post-parse violation validator (programmatic safety net) ────────────────
+// Removes hallucinated counting-based violations by cross-checking the model's
+// own reported person count and vehicle type against the violation list.
+const validateViolations = (allViolations, parsed) => {
+    let violations = [...allViolations];
+    const personCount = typeof parsed.primaryVehiclePersonCount === 'number'
+        ? parsed.primaryVehiclePersonCount : null;
+    const vehicleType = (parsed.vehicleType || '').toLowerCase();
+
+    const isTwoWheeler =
+        vehicleType.includes('motor') || vehicleType.includes('bike') ||
+        vehicleType.includes('scooter') || vehicleType.includes('cycle') ||
+        vehicleType.includes('two') || vehicleType.includes('2-wheel');
+
+    // Triple Riding: model must have reported ≥3 people on the vehicle
+    if (violations.includes('Triple Riding')) {
+        if (personCount !== null && personCount < 3) {
+            console.log(`[AI] ⚡ Validator: Removing 'Triple Riding' — model reported ${personCount} person(s), need ≥ 3`);
+            violations = violations.filter(v => v !== 'Triple Riding');
+        } else if (personCount === null) {
+            // No count provided — conservative: keep it only if description mentions '3' or 'three'
+            const desc = (parsed.description || '').toLowerCase();
+            const mentionsThree = /\bthree\b|\b3\b|\btriple\b/.test(desc);
+            if (!mentionsThree) {
+                console.log(`[AI] ⚡ Validator: Removing 'Triple Riding' — no person count & description doesn't confirm 3 riders`);
+                violations = violations.filter(v => v !== 'Triple Riding');
+            }
+        }
+    }
+
+    // Overloading: only valid for goods vehicles (truck/tempo/bus/auto)
+    // For 2-wheelers, only flag if Triple Riding is also confirmed
+    if (violations.includes('Overloading') && isTwoWheeler) {
+        if (!violations.includes('Triple Riding')) {
+            console.log(`[AI] ⚡ Validator: Removing 'Overloading' — 2-wheeler without confirmed triple riding`);
+            violations = violations.filter(v => v !== 'Overloading');
+        }
+    }
+
+    return violations;
 };
 
 // ─── Parse violation response ───────────────────────────────────────────────
@@ -222,10 +350,26 @@ const parseViolationResult = (raw) => {
         };
     }
 
-    // Pick the highest-severity violation across allViolations
-    const allViolations = parsed.allViolations?.length
+    // Pick reported violations, then run programmatic validator
+    const rawViolations = parsed.allViolations?.length
         ? parsed.allViolations
         : [parsed.violationType || 'Other'];
+
+    const allViolations = validateViolations(rawViolations, parsed);
+
+    // If validator removed everything, treat as no violation
+    if (allViolations.length === 0) {
+        console.log('[AI] ⚡ Validator removed all violations — treating as no violation detected');
+        return {
+            violationDetected: false,
+            vehicleNumber: 'Not applicable',
+            violationType: 'None',
+            allViolations: [],
+            severity: 'None',
+            confidence: parsed.confidence ?? 50,
+            description: parsed.description || 'No confirmed violation after validation.',
+        };
+    }
 
     const primaryViolation = [...allViolations].sort(
         (a, b) => (VIOLATION_SEVERITY[b] ?? 0) - (VIOLATION_SEVERITY[a] ?? 0)
@@ -249,16 +393,17 @@ const parseViolationResult = (raw) => {
 };
 
 // ─── Run one stage with key/model rotation ────────────────────────────────────
+// Returns { text, winningAttempt } so the caller can reuse the winning model+key.
 const runWithRotation = async (prompt, base64Image, attempts, label) => {
     let lastError = null;
-    for (const { model, apiKey } of attempts) {
-        const keyIdx = AI_CONFIG.geminiApiKeys.indexOf(apiKey) + 1;
-        const tag = `[${label}] model=${model} key${keyIdx}`;
+    for (const attempt of attempts) {
+        const { model, apiKey, provider } = attempt;
+        const tag = `[${label}] provider=${provider} model=${model}`;
         console.log(`${tag} → trying`);
         try {
-            const text = await callGemini({ model, apiKey, prompt, base64Image });
+            const text = await callAI({ model, apiKey, provider, prompt, base64Image });
             console.log(`${tag} → ✅ success`);
-            return text;
+            return { text, winningAttempt: attempt };
         } catch (err) {
             lastError = err;
             const isQuota   = err.message.includes('429') || err.message.toLowerCase().includes('quota');
@@ -310,27 +455,51 @@ export const aiService = {
             console.log('[AI] Preparing images…');
             const { violationB64, ocrB64 } = await prepareImages(imageUri);
 
-            const attempts = buildAttemptQueue();
+            const visionAttempts = buildAttemptQueue(AI_CONFIG.visionModels || []);
+            const reasoningAttempts = buildAttemptQueue(AI_CONFIG.reasoningModels || []);
 
-            // ── Stage 1: Violation detection ────────────────────────────────
-            console.log('[AI] Stage 1 — violation detection');
-            const rawViolation = await runWithRotation(
-                VIOLATION_PROMPT, violationB64, attempts, 'S1-VIOLATION'
+            // ── Stage 1: Vision Detection ───────────────────────────────────
+            console.log('[AI] Stage 1 — Vision detection');
+            const { text: rawVisionViolation, winningAttempt: visionWinner } = await runWithRotation(
+                VIOLATION_PROMPT, violationB64, visionAttempts, 'S1-VISION'
             );
-            const violationResult = parseViolationResult(rawViolation);
-            console.log('[AI] S1 result:', JSON.stringify({
+
+            // ── Stage 1.5: Reasoning & Validation ───────────────────────────
+            console.log('[AI] Stage 1.5 — Reasoning validation');
+            let finalRawViolation = rawVisionViolation;
+            if (reasoningAttempts.length > 0) {
+                const reasoningPrompt = REASONING_PROMPT.replace('__RAW_JSON__', rawVisionViolation);
+                try {
+                    const { text: reasonedText } = await runWithRotation(
+                        reasoningPrompt, null, reasoningAttempts, 'S1.5-REASONING'
+                    );
+                    finalRawViolation = reasonedText;
+                } catch (reasonErr) {
+                    console.warn('[AI] Stage 1.5 Reasoning failed (non-fatal), falling back to S1 JSON:', reasonErr.message);
+                }
+            }
+
+            const violationResult = parseViolationResult(finalRawViolation);
+            console.log('[AI] S1.5 result:', JSON.stringify({
                 detected: violationResult.violationDetected,
                 type: violationResult.violationType,
+                violations: violationResult.allViolations,
                 plate: violationResult.vehicleNumber,
                 confidence: violationResult.confidence,
             }));
 
             // ── Stage 2: Plate OCR (runs whenever violation was detected) ───
+            // Reuse the winning model+key from Stage 1 first — only fall back to
+            // others if it fails (avoids unnecessary API hops).
             if (violationResult.violationDetected) {
                 console.log('[AI] Stage 2 — plate OCR');
+                const stage2Attempts = [
+                    visionWinner,
+                    ...visionAttempts.filter(a => a !== visionWinner),
+                ];
                 try {
-                    const rawOCR = await runWithRotation(
-                        PLATE_OCR_PROMPT, ocrB64, attempts, 'S2-OCR'
+                    const { text: rawOCR } = await runWithRotation(
+                        PLATE_OCR_PROMPT, ocrB64, stage2Attempts, 'S2-OCR'
                     );
                     const ocr = extractJSON(rawOCR);
                     console.log(`[AI] S2 OCR result: "${ocr.plate_text}" @ ${ocr.confidence_percent}%`);

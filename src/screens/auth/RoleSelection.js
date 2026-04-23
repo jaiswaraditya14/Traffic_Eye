@@ -111,7 +111,7 @@ export default function RoleSelection({ navigation, onConfirm }) {
 
                 {/* ── Heading ── */}
                 <Animated.View style={[styles.headingBlock, { opacity: headerFade }]}>
-                    <Text style={styles.heading}>How are you using{'\n'}the app today?</Text>
+                    <Text style={styles.heading}>Welcome to{'\n'}TrafficEye</Text>
                 </Animated.View>
 
                 {/* ── Citizen Card (Primary) ── */}
@@ -135,34 +135,22 @@ export default function RoleSelection({ navigation, onConfirm }) {
                         >
                             <View style={styles.iconOuter}>
                                 <View style={styles.iconInner}>
-                                    <Ionicons name="people" size={44} color={C.accent} />
+                                    <Ionicons name="camera" size={42} color={C.accent} />
                                 </View>
                             </View>
                         </Animated.View>
 
                         {/* Text block */}
-                        <Text style={styles.citizenTitle}></Text>
+                        <Text style={styles.citizenTitle}>Make an Impact</Text>
                         <Text style={styles.citizenSubtitle}>
-                            Report traffic violations, track your submissions, and earn rewards
+                            Report traffic violations easily, track your verified submissions, and earn rewards for keeping our streets safe.
                         </Text>
 
-                        {/* Feature chips
-                        <View style={styles.chipRow}>
-                            {[
-                                { icon: 'camera-outline', label: 'Report' },
-                                { icon: 'checkmark-circle-outline', label: 'Track' },
-                                { icon: 'gift-outline', label: 'Earn Rewards' },
-                            ].map((chip) => (
-                                <View key={chip.label} style={styles.chip}>
-                                    <Ionicons name={chip.icon} size={13} color={C.accent} />
-                                    <Text style={styles.chipText}>{chip.label}</Text>
-                                </View>
-                            ))}
-                        </View> */}
+
 
                         {/* CTA Button */}
                         <View style={styles.ctaButton}>
-                            <Text style={styles.ctaText}>Continue as Citizen</Text>
+                            <Text style={styles.ctaText}>Continue</Text>
                             <Ionicons name="arrow-forward" size={18} color={C.white} />
                         </View>
                     </TouchableOpacity>

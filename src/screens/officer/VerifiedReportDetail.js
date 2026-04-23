@@ -210,12 +210,7 @@ export default function VerifiedReportDetail({ route, navigation }) {
     </div>
   </div>
 
-  <div class="section">
-    <h2>Citizen Information</h2>
-    <div class="row"><span class="lbl">Full Name</span><span class="val">${report.submitter?.full_name || '—'}</span></div>
-    <div class="row"><span class="lbl">Email</span><span class="val">${report.submitter?.email || '—'}</span></div>
-    <div class="row"><span class="lbl">Phone</span><span class="val">${report.submitter?.phone || '—'}</span></div>
-  </div>
+
 
   <div class="section">
     <h2>Officer Review</h2>
@@ -411,13 +406,7 @@ export default function VerifiedReportDetail({ route, navigation }) {
                         )}
                     </View>
 
-                    {/* ── Citizen Info ── */}
-                    <View style={s.card}>
-                        <Text style={s.cardTitle}>Citizen Information</Text>
-                        <InfoRow label="Full Name" value={report?.submitter?.full_name} />
-                        <InfoRow label="Email"     value={report?.submitter?.email} />
-                        <InfoRow label="Phone"     value={report?.submitter?.phone} />
-                    </View>
+
 
                     {/* ── Officer Notes ── */}
                     {(publicRemark || officerName) && (

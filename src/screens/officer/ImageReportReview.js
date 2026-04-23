@@ -339,13 +339,7 @@ export default function ImageReportReview({ route, navigation }) {
                         <InfoRow label="Report ID"    value={`#${report?.id?.slice(0, 8).toUpperCase()}`} mono />
                     </View>
 
-                    {/* ── Submitter Identity ── */}
-                    <View style={s.card}>
-                        <Text style={s.cardTitle}>Citizen Info</Text>
-                        <InfoRow label="Full Name"  value={report?.submitter?.full_name || '—'} />
-                        <InfoRow label="Email"      value={report?.submitter?.email} />
-                        <InfoRow label="Phone"      value={report?.submitter?.phone} />
-                    </View>
+
 
                     {/* ── Officer Remarks ── */}
                     <Text style={s.inputLabel}>Public Remark (shown to citizen) *</Text>
