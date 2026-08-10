@@ -186,7 +186,7 @@ export async function fetchReportById(reportId) {
  * Fetch all pending reports for the officer queue, newest-first.
  * Includes submitter profile and media.
  */
-export async function fetchPendingReports(officerProfile = null) {
+export async function fetchPendingReports(officerProfile = null, filterByJurisdiction = true) {
     let query = supabase
         .from('image_reports')
         .select(`
@@ -201,15 +201,21 @@ export async function fetchPendingReports(officerProfile = null) {
         `)
         .eq('status', 'pending');
 
-    // Location routing logic (Strict Pincode mapping)
-    if (officerProfile && officerProfile.role === 'officer' && officerProfile.badge_id) {
-        // Badge Pincode mapping ('EYE-055' -> '400055')
-        const digits = officerProfile.badge_id.match(/\d+$/);
-        if (digits) {
-            // Pad to 3 digits (e.g. 55 -> 055)
-            const suffix = digits[0].padStart(3, '0');
-            const pincode = `400${suffix}`;
-            query = query.ilike('location_address', `%${pincode}%`);
+    // Location routing logic (Jurisdiction & Pincode OR filtering)
+    if (filterByJurisdiction && officerProfile && officerProfile.role === 'officer') {
+        let filters = [];
+        if (officerProfile.badge_id) {
+            const digits = officerProfile.badge_id.match(/\d+$/);
+            if (digits) {
+                const suffix = digits[0].padStart(3, '0');
+                filters.push(`location_address.ilike.%400${suffix}%`);
+            }
+        }
+        if (officerProfile.jurisdiction) {
+            filters.push(`location_address.ilike.%${officerProfile.jurisdiction}%`);
+        }
+        if (filters.length > 0) {
+            query = query.or(filters.join(','));
         }
     }
 
@@ -379,30 +385,69 @@ export function subscribeToNotifications(userId, onInsert) {
  * Fetch all approved reports for the live map view.
  * Joins officer_reviews to get the approving officer's details.
  */
+/**
+ * Fetch approved reports for the live map (legacy direct query).
+ * Used as fallback if RPC is unavailable.
+ */
 export async function fetchApprovedMapReports() {
     const { data, error } = await supabase
         .from('image_reports')
         .select(`
-            id, latitude, longitude, violation_type, severity, vehicle_number, submitted_at, reviewed_at, image_url,
+            id, latitude, longitude, location_address, violation_type, severity,
+            vehicle_number, submitted_at, reviewed_at,
             officer_review:officer_reviews (
                 officer:officer_id ( full_name, badge_id )
             )
         `)
-        .eq('status', 'approved');
+        .eq('status', 'approved')
+        .order('submitted_at', { ascending: false })
+        .limit(500);
     return { data, error };
+}
+
+/**
+ * Fetch anonymized heatmap points via optimized RPC.
+ * Supports bounding-box and time filtering for performance.
+ *
+ * @param {object|null} bbox  - { minLat, maxLat, minLng, maxLng } or null for all
+ * @param {number}      daysBack - how many days back to query (default 30)
+ */
+export async function fetchHeatmapPoints(bbox = null, daysBack = 30) {
+    const params = {
+        p_days_back: daysBack,
+        p_min_lat:   bbox?.minLat  ?? null,
+        p_max_lat:   bbox?.maxLat  ?? null,
+        p_min_lng:   bbox?.minLng  ?? null,
+        p_max_lng:   bbox?.maxLng  ?? null,
+    };
+    const { data, error } = await supabase.rpc('get_approved_heatmap_points', params);
+    if (error) {
+        // Graceful fallback to direct query if RPC is not yet deployed
+        console.warn('[Heatmap] RPC unavailable, falling back to direct query:', error.message);
+        return fetchApprovedMapReports();
+    }
+    return { data, error: null };
 }
 
 /**
  * Subscribe to realtime changes on image_reports for the live map.
  */
+/**
+ * Subscribe to realtime changes on approved image_reports for the live heatmap.
+ * Triggers on any UPDATE — the handler should re-fetch if new status is 'approved'.
+ */
 export function subscribeToApprovedMapReports(onChange) {
     return supabase
-        .channel('image_reports_map_updates')
+        .channel('image_reports_heatmap_realtime')
         .on('postgres_changes', {
             event: 'UPDATE',
             schema: 'public',
             table: 'image_reports',
-            filter: 'status=eq.approved',
-        }, onChange)
+        }, (payload) => {
+            // Only refresh if the report was just approved (or is approved)
+            if (payload?.new?.status === 'approved') {
+                onChange(payload);
+            }
+        })
         .subscribe();
 }

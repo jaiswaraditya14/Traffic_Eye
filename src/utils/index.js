@@ -34,3 +34,9 @@ export {
     formatPoints,
     truncateText,
 } from './formatters';
+export {
+    parseExifGPS,
+    parseCoordinateComponent,
+    applyRef,
+    validateCoordinates,
+} from './exifParser';

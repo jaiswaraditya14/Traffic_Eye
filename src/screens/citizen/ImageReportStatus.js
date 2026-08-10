@@ -43,7 +43,7 @@ const C = {
 };
 
 const SEVERITY_MAP = {
-    critical: { color: '#DC2626', bg: '#FEE2E2', label: 'Critical' },
+    critical: { color: '#2563EB', bg: '#DBEAFE', label: 'Critical' },
     high:     { color: '#EA580C', bg: '#FFEDD5', label: 'High' },
     medium:   { color: '#D97706', bg: '#FEF3C7', label: 'Medium' },
     low:      { color: '#059669', bg: '#D1FAE5', label: 'Low' },

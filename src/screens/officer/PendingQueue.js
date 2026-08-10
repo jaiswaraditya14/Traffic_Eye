@@ -32,14 +32,14 @@ const C = {
     textSecondary: '#44474F',
     textTertiary:  '#747780',
     border:   '#E2E8F0',
-    critical: '#DC2626',
+    critical: '#2563EB',
     high:     '#EA580C',
     medium:   '#D97706',
     low:      '#059669',
 };
 
 const SEV_CFG = {
-    critical: { color: C.critical, bg: '#FEE2E2', label: 'CRITICAL', order: 0 },
+    critical: { color: C.critical, bg: '#DBEAFE', label: 'CRITICAL', order: 0 },
     high:     { color: C.high,     bg: '#FFEDD5', label: 'HIGH',     order: 1 },
     medium:   { color: C.medium,   bg: '#FEF3C7', label: 'MEDIUM',   order: 2 },
     low:      { color: C.low,      bg: '#D1FAE5', label: 'LOW',      order: 3 },
@@ -177,9 +177,12 @@ export default function PendingQueue({ navigation }) {
     const [selectedIds, setSelectedIds] = useState([]);
     const [bulkProcessing, setBulkProcessing] = useState(false);
 
+    // Scope filter: false = All Locations (Testing), true = My Jurisdiction
+    const [filterByArea, setFilterByArea] = useState(false);
+
     const load = useCallback(async (isRefresh = false) => {
         if (!hasLoadedRef.current && !isRefresh) setLoading(true);
-        const { data, error } = await fetchPendingReports(profile);
+        const { data, error } = await fetchPendingReports(profile, filterByArea);
         if (!error && data) {
             setReports(data);
             hasLoadedRef.current = true;
@@ -187,7 +190,11 @@ export default function PendingQueue({ navigation }) {
         setLoading(false);
         setRefreshing(false);
         Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
-    }, [fadeAnim]);
+    }, [profile, filterByArea, fadeAnim]);
+
+    useEffect(() => {
+        load(true);
+    }, [filterByArea]);
 
     useFocusEffect(
         useCallback(() => {
@@ -450,6 +457,29 @@ export default function PendingQueue({ navigation }) {
                             )}
                         </TouchableOpacity>
                     </View>
+
+                    {/* Area Scope Selector */}
+                    <View style={s.scopeRow}>
+                        <TouchableOpacity
+                            style={[s.scopePill, !filterByArea && s.scopePillActive]}
+                            onPress={() => setFilterByArea(false)}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="globe-outline" size={13} color={!filterByArea ? C.navy : 'rgba(255,255,255,0.7)'} />
+                            <Text style={[s.scopeText, !filterByArea && s.scopeTextActive]}>All Locations (Testing)</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[s.scopePill, filterByArea && s.scopePillActive]}
+                            onPress={() => setFilterByArea(true)}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="location" size={13} color={filterByArea ? C.navy : 'rgba(255,255,255,0.7)'} />
+                            <Text style={[s.scopeText, filterByArea && s.scopeTextActive]}>
+                                {profile?.badge_id ? `My Area (${profile.badge_id.match(/\d+$/)?.[0] ? `400${profile.badge_id.match(/\d+$/)[0].padStart(3,'0')}` : profile.badge_id})` : 'My Area'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
                 </LinearGradient>
 
                 {/* List */}
@@ -707,6 +737,12 @@ const s = StyleSheet.create({
     filterBtn:   { width: 44, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 12, justifyContent: 'center', alignItems: 'center', position: 'relative' },
     filterBadge: { position: 'absolute', top: -4, right: -4, backgroundColor: C.critical, borderRadius: 10, width: 18, height: 18, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: C.navy },
     filterBadgeText: { fontSize: 9, fontFamily: 'Nunito-Bold', color: C.white },
+
+    scopeRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
+    scopePill: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'transparent' },
+    scopePillActive: { backgroundColor: C.amber, borderColor: C.amber },
+    scopeText: { fontSize: 11, fontFamily: 'Nunito-SemiBold', color: 'rgba(255,255,255,0.85)' },
+    scopeTextActive: { color: C.navy, fontFamily: 'Nunito-Bold' },
 
     list: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 110 }, // Extra padding for selection bar
 

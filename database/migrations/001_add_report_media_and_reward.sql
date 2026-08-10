@@ -159,9 +159,9 @@ BEGIN
     IF p_decision = 'approved' THEN
         CASE v_report.severity
             WHEN 'low'      THEN v_reward := 50;
-            WHEN 'medium'   THEN v_reward := 100;
-            WHEN 'high'     THEN v_reward := 200;
-            WHEN 'critical' THEN v_reward := 200;
+            WHEN 'medium'   THEN v_reward := 70;
+            WHEN 'high'     THEN v_reward := 100;
+            WHEN 'critical' THEN v_reward := 100;
             ELSE                  v_reward := 50;
         END CASE;
     END IF;

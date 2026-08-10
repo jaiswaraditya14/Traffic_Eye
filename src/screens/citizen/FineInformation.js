@@ -25,7 +25,7 @@ const SEVERITY = {
     low:      { label: 'Low',      color: C.success,  bg: C.successSurface,  bar: '#34D399' },
     medium:   { label: 'Moderate', color: C.warning,  bg: C.warningSurface,  bar: C.amber   },
     high:     { label: 'High',     color: '#EA580C',  bg: '#FFEDD5',         bar: '#F97316' },
-    critical: { label: 'Critical', color: C.error,    bg: C.errorSurface,    bar: C.error   },
+    critical: { label: 'Critical', color: C.info,    bg: C.infoSurface,    bar: C.info   },
 };
 
 const CATEGORY_META = {

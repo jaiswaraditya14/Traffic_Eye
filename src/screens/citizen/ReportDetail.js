@@ -45,7 +45,7 @@ const SEVERITY_MAP = {
     low:      { color: '#059669', bg: '#D1FAE5', label: 'Low',      icon: 'shield-outline' },
     medium:   { color: '#D97706', bg: '#FEF3C7', label: 'Medium',   icon: 'warning-outline' },
     high:     { color: '#DC2626', bg: '#FEE2E2', label: 'High',     icon: 'alert-circle-outline' },
-    critical: { color: '#DC2626', bg: '#FEE2E2', label: 'High',     icon: 'flame-outline' },
+    critical: { color: '#2563EB', bg: '#DBEAFE', label: 'Critical', icon: 'flame-outline' },
 };
 
 export default function ReportDetail({ navigation, route }) {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
     Alert, ActivityIndicator, StatusBar,
@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MobileContainer } from '../../components';
 import { useAppContext, useAuth } from '../../context';
 import { formatPoints } from '../../utils';
+import { supabase } from '../../services/supabase';
 
 // ── Design Tokens ──
 const C = {
@@ -38,7 +39,28 @@ export default function Profile({ navigation }) {
     const { setIsAuthenticated, setUserRole } = useAppContext();
     const { profile, signOut } = useAuth();
     const [loggingOut, setLoggingOut] = useState(false);
+    const [reportCount, setReportCount] = useState(0);
+    const [verifiedCount, setVerifiedCount] = useState(0);
     const insets = useSafeAreaInsets();
+
+    // Fetch real report stats for this user
+    useEffect(() => {
+        if (!profile?.id) return;
+        const fetchStats = async () => {
+            const { count: total } = await supabase
+                .from('image_reports')
+                .select('id', { count: 'exact', head: true })
+                .eq('user_id', profile.id);
+            const { count: verified } = await supabase
+                .from('image_reports')
+                .select('id', { count: 'exact', head: true })
+                .eq('user_id', profile.id)
+                .eq('status', 'approved');
+            setReportCount(total ?? 0);
+            setVerifiedCount(verified ?? 0);
+        };
+        fetchStats();
+    }, [profile?.id]);
 
     // ── BACKEND INTACT: uses signOut, setIsAuthenticated, setUserRole ──
     const handleLogout = () => {
@@ -124,9 +146,9 @@ export default function Profile({ navigation }) {
                         {/* Stats mini bar */}
                         <View style={styles.heroStats}>
                             {[
-                                { label: 'Reports', value: '0', icon: 'document-text' },
-                                { label: 'Verified', value: '0', icon: 'checkmark-circle' },
-                                { label: 'Points', value: formatPoints ? formatPoints(displayPoints) : displayPoints.toLocaleString(), icon: 'trophy' },
+                                { label: 'Reports',  value: reportCount.toString(),  icon: 'document-text'   },
+                                { label: 'Verified', value: verifiedCount.toString(), icon: 'checkmark-circle' },
+                                { label: 'Points',   value: formatPoints ? formatPoints(displayPoints) : displayPoints.toLocaleString(), icon: 'trophy' },
                             ].map((s, idx, arr) => (
                                 <View key={idx} style={styles.heroStatItem}>
                                     <Text style={styles.heroStatValue}>{s.value}</Text>

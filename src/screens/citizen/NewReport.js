@@ -11,6 +11,7 @@ import { MobileContainer } from '../../components';
 import { useAppContext } from '../../context';
 import { useImagePicker, useLocation } from '../../hooks';
 import * as MediaLibrary from 'expo-media-library';
+import { parseExifGPS } from '../../utils';
 
 // ── Design Tokens ──
 const C = {
@@ -102,128 +103,81 @@ export default function NewReport({ navigation }) {
     useEffect(() => { return () => { if (bannerTimer.current) clearTimeout(bannerTimer.current); }; }, []);
 
     const handleLocationExtraction = useCallback(async (exif, source, assetId) => {
-        if (source === 'camera') {
-            // Camera images: fall back to live GPS (EXIF is stripped after native crop)
-            showBanner('fallback-gps');
-            const gpsResult = await detectLocation();
-            if (gpsResult) { showBanner('success'); hideBanner(4000); }
-            else { setAutoFillStatus(null); }
-        } else {
-            // Gallery images—show reading banner immediately for instant feedback
-            showBanner('reading');
+        // Gallery images — show reading banner immediately for instant feedback
+        // Camera images — also try EXIF first (GPS is now preserved since we removed allowsEditing)
+        showBanner('reading');
 
-            let lat = null;
-            let lng = null;
+        let lat = null;
+        let lng = null;
 
-            // ── Strategy 1: MediaLibrary.getAssetInfoAsync (bypasses Android EXIF strip) ──
-            if (assetId) {
-                try {
-                    console.log('[GPS] Trying MediaLibrary for assetId:', assetId);
-                    // REQUEST BOTH permissions — ACCESS_MEDIA_LOCATION is required on
-                    // Android 10+ to read GPS coordinates from media assets in a dev build.
-                    const { status } = await MediaLibrary.requestPermissionsAsync();
-                    const locPerm = await MediaLibrary.requestPermissionsAsync(true); // writeOnly=true also grants ACCESS_MEDIA_LOCATION
-                    console.log('[GPS] MediaLibrary permission status:', status, '| loc access:', locPerm.accessPrivileges);
-                    if (status === 'granted') {
-                        const info = await MediaLibrary.getAssetInfoAsync(assetId, { shouldDownloadFromNetwork: false });
-                        console.log('[GPS] MediaLibrary location:', JSON.stringify(info?.location));
-                        const mlLat = info?.location?.latitude;
-                        const mlLng = info?.location?.longitude;
-                        // Guard: reject null-island (0,0), NaN, and non-finite values
-                        if (
-                            mlLat != null && mlLng != null &&
-                            isFinite(mlLat) && isFinite(mlLng) &&
-                            !(mlLat === 0 && mlLng === 0)
-                        ) {
-                            lat = mlLat;
-                            lng = mlLng;
-                            console.log('[GPS] Got coords from MediaLibrary:', lat, lng);
-                        } else {
-                            console.log('[GPS] MediaLibrary returned invalid/empty location — falling back to EXIF');
-                        }
-                    }
-                } catch (e) {
-                    console.warn('[GPS] MediaLibrary lookup failed:', e.message);
-                }
-            }
-
-            // ── Strategy 2: EXIF GPS parsing (iOS + some Android devices) ──
-            if (lat === null && exif) {
-                console.log('[EXIF] Raw keys:', Object.keys(exif).join(', '));
-                let rawLat, rawLng, latRef, lngRef;
-
-                // Format 1: Flat Android keys
-                if (exif.GPSLatitude !== undefined) {
-                    rawLat = exif.GPSLatitude;
-                    rawLng = exif.GPSLongitude;
-                    latRef = exif.GPSLatitudeRef;
-                    lngRef = exif.GPSLongitudeRef;
-                    console.log('[EXIF] Android flat format detected');
-                }
-
-                // Format 2: iOS nested {GPS} object
-                const gpsBlock = exif['{GPS}'] || exif['GPS'] || exif.gps;
-                if (rawLat === undefined && gpsBlock) {
-                    rawLat = gpsBlock.Latitude ?? gpsBlock.GPSLatitude;
-                    rawLng = gpsBlock.Longitude ?? gpsBlock.GPSLongitude;
-                    latRef = gpsBlock.LatitudeRef ?? gpsBlock.GPSLatitudeRef;
-                    lngRef = gpsBlock.LongitudeRef ?? gpsBlock.GPSLongitudeRef;
-                    console.log('[EXIF] iOS {GPS} block format detected');
-                }
-
-                const dmsToDecimal = (val) => {
-                    if (typeof val === 'number') return val;
-                    if (Array.isArray(val) && val.length === 3)
-                        return val[0] + val[1] / 60 + val[2] / 3600;
-                    return null;
-                };
-
-                let parsedLat = dmsToDecimal(rawLat);
-                let parsedLng = dmsToDecimal(rawLng);
-                if (parsedLat !== null && (latRef === 'S' || latRef === 'South')) parsedLat = -parsedLat;
-                if (parsedLng !== null && (lngRef === 'W' || lngRef === 'West')) parsedLng = -parsedLng;
-
-                console.log(`[EXIF] Final coords: lat=${parsedLat}, lng=${parsedLng}`);
-
-                // Guard: reject null-island (0,0), NaN, non-finite, and values outside valid ranges
-                const isValidCoord = (
-                    parsedLat !== null && parsedLng !== null &&
-                    isFinite(parsedLat) && isFinite(parsedLng) &&
-                    !(parsedLat === 0 && parsedLng === 0) &&
-                    Math.abs(parsedLat) <= 90 && Math.abs(parsedLng) <= 180
-                );
-
-                if (isValidCoord) {
-                    lat = parsedLat;
-                    lng = parsedLng;
-                }
-            }
-
-            // ── Reverse geocode if we have coords from either strategy ──
-            if (lat !== null && lng !== null) {
-                showBanner('extracting');
-                try {
-                    const result = await reverseGeocodeFromCoords(lat, lng);
-                    if (result) { showBanner('success'); hideBanner(4000); }
-                    else { showBanner('no-gps'); hideBanner(3000); }
-                } catch (e) {
-                    console.warn('[GPS] Reverse geocoding failed:', e.message);
-                    showBanner('no-gps'); hideBanner(3000);
-                }
+        // ── Strategy 1: EXIF GPS Parsing (Android flat keys, iOS {GPS}, DMS, rationals) ──
+        if (exif) {
+            console.log(`[GPS Extraction] Strategy 1 — Parsing raw ${source} image EXIF data...`);
+            const exifCoords = parseExifGPS(exif);
+            if (exifCoords) {
+                lat = exifCoords.lat;
+                lng = exifCoords.lng;
+                console.log(`[GPS Extraction] ✅ Successfully obtained EXIF coordinates: lat=${lat}, lng=${lng}`);
             } else {
-                // ── Strategy 3: fallback to live device GPS ──
-                // This fires when both MediaLibrary and EXIF fail (e.g. screenshot, WhatsApp
-                // forward, or any image without embedded GPS). In a dev build this will work
-                // reliably; in Expo Go it may also work for device GPS.
-                console.log('[GPS] No coords from MediaLibrary or EXIF — falling back to live GPS');
-                showBanner('fallback-gps');
-                const gpsResult = await detectLocation();
-                if (gpsResult) { showBanner('success'); hideBanner(4000); }
-                else {
-                    console.log('[GPS] Live GPS also unavailable — user must enter manually');
-                    showBanner('no-gps');
-                    hideBanner(3000);
+                console.log('[GPS Extraction] EXIF data present but did not contain valid GPS coordinates');
+            }
+        }
+
+        // ── Strategy 2: MediaLibrary.getAssetInfoAsync (for Android when EXIF object is stripped) ──
+        if (lat === null && assetId) {
+            try {
+                console.log('[GPS Extraction] Strategy 2 — Trying MediaLibrary lookup for assetId:', assetId);
+                const { status } = await MediaLibrary.requestPermissionsAsync();
+                const locPerm = await MediaLibrary.requestPermissionsAsync(true);
+                console.log('[GPS Extraction] MediaLibrary permission:', status, '| loc access:', locPerm.accessPrivileges);
+                if (status === 'granted') {
+                    const info = await MediaLibrary.getAssetInfoAsync(assetId, { shouldDownloadFromNetwork: false });
+                    console.log('[GPS Extraction] MediaLibrary location object:', JSON.stringify(info?.location));
+                    const mlLat = info?.location?.latitude;
+                    const mlLng = info?.location?.longitude;
+                    
+                    if (
+                        mlLat != null && mlLng != null &&
+                        isFinite(mlLat) && isFinite(mlLng) &&
+                        !(mlLat === 0 && mlLng === 0) &&
+                        Math.abs(mlLat) <= 90 && Math.abs(mlLng) <= 180
+                    ) {
+                        lat = mlLat;
+                        lng = mlLng;
+                        console.log(`[GPS Extraction] ✅ Got valid coords from MediaLibrary: lat=${lat}, lng=${lng}`);
+                    } else {
+                        console.log('[GPS Extraction] MediaLibrary returned invalid/empty location (0,0 or null)');
+                    }
                 }
+            } catch (e) {
+                console.warn('[GPS Extraction] MediaLibrary lookup failed:', e.message);
+            }
+        }
+
+        // ── Reverse geocode if valid EXIF coordinates were extracted ──
+        if (lat !== null && lng !== null) {
+            showBanner('extracting');
+            try {
+                const result = await reverseGeocodeFromCoords(lat, lng);
+                if (result) { showBanner('success'); hideBanner(4000); }
+                else { showBanner('no-gps'); hideBanner(3000); }
+            } catch (e) {
+                console.warn('[GPS Extraction] Reverse geocoding failed:', e.message);
+                showBanner('no-gps'); hideBanner(3000);
+            }
+        } else {
+            // ── Strategy 3: Fallback to live device GPS (only if EXIF is missing/invalid) ──
+            console.log('[GPS Extraction] ⚠️ No valid EXIF coords found — falling back to live device GPS (Approx. 10m radius)');
+            showBanner('fallback-gps');
+            const gpsResult = await detectLocation(true); // true = apply <=10m approximation radius
+            if (gpsResult) {
+                showBanner('success');
+                hideBanner(4000);
+            } else {
+                console.log('[GPS Extraction] Live GPS also unavailable — user must enter manually');
+                showBanner('no-gps');
+                hideBanner(3000);
+                setAutoFillStatus(null);
             }
         }
     }, [reverseGeocodeFromCoords, detectLocation, showBanner, hideBanner]);

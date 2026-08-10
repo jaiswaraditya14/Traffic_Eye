@@ -10,7 +10,25 @@ export default function useLocation() {
     const [address, setAddress] = useState('');
     const [loading, setLoading] = useState(false);
 
-    const detectLocation = async () => {
+    /**
+     * Bounds coordinates to an approximate location within at most a 10-meter radius (approx ±0.00009 degrees).
+     * Used when exact photo EXIF GPS is unavailable.
+     */
+    const getApproximate10mCoords = (coords) => {
+        if (!coords || typeof coords.latitude !== 'number' || typeof coords.longitude !== 'number') return coords;
+        // Bounded random offset <= 10m (0.00009 degrees ~ 10 meters)
+        const latOffset = (Math.random() - 0.5) * 0.00009;
+        const lngOffset = (Math.random() - 0.5) * 0.00009;
+        return {
+            ...coords,
+            latitude: coords.latitude + latOffset,
+            longitude: coords.longitude + lngOffset,
+            accuracy: Math.min(coords.accuracy ?? 10, 10), // Bounded to 10m
+            isApproximate: true,
+        };
+    };
+
+    const detectLocation = async (isFallbackMode = false) => {
         try {
             setLoading(true);
             const { status } = await Location.requestForegroundPermissionsAsync();
@@ -25,14 +43,14 @@ export default function useLocation() {
                 timeout: 5000, // Wait up to 5 seconds
             });
 
-            setLocation(loc.coords);
+            const finalCoords = isFallbackMode ? getApproximate10mCoords(loc.coords) : loc.coords;
+            setLocation(finalCoords);
 
             // Attempt reverse geocoding
             try {
-                // Fetch extra details for more accurate naming
                 const addressData = await Location.reverseGeocodeAsync({
-                    latitude: loc.coords.latitude,
-                    longitude: loc.coords.longitude,
+                    latitude: finalCoords.latitude,
+                    longitude: finalCoords.longitude,
                 });
 
                 if (addressData && addressData.length > 0) {
@@ -47,20 +65,19 @@ export default function useLocation() {
                         geocode.postalCode,
                     ].filter(Boolean);
 
-                    // Filter duplicates (sometimes street and name are the same)
                     const uniqueParts = [...new Set(parts)];
                     const addr = uniqueParts.join(', ');
 
                     setAddress(addr);
-                    return { coords: loc.coords, address: addr };
+                    return { coords: finalCoords, address: addr };
                 }
             } catch (geocodeError) {
                 console.warn('Geocoding failed:', geocodeError);
             }
 
-            const fallback = `${loc.coords.latitude.toFixed(6)}, ${loc.coords.longitude.toFixed(6)}`;
+            const fallback = `${finalCoords.latitude.toFixed(6)}, ${finalCoords.longitude.toFixed(6)}`;
             setAddress(fallback);
-            return { coords: loc.coords, address: fallback };
+            return { coords: finalCoords, address: fallback };
         } catch (error) {
             console.error('Error detecting location:', error);
             Alert.alert('Error', 'Failed to detect your location.');

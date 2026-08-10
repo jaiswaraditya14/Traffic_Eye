@@ -21,14 +21,14 @@ const C = {
     success: '#059669',
     successSurface: '#D1FAE5',
     border: '#E2E8F0',
-    critical: '#DC2626',
+    critical: '#2563EB',
     high: '#EA580C',
     medium: '#D97706',
     low: '#059669',
 };
 
 const SEV_CFG = {
-    critical: { color: C.critical, bg: '#FEE2E2', label: 'CRITICAL', order: 0 },
+    critical: { color: C.critical, bg: '#DBEAFE', label: 'CRITICAL', order: 0 },
     high:     { color: C.high,     bg: '#FFEDD5', label: 'HIGH',     order: 1 },
     medium:   { color: C.medium,   bg: '#FEF3C7', label: 'MEDIUM',   order: 2 },
     low:      { color: C.low,      bg: '#D1FAE5', label: 'LOW',      order: 3 },

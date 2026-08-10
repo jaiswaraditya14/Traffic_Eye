@@ -47,9 +47,9 @@ const C = {
 };
 
 const SEVERITY_CFG = {
-    critical: { color: '#DC2626', bg: '#FEE2E2', label: 'Critical', icon: 'flame',           reward: 200 },
-    high:     { color: '#EA580C', bg: '#FFEDD5', label: 'High',     icon: 'warning',          reward: 200 },
-    medium:   { color: '#D97706', bg: '#FEF3C7', label: 'Medium',   icon: 'alert-circle',     reward: 100 },
+    critical: { color: '#2563EB', bg: '#DBEAFE', label: 'Critical', icon: 'flame',           reward: 100 },
+    high:     { color: '#EA580C', bg: '#FFEDD5', label: 'High',     icon: 'warning',          reward: 100 },
+    medium:   { color: '#D97706', bg: '#FEF3C7', label: 'Medium',   icon: 'alert-circle',     reward: 70  },
     low:      { color: '#059669', bg: '#D1FAE5', label: 'Low',      icon: 'checkmark-circle', reward: 50  },
 };
 

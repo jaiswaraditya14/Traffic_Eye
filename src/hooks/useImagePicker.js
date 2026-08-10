@@ -23,9 +23,15 @@ export default function useImagePicker() {
 
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ['images'],
-                allowsEditing: true,  // Native OS crop — accurate & reliable
-                quality: 0.92,
+                // EXIF FIX: Do NOT set allowsEditing:true or quality<1 here.
+                // Both force Android to re-encode the image, which STRIPS all EXIF GPS data.
+                // We read EXIF from the raw URI first, then let NewReport handle display.
+                allowsEditing: false,
+                quality: 1,
                 exif: true,
+                // legacy:true uses Intent.ACTION_PICK (older Android picker) which
+                // preserves EXIF metadata, unlike the modern MediaStore photo picker.
+                legacy: true,
             });
 
             if (!result.canceled && result.assets?.length > 0) {
@@ -58,8 +64,10 @@ export default function useImagePicker() {
 
             const result = await ImagePicker.launchCameraAsync({
                 mediaTypes: ['images'],
-                allowsEditing: true,  // Native OS crop — accurate & reliable
-                quality: 0.92,
+                // EXIF FIX: allowsEditing:true + quality<1 forces Android to re-encode
+                // the captured image, which strips GPS EXIF. Keep raw output for EXIF read.
+                allowsEditing: false,
+                quality: 1,
                 exif: true,
             });
 

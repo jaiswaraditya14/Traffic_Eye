@@ -34,7 +34,7 @@ const C = {
     warningSurface: '#FEF3C7',
     error: '#BA1A1A',
     errorSurface: '#FFDAD6',
-    critical: '#DC2626',
+    critical: '#2563EB',
     primarySurface: '#D7E2FF',
 };
 
@@ -60,24 +60,47 @@ export default function OfficerDashboard({ navigation }) {
         setLoadingData(true);
         try {
             // Fetch routed pending reports & slice for dashboard top 10
-            const { data: activePending } = await fetchPendingReports(profile);
+            const { data: activePending } = await fetchPendingReports(profile, true);
             const pending = activePending ? activePending.slice(0, 10) : [];
 
-            // Fetch approved count (global for now, can apply routing if needed)
-            const { count: aCount } = await supabase
+            // Build jurisdiction-scoped count filters (same as fetchPendingReports)
+            let approvedQuery = supabase
                 .from('image_reports')
                 .select('id', { count: 'exact', head: true })
                 .eq('status', 'approved');
+            let rejectedQuery = supabase
+                .from('image_reports')
+                .select('id', { count: 'exact', head: true })
+                .eq('status', 'rejected');
+
+            // Apply same OR-based jurisdiction filter so counts match the officer's area
+            if (profile && profile.role === 'officer') {
+                let filters = [];
+                if (profile.badge_id) {
+                    const digits = profile.badge_id.match(/\d+$/);
+                    if (digits) {
+                        const suffix = digits[0].padStart(3, '0');
+                        filters.push(`location_address.ilike.%400${suffix}%`);
+                    }
+                }
+                if (profile.jurisdiction) {
+                    filters.push(`location_address.ilike.%${profile.jurisdiction}%`);
+                }
+                if (filters.length > 0) {
+                    const orStr = filters.join(',');
+                    approvedQuery = approvedQuery.or(orStr);
+                    rejectedQuery = rejectedQuery.or(orStr);
+                }
+            }
+
+            const [{ count: aCount }, { count: rCount }] = await Promise.all([
+                approvedQuery,
+                rejectedQuery,
+            ]);
 
             // Fetch routed reviewed reports (filtered to rejected in UI logic)
             const { data: allReviewed } = await fetchReviewedReports(profile);
             const rejected = allReviewed ? allReviewed.filter(r => r.status === 'rejected').slice(0, 5) : [];
-
-            // Fetch rejected count
-            const { count: rCount } = await supabase
-                .from('image_reports')
-                .select('id', { count: 'exact', head: true })
-                .eq('status', 'rejected');
 
             setPendingReports(pending || []);
             setRejectedReports(rejected || []);
@@ -88,7 +111,7 @@ export default function OfficerDashboard({ navigation }) {
         } finally {
             setLoadingData(false);
         }
-    }, []);
+    }, [profile]);
 
     useFocusEffect(
         useCallback(() => {

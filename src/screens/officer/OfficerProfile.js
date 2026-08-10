@@ -159,6 +159,16 @@ export default function OfficerProfile({ navigation }) {
                     </View>
                 </View>
 
+                {/* ── Analytics & Map ── */}
+                <Text style={styles.sectionHeader}>Analytics & Map</Text>
+                <View style={styles.menuGroup}>
+                    <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('LiveMap')} activeOpacity={0.7}>
+                        <View style={[styles.menuIconBg, { backgroundColor: '#FEF3C7' }]}><Ionicons name="flame" size={20} color={C.amber} /></View>
+                        <Text style={styles.menuItemText}>Live Violation Heatmap</Text>
+                        <Ionicons name="chevron-forward" size={18} color={C.textTertiary} />
+                    </TouchableOpacity>
+                </View>
+
                 {/* ── Menu Options ── */}
                 <Text style={styles.sectionHeader}>Preferences</Text>
                 <View style={styles.menuGroup}>

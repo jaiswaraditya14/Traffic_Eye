@@ -26,7 +26,7 @@ const VIOLATION_SEVERITY = {
 const buildAttemptQueue = (modelsArray) => {
     const queue = [];
     for (const model of modelsArray) {
-        if (model.includes('llama') || model.includes('openai') || model.includes('gpt')) {
+        if (model.includes('/') || model.includes('llama') || model.includes('openai') || model.includes('gpt') || model.includes('qwen')) {
             // Groq model
             for (const apiKey of (AI_CONFIG.groqApiKeys || [])) {
                 queue.push({ model, apiKey, provider: 'groq' });
@@ -224,6 +224,9 @@ const callAI = async ({ model, apiKey, provider, prompt, base64Image, timeoutMs 
         ? 'https://api.groq.com/openai/v1/chat/completions'
         : `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
+    const isGpt120b = model.includes('gpt-oss-120b');
+    const isQwen = model.includes('qwen');
+
     const body = isGroq 
         ? JSON.stringify({
             model,
@@ -236,9 +239,10 @@ const callAI = async ({ model, apiKey, provider, prompt, base64Image, timeoutMs 
                         { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
                     ]
             }],
-            temperature: 0.1,
-            max_completion_tokens: 8192,
-            ...(model.includes('gpt-oss-120b') ? { reasoning_effort: 'medium' } : {})
+            temperature: isGpt120b ? 1 : (isQwen ? 0.6 : 0.1),
+            max_completion_tokens: 2048,
+            top_p: isGpt120b ? 1 : 0.95,
+            ...(isGpt120b ? { reasoning_effort: 'medium' } : {})
         })
         : JSON.stringify({
             contents: [{
@@ -416,18 +420,18 @@ const runWithRotation = async (prompt, base64Image, attempts, label) => {
 
 // ─── Image preparation ────────────────────────────────────────────────────────
 const prepareImages = async (imageUri) => {
-    // Violation image: high resolution for complex scene understanding
+    // Violation image: balanced quality vs. speed
     const violationImg = await ImageManipulator.manipulateAsync(
         imageUri,
-        [{ resize: { width: 1600 } }], // Increased from 1024 to 1600
-        { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
+        [{ resize: { width: 960 } }],
+        { compress: 0.82, format: ImageManipulator.SaveFormat.JPEG }
     );
 
-    // OCR image: ULTRA HIGH resolution — needs crisp plate text pixels for Pro models
+    // OCR image: higher res only for plate text clarity
     const ocrImg = await ImageManipulator.manipulateAsync(
         imageUri,
-        [{ resize: { width: 2400 } }], // Increased from 1600 to 2400
-        { compress: 1.0, format: ImageManipulator.SaveFormat.JPEG } // 1.0 = Max quality
+        [{ resize: { width: 1440 } }],
+        { compress: 0.92, format: ImageManipulator.SaveFormat.JPEG }
     );
 
     const [violationB64, ocrB64] = await Promise.all([
@@ -532,7 +536,7 @@ export const aiService = {
 
             return violationResult;
         } catch (error) {
-            console.error('[AI] Fatal failure:', error);
+            console.warn('[AI] Analysis warning/error:', error?.message || error);
             
             // EMERGENCY SAFETY FALLBACK (for development/demos)
             // If every key and model returns 429 (Quota) or 404 (Missing),
