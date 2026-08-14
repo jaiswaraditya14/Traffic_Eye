@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { FocusAwareStatusBar } from '../../components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -293,7 +294,7 @@ export default function VerifiedReportDetail({ route, navigation }) {
 
     return (
         <View style={s.container}>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navyDeep} />
             <SafeAreaView style={{ flex: 1 }} edges={['top']}>
 
                 {/* ── Header ── */}

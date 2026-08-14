@@ -3,81 +3,80 @@ import { StyleSheet, Dimensions, Platform } from 'react-native';
 const { width, height } = Dimensions.get('window');
 
 // ─────────────────────────────────────────────────────────
-// TRAFFIC EYE 1.1 — "Civic Authority" Design System
-// North Star: "The Digital Sentinel"
-// Professional government-grade civic app aesthetic
-// Navy Blue (#1B3A6B) + Amber (#F59E0B) + Off-White (#F8F9FB)
+// TRAFFIC EYE — "Official Indian Government Civic Service" Design System
+// Deep Navy (#0F2C59) + Civic Saffron (#D97706) + Off-White Canvas (#F4F6F9)
+// High contrast, mobile-first, production-ready civic portal
 // ─────────────────────────────────────────────────────────
 
 export const COLORS = {
-    // ── Primary: Deep Navy (Authority & Trust) ──
-    primary: '#1B3A6B',
-    primaryDark: '#002452',
-    primaryLight: '#2C4E80',
-    primarySurface: '#D7E2FF',     // Light navy tint for backgrounds
-    primaryBorder: '#ACC7FF',
+    // ── Primary: Deep Government Navy Blue (Authority, Security & Trust) ──
+    primary: '#0F2C59',
+    primaryDark: '#0A1E3F',
+    primaryLight: '#1E3A8A',
+    primarySurface: '#EFF6FF',     // Light navy tint for backgrounds
+    primaryBorder: '#BFDBFE',
 
-    // ── Secondary / Accent: Amber (Action & Alert) ──
-    secondary: '#F59E0B',
-    secondaryDark: '#D97706',
-    secondaryLight: '#FCD34D',
-    secondarySurface: '#FFF8E7',   // Light amber tint
+    // ── Accent: Saffron / Warm Amber (Action & Alert) ──
+    secondary: '#D97706',
+    secondaryDark: '#B45309',
+    secondaryLight: '#F59E0B',
+    secondarySurface: '#FEF3C7',   // Light saffron tint
     secondaryBorder: '#FDE68A',
 
     // ── Status Colors ──
-    success: '#059669',
-    successLight: '#10B981',
-    successSurface: '#D1FAE5',
-    warning: '#D97706',
-    warningLight: '#F59E0B',
+    success: '#15803D',
+    successLight: '#16A34A',
+    successSurface: '#DCFCE7',
+    warning: '#B45309',
+    warningLight: '#D97706',
     warningSurface: '#FEF3C7',
-    error: '#BA1A1A',
+    error: '#B91C1C',
     errorLight: '#DC2626',
-    errorSurface: '#FFDAD6',
-    info: '#1B3A6B',
-    infoLight: '#2C4E80',
-    infoSurface: '#D7E2FF',
-    danger: '#DC2626',
+    errorSurface: '#FEE2E2',
+    info: '#0F2C59',
+    infoLight: '#1E3A8A',
+    infoSurface: '#EFF6FF',
+    danger: '#B91C1C',
 
-    // ── Surfaces: "Layered Paper" depth model ──
-    background: '#F8F9FB',          // Base canvas — off-white
-    backgroundSecondary: '#F2F4F6', // Section layer
-    surface: '#FFFFFF',             // Elevated cards
+    // ── Surfaces ──
+    background: '#F4F6F9',          // Base canvas — crisp civic light grey
+    backgroundSecondary: '#EAEFE9', // Section layer
+    surface: '#FFFFFF',             // Elevated white cards
     surfaceElevated: '#FFFFFF',
-    surfaceContainerLow: '#F2F4F6', // Secondary content zones
-    surfaceContainer: '#EDEEF0',    // Standard containers
-    surfaceContainerHigh: '#E7E8EA',
-    surfaceContainerHighest: '#E1E2E4',
+    surfaceContainerLow: '#F8FAFC', // Secondary content zones
+    surfaceContainer: '#F1F5F9',    // Standard containers
+    surfaceContainerHigh: '#E2E8F0',
+    surfaceContainerHighest: '#CBD5E1',
 
     // ── Text ──
-    textPrimary: '#191C1E',         // NOT pure black — editorial ink feel
-    textSecondary: '#44474F',
-    textTertiary: '#747780',
+    textPrimary: '#0F172A',         // High contrast charcoal black
+    textSecondary: '#475569',       // Clear dark slate
+    textTertiary: '#64748B',        // Accessible grey
     textInverse: '#FFFFFF',
-    textAccent: '#1B3A6B',
+    textAccent: '#0F2C59',
 
     // ── Borders / Outline ──
-    border: '#C4C6D0',
-    borderLight: '#E1E2E4',
-    borderFocus: '#1B3A6B',
+    border: '#CBD5E1',
+    borderLight: '#E2E8F0',
+    borderFocus: '#1E3A8A',
 
     // ── Neutrals ──
     white: '#FFFFFF',
     black: '#000000',
-    gray50: '#F8F9FB',
-    gray100: '#F2F4F6',
-    gray200: '#E1E2E4',
-    gray300: '#C4C6D0',
-    gray400: '#747780',
-    gray500: '#44474F',
-    gray600: '#2E3132',
-    gray700: '#191C1E',
-    gray800: '#0D0F10',
-    gray900: '#000000',
+    gray50: '#F8FAFC',
+    gray100: '#F1F5F9',
+    gray200: '#E2E8F0',
+    gray300: '#CBD5E1',
+    gray400: '#94A3B8',
+    gray500: '#64748B',
+    gray600: '#475569',
+    gray700: '#334155',
+    gray800: '#1E293B',
+    gray900: '#0F172A',
 
     // ── Overlay ──
-    overlay: 'rgba(25, 28, 30, 0.5)',
-    overlayLight: 'rgba(25, 28, 30, 0.08)',
+    overlay: 'rgba(15, 23, 42, 0.6)',
+    overlayLight: 'rgba(15, 23, 42, 0.08)',
 };
 
 // Legacy dark colors (kept for backward compat with any remaining usage)

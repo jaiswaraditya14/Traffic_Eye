@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MobileContainer } from '../../components';
+import { MobileContainer, FocusAwareStatusBar } from '../../components';
 import { supabase } from '../../services';
 import { useAuth } from '../../context';
 
@@ -421,7 +421,7 @@ export default function VerificationReports({ navigation }) {
 
     return (
         <MobileContainer>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
 
             {/* Header */}
             <LinearGradient colors={[C.navy, C.navyMid]} style={styles.header}>

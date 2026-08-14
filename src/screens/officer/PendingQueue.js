@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { FocusAwareStatusBar } from '../../components';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFocusEffect } from '@react-navigation/native';
 import { fetchPendingReports, subscribeToOfficerQueue, submitOfficerDecision } from '../../services/reports';
@@ -22,20 +23,20 @@ import { useAuth } from '../../context';
 
 // ── Tokens ────────────────────────────────────────────────────────────────
 const C = {
-    navy:     '#002452',
-    navyMid:  '#1B3A6B',
-    amber:    '#F59E0B',
+    navy:     '#0A1E3F',
+    navyMid:  '#0F2C59',
+    amber:    '#D97706',
     white:    '#FFFFFF',
-    offWhite: '#F8F9FB',
+    offWhite: '#F4F6F9',
     surface:  '#FFFFFF',
-    textPrimary:   '#191C1E',
-    textSecondary: '#44474F',
-    textTertiary:  '#747780',
-    border:   '#E2E8F0',
-    critical: '#2563EB',
-    high:     '#EA580C',
-    medium:   '#D97706',
-    low:      '#059669',
+    textPrimary:   '#0F172A',
+    textSecondary: '#475569',
+    textTertiary:  '#64748B',
+    border:   '#CBD5E1',
+    critical: '#1E3A8A',
+    high:     '#C2410C',
+    medium:   '#B45309',
+    low:      '#15803D',
 };
 
 const SEV_CFG = {
@@ -66,6 +67,11 @@ function ReportCard({ report, onPress, onLongPress, isSelectionMode, isSelected 
         : '—';
     const name = report.submitter?.full_name || 'Anonymous';
 
+    const hasLowConf = (report.ai_confidence ?? 1) < 0.70;
+    const authCheck = report.authenticity_check;
+    const hasAuthFlag = authCheck && (authCheck.authentic === false || (authCheck.flags && authCheck.flags.length > 0));
+    const hasFraudRisk = hasLowConf || hasAuthFlag;
+
     return (
         <TouchableOpacity style={rc.card} onPress={onPress} onLongPress={onLongPress} activeOpacity={0.82}>
             {isSelectionMode && (
@@ -90,6 +96,12 @@ function ReportCard({ report, onPress, onLongPress, isSelectionMode, isSelected 
             <View style={rc.content}>
                 <View style={rc.topRow}>
                     <Text style={rc.type} numberOfLines={1}>{report.violation_type || 'Traffic Violation'}</Text>
+                    {hasFraudRisk && (
+                        <View style={{ backgroundColor: '#FEF2F2', borderColor: '#EF4444', borderWidth: 1, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                            <Ionicons name="warning" size={10} color="#DC2626" />
+                            <Text style={{ fontSize: 9, fontFamily: 'Nunito-Bold', color: '#DC2626' }}>FRAUD FLAG</Text>
+                        </View>
+                    )}
                     <View style={[rc.sevChip, { backgroundColor: sev.bg }]}>
                         <Text style={[rc.sevText, { color: sev.color }]}>{sev.label}</Text>
                     </View>
@@ -392,7 +404,7 @@ export default function PendingQueue({ navigation }) {
 
     return (
         <View style={s.container}>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
             <SafeAreaView style={{ flex: 1 }} edges={['top']}>
                 {/* Header */}
                 <LinearGradient colors={[C.navy, C.navyMid]} style={s.header}>

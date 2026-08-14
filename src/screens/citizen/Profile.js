@@ -6,7 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MobileContainer } from '../../components';
+import { MobileContainer, FocusAwareStatusBar } from '../../components';
 import { useAppContext, useAuth } from '../../context';
 import { formatPoints } from '../../utils';
 import { supabase } from '../../services/supabase';
@@ -121,7 +121,7 @@ export default function Profile({ navigation }) {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
             <SafeAreaView style={styles.safeArea} edges={['bottom']}>
                 <ScrollView showsVerticalScrollIndicator={false}>
                     {/* ── Navy Profile Hero ── */}

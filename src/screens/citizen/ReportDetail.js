@@ -13,32 +13,33 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { FocusAwareStatusBar } from '../../components';
 import { fetchReportById } from '../../services/reports';
 import { rewardService } from '../../services';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const C = {
-    navy: '#002452',
-    navyDeep: '#00102B',
-    navyMid: '#1B3A6B',
-    amber: '#F59E0B',
-    amberDark: '#D97706',
+    navy: '#0A1E3F',
+    navyDeep: '#051329',
+    navyMid: '#0F2C59',
+    amber: '#D97706',
+    amberDark: '#B45309',
     amberSurface: '#FEF3C7',
     white: '#FFFFFF',
-    offWhite: '#F8F9FB',
+    offWhite: '#F4F6F9',
     surface: '#FFFFFF',
-    surfaceLow: '#F2F4F6',
-    textPrimary: '#191C1E',
-    textSecondary: '#44474F',
-    textTertiary: '#747780',
-    border: '#C4C6D0',
-    success: '#059669',
-    successSurface: '#D1FAE5',
-    warning: '#D97706',
+    surfaceLow: '#F8FAFC',
+    textPrimary: '#0F172A',
+    textSecondary: '#475569',
+    textTertiary: '#64748B',
+    border: '#CBD5E1',
+    success: '#15803D',
+    successSurface: '#DCFCE7',
+    warning: '#B45309',
     warningSurface: '#FEF3C7',
-    error: '#BA1A1A',
-    errorSurface: '#FFDAD6',
+    error: '#B91C1C',
+    errorSurface: '#FEE2E2',
 };
 
 const SEVERITY_MAP = {
@@ -116,7 +117,7 @@ export default function ReportDetail({ navigation, route }) {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navyDeep} />
             <SafeAreaView style={styles.safeArea} edges={['top']}>
                 {/* ── Navy Header ── */}
                 <LinearGradient colors={[C.navyDeep, C.navy, C.navyMid]} style={[styles.header, { paddingTop: insets.top + 8 }]}>

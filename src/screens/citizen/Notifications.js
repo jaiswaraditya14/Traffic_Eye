@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context';
+import { FocusAwareStatusBar } from '../../components';
 import {
     fetchNotifications,
     markNotificationRead,
@@ -100,7 +101,7 @@ export default function Notifications({ navigation }) {
 
     return (
         <View style={s.container}>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
             <SafeAreaView style={{ flex: 1 }} edges={['top']}>
                 <LinearGradient colors={[C.navy, C.navyMid]} style={s.header}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={s.iconBtn}>

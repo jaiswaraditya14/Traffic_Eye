@@ -13,33 +13,34 @@ import { supabase } from '../../services';
 import * as FileSystem from 'expo-file-system/legacy';
 const { EncodingType } = FileSystem;
 import { decode } from 'base64-arraybuffer';
+import { FocusAwareStatusBar } from '../../components';
 
 // ── Design Tokens (matches existing app exactly) ──
 const C = {
-    navy: '#002452',
-    navyMid: '#1B3A6B',
-    navyLight: '#2C4E80',
-    amber: '#F59E0B',
-    amberDark: '#D97706',
+    navy: '#0A1E3F',
+    navyMid: '#0F2C59',
+    navyLight: '#1E3A8A',
+    amber: '#D97706',
+    amberDark: '#B45309',
     amberSurface: '#FEF3C7',
     white: '#FFFFFF',
-    offWhite: '#F8F9FB',
+    offWhite: '#F4F6F9',
     surface: '#FFFFFF',
-    surfaceLow: '#F2F4F6',
-    textPrimary: '#191C1E',
-    textSecondary: '#44474F',
-    textTertiary: '#747780',
-    border: '#C4C6D0',
-    success: '#059669',
-    successSurface: '#D1FAE5',
-    warning: '#D97706',
+    surfaceLow: '#F8FAFC',
+    textPrimary: '#0F172A',
+    textSecondary: '#475569',
+    textTertiary: '#64748B',
+    border: '#CBD5E1',
+    success: '#15803D',
+    successSurface: '#DCFCE7',
+    warning: '#B45309',
     warningSurface: '#FEF3C7',
-    error: '#BA1A1A',
-    errorSurface: '#FFDAD6',
-    primarySurface: '#D7E2FF',
+    error: '#B91C1C',
+    errorSurface: '#FEE2E2',
+    primarySurface: '#EFF6FF',
     infoBg: '#EFF6FF',
     infoBorder: '#BFDBFE',
-    infoText: '#1D4ED8',
+    infoText: '#1E3A8A',
 };
 
 const VIOLATION_TYPES = [
@@ -506,7 +507,7 @@ export default function VideoReport({ navigation }) {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
             <SafeAreaView style={styles.safeArea} edges={['bottom']}>
 
                 {/* ── Navy Header ── */}

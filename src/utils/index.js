@@ -40,3 +40,4 @@ export {
     applyRef,
     validateCoordinates,
 } from './exifParser';
+// imageHash.js removed — duplicate detection now uses plate-OCR + Supabase DB matching

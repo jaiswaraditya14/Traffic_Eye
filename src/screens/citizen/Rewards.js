@@ -8,6 +8,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useAuth } from '../../context';
+import { FocusAwareStatusBar } from '../../components';
 import { rewardService, REDEEM_CATALOG } from '../../services';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Clipboard from 'expo-clipboard';
@@ -17,26 +18,26 @@ const CARD_WIDTH = (width - 56) / 2;
 
 // ── Shared Design Tokens (Civic Curator palette) ──
 const C = {
-    navy: '#002452',
-    navyDeep: '#00102B',
-    navyMid: '#1B3A6B',
-    amber: '#F59E0B',
-    amberDark: '#D97706',
+    navy: '#0A1E3F',
+    navyDeep: '#051329',
+    navyMid: '#0F2C59',
+    amber: '#D97706',
+    amberDark: '#B45309',
     amberSurface: '#FEF3C7',
-    secondary: '#855300',
-    secondaryContainer: '#FEA619',
+    secondary: '#B45309',
+    secondaryContainer: '#F59E0B',
     white: '#FFFFFF',
-    offWhite: '#F8F9FB',
-    surfaceLow: '#F2F4F6',
-    surfaceContainer: '#EDEEF0',
-    bluePrimary: '#0052CC',
-    textPrimary: '#191C1E',
-    textSecondary: '#44474F',
-    textTertiary: '#747780',
-    outlineVariant: '#C4C6D0',
-    success: '#059669',
-    successSurface: '#D1FAE5',
-    error: '#DC2626',
+    offWhite: '#F4F6F9',
+    surfaceLow: '#F8FAFC',
+    surfaceContainer: '#F1F5F9',
+    bluePrimary: '#0F2C59',
+    textPrimary: '#0F172A',
+    textSecondary: '#475569',
+    textTertiary: '#64748B',
+    outlineVariant: '#CBD5E1',
+    success: '#15803D',
+    successSurface: '#DCFCE7',
+    error: '#B91C1C',
     errorSurface: '#FEE2E2',
 };
 
@@ -516,7 +517,7 @@ export default function Rewards() {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
             <SafeAreaView style={styles.safeArea} edges={['bottom']}>
                 <ScrollView showsVerticalScrollIndicator={false}>
                     {renderHeader()}

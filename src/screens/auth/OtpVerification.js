@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MobileContainer } from '../../components';
+import { MobileContainer, FocusAwareStatusBar } from '../../components';
 import { supabase } from '../../services';
 
 const C = {
@@ -181,7 +181,7 @@ export default function OtpVerification({ navigation, route }) {
 
     return (
         <MobileContainer>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
                 <ScrollView
                     contentContainerStyle={styles.scrollContent}

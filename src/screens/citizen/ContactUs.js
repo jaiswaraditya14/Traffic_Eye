@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert, S
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { FocusAwareStatusBar } from '../../components';
 
 const C = {
     navy: '#002452',
@@ -35,7 +36,7 @@ export default function ContactUs({ navigation }) {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
             <SafeAreaView style={styles.safeArea} edges={['top']}>
                 {/* ── Navy Header ── */}
                 <LinearGradient colors={[C.navy, C.navyMid]} style={styles.header}>

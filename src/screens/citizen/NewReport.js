@@ -7,7 +7,7 @@ import MapView, { Marker } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MobileContainer } from '../../components';
+import { MobileContainer, FocusAwareStatusBar } from '../../components';
 import { useAppContext } from '../../context';
 import { useImagePicker, useLocation } from '../../hooks';
 import * as MediaLibrary from 'expo-media-library';
@@ -15,25 +15,25 @@ import { parseExifGPS } from '../../utils';
 
 // ── Design Tokens ──
 const C = {
-    navy: '#002452',
-    navyMid: '#1B3A6B',
-    amber: '#F59E0B',
-    amberDark: '#D97706',
+    navy: '#0A1E3F',
+    navyMid: '#0F2C59',
+    amber: '#D97706',
+    amberDark: '#B45309',
     white: '#FFFFFF',
-    offWhite: '#F8F9FB',
+    offWhite: '#F4F6F9',
     surface: '#FFFFFF',
-    surfaceInput: '#F2F4F6',
-    textPrimary: '#191C1E',
-    textSecondary: '#44474F',
-    textTertiary: '#747780',
-    border: '#C4C6D0',
-    success: '#059669',
-    successSurface: '#D1FAE5',
-    warning: '#D97706',
+    surfaceInput: '#F1F5F9',
+    textPrimary: '#0F172A',
+    textSecondary: '#475569',
+    textTertiary: '#64748B',
+    border: '#CBD5E1',
+    success: '#15803D',
+    successSurface: '#DCFCE7',
+    warning: '#B45309',
     warningSurface: '#FEF3C7',
-    error: '#BA1A1A',
-    primarySurface: '#D7E2FF',
-    info: '#1B3A6B',
+    error: '#B91C1C',
+    primarySurface: '#EFF6FF',
+    info: '#0F2C59',
 };
 
 export default function NewReport({ navigation }) {
@@ -44,7 +44,7 @@ export default function NewReport({ navigation }) {
     const insets = useSafeAreaInsets();
 
     const {
-        location, address, setAddress, loading: loadingLocation,
+        location, address, setAddress, locationSource, loading: loadingLocation,
         detectLocation, setManualLocation, reverseGeocodeFromCoords
     } = useLocation();
 
@@ -103,12 +103,12 @@ export default function NewReport({ navigation }) {
     useEffect(() => { return () => { if (bannerTimer.current) clearTimeout(bannerTimer.current); }; }, []);
 
     const handleLocationExtraction = useCallback(async (exif, source, assetId) => {
-        // Gallery images — show reading banner immediately for instant feedback
-        // Camera images — also try EXIF first (GPS is now preserved since we removed allowsEditing)
+        // Show reading banner immediately for instant feedback
         showBanner('reading');
 
         let lat = null;
         let lng = null;
+        let coordSource = null; // 'IMAGE_EXIF' | 'MEDIA_LIBRARY'
 
         // ── Strategy 1: EXIF GPS Parsing (Android flat keys, iOS {GPS}, DMS, rationals) ──
         if (exif) {
@@ -117,13 +117,14 @@ export default function NewReport({ navigation }) {
             if (exifCoords) {
                 lat = exifCoords.lat;
                 lng = exifCoords.lng;
-                console.log(`[GPS Extraction] ✅ Successfully obtained EXIF coordinates: lat=${lat}, lng=${lng}`);
+                coordSource = 'IMAGE_EXIF';
+                console.log(`[GPS Extraction] ✅ EXIF GPS: lat=${lat}, lng=${lng}`);
             } else {
-                console.log('[GPS Extraction] EXIF data present but did not contain valid GPS coordinates');
+                console.log('[GPS Extraction] EXIF data present but no valid GPS coordinates');
             }
         }
 
-        // ── Strategy 2: MediaLibrary.getAssetInfoAsync (for Android when EXIF object is stripped) ──
+        // ── Strategy 2: MediaLibrary.getAssetInfoAsync (Android EXIF stripped fallback) ──
         if (lat === null && assetId) {
             try {
                 console.log('[GPS Extraction] Strategy 2 — Trying MediaLibrary lookup for assetId:', assetId);
@@ -132,10 +133,9 @@ export default function NewReport({ navigation }) {
                 console.log('[GPS Extraction] MediaLibrary permission:', status, '| loc access:', locPerm.accessPrivileges);
                 if (status === 'granted') {
                     const info = await MediaLibrary.getAssetInfoAsync(assetId, { shouldDownloadFromNetwork: false });
-                    console.log('[GPS Extraction] MediaLibrary location object:', JSON.stringify(info?.location));
+                    console.log('[GPS Extraction] MediaLibrary location:', JSON.stringify(info?.location));
                     const mlLat = info?.location?.latitude;
                     const mlLng = info?.location?.longitude;
-                    
                     if (
                         mlLat != null && mlLng != null &&
                         isFinite(mlLat) && isFinite(mlLng) &&
@@ -144,9 +144,10 @@ export default function NewReport({ navigation }) {
                     ) {
                         lat = mlLat;
                         lng = mlLng;
-                        console.log(`[GPS Extraction] ✅ Got valid coords from MediaLibrary: lat=${lat}, lng=${lng}`);
+                        coordSource = 'MEDIA_LIBRARY';
+                        console.log(`[GPS Extraction] ✅ MediaLibrary GPS: lat=${lat}, lng=${lng}`);
                     } else {
-                        console.log('[GPS Extraction] MediaLibrary returned invalid/empty location (0,0 or null)');
+                        console.log('[GPS Extraction] MediaLibrary returned invalid/empty location');
                     }
                 }
             } catch (e) {
@@ -154,11 +155,12 @@ export default function NewReport({ navigation }) {
             }
         }
 
-        // ── Reverse geocode if valid EXIF coordinates were extracted ──
+        // ── Reverse-geocode if valid image GPS coordinates were found ──────────────
         if (lat !== null && lng !== null) {
             showBanner('extracting');
             try {
-                const result = await reverseGeocodeFromCoords(lat, lng);
+                // guardUserInput=true: do NOT overwrite an address the user already typed
+                const result = await reverseGeocodeFromCoords(lat, lng, coordSource, true);
                 if (result) { showBanner('success'); hideBanner(4000); }
                 else { showBanner('no-gps'); hideBanner(3000); }
             } catch (e) {
@@ -166,10 +168,11 @@ export default function NewReport({ navigation }) {
                 showBanner('no-gps'); hideBanner(3000);
             }
         } else {
-            // ── Strategy 3: Fallback to live device GPS (only if EXIF is missing/invalid) ──
-            console.log('[GPS Extraction] ⚠️ No valid EXIF coords found — falling back to live device GPS (Approx. 10m radius)');
+            // ── Strategy 3: Fallback to live device GPS ───────────────────────────
+            console.log('[GPS Extraction] ⚠️ No image GPS — falling back to live device GPS (≤10m radius)');
             showBanner('fallback-gps');
-            const gpsResult = await detectLocation(true); // true = apply <=10m approximation radius
+            // guardUserInput=true: do NOT overwrite user-typed address
+            const gpsResult = await detectLocation(true, true);
             if (gpsResult) {
                 showBanner('success');
                 hideBanner(4000);
@@ -218,6 +221,7 @@ export default function NewReport({ navigation }) {
         if (!image && !video) { Alert.alert('Error', 'Please capture or select an image or video'); return; }
         setCurrentReport({
             image, video, mediaType, description, address, location,
+            locationSource: locationSource || null,
             trustLevel: trustLevel || 'Needs Verification / Manual Location',
             timestamp: new Date()
         });
@@ -226,7 +230,7 @@ export default function NewReport({ navigation }) {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
             <SafeAreaView style={styles.safeArea} edges={['bottom']}>
                 {/* ── Navy Header ── */}
                 <LinearGradient colors={[C.navy, C.navyMid]} style={[styles.header, { paddingTop: insets.top + 16 }]}>
@@ -438,14 +442,23 @@ export default function NewReport({ navigation }) {
                 </View>
             </Modal>
 
-            {/* Fullscreen Image Modal */}
+            {/* Fullscreen Image Modal with Pinch-to-Zoom */}
             <Modal visible={!!fullscreenImage} transparent={true} animationType="fade" onRequestClose={() => setFullscreenImage(null)}>
                 <View style={styles.modalBg}>
                     <TouchableOpacity style={styles.modalClose} onPress={() => setFullscreenImage(null)}>
                         <Ionicons name="close" size={28} color={C.white} />
                     </TouchableOpacity>
                     {fullscreenImage && (
-                        <Image source={{ uri: fullscreenImage }} style={styles.modalImg} resizeMode="contain" />
+                        <ScrollView
+                            maximumZoomScale={5}
+                            minimumZoomScale={1}
+                            showsHorizontalScrollIndicator={false}
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={{ flex: 1, width: '100%', justifyContent: 'center', alignItems: 'center' }}
+                            style={{ width: '100%', height: '100%' }}
+                        >
+                            <Image source={{ uri: fullscreenImage }} style={styles.modalImg} resizeMode="contain" />
+                        </ScrollView>
                     )}
                 </View>
             </Modal>
@@ -583,9 +596,6 @@ const styles = StyleSheet.create({
     placeholderText: { fontSize: 15, fontFamily: 'Nunito-Bold', color: C.textSecondary, marginTop: 12 },
     placeholderSub: { fontSize: 13, color: C.textTertiary, marginTop: 6, textAlign: 'center' },
 
-    videoPlaceholder: { alignItems: 'center', flex: 1, width: '100%', justifyContent: 'center', backgroundColor: '#FEE2E2' },
-    videoText: { fontSize: 15, fontFamily: 'Nunito-Bold', color: '#BA1A1A', marginTop: 10 },
-
     mediaBtnRow: { flexDirection: 'row', gap: 14, marginBottom: 14 },
     mediaBtn: { flex: 1, borderRadius: 16, overflow: 'hidden' },
     mediaBtnGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
@@ -668,27 +678,6 @@ const styles = StyleSheet.create({
         shadowRadius: 6,
     },
     descInput: { fontSize: 14, color: C.textPrimary, textAlignVertical: 'top', height: 90, fontFamily: 'Nunito-Medium' },
-
-    plateBox: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-        backgroundColor: C.surface,
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        borderWidth: 1,
-        borderColor: 'rgba(0,0,0,0.08)',
-        marginBottom: 32,
-    },
-    plateInput: {
-        flex: 1,
-        fontSize: 15,
-        fontFamily: 'Nunito-Bold',
-        color: C.textPrimary,
-        letterSpacing: 1.5,
-    },
-
 
     submitBtn: {
         borderRadius: 18,

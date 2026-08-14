@@ -7,6 +7,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../services';
 import { useAuth } from '../../context';
+import { FocusAwareStatusBar } from '../../components';
 
 const C = {
     navy: '#002452',
@@ -202,7 +203,7 @@ export default function VerifiedReports({ route, navigation }) {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
             <SafeAreaView style={styles.safeArea} edges={['top']}>
                 {/* ── Header ── */}
                 <LinearGradient colors={[C.navy, C.navyMid]} style={styles.header}>
@@ -213,8 +214,18 @@ export default function VerifiedReports({ route, navigation }) {
                             </TouchableOpacity>
                             <Text style={styles.headerTitle}>{pageTitle}</Text>
                         </View>
-                        <View style={styles.badge}>
-                            <Text style={styles.badgeText}>{filteredReports.length}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <TouchableOpacity 
+                                style={styles.exportHeaderBtn}
+                                onPress={() => navigation.navigate('OfficerReportExport')}
+                                activeOpacity={0.8}
+                            >
+                                <Ionicons name="download-outline" size={15} color={C.white} />
+                                <Text style={styles.exportHeaderBtnText}>Export</Text>
+                            </TouchableOpacity>
+                            <View style={styles.badge}>
+                                <Text style={styles.badgeText}>{filteredReports.length}</Text>
+                            </View>
                         </View>
                     </View>
 
@@ -449,6 +460,23 @@ const styles = StyleSheet.create({
     headerTitle: { fontSize: 20, fontFamily: 'Nunito-Bold', color: C.white },
     badge: { backgroundColor: C.successSurface, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 4, minWidth: 36, alignItems: 'center' },
     badgeText: { fontSize: 14, fontFamily: 'Nunito-Bold', color: C.success },
+
+    exportHeaderBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: 'rgba(255,255,255,0.18)',
+        borderRadius: 12,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.25)',
+    },
+    exportHeaderBtnText: {
+        fontSize: 12,
+        fontFamily: 'Nunito-Bold',
+        color: C.white,
+    },
 
     // Search and filter styles (copied from PendingQueue)
     searchFilterRow: { flexDirection: 'row', gap: 10 },

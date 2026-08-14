@@ -5,18 +5,19 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
+import { FocusAwareStatusBar } from '../../components';
 
 const { width, height } = Dimensions.get('window');
 
 // ─── Design Tokens (Civic Authority) — UNCHANGED ───
 const C = {
-    navy: '#002452',
-    navyMid: '#1B3A6B',
-    navyLight: '#2C4E80',
-    amber: '#F59E0B',
-    amberDark: '#D97706',
+    navy: '#0A1E3F',
+    navyMid: '#0F2C59',
+    navyLight: '#1E3A8A',
+    amber: '#D97706',
+    amberDark: '#B45309',
     white: '#FFFFFF',
-    offWhite: '#D7E2FF',
+    offWhite: '#E2E8F0',
 };
 
 
@@ -205,7 +206,7 @@ export default function SplashScreen({ navigation }) {
     // ── Render ──
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor="#001535" />
 
             {/* ── Deep gradient background ── */}
             <LinearGradient

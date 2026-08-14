@@ -1,175 +1,185 @@
+/**
+ * ai/index.js — Traffic Eye AI Vision & Violation Detection Service
+ *
+ * Pipeline:
+ *   Stage 1    — Vision scene + violation detection (1280px JPEG, 512 tokens, 45s)
+ *   Stage 1.5  — Reasoning validation (text-only, 384 tokens, 30s)
+ *   Stage 2    — High-res plate OCR fallback (1600px, 256 tokens, 30s)
+ *
+ * Shared utilities (callAI, buildAttemptQueue, runWithRotation, stripThinkTags)
+ * live in ./utils to avoid circular imports with authenticity.js.
+ */
+
 import { AI_CONFIG } from '../../config';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { stripThinkTags, buildAttemptQueue, runWithRotation, callAI } from './utils';
 
 // ─── Violation severity ranking ───────────────────────────────────────────────
 const VIOLATION_SEVERITY = {
-    'Drunk Driving':        10,
-    'Dangerous Driving':     9,
-    'Red Light Violation':   8,
-    'Wrong Side Driving':    7,
-    'Speeding':              6,
-    'Triple Riding':         5,
-    'Overloading':           5,
-    'No Helmet':             2,
-    'No Seat Belt':          4,
-    'Mobile Phone Use':      3,
-    'No Registration Plate': 3,
-    'Lane Cutting':          2,
-    'Wrong Parking':         1,
-    'Other':                 0,
+    'Drunk Driving':                        10,
+    'Dangerous Driving':                     9,
+    'Rash Driving':                          9,
+    'Driving on Footpath':                   8.5,
+    'Footpath Driving':                      8.5,
+    'Footpath Riding':                       8.5,
+    'Red Light Violation':                   8,
+    'Red Light':                             8,
+    'Signal Jump':                           8,
+    'Wrong Side Driving':                    7,
+    'Wrong Way':                             7,
+    'Footboard Travelling':                  7,
+    'Roof Travelling':                       7,
+    'Speeding':                              6,
+    'Over Speeding':                         6,
+    'Triple Riding':                         5,
+    'Overloading':                           5,
+    'Overloading Goods':                     5,
+    'Protruding Cargo':                      5,
+    'Passenger Overcrowding':                4.5,
+    'Auto Overcrowding':                     4.5,
+    'No Seat Belt':                          4,
+    'No Seatbelt':                           4,
+    'Tinted Glass':                          3.5,
+    'Mobile Phone Use':                      3,
+    'Phone Use':                             3,
+    'No Registration Plate':                 3,
+    'Defective Number Plate':                3,
+    'No Helmet':                             2,
+    'Without Helmet':                        2,
+    'Lane Cutting':                          2,
+    'Illegal U-Turn':                        2,
+    'Wrong Parking':                         1,
+    'Illegal Parking':                       1,
+    'No Parking':                            1,
+    'Footpath Parking':                      1,
+    'Parking Violation':                     1,
+    'Other':                                 0,
 };
 
-// ─── Attempt queue builder ─────────────────────────────────────────────────────
-// Strategy: exhaust ALL keys for Model A before trying Model B.
-// Strategy: exhaust ALL keys for Model A before trying Model B.
-const buildAttemptQueue = (modelsArray) => {
-    const queue = [];
-    for (const model of modelsArray) {
-        if (model.includes('/') || model.includes('llama') || model.includes('openai') || model.includes('gpt') || model.includes('qwen')) {
-            // Groq model
-            for (const apiKey of (AI_CONFIG.groqApiKeys || [])) {
-                queue.push({ model, apiKey, provider: 'groq' });
-            }
-        } else {
-            // Gemini model
-            for (const apiKey of AI_CONFIG.geminiApiKeys) {
-                queue.push({ model, apiKey, provider: 'gemini' });
-            }
-        }
-    }
-    return queue;
-};
+// Re-export shared utilities for callers that import from this module
+export { stripThinkTags, buildAttemptQueue, runWithRotation, callAI } from './utils';
 
+// ─── Diagnostics ─────────────────────────────────────────────────────────────
 const logDiagnostics = () => {
-    const geminiKeyCount = AI_CONFIG.geminiApiKeys?.length || 0;
-    const groqKeyCount = AI_CONFIG.groqApiKeys?.length || 0;
-    console.log(`[AI] Keys: Gemini(${geminiKeyCount}), Groq(${groqKeyCount})`);
-    console.log(`[AI] Vision Models: ${AI_CONFIG.visionModels?.join(', ') || 'None'}`);
-    console.log(`[AI] Reasoning Models: ${AI_CONFIG.reasoningModels?.join(', ') || 'None'}`);
-    if (geminiKeyCount === 0 && groqKeyCount === 0)
-        console.error('[AI] ⚠️ No API keys! Check .env and restart.');
+    const g = AI_CONFIG.geminiApiKeys?.length || 0;
+    const q = AI_CONFIG.groqApiKeys?.length || 0;
+    const n = AI_CONFIG.nvidiaApiKeys?.length || 0;
+    console.log(`[AI] Keys: NVIDIA(${n}), Gemini(${g}), Groq(${q})`);
+    console.log(`[AI] Vision Models:       ${AI_CONFIG.visionModels?.join(', ')      || 'None'}`);
+    console.log(`[AI] Authenticity Models: ${AI_CONFIG.authenticityModels?.join(', ') || 'None'}`);
+    console.log(`[AI] OCR Models:          ${AI_CONFIG.ocrModels?.join(', ')          || 'None'}`);
+    console.log(`[AI] Reasoning Models:    ${AI_CONFIG.reasoningModels?.join(', ')    || 'None'}`);
+    if (g === 0 && q === 0 && n === 0) console.error('[AI] ⚠️ No API keys! Check .env and restart.');
 };
 
-// ─── Stage 1 prompt: Violation detection ─────────────────────────────────────
-// Kept deliberately wide-angle — give full scene context, don't over-zoom.
+// ─── Stage 1 prompt: Violation detection (All Indian MVA Rules) ─────────────────
 const VIOLATION_PROMPT = `
-You are an Indian traffic enforcement AI system analysing a dashcam or phone photograph.
-Your responses directly lead to legal action. Accuracy is paramount. False accusations are UNACCEPTABLE.
+Analyze the image strictly for ANY clearly visible traffic violation under Indian Motor Vehicles Act (MVA) and Traffic Rules involving the PRIMARY vehicle.
 
-STEP 1 — SCENE UNDERSTANDING (think step-by-step, internally):
-  • Count every visible vehicle (cars, bikes, autos, trucks, buses, cycles).
-  • For each vehicle, carefully count the number of people PHYSICALLY SEATED ON IT.
-  • Note each rider/passenger's position, helmet status, and any visible goods.
+PRIMARY VEHICLE:
+- Focus on the main vehicle in the photo (motorcycle, scooter, car, auto-rickshaw, truck, bus, tempo, e-rickshaw, commercial goods vehicle).
+- Evaluate violations ONLY for this primary vehicle. Do not transfer violations from background or adjacent vehicles.
 
-STEP 2 — VIOLATION DETECTION:
-  Check EVERY vehicle for these Indian traffic violations:
+STRICT EVIDENCE RULES:
+* Detect ONLY what is directly and unambiguously visible in the image.
+* NEVER guess, assume, infer, or fabricate a violation.
+* Do NOT explain traffic laws or write long reasoning.
+* If evidence is unclear or doubtful, omit that violation.
+* Output strictly valid JSON.
 
-  ── COUNTING-BASED VIOLATIONS (EXTREME CAUTION REQUIRED) ──
-  - Triple Riding: ONLY flag if you can EXPLICITLY COUNT 3 or more DISTINCT human bodies
-    ALL physically on the SAME 2-wheeler AT THE SAME TIME in the FOREGROUND.
-    ★ Count: 1 body = driver only. 2 bodies = driver + 1 pillion (NORMAL, NOT a violation).
-    ★ You need to see 3 SEPARATE bodies. If you see only 1 or 2 people on the bike → DO NOT flag.
-    ★ People walking/standing near the bike, on other vehicles, or in the BACKGROUND do NOT count.
-    ★ If there is ANY doubt about the exact count → DO NOT FLAG. Doubt = no violation.
+INDIAN TRAFFIC VIOLATIONS TO DETECT (ALL VEHICLES):
+1. TWO-WHEELERS (Motorcycles, Scooters, Mopeds):
+   • "Triple Riding": 3 or more people physically on one two-wheeler.
+   • "No Helmet": Rider or pillion passenger clearly not wearing a helmet.
+   • "Footpath Driving": Riding on a pedestrian footpath / pavement / sidewalk.
 
-  - Overloading: ONLY flag for goods vehicles (trucks/tempos/autos) when cargo is VISIBLY
-    spilling over the sides or stacked dangerously beyond the vehicle body.
-    ★ DO NOT flag overloading for motorcycles/scooters unless 3+ people are literally on it.
-    ★ A rider carrying a backpack or small bag is NOT overloading.
-    ★ If you cannot see obvious overflowing goods → DO NOT FLAG.
+2. FOUR-WHEELERS & PASSENGER CARS (Cars, Taxis, SUVs):
+   • "No Seat Belt": Driver or front-seat passenger without seatbelt.
+   • "Tinted Glass": Dark / black sunfilm on windows obstructing clear visibility.
+   • "Passenger Overcrowding": Carrying excess passengers beyond licensed capacity.
 
-  ── OTHER VIOLATIONS ──
-  - No Helmet: rider or pillion is clearly NOT wearing a helmet
-  - Red Light Violation: vehicle clearly past stop line at a red signal
-  - Wrong Side Driving / Wrong Way: driving visibly against traffic flow
-  - No Registration Plate: plate is fully missing or completely unreadable/obscured
-  - Speeding: clear motion blur or strong context clues
-  - Mobile Phone Use: driver is visibly holding/using a phone while riding
-  - No Seat Belt: car driver/front passenger without seat belt clearly visible
-  - Wrong Parking: parked on footpath, no-parking zone, or causing obstruction
-  - Lane Cutting: abrupt unsafe lane change captured in the moment
-  - Dangerous Driving / Drunk Driving: visually evident erratic behaviour
+3. AUTO-RICKSHAWS & THREE-WHEELERS:
+   • "Auto Overcrowding": Excess passengers (e.g. passengers seated next to driver or overcrowded cabin).
+   • "Dangerous Passenger Posture": Passengers hanging outside the auto body.
 
-  ══════════════════════════════════════════════════════════════════
-  ZERO-TOLERANCE HALLUCINATION POLICY — READ CAREFULLY:
-  • You MUST only report what you can PHYSICALLY and UNAMBIGUOUSLY see.
-  • Do NOT infer, assume, or guess any violation.
-  • Do NOT report Triple Riding unless you can clearly count THREE bodies on the vehicle.
-  • Do NOT report Overloading unless goods are visibly spilling beyond the vehicle frame.
-  • A single rider without a helmet → ONLY "No Helmet". Nothing else unless separately verified.
-  • "No violation" is always valid and often the correct answer.
-  • When in doubt about ANY violation → DO NOT include it. Silence is better than false accusation.
-  ══════════════════════════════════════════════════════════════════
+4. COMMERCIAL, GOODS & HEAVY VEHICLES (Trucks, Tempos, Lorries, Buses):
+   • "Overloading Goods": Cargo overflowing, spilling over the sides, or dangerously stacked beyond the vehicle body.
+   • "Protruding Cargo": Unsecured long iron rods, pipes, or timber protruding without safety markers.
+   • "Carrying Passengers in Goods Vehicle": People transported in open goods carriage bed.
+   • "Footboard Travelling": Passengers hanging or standing on the bus footboard/door.
+   • "Roof Travelling": People travelling on the roof of a bus or vehicle.
 
-STEP 3 — PRIMARY VIOLATOR SELECTION:
-  • Focus primarily on the clear FOREGROUND vehicle.
-  • Do NOT penalise a vehicle for pedestrians walking behind it (depth perspective illusion).
-  • If multiple violations on same vehicle, pick the most severe one as primary.
-  • If multiple vehicles violated, pick the one with the most readable plate.
+5. MOVING & DRIVING VIOLATIONS (ALL VEHICLES):
+   • "Red Light Violation": Crossing stop line or intersection during a red traffic signal.
+   • "Wrong Side Driving": Driving against designated one-way or opposing traffic flow.
+   • "Speeding": Excessive speed clearly supported by strong motion blur or context.
+   • "Rash Driving": Reckless zigzagging, stunt riding, or dangerous erratic driving.
+   • "Mobile Phone Use": Driver/rider holding or using a mobile phone while operating the vehicle.
+   • "Lane Cutting": Abrupt unsafe lane change without indicator or crossing solid dividing lines.
+   • "Illegal U-Turn": Making a U-turn or prohibited turn where disallowed.
+   • "Drunk Driving": Visibly erratic out-of-control vehicle state with clear evidence.
 
-STEP 4 — PLATE READING (rough pass — OCR will verify in next step):
-  • Read the number plate of the PRIMARY violator ONLY.
-  • Indian plate format examples: MH12AB1234, KA01MF7890, DL8CAK0001, UP32ET5678
-  • If completely unreadable, write "Not detected".
-  • DO NOT read a bystander vehicle's plate.
+6. PARKING & REGULATORY VIOLATIONS (ALL VEHICLES):
+   • "Wrong Parking": Vehicle parked in a "No Parking" zone (sign/marking visible), on zebra crossing, bus stop, yellow line, or causing obstruction.
+   • "Footpath Parking": Parked on a pedestrian footpath or sidewalk.
+   • "No Registration Plate": Number plate missing, covered, tampered, or completely unreadable.
 
-STEP 5 — CONFIDENCE:
-  • 90-100: Plate clearly visible, violation obvious and unambiguous.
-  • 70-89: Good confidence but minor ambiguity exists.
-  • 50-69: Partial evidence of violation.
-  • 0-49: Low quality or significantly ambiguous image.
+Return ONLY valid JSON. No reasoning, explanation, Markdown, or extra text.
 
-MANDATORY OUTPUT FORMAT — Return ONLY this exact JSON (no markdown, no explanation):
+If violation(s) detected:
 {
-  "vehicleType": "motorcycle",
-  "primaryVehiclePersonCount": 1,
-  "violationDetected": true,
-  "vehicleNumber": "AP28R8104",
-  "violationType": "No Helmet",
-  "allViolations": ["No Helmet"],
-  "severity": "Medium",
-  "confidence": 92,
-  "description": "Rider on a black motorcycle is not wearing a helmet. Only this single violation is visible."
+  "violation_detected": true,
+  "vehicle_type": "motorcycle",
+  "vehicle_number": "MH12MJ0208",
+  "person_count": 3,
+  "violations": [
+    {
+      "type": "Triple Riding",
+      "confidence": 0.98,
+      "evidence": "Three people are clearly visible on one motorcycle."
+    },
+    {
+      "type": "No Helmet",
+      "confidence": 0.98,
+      "evidence": "The riders are clearly visible without helmets."
+    }
+  ],
+  "severity": "high",
+  "description": "Three people riding one motorcycle without helmets."
 }
 
-IMPORTANT: vehicleType must be one of: motorcycle, scooter, car, truck, bus, auto, cycle, other.
-primaryVehiclePersonCount = exact number of people you can see ON the primary vehicle (integer).
-
-If NO violation at all:
+If NO violation detected:
 {
-  "vehicleType": "motorcycle",
-  "primaryVehiclePersonCount": 1,
-  "violationDetected": false,
-  "vehicleNumber": "Not applicable",
-  "violationType": "None",
-  "allViolations": [],
-  "severity": "None",
-  "confidence": 90,
-  "description": "No traffic violation detected in this image."
+  "violation_detected": false,
+  "vehicle_type": "car",
+  "vehicle_number": "MH02CR7036",
+  "person_count": 1,
+  "violations": [],
+  "severity": "none",
+  "description": "No clear traffic violation."
 }
 `;
 
-// ─── Stage 1.5 prompt: Reasoning validation ──────────────────────────────────
+// ─── Stage 1.5 prompt: Reasoning validation ───────────────────────────────────
 const REASONING_PROMPT = `
 You are a senior traffic police officer evaluating a preliminary traffic violation report generated by a vision AI.
-Review the following initial detection data carefully and determine if it constitutes a definitive, legally binding traffic violation.
+Review the following initial detection data carefully and determine if it constitutes a definitive, legally binding traffic violation under Indian Motor Vehicles Act.
 Apply strict logic based on Indian traffic rules.
 
 Initial Report:
 __RAW_JSON__
 
 MANDATORY RULES:
-1. Triple Riding requires exactly 3 or more people ON the vehicle. 1 or 2 people is NOT a violation.
+1. Triple Riding requires exactly 3 or more people ON the two-wheeler. 1 or 2 people is NOT a violation.
 2. Overloading only applies to goods clearly spilling out of goods vehicles, not passenger bags.
-3. If the violation is doubtful based on the description, mark violationDetected as false and violationType as "None".
+3. If the violation is doubtful based on the description, mark violation_detected as false and violations as [].
 4. Ensure the output is strictly valid JSON matching the exact schema of the input.
 
 Output ONLY the final evaluated JSON. No markdown, no explanations.
 `;
 
 // ─── Stage 2 prompt: High-accuracy plate OCR ─────────────────────────────────
-// Use the higher-resolution image. This pass ONLY reads the plate — nothing else.
 const PLATE_OCR_PROMPT = `
 You are a specialist license plate OCR system for Indian vehicles.
 Your ONLY job is to read the number plate text as accurately as possible.
@@ -179,7 +189,7 @@ MANDATORY RULES:
 2. Common lookalike pairs to distinguish carefully:
      0 vs O  (zero has slightly different shape)
      1 vs I vs l  (one, capital-i, lowercase-L)
-     8 vs B  (eight vs capital-B) 
+     8 vs B  (eight vs capital-B)
      5 vs S  (five vs S — very common mistake!)
      6 vs G  (six vs capital-G)
      2 vs Z  (two vs capital-Z)
@@ -213,165 +223,153 @@ If no plate is visible at all:
 }
 `;
 
-// ─── Low-level Gemini API caller ───────────────────────────────────────────────
-// ─── Universal AI Caller (Gemini & Groq) ──────────────────────────────────────
-const callAI = async ({ model, apiKey, provider, prompt, base64Image, timeoutMs = 60000 }) => {
-    if (!apiKey) throw new Error(`${provider} API key undefined — check .env`);
-
-    const isGroq = provider === 'groq';
-    const isTextOnly = !base64Image;
-    const url = isGroq 
-        ? 'https://api.groq.com/openai/v1/chat/completions'
-        : `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-    const isGpt120b = model.includes('gpt-oss-120b');
-    const isQwen = model.includes('qwen');
-
-    const body = isGroq 
-        ? JSON.stringify({
-            model,
-            messages: [{
-                role: 'user',
-                content: isTextOnly
-                    ? prompt
-                    : [
-                        { type: 'text', text: prompt },
-                        { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
-                    ]
-            }],
-            temperature: isGpt120b ? 1 : (isQwen ? 0.6 : 0.1),
-            max_completion_tokens: 2048,
-            top_p: isGpt120b ? 1 : 0.95,
-            ...(isGpt120b ? { reasoning_effort: 'medium' } : {})
-        })
-        : JSON.stringify({
-            contents: [{
-                parts: isTextOnly
-                    ? [{ text: prompt }]
-                    : [
-                        { text: prompt },
-                        { inline_data: { mime_type: 'image/jpeg', data: base64Image } },
-                    ],
-            }],
-            generationConfig: { temperature: 0.1, responseMimeType: 'text/plain' },
-        });
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                ...(isGroq ? { 'Authorization': `Bearer ${apiKey}` } : {})
-            },
-            body,
-            signal: controller.signal,
-        });
-
-        if (!res.ok) {
-            const txt = await res.text();
-            throw new Error(`${provider} HTTP ${res.status}: ${txt.slice(0, 200)}`);
-        }
-
-        const json = await res.json();
-        if (isGroq) {
-            if (!json.choices?.length) throw new Error('No choices in Groq response');
-            return json.choices[0].message.content;
-        } else {
-            if (!json.candidates?.length) throw new Error('No candidates in Gemini response');
-            return json.candidates[0].content.parts[0].text;
-        }
-    } finally {
-        clearTimeout(timer);
-    }
-};
-
-// ─── JSON extractor ────────────────────────────────────────────────────────────
+// ─── JSON extractor ───────────────────────────────────────────────────────────
+// Strips thinking tags + markdown fences, then finds the outermost JSON object.
 const extractJSON = (text) => {
-    // Strip markdown fences if present
-    const stripped = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
-    const match = stripped.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error('No JSON object found in response');
-    return JSON.parse(match[0]);
+    if (!text) throw new Error('Empty text passed to extractJSON');
+    let clean = stripThinkTags(text);
+    clean = clean.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+    const first = clean.indexOf('{');
+    const last  = clean.lastIndexOf('}');
+    if (first === -1 || last === -1 || last <= first)
+        throw new Error('No JSON object found in response');
+    return JSON.parse(clean.substring(first, last + 1));
 };
 
-// ─── Post-parse violation validator (programmatic safety net) ────────────────
-// Removes hallucinated counting-based violations by cross-checking the model's
-// own reported person count and vehicle type against the violation list.
+// ─── Post-parse violation validator ──────────────────────────────────────────
+// Ensures violations list is consistent with model output and description
 const validateViolations = (allViolations, parsed) => {
     let violations = [...allViolations];
-    const personCount = typeof parsed.primaryVehiclePersonCount === 'number'
-        ? parsed.primaryVehiclePersonCount : null;
-    const vehicleType = (parsed.vehicleType || '').toLowerCase();
+    const desc = (parsed.description || '').toLowerCase();
 
-    const isTwoWheeler =
-        vehicleType.includes('motor') || vehicleType.includes('bike') ||
-        vehicleType.includes('scooter') || vehicleType.includes('cycle') ||
-        vehicleType.includes('two') || vehicleType.includes('2-wheel');
-
-    // Triple Riding: model must have reported ≥3 people on the vehicle
-    if (violations.includes('Triple Riding')) {
-        if (personCount !== null && personCount < 3) {
-            console.log(`[AI] ⚡ Validator: Removing 'Triple Riding' — model reported ${personCount} person(s), need ≥ 3`);
-            violations = violations.filter(v => v !== 'Triple Riding');
-        } else if (personCount === null) {
-            // No count provided — conservative: keep it only if description mentions '3' or 'three'
-            const desc = (parsed.description || '').toLowerCase();
-            const mentionsThree = /\bthree\b|\b3\b|\btriple\b/.test(desc);
-            if (!mentionsThree) {
-                console.log(`[AI] ⚡ Validator: Removing 'Triple Riding' — no person count & description doesn't confirm 3 riders`);
-                violations = violations.filter(v => v !== 'Triple Riding');
-            }
-        }
+    // Auto-detect violations mentioned in description if missing from array
+    if (/no\s*helmet|without\s*helmet|no\s*helmets/i.test(desc) && !violations.includes('No Helmet')) {
+        violations.push('No Helmet');
     }
-
-    // Overloading: only valid for goods vehicles (truck/tempo/bus/auto)
-    // For 2-wheelers, only flag if Triple Riding is also confirmed
-    if (violations.includes('Overloading') && isTwoWheeler) {
-        if (!violations.includes('Triple Riding')) {
-            console.log(`[AI] ⚡ Validator: Removing 'Overloading' — 2-wheeler without confirmed triple riding`);
-            violations = violations.filter(v => v !== 'Overloading');
-        }
+    if (/triple|3\s*riders|three\s*people|3\s*people/i.test(desc) && !violations.includes('Triple Riding')) {
+        violations.push('Triple Riding');
+    }
+    if (/footpath|sidewalk|pavement/i.test(desc) && !violations.includes('Driving on Footpath') && !violations.includes('Footpath Driving')) {
+        violations.push('Footpath Driving');
+    }
+    if (/seat\s*belt|seatbelt|without\s*seatbelt/i.test(desc) && !violations.includes('No Seat Belt') && !violations.includes('No Seatbelt')) {
+        violations.push('No Seat Belt');
+    }
+    if (/tinted|dark\s*film|black\s*film/i.test(desc) && !violations.includes('Tinted Glass')) {
+        violations.push('Tinted Glass');
+    }
+    if (/footboard|hanging\s*out/i.test(desc) && !violations.includes('Footboard Travelling')) {
+        violations.push('Footboard Travelling');
+    }
+    if (/roof\s*travelling|on\s*the\s*roof/i.test(desc) && !violations.includes('Roof Travelling')) {
+        violations.push('Roof Travelling');
+    }
+    if (/rash|dangerous\s*driving|reckless|stunt/i.test(desc) && !violations.includes('Rash Driving') && !violations.includes('Dangerous Driving')) {
+        violations.push('Rash Driving');
+    }
+    if (/speeding|fast|excessive\s*speed/i.test(desc) && !violations.includes('Speeding')) {
+        violations.push('Speeding');
+    }
+    if (/wrong\s*side|wrong\s*way|against\s*traffic/i.test(desc) && !violations.includes('Wrong Side Driving') && !violations.includes('Wrong Way')) {
+        violations.push('Wrong Side Driving');
+    }
+    if (/red\s*light|signal\s*jump/i.test(desc) && !violations.includes('Red Light Violation') && !violations.includes('Red Light')) {
+        violations.push('Red Light Violation');
+    }
+    if (/phone|mobile/i.test(desc) && !violations.includes('Mobile Phone Use') && !violations.includes('Phone Use')) {
+        violations.push('Mobile Phone Use');
+    }
+    if (/overload|protruding/i.test(desc) && !violations.includes('Overloading Goods') && !violations.includes('Overloading')) {
+        violations.push('Overloading Goods');
+    }
+    if (/no\s*parking|wrong\s*parking|parked/i.test(desc) && !violations.includes('Wrong Parking') && !violations.some(v => v.includes('Riding') || v.includes('Helmet') || v.includes('Footpath'))) {
+        violations.push('Wrong Parking');
     }
 
     return violations;
 };
 
-// ─── Parse violation response ───────────────────────────────────────────────
+
+// ─── Parse violation response ─────────────────────────────────────────────────
+// Handles BOTH the new schema (violation_detected / violations[]) and old schema (violationDetected / allViolations).
 const parseViolationResult = (raw) => {
     const parsed = extractJSON(raw);
+    const desc = (parsed.description || '').toLowerCase();
 
-    if (!parsed.violationDetected) {
+    // ── Normalise field names: new snake_case schema → camelCase ─────────────
+    // violation_detected, vehicle_type, vehicle_number, person_count, violations[]
+    const isNewSchema = 'violation_detected' in parsed || Array.isArray(parsed.violations);
+
+    let violationDetected, vehicleType, vehicleNumber, personCount, rawViolations, confidence, severity;
+
+    if (isNewSchema) {
+        violationDetected = Boolean(parsed.violation_detected);
+        vehicleType       = parsed.vehicle_type  || parsed.vehicleType  || 'other';
+        vehicleNumber     = parsed.vehicle_number || parsed.vehicleNumber || 'Not detected';
+        personCount       = parsed.person_count  ?? parsed.primaryVehiclePersonCount ?? null;
+
+        // violations[] is an array of objects { type, confidence, evidence }
+        rawViolations = Array.isArray(parsed.violations)
+            ? parsed.violations.map(v => (typeof v === 'string' ? v : v?.type)).filter(Boolean)
+            : [];
+
+        // Confidence: take average of per-violation confidences (0-1 scale → scale to 0-100)
+        if (Array.isArray(parsed.violations) && parsed.violations.length > 0) {
+            const avgConf = parsed.violations.reduce((s, v) => s + (v?.confidence ?? 0.8), 0) / parsed.violations.length;
+            confidence = Math.round(avgConf * 100);
+        } else {
+            confidence = Math.round((parsed.confidence ?? 0.8) * 100);
+            if (confidence <= 1) confidence = Math.round(confidence * 100); // already 0-100
+        }
+
+        const severityRaw = (parsed.severity || 'none').toLowerCase();
+        severity = severityRaw === 'high'   ? 'High'   :
+                   severityRaw === 'medium' ? 'Medium' :
+                   severityRaw === 'low'    ? 'Low'    :
+                   severityRaw === 'critical' ? 'Critical' : 'None';
+    } else {
+        // Old camelCase schema
+        violationDetected = Boolean(parsed.violationDetected);
+        vehicleType       = parsed.vehicleType  || 'other';
+        vehicleNumber     = parsed.vehicleNumber || 'Not detected';
+        personCount       = parsed.primaryVehiclePersonCount ?? null;
+        rawViolations     = parsed.allViolations?.length ? parsed.allViolations : [parsed.violationType || 'Other'];
+        confidence        = parsed.confidence ?? 60;
+        severity          = null; // computed below
+    }
+
+    // ── hasViolationInText safety net (catches boolean mis-set to false) ─────
+    const hasViolationInText =
+        /triple|no\s*helmet|without\s*helmet|seat\s*belt|seatbelt|footpath|sidewalk|rash|reckless|speeding|red\s*light|wrong\s*side|wrong\s*parking|no\s*parking|overload|phone/i.test(desc) ||
+        (rawViolations.length > 0 && rawViolations[0] !== 'None') ||
+        (parsed.violationType && parsed.violationType !== 'None');
+
+    const isViolation = violationDetected || hasViolationInText;
+
+    if (!isViolation) {
         return {
             violationDetected: false,
-            vehicleNumber: 'Not applicable',
-            violationType: 'None',
-            allViolations: [],
-            severity: 'None',
-            confidence: parsed.confidence ?? 90,
-            description: parsed.description || 'No traffic violation detected.',
+            vehicleNumber:     'Not applicable',
+            violationType:     'None',
+            allViolations:     [],
+            severity:          'None',
+            confidence:        confidence ?? 90,
+            description:       parsed.description || 'No traffic violation detected.',
         };
     }
 
-    // Pick reported violations, then run programmatic validator
-    const rawViolations = parsed.allViolations?.length
-        ? parsed.allViolations
-        : [parsed.violationType || 'Other'];
-
     const allViolations = validateViolations(rawViolations, parsed);
 
-    // If validator removed everything, treat as no violation
     if (allViolations.length === 0) {
-        console.log('[AI] ⚡ Validator removed all violations — treating as no violation detected');
+        console.log('[AI] Validator produced empty violations — no violation detected');
         return {
             violationDetected: false,
-            vehicleNumber: 'Not applicable',
-            violationType: 'None',
-            allViolations: [],
-            severity: 'None',
-            confidence: parsed.confidence ?? 50,
-            description: parsed.description || 'No confirmed violation after validation.',
+            vehicleNumber:     'Not applicable',
+            violationType:     'None',
+            allViolations:     [],
+            severity:          'None',
+            confidence:        confidence ?? 50,
+            description:       parsed.description || 'No confirmed violation after validation.',
         };
     }
 
@@ -379,194 +377,211 @@ const parseViolationResult = (raw) => {
         (a, b) => (VIOLATION_SEVERITY[b] ?? 0) - (VIOLATION_SEVERITY[a] ?? 0)
     )[0];
 
-    const score = VIOLATION_SEVERITY[primaryViolation] ?? 0;
-    const severityLabel =
-        score >= 8 ? 'Critical' :
-        score >= 5 ? 'High'     :
-        score >= 3 ? 'Medium'   : 'Low';
+    if (!severity) {
+        const score = VIOLATION_SEVERITY[primaryViolation] ?? 0;
+        severity =
+            score >= 8 ? 'Critical' :
+            score >= 5 ? 'High'     :
+            score >= 3 ? 'Medium'   : 'Low';
+    }
+
+    const normalizedPlate = (vehicleNumber || 'Not detected').replace(/\s+/g, '').toUpperCase();
+    const finalPlate = (normalizedPlate === 'NOTDETECTED' || normalizedPlate === 'NOTAPPLICABLE' || normalizedPlate.length < 4)
+        ? 'Not detected'
+        : normalizedPlate;
 
     return {
         violationDetected: true,
-        vehicleNumber: parsed.vehicleNumber || 'Not detected',
-        violationType: primaryViolation,
+        vehicleNumber:     finalPlate,
+        violationType:     primaryViolation,
         allViolations,
-        severity: severityLabel,
-        confidence: parsed.confidence ?? 60,
-        description: parsed.description || 'Violation detected.',
+        severity,
+        confidence:        confidence ?? 60,
+        description:       parsed.description || 'Violation detected.',
     };
-};
 
-// ─── Run one stage with key/model rotation ────────────────────────────────────
-// Returns { text, winningAttempt } so the caller can reuse the winning model+key.
-const runWithRotation = async (prompt, base64Image, attempts, label) => {
-    let lastError = null;
-    for (const attempt of attempts) {
-        const { model, apiKey, provider } = attempt;
-        const tag = `[${label}] provider=${provider} model=${model}`;
-        console.log(`${tag} → trying`);
-        try {
-            const text = await callAI({ model, apiKey, provider, prompt, base64Image });
-            console.log(`${tag} → ✅ success`);
-            return { text, winningAttempt: attempt };
-        } catch (err) {
-            lastError = err;
-            const isQuota   = err.message.includes('429') || err.message.toLowerCase().includes('quota');
-            const isNetwork = err.name === 'AbortError' || err.message.toLowerCase().includes('network');
-            console.warn(`${tag} → ✗ ${isQuota ? 'QUOTA' : isNetwork ? 'TIMEOUT' : 'ERROR'}: ${err.message}`);
-        }
-    }
-    throw lastError ?? new Error(`${label}: all attempts failed`);
 };
 
 // ─── Image preparation ────────────────────────────────────────────────────────
-const prepareImages = async (imageUri) => {
-    // Violation image: balanced quality vs. speed
-    const violationImg = await ImageManipulator.manipulateAsync(
-        imageUri,
-        [{ resize: { width: 960 } }],
-        { compress: 0.82, format: ImageManipulator.SaveFormat.JPEG }
-    );
 
-    // OCR image: higher res only for plate text clarity
-    const ocrImg = await ImageManipulator.manipulateAsync(
-        imageUri,
-        [{ resize: { width: 1440 } }],
-        { compress: 0.92, format: ImageManipulator.SaveFormat.JPEG }
-    );
 
-    const [violationB64, ocrB64] = await Promise.all([
-        FileSystem.readAsStringAsync(violationImg.uri, { encoding: 'base64' }),
-        FileSystem.readAsStringAsync(ocrImg.uri,       { encoding: 'base64' }),
-    ]);
-
-    return { violationB64, ocrB64 };
+const prepareViolationImage = async (imageUri) => {
+    let tempUri = null;
+    try {
+        const img = await ImageManipulator.manipulateAsync(
+            imageUri.split('?')[0],
+            [{ resize: { width: 1280 } }],
+            { compress: 0.88, format: ImageManipulator.SaveFormat.JPEG }
+        );
+        tempUri = img.uri;
+        return await FileSystem.readAsStringAsync(tempUri, { encoding: 'base64' });
+    } finally {
+        if (tempUri) FileSystem.deleteAsync(tempUri, { idempotent: true }).catch(() => {});
+    }
 };
 
-// ─── Main service ─────────────────────────────────────────────────────────────
+const prepareOCRImage = async (imageUri) => {
+    let tempUri = null;
+    try {
+        const img = await ImageManipulator.manipulateAsync(
+            imageUri.split('?')[0],
+            [{ resize: { width: 1600 } }],
+            { compress: 0.95, format: ImageManipulator.SaveFormat.JPEG }
+        );
+        tempUri = img.uri;
+        return await FileSystem.readAsStringAsync(tempUri, { encoding: 'base64' });
+    } finally {
+        if (tempUri) FileSystem.deleteAsync(tempUri, { idempotent: true }).catch(() => {});
+    }
+};
+
+// ─── Main AI service ──────────────────────────────────────────────────────────
 export const aiService = {
     /**
-     * Two-stage analysis:
-     *   Stage 1 — Violation detection  (scene-context image, 1024px)
-     *   Stage 2 — Plate OCR            (high-res image, 1600px, ALWAYS runs when violation found)
+     * Analyse a traffic violation image through a 3-stage pipeline:
      *
-     * Stage 2 plate text ALWAYS overrides Stage 1 plate when OCR confidence ≥ 45%.
+     *   Stage 1    — Vision scene + violation detection (1280px JPEG, 512 tokens, 45s)
+     *   Stage 1.5  — Reasoning validation (text-only, 384 tokens, 30s) — skipped on fast path
+     *   Stage 2    — High-res plate OCR fallback (1600px, 256 tokens, 30s) — lazy, only if plate missing
+     *
+     * Fast path: if Stage 1 returns a valid violation + plate @ ≥ 60% confidence,
+     * returns immediately without calling Stage 1.5 or Stage 2.
+     *
+     * @param {string} imageUri - local file URI from camera/gallery
+     * @returns {Promise<object>} violation result object
      */
     analyzeViolationImage: async (imageUri) => {
         try {
             logDiagnostics();
 
-            // ── Prepare two resolution variants in parallel ─────────────────
-            console.log('[AI] Preparing images…');
-            const { violationB64, ocrB64 } = await prepareImages(imageUri);
-
-            const visionAttempts = buildAttemptQueue(AI_CONFIG.visionModels || []);
+            const visionAttempts    = buildAttemptQueue(AI_CONFIG.visionModels    || []);
             const reasoningAttempts = buildAttemptQueue(AI_CONFIG.reasoningModels || []);
+            const ocrAttempts       = buildAttemptQueue(AI_CONFIG.ocrModels       || AI_CONFIG.visionModels || []);
 
-            // ── Stage 1: Vision Detection ───────────────────────────────────
-            console.log('[AI] Stage 1 — Vision detection');
-            const { text: rawVisionViolation, winningAttempt: visionWinner } = await runWithRotation(
-                VIOLATION_PROMPT, violationB64, visionAttempts, 'S1-VISION'
+            // ── Stage 1: Vision Detection (1280px) ───────────────────────────
+            console.log('[AI] Stage 1 — Preparing vision image...');
+            const violationB64 = await prepareViolationImage(imageUri);
+
+            console.log('[AI] Stage 1 — Vision detection executing...');
+            const { text: rawVision, winningAttempt: visionWinner } = await runWithRotation(
+                VIOLATION_PROMPT, violationB64, visionAttempts, 'S1-VISION',
+                { maxTokens: 2048, timeoutMs: 45000 }
             );
+            console.log('[AI] Stage 1 — Raw output:', rawVision);
 
-            // ── Stage 1.5: Reasoning & Validation ───────────────────────────
-            console.log('[AI] Stage 1.5 — Reasoning validation');
-            let finalRawViolation = rawVisionViolation;
+            const s1Result = parseViolationResult(rawVision);
+            console.log('[AI] Stage 1 — Parsed result:', JSON.stringify(s1Result));
+
+            // No violation → return immediately
+            if (!s1Result.violationDetected) {
+                console.log('[AI] ⚡ Fast path: No violation — returning immediately');
+                return s1Result;
+            }
+
+            const hasValidPlate = s1Result.vehicleNumber &&
+                s1Result.vehicleNumber !== 'Not detected' &&
+                s1Result.vehicleNumber !== 'Not applicable' &&
+                s1Result.vehicleNumber.trim().length >= 4;
+
+            // Violation + readable plate + good confidence → fast path
+            if (hasValidPlate && (s1Result.confidence ?? 0) >= 60) {
+                console.log(`[AI] ⚡ Fast path: Violation="${s1Result.violationType}", Plate="${s1Result.vehicleNumber}" (${s1Result.confidence}%)`);
+                return s1Result;
+            }
+
+            // ── Stage 1.5: Reasoning Validation (low confidence / ambiguous) ─
+            console.log('[AI] Stage 1.5 — Reasoning validation...');
+            let finalRaw = rawVision;
             if (reasoningAttempts.length > 0) {
-                const reasoningPrompt = REASONING_PROMPT.replace('__RAW_JSON__', rawVisionViolation);
                 try {
                     const { text: reasonedText } = await runWithRotation(
-                        reasoningPrompt, null, reasoningAttempts, 'S1.5-REASONING'
+                        REASONING_PROMPT.replace('__RAW_JSON__', rawVision),
+                        null,
+                        reasoningAttempts,
+                        'S1.5-REASONING',
+                        { maxTokens: 384, timeoutMs: 30000 }
                     );
-                    finalRawViolation = reasonedText;
-                } catch (reasonErr) {
-                    console.warn('[AI] Stage 1.5 Reasoning failed (non-fatal), falling back to S1 JSON:', reasonErr.message);
+                    finalRaw = reasonedText;
+                } catch (err) {
+                    console.warn('[AI] Stage 1.5 failed (non-fatal) — using Stage 1 result:', err.message);
                 }
             }
 
-            const violationResult = parseViolationResult(finalRawViolation);
-            console.log('[AI] S1.5 result:', JSON.stringify({
-                detected: violationResult.violationDetected,
-                type: violationResult.violationType,
-                violations: violationResult.allViolations,
-                plate: violationResult.vehicleNumber,
-                confidence: violationResult.confidence,
-            }));
+            const violationResult = parseViolationResult(finalRaw);
 
-            // ── Stage 2: Plate OCR (runs whenever violation was detected) ───
-            // Reuse the winning model+key from Stage 1 first — only fall back to
-            // others if it fails (avoids unnecessary API hops).
-            if (violationResult.violationDetected) {
-                console.log('[AI] Stage 2 — plate OCR');
-                const stage2Attempts = [
-                    visionWinner,
-                    ...visionAttempts.filter(a => a !== visionWinner),
-                ];
+            // ── Stage 2: Plate OCR (lazy — only if plate still missing) ──────
+            const plateMissing =
+                !violationResult.vehicleNumber ||
+                violationResult.vehicleNumber === 'Not detected' ||
+                violationResult.vehicleNumber === 'Not applicable';
+
+            if (violationResult.violationDetected && plateMissing) {
+                console.log('[AI] Stage 2 — Lazy-loading high-res OCR image...');
                 try {
+                    const ocrB64 = await prepareOCRImage(imageUri);
+                    // OCR uses its own dedicated queue: NVIDIA → Gemini #1 → Gemini #2
                     const { text: rawOCR } = await runWithRotation(
-                        PLATE_OCR_PROMPT, ocrB64, stage2Attempts, 'S2-OCR'
+                        PLATE_OCR_PROMPT, ocrB64, ocrAttempts, 'S2-OCR',
+                        { maxTokens: 256, timeoutMs: 30000 }
                     );
                     const ocr = extractJSON(rawOCR);
-                    console.log(`[AI] S2 OCR result: "${ocr.plate_text}" @ ${ocr.confidence_percent}%`);
+                    console.log(`[AI] S2 OCR: "${ocr.plate_text}" @ ${ocr.confidence_percent}%`);
 
-                    const ocrConf = ocr.confidence_percent ?? 0;
                     const plateValid =
                         ocr.plate_text &&
                         ocr.plate_text !== 'Not detected' &&
                         ocr.plate_text.trim().length >= 4;
 
-                    if (plateValid && ocrConf >= 45) {
-                        // Normalize: strip spaces → "MH12AB1234"
+                    if (plateValid && (ocr.confidence_percent ?? 0) >= 45) {
                         const normalized = ocr.plate_text.replace(/\s+/g, '').toUpperCase();
                         console.log(`[AI] Plate upgraded: "${violationResult.vehicleNumber}" → "${normalized}"`);
                         violationResult.vehicleNumber = normalized;
                         violationResult.plateOCR = {
-                            raw: ocr.plate_text,
-                            confidence: ocrConf,
-                            uncertainCharacters: ocr.uncertain_characters ?? [],
-                            notes: ocr.notes ?? '',
+                            raw:               ocr.plate_text,
+                            confidence:        ocr.confidence_percent,
+                            uncertainChars:    ocr.uncertain_characters ?? [],
+                            notes:             ocr.notes ?? '',
                         };
-                    } else {
-                        console.log(`[AI] OCR plate rejected (conf=${ocrConf}, text="${ocr.plate_text}") — keeping S1 plate`);
                     }
-                } catch (ocrErr) {
-                    // OCR failure is non-fatal — Stage 1 plate is kept
-                    console.warn('[AI] Stage 2 OCR failed (non-fatal):', ocrErr.message);
+                } catch (err) {
+                    console.warn('[AI] Stage 2 OCR failed (non-fatal):', err.message);
                 }
             }
 
             return violationResult;
+
         } catch (error) {
             console.warn('[AI] Analysis warning/error:', error?.message || error);
-            
-            // EMERGENCY SAFETY FALLBACK (for development/demos)
-            // If every key and model returns 429 (Quota) or 404 (Missing),
-            // return a smart mock so the user isn't stuck.
+
+            // Development safety fallback — keeps the UI unblocked during quota outage
             if (__DEV__) {
-                console.warn('[AI] 🛡️ SAFETY FALLBACK: Generating simulated result due to API outage/quota.');
+                console.warn('[AI] 🛡️ SAFETY FALLBACK: Simulated result due to API outage/quota.');
                 return {
-                    violationDetected: true,
-                    vehicleNumber: "MH02CZ7784", 
-                    violationType: "No Helmet",
-                    allViolations: ["No Helmet"],
-                    severity: "High",
-                    confidence: 80,
-                    description: "AI analysis simulated: Rider detected without helmet. (Fallback active due to API Outage)",
-                    isMock: true
+                    violationDetected: false,
+                    vehicleNumber:     'Not detected',
+                    violationType:     'None',
+                    allViolations:     [],
+                    severity:          'None',
+                    confidence:        0,
+                    description:       'AI analysis could not complete (API outage/quota). Please fill details manually.',
+                    isMock:            true,
                 };
             }
-            
-            // Production fallback
+
             return {
                 violationDetected: false,
-                vehicleNumber: 'Not detected',
-                violationType: 'None',
-                allViolations: [],
-                severity: 'None',
-                confidence: 0,
-                description: 'AI analysis encountered an error. Please fill details manually.'
+                vehicleNumber:     'Not detected',
+                violationType:     'None',
+                allViolations:     [],
+                severity:          'None',
+                confidence:        0,
+                description:       'AI analysis encountered an error. Please fill details manually.',
             };
         }
     },
 };
 
 export default aiService;
+
+// Re-export authenticity checker so callers can import from one place
+export { checkImageAuthenticity } from './authenticity';

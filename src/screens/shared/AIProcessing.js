@@ -1,65 +1,51 @@
 import React, { useEffect, useRef } from 'react';
 import {
-    View, Text, StyleSheet, Animated, Easing, Alert, StatusBar, Image
+    View, Text, StyleSheet, Animated, Easing, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAppContext } from '../../context';
+import { useAppContext, useAuth } from '../../context';
 import { aiService } from '../../services';
+import { checkPlateDuplicate, checkUserRateLimit } from '../../services/reports';
+import { FocusAwareStatusBar } from '../../components';
 
 const C = {
-    navy:          '#0A1128',
-    navyCard:      '#101F42',
-    accentBlue:    '#2563EB',
-    cyan:          '#06B6D4',
-    amber:         '#F59E0B',
+    navy:          '#0F2C59',
+    navyCard:      '#1E3A8A',
+    amber:         '#D97706',
     white:         '#FFFFFF',
-    textSecondary: '#94A3B8',
+    textPrimary:   '#FFFFFF',
+    textSecondary: '#E2E8F0',
+    border:        '#3B82F6',
+};
+
+// ─── Normalize plate for DB lookup ────────────────────────────────────────────
+// Strips spaces and converts to uppercase: "MH 12 AB 1234" → "MH12AB1234"
+const normalizePlate = (raw) => {
+    if (!raw || typeof raw !== 'string') return null;
+    const n = raw.replace(/\s+/g, '').toUpperCase();
+    // Must be at least 4 chars and not a placeholder string
+    if (n.length < 4 || n === 'NOTDETECTED' || n === 'NOTAPPLICABLE' || n === 'N/A') return null;
+    return n;
 };
 
 export default function AIProcessing({ navigation }) {
-    const { currentReport } = useAppContext();
+    const { currentReport, setCurrentReport } = useAppContext();
+    const { user } = useAuth();
 
-    const scanLineAnim = useRef(new Animated.Value(0)).current;
     const pulseAnim    = useRef(new Animated.Value(1)).current;
-    const rotateAnim   = useRef(new Animated.Value(0)).current;
     const progressAnim = useRef(new Animated.Value(0)).current;
 
-    // ── Industrial Level Animations ──────────────────────────────────────────
     useEffect(() => {
-        // Laser scan line vertical sweep
         Animated.loop(
             Animated.sequence([
-                Animated.timing(scanLineAnim, {
-                    toValue: 1, duration: 1600,
-                    easing: Easing.inOut(Easing.quad), useNativeDriver: true,
-                }),
-                Animated.timing(scanLineAnim, {
-                    toValue: 0, duration: 1600,
-                    easing: Easing.inOut(Easing.quad), useNativeDriver: true,
-                }),
+                Animated.timing(pulseAnim, { toValue: 1.08, duration: 1000, useNativeDriver: true }),
+                Animated.timing(pulseAnim, { toValue: 1,    duration: 1000, useNativeDriver: true }),
             ])
         ).start();
 
-        // Orbital ring continuous rotation
-        Animated.loop(
-            Animated.timing(rotateAnim, {
-                toValue: 1, duration: 3000,
-                easing: Easing.linear, useNativeDriver: true,
-            })
-        ).start();
-
-        // Subtle glow pulse
         Animated.loop(
             Animated.sequence([
-                Animated.timing(pulseAnim, { toValue: 1.15, duration: 1200, useNativeDriver: true }),
-                Animated.timing(pulseAnim, { toValue: 1,    duration: 1200, useNativeDriver: true }),
-            ])
-        ).start();
-
-        // Indefinite smooth progress bar loop
-        Animated.loop(
-            Animated.sequence([
-                Animated.timing(progressAnim, { toValue: 1, duration: 2400, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+                Animated.timing(progressAnim, { toValue: 1, duration: 2200, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
                 Animated.timing(progressAnim, { toValue: 0, duration: 0, useNativeDriver: false }),
             ])
         ).start();
@@ -82,7 +68,66 @@ export default function AIProcessing({ navigation }) {
 
         const run = async () => {
             try {
+                // ══════════════════════════════════════════════════════════
+                // STAGE -1 — Rate Limit Check (Max 3 reports per hour)
+                // ══════════════════════════════════════════════════════════
+                if (user?.id) {
+                    console.log('[AIProcessing] Pre-flight — checking rate limit for user', user.id);
+                    const { allowed, count, remainingMinutes } = await checkUserRateLimit(user.id, 3);
+                    if (!allowed) {
+                        if (didNavigate) return;
+                        didNavigate = true;
+                        Alert.alert(
+                            'Hourly Report Limit Reached',
+                            `You have submitted ${count} reports in the last hour.\n\n` +
+                            `To ensure system quality and prevent abuse, citizens are limited to 3 reports per hour. Please wait ${remainingMinutes} minute(s) before submitting another report.`,
+                            [{ text: 'Understood', style: 'default', onPress: () => navigation.goBack() }]
+                        );
+                        return;
+                    }
+                }
+
+                // Strip any cache-buster query string from the URI before processing
+                const rawUri = currentReport.image.split('?')[0];
+
+                // ═══════════════════════════════════════════════════════════════════
+                // CONCURRENT INTAKE PIPELINE
+                //   Task A — AI Authenticity Check (staggered 250ms, non-blocking)
+                //   Task B — Vision Violation Detection (Stage 1 + lazy Stage 2)
+                //
+                // Plate-OCR duplicate check runs AFTER Task B using the plate
+                // extracted from Task B — no extra model call needed.
+                // ═══════════════════════════════════════════════════════════════════
+                console.log('[AIProcessing] Launching vision detection...');
+
+                // Vision Violation Detection (Stage 1, optional Stage 1.5 + Stage 2)
                 const results = await aiService.analyzeViolationImage(currentReport.image);
+
+                // ── Plate-OCR Duplicate Check (uses plate from Task B — 0 extra API calls) ──
+                // POSSIBLE_DUPLICATE ≠ automatic rejection. Officer still reviews.
+                // PLATE_NOT_DETECTED → skip check; user enters plate manually.
+                let possibleDuplicate = false;
+                let duplicateExistingId = null;
+
+                const normalizedPlate = normalizePlate(results?.vehicleNumber);
+                if (normalizedPlate) {
+                    try {
+                        console.log(`[AIProcessing] Plate duplicate check: "${normalizedPlate}"`);
+                        const { isDuplicate, existingReportId } = await checkPlateDuplicate(normalizedPlate);
+                        if (isDuplicate) {
+                            possibleDuplicate = true;
+                            duplicateExistingId = existingReportId;
+                            console.log(`[AIProcessing] ⚠️ POSSIBLE_DUPLICATE — plate "${normalizedPlate}" already in report ${existingReportId}`);
+                        } else {
+                            console.log(`[AIProcessing] ✅ UNIQUE — plate "${normalizedPlate}" not previously reported`);
+                        }
+                    } catch (e) {
+                        // Fail open — a network error must not block a legitimate report
+                        console.warn('[AIProcessing] Plate duplicate check error (failing open):', e.message);
+                    }
+                } else {
+                    console.log('[AIProcessing] PLATE_NOT_DETECTED — skipping duplicate check');
+                }
 
                 if (didNavigate) return;
                 didNavigate = true;
@@ -92,102 +137,71 @@ export default function AIProcessing({ navigation }) {
                         'No Violation Detected',
                         results.description || 'No traffic violation detected in this image.',
                         [
-                            { text: 'Try Again',     style: 'cancel', onPress: () => navigation.goBack() },
-                            { text: 'Enter Manually', onPress: () => navigation.replace('AIResultsVerification', { aiResults: results }) },
+                            { text: 'Try Again',      style: 'cancel', onPress: () => navigation.goBack() },
+                            { text: 'Enter Manually', onPress: () => navigation.replace('AIResultsVerification', {
+                                aiResults: results,
+                                possibleDuplicate,
+                                duplicateExistingId,
+                            }) },
                         ]
                     );
                     return;
                 }
 
-                navigation.replace('AIResultsVerification', { aiResults: results });
+                navigation.replace('AIResultsVerification', {
+                    aiResults: results,
+                    possibleDuplicate,
+                    duplicateExistingId,
+                });
 
-            } catch (error) {
-                console.error('[AIProcessing] Error:', error);
+            } catch (err) {
                 if (didNavigate) return;
                 didNavigate = true;
+                console.error('[AIProcessing] Pipeline error:', err);
                 Alert.alert(
-                    'Analysis Failed',
-                    'Could not analyze the image automatically. You can enter details manually.',
-                    [{
-                        text: 'Enter Manually',
-                        onPress: () => navigation.replace('AIResultsVerification', {
-                            aiResults: {
-                                violationDetected: false,
-                                vehicleNumber: '', violationType: '',
-                                allViolations: [], severity: 'Unknown', confidence: 0,
-                            },
-                        }),
-                    }]
+                    'Analysis Note',
+                    'Could not auto-detect violation. Please fill details manually.',
+                    [{ text: 'Continue', onPress: () => navigation.replace('AIResultsVerification', {
+                        aiResults: {
+                            violationDetected: false, vehicleNumber: '', violationType: '',
+                            allViolations: [], severity: 'None', confidence: 0,
+                        },
+                    })}]
                 );
             }
         };
 
-        run();
-        return () => { didNavigate = true; };
-    }, [currentReport, navigation]);
-
-    const translateY = scanLineAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0, 160],
-    });
-
-    const spin = rotateAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['0deg', '360deg'],
-    });
+        const timer = setTimeout(run, 300);
+        return () => { didNavigate = true; clearTimeout(timer); };
+    }, [currentReport?.image, navigation]);
 
     const progressWidth = progressAnim.interpolate({
-        inputRange: [0, 0.5, 1],
-        outputRange: ['0%', '70%', '100%'],
+        inputRange: [0, 1],
+        outputRange: ['15%', '95%'],
     });
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
 
-            {/* Industrial Top Badge */}
+            {/* Official Badge Header */}
             <View style={styles.badgeContainer}>
-                <View style={styles.liveDot} />
-                <Text style={styles.badgeText}>TRAFFIC EYE NEURAL ENGINE</Text>
+                <Ionicons name="shield-checkmark" size={18} color="#F59E0B" />
+                <Text style={styles.badgeText}>TRAFFIC EYE AI ANALYSIS</Text>
             </View>
 
-            {/* Futuristic Viewfinder HUD */}
-            <View style={styles.hudWrapper}>
-                {/* Outer Rotating Arc */}
-                <Animated.View style={[styles.orbitalRing, { transform: [{ rotate: spin }] }]} />
-
-                {/* Outer Pulsing Aura */}
-                <Animated.View style={[styles.auraRing, { transform: [{ scale: pulseAnim }] }]} />
-
-                {/* Viewfinder Target Container */}
-                <View style={styles.imageCard}>
-                    {/* HUD Radar Crosshair Grid */}
-                    <View style={styles.radarGrid}>
-                        <View style={styles.gridLineV} />
-                        <View style={styles.gridLineH} />
-                        <View style={styles.centerIconBg}>
-                            <Ionicons name="hardware-chip-outline" size={38} color={C.cyan} />
-                        </View>
-                    </View>
-
-                    {/* HUD Corner Brackets */}
-                    <View style={[styles.corner, styles.topLeft]} />
-                    <View style={[styles.corner, styles.topRight]} />
-                    <View style={[styles.corner, styles.bottomLeft]} />
-                    <View style={[styles.corner, styles.bottomRight]} />
-
-                    {/* Laser Scanner Line */}
-                    <Animated.View style={[styles.laserLine, { transform: [{ translateY }] }]}>
-                        <View style={styles.laserGlow} />
-                    </Animated.View>
+            {/* Pulsing AI Icon */}
+            <Animated.View style={[styles.card, { transform: [{ scale: pulseAnim }] }]}>
+                <View style={styles.iconCircle}>
+                    <Ionicons name="hardware-chip-outline" size={44} color="#D97706" />
                 </View>
-            </View>
+            </Animated.View>
 
-            {/* Title & Single Status */}
-            <Text style={styles.title}>Analyzing Scene</Text>
-            <Text style={styles.subtitle}>Processing computer vision & violation detection</Text>
+            {/* Title & Status */}
+            <Text style={styles.title}>Analyzing Evidence</Text>
+            <Text style={styles.subtitle}>Verifying license plate, location, and offense details</Text>
 
-            {/* Tech Giant Sleek Progress Bar */}
+            {/* Progress Bar */}
             <View style={styles.progressBarBg}>
                 <Animated.View style={[styles.progressBarFill, { width: progressWidth }]} />
             </View>
@@ -197,110 +211,75 @@ export default function AIProcessing({ navigation }) {
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1, backgroundColor: C.navy,
-        justifyContent: 'center', alignItems: 'center',
-        paddingHorizontal: 32,
+        flex: 1,
+        backgroundColor: C.navy,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 28,
     },
-
-    // Badge
     badgeContainer: {
-        flexDirection: 'row', alignItems: 'center', gap: 8,
-        backgroundColor: 'rgba(37, 99, 235, 0.15)',
-        borderColor: 'rgba(37, 99, 235, 0.4)', borderWidth: 1,
-        borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6,
-        marginBottom: 40,
-    },
-    liveDot: {
-        width: 7, height: 7, borderRadius: 3.5,
-        backgroundColor: C.cyan,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        borderColor: 'rgba(217, 119, 6, 0.5)',
+        borderWidth: 1,
+        borderRadius: 20,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        marginBottom: 36,
     },
     badgeText: {
-        fontSize: 11, fontFamily: 'Nunito-Bold',
-        color: C.cyan, letterSpacing: 1,
+        fontSize: 12,
+        fontFamily: 'Nunito-Bold',
+        color: '#FFFFFF',
+        letterSpacing: 0.8,
     },
-
-    // HUD Viewfinder
-    hudWrapper: {
-        width: 220, height: 220,
-        justifyContent: 'center', alignItems: 'center',
-        marginBottom: 36, position: 'relative',
-    },
-    orbitalRing: {
-        position: 'absolute',
-        width: 220, height: 220, borderRadius: 110,
-        borderWidth: 2, borderColor: 'transparent',
-        borderTopColor: C.cyan, borderRightColor: 'rgba(37,99,235,0.3)',
-    },
-    auraRing: {
-        position: 'absolute',
-        width: 190, height: 190, borderRadius: 95,
-        backgroundColor: 'rgba(37,99,235,0.08)',
-        borderWidth: 1, borderColor: 'rgba(37,99,235,0.25)',
-    },
-    imageCard: {
-        width: 160, height: 160, borderRadius: 20,
-        overflow: 'hidden', position: 'relative',
-        borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)',
+    card: {
+        width: 110,
+        height: 110,
+        borderRadius: 24,
         backgroundColor: C.navyCard,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: C.border,
+        marginBottom: 32,
     },
-    radarGrid: {
-        flex: 1, justifyContent: 'center', alignItems: 'center',
-        position: 'relative',
+    iconCircle: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        backgroundColor: 'rgba(255,255,255,0.95)',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
-    gridLineV: {
-        position: 'absolute', top: 10, bottom: 10, width: 1,
-        backgroundColor: 'rgba(6, 182, 212, 0.25)',
-    },
-    gridLineH: {
-        position: 'absolute', left: 10, right: 10, height: 1,
-        backgroundColor: 'rgba(6, 182, 212, 0.25)',
-    },
-    centerIconBg: {
-        width: 64, height: 64, borderRadius: 32,
-        backgroundColor: 'rgba(6, 182, 212, 0.12)',
-        borderWidth: 1.5, borderColor: 'rgba(6, 182, 212, 0.4)',
-        justifyContent: 'center', alignItems: 'center',
-    },
-
-    // Corner HUD brackets
-    corner: {
-        position: 'absolute', width: 14, height: 14,
-        borderColor: C.cyan,
-    },
-    topLeft: { top: 6, left: 6, borderTopWidth: 2, borderLeftWidth: 2 },
-    topRight: { top: 6, right: 6, borderTopWidth: 2, borderRightWidth: 2 },
-    bottomLeft: { bottom: 6, left: 6, borderBottomWidth: 2, borderLeftWidth: 2 },
-    bottomRight: { bottom: 6, right: 6, borderBottomWidth: 2, borderRightWidth: 2 },
-
-    // Laser Line
-    laserLine: {
-        position: 'absolute', top: 0, left: 0, right: 0,
-        height: 3, backgroundColor: C.cyan,
-        shadowColor: C.cyan, shadowRadius: 10, shadowOpacity: 1,
-    },
-    laserGlow: {
-        position: 'absolute', top: 0, left: 0, right: 0, bottom: -12,
-        backgroundColor: 'rgba(6, 182, 212, 0.25)',
-    },
-
-    // Typography
     title: {
-        fontSize: 22, fontFamily: 'Nunito-Bold',
-        color: C.white, marginBottom: 6, textAlign: 'center',
+        fontSize: 24,
+        fontFamily: 'Nunito-Bold',
+        color: C.textPrimary,
+        marginBottom: 8,
+        textAlign: 'center',
     },
     subtitle: {
-        fontSize: 14, fontFamily: 'Nunito-Medium',
-        color: C.textSecondary, textAlign: 'center', marginBottom: 28,
+        fontSize: 14,
+        fontFamily: 'Nunito-Medium',
+        color: C.textSecondary,
+        textAlign: 'center',
+        marginBottom: 32,
+        paddingHorizontal: 16,
     },
-
-    // Progress Bar
     progressBarBg: {
-        width: 180, height: 4, borderRadius: 2,
-        backgroundColor: 'rgba(255,255,255,0.1)',
+        width: 220,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: 'rgba(255,255,255,0.2)',
         overflow: 'hidden',
+        marginBottom: 10,
     },
     progressBarFill: {
-        height: '100%', backgroundColor: C.cyan,
-        borderRadius: 2,
+        height: '100%',
+        borderRadius: 3,
+        backgroundColor: C.amber,
     },
 });

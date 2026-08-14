@@ -46,7 +46,6 @@ const TAB_CONFIG = {
 
 function CitizenTabNavigator() {
     const insets = useSafeAreaInsets();
-    const bottomTabHeight = Platform.OS === 'ios' ? 88 : 68;
 
     return (
         <Tab.Navigator
@@ -55,13 +54,18 @@ function CitizenTabNavigator() {
                     const config = TAB_CONFIG[route.name];
                     const iconName = focused ? config.icon : `${config.icon}-outline`;
                     return (
-                        <Ionicons name={iconName} size={24} color={color} />
+                        <View style={focused ? styles.activeTabIconContainer : null}>
+                            <Ionicons name={iconName} size={22} color={color} />
+                        </View>
                     );
                 },
                 tabBarActiveTintColor: COLORS.primary,
                 tabBarInactiveTintColor: COLORS.textTertiary,
                 headerShown: false,
-                tabBarStyle: styles.tabBar,
+                tabBarStyle: [
+                    styles.tabBar,
+                    { height: Platform.OS === 'ios' ? 88 : 64 + insets.bottom, paddingBottom: Platform.OS === 'ios' ? insets.bottom : 8 }
+                ],
                 tabBarLabelStyle: styles.tabLabel,
             })}
         >
@@ -112,17 +116,23 @@ export default function CitizenNavigator() {
 const styles = StyleSheet.create({
     tabBar: {
         backgroundColor: COLORS.surface,
-        borderTopWidth: 1,
-        borderTopColor: COLORS.border,
-        elevation: 8,
-        shadowColor: '#000',
+        borderTopWidth: 1.5,
+        borderTopColor: COLORS.borderLight,
+        elevation: 6,
+        shadowColor: '#0F2C59',
         shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 4,
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+        paddingTop: 6,
     },
     tabLabel: {
-        fontSize: 11,
-        fontFamily: 'Nunito-SemiBold',
-        marginBottom: Platform.OS === 'ios' ? 0 : 4,
+        fontSize: 12,
+        fontFamily: 'Nunito-Bold',
+        marginTop: 2,
+    },
+    activeTabIconContainer: {
+        borderBottomWidth: 2,
+        borderBottomColor: COLORS.secondary,
+        paddingBottom: 2,
     },
 });

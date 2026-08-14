@@ -7,6 +7,7 @@ import { useAppContext } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../services';
+import { FocusAwareStatusBar } from '../../components';
 
 const C = {
     navy: '#002452',
@@ -103,7 +104,7 @@ export default function OfficerProfile({ navigation }) {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
             
             {/* ── Navy Hero Header ── */}
             <LinearGradient colors={[C.navy, C.navyMid]} style={styles.heroSection}>

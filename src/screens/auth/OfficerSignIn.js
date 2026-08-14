@@ -1,28 +1,28 @@
 import React, { useState } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView,
-    Platform, ScrollView, Alert, ActivityIndicator, StatusBar, TextInput, Animated,
+    Platform, ScrollView, Alert, ActivityIndicator, TextInput, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MobileContainer } from '../../components';
+import { MobileContainer, FocusAwareStatusBar } from '../../components';
 import { useAuth } from '../../context';
 
 // ── Design Tokens (Civic Authority) ──
 const C = {
-    navy: '#002452',
-    navyMid: '#1B3A6B',
-    amber: '#F59E0B',
-    amberDark: '#D97706',
+    navy: '#0F2C59',
+    navyMid: '#1E3A8A',
+    amber: '#D97706',
+    amberDark: '#B45309',
     white: '#FFFFFF',
-    offWhite: '#F8F9FB',
+    offWhite: '#F4F6F9',
     surface: '#FFFFFF',
-    surfaceInput: '#F2F4F6',
-    textPrimary: '#191C1E',
-    textSecondary: '#44474F',
-    textTertiary: '#747780',
-    border: '#C4C6D0',
-    error: '#BA1A1A',
+    surfaceInput: '#F1F5F9',
+    textPrimary: '#0F172A',
+    textSecondary: '#475569',
+    textTertiary: '#64748B',
+    border: '#CBD5E1',
+    error: '#B91C1C',
 };
 
 export default function OfficerSignIn({ navigation }) {
@@ -55,7 +55,7 @@ export default function OfficerSignIn({ navigation }) {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor="#0F2C59" />
             <ScrollView
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}

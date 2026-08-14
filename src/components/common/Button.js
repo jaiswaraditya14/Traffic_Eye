@@ -1,3 +1,4 @@
+/* eslint-disable react-native/no-unused-styles */
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,9 +26,6 @@ export const Button = ({
         !isGradient && styles[variant],
         fullWidth && styles.fullWidth,
         disabled && styles.disabled,
-        isPrimary && !disabled && SHADOWS.primary,
-        variant === 'danger' && !disabled && SHADOWS.error,
-        variant === 'success' && !disabled && SHADOWS.success,
         style,
     ];
 
@@ -43,13 +41,12 @@ export const Button = ({
         if (loading) {
             return (
                 <ActivityIndicator
-                    color={isPrimary || variant === 'danger' || variant === 'success' ? '#FFFFFF' : COLORS.primary}
+                    color={isPrimary || variant === 'danger' || variant === 'success' || variant === 'amber' ? '#FFFFFF' : COLORS.primary}
                     size="small"
                 />
             );
         }
 
-        // If children is a string, render as Text; otherwise render as-is (for custom content like icons)
         if (typeof children === 'string') {
             return <Text style={textStyles}>{children}</Text>;
         }
@@ -62,11 +59,11 @@ export const Button = ({
             <TouchableOpacity
                 onPress={onPress}
                 disabled={disabled || loading}
-                activeOpacity={0.8}
-                style={[fullWidth && styles.fullWidth, isPrimary && !disabled && SHADOWS.primary, style]}
+                activeOpacity={0.85}
+                style={[fullWidth && styles.fullWidth, style]}
             >
                 <LinearGradient
-                    colors={GRADIENTS.primary}
+                    colors={['#0F2C59', '#1E3A8A']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={[styles.button, styles[`size_${size}`], styles.gradientInner]}
@@ -82,7 +79,7 @@ export const Button = ({
             style={buttonStyles}
             onPress={onPress}
             disabled={disabled || loading}
-            activeOpacity={0.7}
+            activeOpacity={0.8}
         >
             {renderContent()}
         </TouchableOpacity>
@@ -91,19 +88,22 @@ export const Button = ({
 
 const styles = StyleSheet.create({
     button: {
-        borderRadius: BORDER_RADIUS.lg,
+        borderRadius: BORDER_RADIUS.md,
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'row',
         gap: SPACING.sm,
     },
     gradientInner: {
-        borderRadius: BORDER_RADIUS.lg,
+        borderRadius: BORDER_RADIUS.md,
     },
 
     // ── Variants ──
     primary: {
         backgroundColor: COLORS.primary,
+    },
+    amber: {
+        backgroundColor: COLORS.secondary,
     },
     secondary: {
         backgroundColor: COLORS.surface,
@@ -124,28 +124,29 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.error,
     },
     success: {
-        backgroundColor: COLORS.secondary,
+        backgroundColor: COLORS.success,
     },
     soft: {
         backgroundColor: COLORS.primarySurface,
+        borderWidth: 1,
+        borderColor: COLORS.primaryBorder,
     },
-
 
     // ── Sizes ──
     size_sm: {
-        paddingVertical: SPACING.sm,
-        paddingHorizontal: SPACING.lg,
-        minHeight: 36,
+        paddingVertical: SPACING.xs + 2,
+        paddingHorizontal: SPACING.md,
+        minHeight: 38,
     },
     size_md: {
-        paddingVertical: SPACING.md,
+        paddingVertical: SPACING.sm + 4,
         paddingHorizontal: SPACING.xl,
         minHeight: 48,
     },
     size_lg: {
-        paddingVertical: SPACING.lg,
+        paddingVertical: SPACING.md,
         paddingHorizontal: SPACING.xxl,
-        minHeight: 56,
+        minHeight: 54,
     },
 
     fullWidth: {
@@ -153,19 +154,23 @@ const styles = StyleSheet.create({
     },
 
     disabled: {
-        opacity: 0.45,
+        opacity: 0.5,
     },
 
     disabledText: {
-        opacity: 0.7,
+        opacity: 0.8,
     },
 
     // ── Text styles ──
     text: {
         fontFamily: FONT_FAMILIES.semibold,
-        letterSpacing: 0.3,
+        letterSpacing: 0.2,
     },
     primaryText: {
+        color: '#FFFFFF',
+        fontSize: FONT_SIZES.md,
+    },
+    amberText: {
         color: '#FFFFFF',
         fontSize: FONT_SIZES.md,
     },

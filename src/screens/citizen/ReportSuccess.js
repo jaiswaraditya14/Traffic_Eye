@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, StatusBar, BackHandler } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { FocusAwareStatusBar } from '../../components';
 
 const C = {
     navy: '#002452',
@@ -36,7 +37,7 @@ export default function ReportSuccess({ navigation }) {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#F8F9FB" />
+            <FocusAwareStatusBar barStyle="dark-content" statusBgColor={C.offWhite} />
             <Animated.View style={[styles.content, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
                 {/* ── Checkmark Icon ── */}
                 <View style={styles.iconContainer}>

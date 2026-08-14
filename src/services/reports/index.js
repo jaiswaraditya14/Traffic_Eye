@@ -100,6 +100,143 @@ export async function fetchReportMedia(reportId) {
     return { data, error };
 }
 
+// ── Duplicate detection ────────────────────────────────────────────────────
+
+/**
+ * @deprecated LEGACY — no longer called from the UI.
+ * Hash-based duplicate detection has been replaced by checkPlateDuplicate()
+ * (plate-OCR + Supabase DB matching). This function is kept for backwards
+ * compatibility with the existing image_hash DB column and check_image_duplicate RPC.
+ *
+ * @param {string} hash - 64-char hex SHA-256 fingerprint
+ * @returns {Promise<{ isDuplicate: boolean, existingReportId: string|null }>}
+ */
+export async function checkImageHashExists(hash) {
+    if (!hash) return { isDuplicate: false, existingReportId: null };
+    try {
+        // Strategy 1: Try SECURITY DEFINER RPC function (bypasses citizen RLS restrictions across all users)
+        const { data: rpcData, error: rpcError } = await supabase.rpc('check_image_duplicate', { p_hash: hash });
+
+        if (!rpcError && rpcData && rpcData.length > 0) {
+            const result = rpcData[0];
+            if (result?.is_duplicate) {
+                console.log(`[DuplicateCheck] RPC match found! Duplicate report id=${result.existing_report_id}`);
+                return { isDuplicate: true, existingReportId: result.existing_report_id };
+            }
+            return { isDuplicate: false, existingReportId: null };
+        }
+
+        // Strategy 2: Direct table select fallback
+        const { data, error } = await supabase
+            .from('image_reports')
+            .select('id, status, submitted_at')
+            .eq('image_hash', hash)
+            .neq('status', 'rejected')  // Rejected reports don't block re-submission
+            .limit(1)
+            .maybeSingle();
+
+        if (error) {
+            if (error.code === '42703' || error.message?.includes('image_hash')) {
+                console.warn('[DuplicateCheck] image_hash column not found — skipping check.');
+                return { isDuplicate: false, existingReportId: null };
+            }
+            console.warn('[DuplicateCheck] Query warning:', error.message);
+            return { isDuplicate: false, existingReportId: null };
+        }
+
+        if (data) {
+            console.log(`[DuplicateCheck] Direct table match found! Existing report id=${data.id}, status=${data.status}`);
+            return { isDuplicate: true, existingReportId: data.id };
+        }
+
+        return { isDuplicate: false, existingReportId: null };
+    } catch (err) {
+        console.warn('[DuplicateCheck] Unexpected error — skipping check:', err.message);
+        return { isDuplicate: false, existingReportId: null };
+    }
+}
+
+/**
+ * Check whether a vehicle plate has already been reported recently.
+ * Catches duplicate reports even if the image was cropped or screenshotted.
+ *
+ * @param {string} vehicleNumber - e.g. "MH02CR7036"
+ * @returns {Promise<{ isDuplicate: boolean, existingReportId: string|null }>}
+ */
+export async function checkPlateDuplicate(vehicleNumber) {
+    if (!vehicleNumber || vehicleNumber === 'Not detected' || vehicleNumber === 'Not applicable' || vehicleNumber.trim().length < 4) {
+        return { isDuplicate: false, existingReportId: null };
+    }
+    try {
+        const normalized = vehicleNumber.replace(/\s+/g, '').toUpperCase();
+        const { data, error } = await supabase
+            .from('image_reports')
+            .select('id, submitted_at, vehicle_number, status')
+            .eq('vehicle_number', normalized)
+            .neq('status', 'rejected')
+            .limit(1)
+            .maybeSingle();
+
+        if (error) {
+            console.warn('[PlateDuplicateCheck] Query warning:', error.message);
+            return { isDuplicate: false, existingReportId: null };
+        }
+
+        if (data) {
+            console.log(`[PlateDuplicateCheck] Vehicle plate duplicate match found! Plate=${normalized}, report id=${data.id}`);
+            return { isDuplicate: true, existingReportId: data.id };
+        }
+
+        return { isDuplicate: false, existingReportId: null };
+    } catch (err) {
+        console.warn('[PlateDuplicateCheck] Error checking plate duplicate:', err.message);
+        return { isDuplicate: false, existingReportId: null };
+    }
+}
+
+// ── Rate Limiting ──────────────────────────────────────────────────────────
+
+/**
+ * Check whether a user has exceeded the 3 reports per hour rate limit.
+ *
+ * @param {string} userId
+ * @param {number} maxPerHour
+ * @returns {Promise<{ allowed: boolean, count: number, remainingMinutes: number }>}
+ */
+export async function checkUserRateLimit(userId, maxPerHour = 3) {
+    if (!userId) return { allowed: true, count: 0, remainingMinutes: 0 };
+    try {
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+        const { data, error, count } = await supabase
+            .from('image_reports')
+            .select('submitted_at', { count: 'exact' })
+            .eq('user_id', userId)
+            .gte('submitted_at', oneHourAgo)
+            .order('submitted_at', { ascending: true });
+
+        if (error) {
+            console.warn('[RateLimit] Query warning:', error.message);
+            return { allowed: true, count: 0, remainingMinutes: 0 }; // Fail open
+        }
+
+        const recentCount = count ?? (data ? data.length : 0);
+        if (recentCount >= maxPerHour && data && data.length > 0) {
+            const oldestSubmission = new Date(data[0].submitted_at).getTime();
+            const resetTime = oldestSubmission + 60 * 60 * 1000;
+            const remainingMs = Math.max(0, resetTime - Date.now());
+            const remainingMinutes = Math.ceil(remainingMs / (60 * 1000));
+            console.log(`[RateLimit] User ${userId} rate limited! Count: ${recentCount}/${maxPerHour}. Reset in ${remainingMinutes}m`);
+            return { allowed: false, count: recentCount, remainingMinutes };
+        }
+
+        return { allowed: true, count: recentCount, remainingMinutes: 0 };
+    } catch (err) {
+        console.warn('[RateLimit] Unexpected error — failing open:', err.message);
+        return { allowed: true, count: 0, remainingMinutes: 0 };
+    }
+}
+
+
 // ── Citizen helpers ────────────────────────────────────────────────────────
 
 /**
@@ -109,6 +246,8 @@ export async function fetchReportMedia(reportId) {
  *   - user_id, image_url, image_storage_path (optional)
  *   - latitude, longitude, location_address (optional)
  *   - violation_type, violation_description, severity, ai_confidence, ai_raw_result, vehicle_number
+ *   - image_hash (optional) - SHA-256 fingerprint for duplicate detection
+ *   - authenticity_check (optional) - JSON result of Stage 0B AI check
  */
 export async function submitImageReport(payload) {
     const { data, error } = await supabase
@@ -430,8 +569,67 @@ export async function fetchHeatmapPoints(bbox = null, daysBack = 30) {
 }
 
 /**
- * Subscribe to realtime changes on image_reports for the live map.
+ * Fetch reports within a specific date range for officer export.
+ *
+ * @param {Date} fromDate
+ * @param {Date} toDate
+ * @param {string} status - 'all' | 'approved' | 'pending' | 'rejected'
+ * @param {object|null} officerProfile
+ * @returns {Promise<{ data: Array|null, error: any }>}
  */
+export async function fetchReportsByDateRange(fromDate, toDate, status = 'all', officerProfile = null) {
+    try {
+        const start = new Date(fromDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(toDate);
+        end.setHours(23, 59, 59, 999);
+
+        let query = supabase
+            .from('image_reports')
+            .select(`
+                id,
+                submitted_at,
+                violation_type,
+                vehicle_number,
+                location_address,
+                severity,
+                status,
+                ai_raw_result
+            `)
+            .gte('submitted_at', start.toISOString())
+            .lte('submitted_at', end.toISOString())
+            .order('submitted_at', { ascending: false });
+
+        if (status && status !== 'all') {
+            query = query.eq('status', status);
+        }
+
+        // Location jurisdiction filter if officer
+        if (officerProfile && officerProfile.role === 'officer') {
+            let filters = [];
+            if (officerProfile.badge_id) {
+                const digits = officerProfile.badge_id.match(/\d+$/);
+                if (digits) {
+                    const suffix = digits[0].padStart(3, '0');
+                    filters.push(`location_address.ilike.%400${suffix}%`);
+                }
+            }
+            if (officerProfile.jurisdiction) {
+                filters.push(`location_address.ilike.%${officerProfile.jurisdiction}%`);
+            }
+            if (filters.length > 0) {
+                query = query.or(filters.join(','));
+            }
+        }
+
+        const { data, error } = await query;
+        return { data, error };
+    } catch (error) {
+        console.error('[ExportService] Error fetching reports by date range:', error);
+        return { data: null, error };
+    }
+}
+
 /**
  * Subscribe to realtime changes on approved image_reports for the live heatmap.
  * Triggers on any UPDATE — the handler should re-fetch if new status is 'approved'.
@@ -451,3 +649,4 @@ export function subscribeToApprovedMapReports(onChange) {
         })
         .subscribe();
 }
+

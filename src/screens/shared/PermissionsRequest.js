@@ -4,17 +4,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppContext } from '../../context/AppContext';
 import { LinearGradient } from 'expo-linear-gradient';
+import { FocusAwareStatusBar } from '../../components';
 
 const C = {
-    navy: '#002452',
-    navyMid: '#1B3A6B',
-    amber: '#F59E0B',
+    navy: '#0A1E3F',
+    navyMid: '#0F2C59',
+    amber: '#D97706',
     white: '#FFFFFF',
-    offWhite: '#F8F9FB',
+    offWhite: '#F4F6F9',
     surface: '#FFFFFF',
-    textPrimary: '#191C1E',
-    textSecondary: '#44474F',
-    border: '#E5E7EB',
+    textPrimary: '#0F172A',
+    textSecondary: '#475569',
+    border: '#CBD5E1',
 };
 
 export default function PermissionsRequest({ navigation }) {
@@ -30,7 +31,7 @@ export default function PermissionsRequest({ navigation }) {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor={C.offWhite} />
+            <FocusAwareStatusBar barStyle="dark-content" statusBgColor={C.offWhite} />
             <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
                 
                 <ScrollView contentContainerStyle={styles.content}>

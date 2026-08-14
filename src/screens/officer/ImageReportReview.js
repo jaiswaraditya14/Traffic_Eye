@@ -18,6 +18,7 @@ import {
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { FocusAwareStatusBar } from '../../components';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context';
 import { fetchReportById, submitOfficerDecision } from '../../services/reports';
@@ -200,7 +201,7 @@ export default function ImageReportReview({ route, navigation }) {
 
     return (
         <View style={s.container}>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
             <SafeAreaView style={{ flex: 1 }} edges={['top']}>
 
                 {/* Header */}
@@ -276,6 +277,97 @@ export default function ImageReportReview({ route, navigation }) {
                             ))}
                         </View>
                     )}
+
+                    {/* ── Possible Duplicate Report Banner for Officers ── */}
+                    {report?.possible_duplicate && (
+                        <View style={{
+                            backgroundColor: '#FFF7ED',
+                            borderColor: '#F97316',
+                            borderWidth: 1.5,
+                            borderRadius: 14,
+                            padding: 14,
+                            marginBottom: 16,
+                        }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                <Ionicons name="copy" size={18} color="#EA580C" />
+                                <Text style={{ fontSize: 14, fontFamily: 'Nunito-ExtraBold', color: '#9A3412' }}>
+                                    POSSIBLE DUPLICATE REPORT
+                                </Text>
+                            </View>
+                            <Text style={{ fontSize: 12, fontFamily: 'Nunito-Medium', color: '#7C2D12', marginBottom: 10 }}>
+                                This vehicle plate <Text style={{ fontFamily: 'Nunito-Bold' }}>{report.vehicle_number}</Text> was already reported previously. Review both reports before taking action.
+                            </Text>
+                            {report.duplicate_report_id && (
+                                <TouchableOpacity
+                                    onPress={() => navigation.push('ImageReportReview', { reportId: report.duplicate_report_id })}
+                                    style={{
+                                        flexDirection: 'row', alignItems: 'center', gap: 6,
+                                        backgroundColor: '#EA580C', borderRadius: 10,
+                                        paddingHorizontal: 14, paddingVertical: 8,
+                                        alignSelf: 'flex-start',
+                                    }}
+                                    activeOpacity={0.8}
+                                >
+                                    <Ionicons name="document-text-outline" size={14} color="#FFF" />
+                                    <Text style={{ fontSize: 12, fontFamily: 'Nunito-Bold', color: '#FFF' }}>
+                                        View Previous Report #{report.duplicate_report_id.slice(0, 8).toUpperCase()}
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    )}
+
+                    {/* ── Fraud & Evidence Risk Warning Banner for Officers ── */}
+                    {(() => {
+                        const aiConf = report?.ai_confidence ?? 1;
+                        const auth = report?.authenticity_check;
+                        const isLowConf = aiConf < 0.70;
+                        const isFakeOrSuspect = auth && (auth.authentic === false || (auth.flags && auth.flags.length > 0));
+                        
+                        if (!isLowConf && !isFakeOrSuspect) return null;
+
+                        return (
+                            <View style={{
+                                backgroundColor: '#FEF2F2',
+                                borderColor: '#FCA5A5',
+                                borderWidth: 1.5,
+                                borderRadius: 14,
+                                padding: 14,
+                                marginBottom: 16,
+                            }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                    <Ionicons name="shield-alert" size={20} color="#DC2626" />
+                                    <Text style={{ fontSize: 14, fontFamily: 'Nunito-ExtraBold', color: '#991B1B' }}>
+                                        FRAUD & EVIDENCE RISK DETECTED
+                                    </Text>
+                                </View>
+                                <Text style={{ fontSize: 12, fontFamily: 'Nunito-Medium', color: '#7F1D1D', marginBottom: 8 }}>
+                                    This report triggered evidence risk flags during automated intake analysis. Please inspect evidence carefully before taking action.
+                                </Text>
+                                {isLowConf && (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                                        <Ionicons name="alert-circle" size={14} color="#DC2626" />
+                                        <Text style={{ fontSize: 12, fontFamily: 'Nunito-SemiBold', color: '#B91C1C' }}>
+                                            Low AI Confidence ({Math.round(aiConf * 100)}%) — Plate or offense is ambiguous
+                                        </Text>
+                                    </View>
+                                )}
+                                {isFakeOrSuspect && (
+                                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 4 }}>
+                                        <Ionicons name="alert-circle" size={14} color="#DC2626" style={{ marginTop: 1 }} />
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={{ fontSize: 12, fontFamily: 'Nunito-SemiBold', color: '#B91C1C' }}>
+                                                Stage 0 Authenticity Flag ({auth?.confidence ?? 80}% conf):
+                                            </Text>
+                                            <Text style={{ fontSize: 11, fontFamily: 'Nunito-Medium', color: '#991B1B', marginTop: 2 }}>
+                                                {auth?.reason || 'Possible AI generated, screenshot, or screen capture.'}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                )}
+                            </View>
+                        );
+                    })()}
 
                     {/* ── AI Analysis Card ── */}
                     {!isVideoReport && (
@@ -424,14 +516,23 @@ export default function ImageReportReview({ route, navigation }) {
                 </LinearGradient>
             </Animated.View>
 
-            {/* Fullscreen Image Modal */}
+            {/* Fullscreen Image Modal with Pinch-to-Zoom */}
             <Modal visible={!!fullscreenImage} transparent={true} animationType="fade" onRequestClose={() => setFullscreenImage(null)}>
                 <View style={s.modalBg}>
                     <TouchableOpacity style={s.modalClose} onPress={() => setFullscreenImage(null)}>
                         <Ionicons name="close" size={28} color={C.white} />
                     </TouchableOpacity>
                     {fullscreenImage && (
-                        <Image source={{ uri: fullscreenImage }} style={s.modalImg} resizeMode="contain" />
+                        <ScrollView
+                            maximumZoomScale={5}
+                            minimumZoomScale={1}
+                            showsHorizontalScrollIndicator={false}
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={{ flex: 1, width: '100%', justifyContent: 'center', alignItems: 'center' }}
+                            style={{ width: '100%', height: '100%' }}
+                        >
+                            <Image source={{ uri: fullscreenImage }} style={s.modalImg} resizeMode="contain" />
+                        </ScrollView>
                     )}
                 </View>
             </Modal>
@@ -463,13 +564,6 @@ const s = StyleSheet.create({
     reviewedText:   { flex: 1, fontSize: 12, fontFamily: 'Nunito-SemiBold', lineHeight: 17 },
 
     scroll: { paddingHorizontal: 16, paddingTop: 16 },
-
-    imgCard:        { borderRadius: 20, overflow: 'hidden', marginBottom: 16, height: 220, backgroundColor: '#E2E8F0' },
-    evidenceImg:    { width: '100%', height: '100%' },
-    imgPlaceholder: { justifyContent: 'center', alignItems: 'center' },
-    imgOverlay:     { position: 'absolute', top: 12, left: 12 },
-    sevPill:        { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-    sevPillText:    { fontSize: 10, fontFamily: 'Nunito-ExtraBold', color: C.white, letterSpacing: 0.6 },
 
     // Gallery
     galleryImgContainer: {

@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { fetchHeatmapPoints, subscribeToApprovedMapReports } from '../../services/reports';
+import { FocusAwareStatusBar } from '../../components';
 import { supabase } from '../../services/supabase';
 import {
     COLORS,
@@ -573,7 +574,7 @@ export default function ViolationHeatmap({ navigation }) {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+            <FocusAwareStatusBar barStyle="dark-content" statusBgColor="#F8F9FB" />
 
             {/* ── Map ── */}
             <MapView

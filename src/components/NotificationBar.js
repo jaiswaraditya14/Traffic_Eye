@@ -51,7 +51,7 @@ const VARIANTS = {
 };
 
 const AUTO_DISMISS_MS = 4000;
-const SLIDE_HEIGHT = 110; // enough to fully hide above screen
+const SLIDE_HEIGHT = 160; // generous enough to fully hide above any screen
 
 /**
  * NotificationBar
@@ -77,7 +77,7 @@ export default function NotificationBar({
     const config = VARIANTS[variant] ?? VARIANTS.info;
 
     // ── Animations ────────────────────────────────────────────────────────────
-    const translateY = useRef(new Animated.Value(-SLIDE_HEIGHT)).current;
+    const translateY = useRef(new Animated.Value(-SLIDE_HEIGHT)).current; // start hidden
     const opacity    = useRef(new Animated.Value(0)).current;
     const progress   = useRef(new Animated.Value(1)).current;   // 1 → 0 over `duration`
     const swipeDelta = useRef(new Animated.Value(0)).current;   // tracks live swipe
@@ -113,8 +113,16 @@ export default function NotificationBar({
 
     // ── Show / hide effect ────────────────────────────────────────────────────
     useEffect(() => {
+        clearTimeout(dismissTimerRef.current);
+        progressAnimRef.current?.stop();
+
         if (visible) {
             isAnimatingOut.current = false;
+
+            // Always reset to fully-hidden position before animating in,
+            // preventing stale-position flashes on re-show.
+            translateY.setValue(-SLIDE_HEIGHT);
+            opacity.setValue(0);
             swipeDelta.setValue(0);
             progress.setValue(1);
 
@@ -145,11 +153,11 @@ export default function NotificationBar({
 
             dismissTimerRef.current = setTimeout(dismiss, duration + 300);
         } else {
-            // If hidden externally while visible, snap away
-            translateY.setValue(-SLIDE_HEIGHT);
-            opacity.setValue(0);
-            clearTimeout(dismissTimerRef.current);
-            progressAnimRef.current?.stop();
+            // Animate out only if not already animating out
+            if (!isAnimatingOut.current) {
+                translateY.setValue(-SLIDE_HEIGHT);
+                opacity.setValue(0);
+            }
         }
 
         return () => {
@@ -207,7 +215,8 @@ export default function NotificationBar({
         })
     ).current;
 
-    if (!visible) return null;
+    // Do NOT return null — we must stay mounted so the hide animation can run.
+    // Instead use pointerEvents to block/unblock interaction.
 
     const progressWidth = progress.interpolate({
         inputRange: [0, 1],
@@ -218,6 +227,7 @@ export default function NotificationBar({
 
     return (
         <Animated.View
+            pointerEvents={visible ? 'auto' : 'none'}
             style={[
                 styles.wrapper,
                 {

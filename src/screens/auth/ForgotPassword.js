@@ -2,11 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView,
     Platform, ScrollView, Alert, ActivityIndicator, Animated,
-    StatusBar, TextInput,
+    TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MobileContainer } from '../../components';
+import { MobileContainer, FocusAwareStatusBar } from '../../components';
 import { supabase } from '../../services';
 import { isValidEmail } from '../../utils';
 
@@ -67,7 +67,7 @@ export default function ForgotPassword({ navigation }) {
 
     return (
         <MobileContainer>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.container}

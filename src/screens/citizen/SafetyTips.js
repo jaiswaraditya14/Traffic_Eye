@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { TRAFFIC_RULES, SAFETY_TIPS } from '../../data/trafficData';
+import { FocusAwareStatusBar } from '../../components';
 
 const C = {
     navy: '#002452', navyMid: '#1B3A6B',
@@ -25,7 +26,7 @@ export default function SafetyTips({ navigation }) {
 
     return (
         <View style={s.root}>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
             <SafeAreaView style={s.safe} edges={['top']}>
 
                 {/* Header */}

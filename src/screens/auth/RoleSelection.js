@@ -4,7 +4,7 @@ import {
     Animated, StatusBar, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MobileContainer } from '../../components';
+import { MobileContainer, FocusAwareStatusBar } from '../../components';
 import { useAppContext, useAuth } from '../../context';
 import { ROLES } from '../../utils';
 import {
@@ -87,7 +87,7 @@ export default function RoleSelection({ navigation, onConfirm }) {
 
     return (
         <MobileContainer>
-            <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+            <FocusAwareStatusBar barStyle="dark-content" statusBgColor={C.bg} />
             <ScrollView
                 style={styles.scroll}
                 contentContainerStyle={styles.scrollContent}
@@ -103,15 +103,16 @@ export default function RoleSelection({ navigation, onConfirm }) {
                 >
                     {/* App logo mark */}
                     <View style={styles.logoMark}>
-                        <Ionicons name="shield-checkmark" size={28} color={C.accent} />
+                        <Ionicons name="shield-checkmark" size={30} color="#0F2C59" />
                     </View>
                     <Text style={styles.appName}>TrafficEye</Text>
-                    <Text style={styles.tagline}>Civic Intelligence Platform</Text>
+                    <Text style={styles.tagline}>Traffic Enforcement Portal • Govt Civic Service</Text>
                 </Animated.View>
 
                 {/* ── Heading ── */}
                 <Animated.View style={[styles.headingBlock, { opacity: headerFade }]}>
-                    <Text style={styles.heading}>Welcome to{'\n'}TrafficEye</Text>
+                    <Text style={styles.heading}>Select Portal Access</Text>
+                    <Text style={styles.subheading}>Choose your role to proceed to the official traffic enforcement portal.</Text>
                 </Animated.View>
 
                 {/* ── Citizen Card (Primary) ── */}
@@ -135,22 +136,20 @@ export default function RoleSelection({ navigation, onConfirm }) {
                         >
                             <View style={styles.iconOuter}>
                                 <View style={styles.iconInner}>
-                                    <Ionicons name="camera" size={42} color={C.accent} />
+                                    <Ionicons name="person" size={36} color="#0F2C59" />
                                 </View>
                             </View>
                         </Animated.View>
 
                         {/* Text block */}
-                        <Text style={styles.citizenTitle}>Make an Impact</Text>
+                        <Text style={styles.citizenTitle}>Citizen Portal</Text>
                         <Text style={styles.citizenSubtitle}>
-                            Report traffic violations easily, track your verified submissions, and earn rewards for keeping our streets safe.
+                            Report traffic violations, track submitted e-challan status, check penalties, and contribute to public road safety.
                         </Text>
-
-
 
                         {/* CTA Button */}
                         <View style={styles.ctaButton}>
-                            <Text style={styles.ctaText}>Continue</Text>
+                            <Text style={styles.ctaText}>Enter Citizen Portal</Text>
                             <Ionicons name="arrow-forward" size={18} color={C.white} />
                         </View>
                     </TouchableOpacity>
@@ -167,17 +166,17 @@ export default function RoleSelection({ navigation, onConfirm }) {
                     <TouchableOpacity
                         style={styles.officerLink}
                         onPress={() => handleRoleSelect(ROLES.OFFICER)}
-                        activeOpacity={0.65}
+                        activeOpacity={0.8}
                     >
-                        <Ionicons name="shield-outline" size={15} color={C.textMuted} />
+                        <Ionicons name="shield" size={18} color="#0F2C59" />
                         <Text style={styles.officerLinkText}>
-                            Are you an officer?{' '}
-                            <Text style={styles.officerLinkAccent}>Sign in here →</Text>
+                            Police Officer Access •{' '}
+                            <Text style={styles.officerLinkAccent}>Sign In Here →</Text>
                         </Text>
                     </TouchableOpacity>
 
                     <Text style={styles.footerNote}>
-                        Officer access requires Traffic Authority registration
+                        Restricted to registered Traffic Enforcement Officers & Station Personnel
                     </Text>
                 </Animated.View>
 

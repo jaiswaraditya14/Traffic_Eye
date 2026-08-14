@@ -7,27 +7,28 @@ import { supabase } from '../../services';
 import * as FileSystem from 'expo-file-system/legacy';
 const { EncodingType } = FileSystem;
 import { decode } from 'base64-arraybuffer';
+import { FocusAwareStatusBar } from '../../components';
 
 
 const C = {
-    navy: '#002452',
-    navyMid: '#1B3A6B',
-    amber: '#F59E0B',
+    navy: '#0A1E3F',
+    navyMid: '#0F2C59',
+    amber: '#D97706',
     white: '#FFFFFF',
-    offWhite: '#F8F9FB',
+    offWhite: '#F4F6F9',
     surface: '#FFFFFF',
-    textPrimary: '#191C1E',
-    textSecondary: '#44474F',
-    border: '#E5E7EB',
-    error: '#BA1A1A',
-    success: '#059669',
-    successSurface: '#D1FAE5',
-    warning: '#D97706',
+    textPrimary: '#0F172A',
+    textSecondary: '#475569',
+    border: '#CBD5E1',
+    error: '#B91C1C',
+    success: '#15803D',
+    successSurface: '#DCFCE7',
+    warning: '#B45309',
 };
 
 export default function AIResultsVerification({ navigation, route }) {
     const { currentReport } = useAppContext();
-    const { aiResults } = route.params || {};
+    const { aiResults, authenticityResult: routeAuthResult, possibleDuplicate, duplicateExistingId } = route.params || {};
 
     const [vehicleNumber, setVehicleNumber] = useState(() => {
         const raw = aiResults?.vehicleNumber || currentReport?.vehiclePlate || '';
@@ -109,11 +110,20 @@ export default function AIResultsVerification({ navigation, route }) {
             // Save to new image_reports table (officer queue + transparency layer)
             const severityLower = (aiResults?.severity || 'medium').toLowerCase();
             const normSeverity = ['low', 'medium', 'high', 'critical'].includes(severityLower) ? severityLower : 'medium';
+            // location_source is persisted only when the optional DB column exists.
+            // Run: ALTER TABLE image_reports ADD COLUMN IF NOT EXISTS location_source TEXT;
+            const locationSourcePayload = currentReport?.locationSource
+                ? { location_source: currentReport.locationSource }
+                : {};
+
             const { data: imgReport, error: imgReportError } = await supabase.from('image_reports').insert({
                 user_id:               user.id,
                 image_url:             publicUrl || '',
                 image_storage_path:    storagePath,
+                latitude:              currentReport?.location?.latitude ?? null,
+                longitude:             currentReport?.location?.longitude ?? null,
                 location_address:      address || currentReport?.address || null,
+                ...locationSourcePayload,
                 violation_type:        violationType,
                 violation_description: aiResults?.description || null,
                 severity:              normSeverity,
@@ -121,7 +131,11 @@ export default function AIResultsVerification({ navigation, route }) {
                 ai_raw_result:         aiResults,
                 vehicle_number:        vehicleNumber,
                 status:                'pending',
+                authenticity_check:    routeAuthResult || currentReport?.authenticityResult || null,
+                possible_duplicate:    possibleDuplicate || false,
+                duplicate_report_id:   duplicateExistingId || null,
             }).select().single();
+
 
             if (imgReportError) throw imgReportError;
             imgReportId = imgReport.id;
@@ -162,7 +176,7 @@ export default function AIResultsVerification({ navigation, route }) {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
             <SafeAreaView style={styles.safeArea} edges={['top']}>
                 {/* ── Header ── */}
                 <View style={styles.header}>
@@ -186,6 +200,19 @@ export default function AIResultsVerification({ navigation, route }) {
                             <View style={styles.placeholder}><Ionicons name="image" size={48} color={C.border} /></View>
                         )}
                     </View>
+
+                    {/* Possible Duplicate Warning Banner */}
+                    {possibleDuplicate && (
+                        <View style={styles.duplicateBanner}>
+                            <Ionicons name="warning" size={18} color="#B45309" />
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.duplicateBannerTitle}>⚠️ Possible Duplicate</Text>
+                                <Text style={styles.duplicateBannerText}>
+                                    This vehicle number plate has already been reported. The officer will review both reports independently. You may still submit.
+                                </Text>
+                            </View>
+                        </View>
+                    )}
 
                     {/* AI Insights Card */}
                     <View style={styles.aiCard}>
@@ -277,7 +304,7 @@ export default function AIResultsVerification({ navigation, route }) {
                     <View style={styles.inputBox}>
                         <Text style={styles.inputLabel}>Violation Type(s)</Text>
                         <View style={styles.chipsRow}>
-                            {['Speeding', 'Red Light', 'No Helmet', 'Wrong Way', 'Illegal Parking', 'Phone Use', 'Triple Riding', 'No Seatbelt', 'Footpath Driving', 'Overloading'].map(type => {
+                            {['Triple Riding', 'No Helmet', 'Wrong Parking', 'Speeding', 'No Seat Belt', 'Rash Driving', 'Footpath Driving', 'Red Light', 'Wrong Way', 'Phone Use', 'Overloading', 'Lane Cutting'].map(type => {
                                 const active = selectedViolations.includes(type);
                                 return (
                                     <TouchableOpacity
@@ -340,7 +367,16 @@ export default function AIResultsVerification({ navigation, route }) {
                     <TouchableOpacity style={styles.modalClose} onPress={() => setImageModalVisible(false)}>
                         <Ionicons name="close" size={28} color={C.white} />
                     </TouchableOpacity>
-                    <Image source={{ uri: currentReport?.image }} style={styles.modalImg} resizeMode="contain" />
+                    <ScrollView
+                        maximumZoomScale={5}
+                        minimumZoomScale={1}
+                        showsHorizontalScrollIndicator={false}
+                        showsVerticalScrollIndicator={false}
+                        contentContainerStyle={{ flex: 1, width: '100%', justifyContent: 'center', alignItems: 'center' }}
+                        style={{ width: '100%', height: '100%' }}
+                    >
+                        <Image source={{ uri: currentReport?.image }} style={styles.modalImg} resizeMode="contain" />
+                    </ScrollView>
                 </View>
             </Modal>
         </View>
@@ -539,4 +575,29 @@ const styles = StyleSheet.create({
     modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
     modalClose: { position: 'absolute', top: 60, right: 24, zIndex: 10, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
     modalImg: { width: '100%', height: '85%' },
+
+    // Possible Duplicate Warning Banner
+    duplicateBanner: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 12,
+        backgroundColor: '#FEF3C7',
+        borderWidth: 1.5,
+        borderColor: '#D97706',
+        borderRadius: 18,
+        padding: 16,
+        marginBottom: 20,
+    },
+    duplicateBannerTitle: {
+        fontSize: 14,
+        fontFamily: 'Nunito-Bold',
+        color: '#92400E',
+        marginBottom: 4,
+    },
+    duplicateBannerText: {
+        fontSize: 13,
+        fontFamily: 'Nunito-Medium',
+        color: '#78350F',
+        lineHeight: 19,
+    },
 });

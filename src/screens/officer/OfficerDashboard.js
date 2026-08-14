@@ -6,7 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MobileContainer } from '../../components';
+import { MobileContainer, FocusAwareStatusBar } from '../../components';
 import { useAuth } from '../../context';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../services';
@@ -14,28 +14,28 @@ import { fetchPendingReports, fetchReviewedReports } from '../../services/report
 
 // ── Design Tokens (Civic Authority — Officer Side) ──
 const C = {
-    navy: '#002452',
-    navyMid: '#1B3A6B',
-    navyLight: '#2C4E80',
-    amber: '#F59E0B',
-    amberDark: '#D97706',
+    navy: '#0A1E3F',
+    navyMid: '#0F2C59',
+    navyLight: '#1E3A8A',
+    amber: '#D97706',
+    amberDark: '#B45309',
     amberSurface: '#FEF3C7',
     white: '#FFFFFF',
-    offWhite: '#F8F9FB',
+    offWhite: '#F4F6F9',
     surface: '#FFFFFF',
-    surfaceLow: '#F2F4F6',
-    textPrimary: '#191C1E',
-    textSecondary: '#44474F',
-    textTertiary: '#747780',
-    border: '#C4C6D0',
-    success: '#059669',
-    successSurface: '#D1FAE5',
-    warning: '#D97706',
+    surfaceLow: '#F8FAFC',
+    textPrimary: '#0F172A',
+    textSecondary: '#475569',
+    textTertiary: '#64748B',
+    border: '#CBD5E1',
+    success: '#15803D',
+    successSurface: '#DCFCE7',
+    warning: '#B45309',
     warningSurface: '#FEF3C7',
-    error: '#BA1A1A',
-    errorSurface: '#FFDAD6',
-    critical: '#2563EB',
-    primarySurface: '#D7E2FF',
+    error: '#B91C1C',
+    errorSurface: '#FEE2E2',
+    critical: '#1E3A8A',
+    primarySurface: '#EFF6FF',
 };
 
 export default function OfficerDashboard({ navigation }) {
@@ -161,7 +161,7 @@ export default function OfficerDashboard({ navigation }) {
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} />
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
             <SafeAreaView style={styles.safeArea} edges={['bottom']}>
                 <ScrollView showsVerticalScrollIndicator={false}>
 
@@ -271,6 +271,21 @@ export default function OfficerDashboard({ navigation }) {
                             <View style={styles.actionCardContent}>
                                 <Text style={styles.actionCardTitle}>Verified Reports</Text>
                                 <Text style={styles.actionCardDesc}>View all verified violations history</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={18} color={C.textTertiary} />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.actionCard}
+                            onPress={() => navigation.navigate('OfficerReportExport')}
+                            activeOpacity={0.8}
+                        >
+                            <View style={[styles.actionIconCircle, { backgroundColor: '#E0F2FE' }]}>
+                                <Ionicons name="document-text" size={22} color="#0284C7" />
+                            </View>
+                            <View style={styles.actionCardContent}>
+                                <Text style={styles.actionCardTitle}>Export Reports (Excel)</Text>
+                                <Text style={styles.actionCardDesc}>Download .xlsx spreadsheets by date range</Text>
                             </View>
                             <Ionicons name="chevron-forward" size={18} color={C.textTertiary} />
                         </TouchableOpacity>
