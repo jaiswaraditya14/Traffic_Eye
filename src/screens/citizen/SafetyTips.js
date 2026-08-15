@@ -36,7 +36,7 @@ export default function SafetyTips({ navigation }) {
                     </TouchableOpacity>
                     <View style={{ flex: 1 }}>
                         <Text style={s.headerTitle}>Road Safety Guide</Text>
-                        <Text style={s.headerSub}>Maharashtra Road Safety Standards</Text>
+                        <Text style={s.headerSub}>MoRTH · MV Act 1988 · IRC Guidelines</Text>
                     </View>
                     <View style={s.headerIcon}>
                         <Ionicons name="shield-checkmark" size={22} color={C.amber} />

@@ -9,7 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context';
 import { FocusAwareStatusBar } from '../../components';
 import { formatNumber } from '../../utils';
-import { fetchCitizenReports, subscribeToReportUpdates } from '../../services/reports';
+import { fetchCitizenReports, subscribeToReportUpdates, fetchNotifications } from '../../services/reports';
 import { useFocusEffect } from '@react-navigation/native';
 
 // ── Design Tokens (Civic Authority) ──
@@ -54,12 +54,19 @@ export default function CitizenHome({ navigation }) {
 
     // Stats data
     const [reports, setReports] = React.useState([]);
+    const [unreadCount, setUnreadCount] = React.useState(0);
 
     const loadData = React.useCallback(async () => {
         if (!profile?.id) return;
-        const { data, error } = await fetchCitizenReports(profile.id);
-        if (!error && data) {
-            setReports(data);
+        const [reportsResult, notifsResult] = await Promise.all([
+            fetchCitizenReports(profile.id),
+            fetchNotifications(profile.id),
+        ]);
+        if (!reportsResult.error && reportsResult.data) {
+            setReports(reportsResult.data);
+        }
+        if (!notifsResult.error && notifsResult.data) {
+            setUnreadCount(notifsResult.data.filter(n => !n.is_read).length);
         }
     }, [profile?.id]);
 
@@ -184,9 +191,13 @@ export default function CitizenHome({ navigation }) {
                                 style={styles.notifButton}
                             >
                                 <Ionicons name="notifications-outline" size={20} color={C.white} />
+                                {unreadCount > 0 && (
                                 <View style={styles.notifBadge}>
-                                    <Text style={styles.notifBadgeText}>0</Text>
+                                    <Text style={styles.notifBadgeText}>
+                                        {unreadCount > 99 ? '99+' : unreadCount}
+                                    </Text>
                                 </View>
+                            )}
                             </TouchableOpacity>
                         </View>
 
