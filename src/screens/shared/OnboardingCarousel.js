@@ -1,14 +1,7 @@
-/**
- * OnboardingCarousel.js — Traffic Eye Citizen Onboarding
- *
- * Fully illustrated using Ionicons on gradient backgrounds.
- * No photo assets required — zero broken-image risk.
- * Professional government-app feel.
- */
 import React, { useState, useRef } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, Dimensions,
-    TouchableOpacity, StatusBar, Animated,
+    TouchableOpacity, Image, StatusBar, Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,89 +23,39 @@ const C = {
     border: '#CBD5E1',
 };
 
-// Slides — pure Ionicons illustration, no photos
 const slides = [
     {
+        image: require('../../../assets/images/1.jpg'),
         icon: 'camera',
-        iconSize: 80,
-        gradColors: ['#0A1E3F', '#0F2C59'],
-        accentIcon: 'shield-checkmark',
-        accentColor: '#D97706',
-        bgShapes: ['scan-outline', 'location-outline'],
+        iconColor: C.navyMid,
+        iconBg: '#D7E2FF',
         title: 'Report Violations',
-        description: 'Photograph traffic violations directly from your phone. Help maintain road safety and hold violators accountable.',
-        chips: ['Photo Report', 'Video Clip', 'GPS Tagged'],
+        description: 'Capture traffic violations with your phone camera. Help keep roads safe and earn rewards for your community.',
+        accent: C.navyMid,
     },
     {
+        image: require('../../../assets/images/onboarding_ai.jpg'),
         icon: 'scan',
-        iconSize: 80,
-        gradColors: ['#064E3B', '#047857'],
-        accentIcon: 'checkmark-circle',
-        accentColor: '#34D399',
-        bgShapes: ['eye-outline', 'analytics-outline'],
+        iconColor: '#047857',
+        iconBg: '#D1FAE5',
         title: 'AI Verification',
-        description: 'Our AI analyses licence plates, violation type and geolocation with government-grade accuracy before forwarding to officers.',
-        chips: ['Plate Reader', 'GPS Verified', 'Anti-Fake'],
+        description: 'AI instantly analyzes license plates, violation types, and location with government-grade accuracy.',
+        accent: '#047857',
     },
     {
+        image: require('../../../assets/images/onboarding_rewards.jpg'),
         icon: 'trophy',
-        iconSize: 80,
-        gradColors: ['#78350F', '#B45309'],
-        accentIcon: 'star',
-        accentColor: '#FCD34D',
-        bgShapes: ['gift-outline', 'ribbon-outline'],
+        iconColor: C.amberDark,
+        iconBg: '#FEF3C7',
         title: 'Earn Rewards',
-        description: 'Every verified report earns you civic points. Redeem them for safety gear, discount coupons, and more.',
-        chips: ['Civic Points', 'Safety Gear', 'Coupons'],
+        description: 'Get recognition for verified reports. Accumulate points, unlock achievements and make a real difference.',
+        accent: C.amberDark,
     },
 ];
 
-// Illustrated slide card — full gradient panel with large icon
-function IllustrationCard({ slide, index }) {
-    return (
-        <LinearGradient
-            colors={slide.gradColors}
-            style={styles.illustration}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-        >
-            {/* Decorative background shape icons */}
-            <Ionicons
-                name={slide.bgShapes[0]}
-                size={180}
-                color="rgba(255,255,255,0.04)"
-                style={styles.bgShape1}
-            />
-            <Ionicons
-                name={slide.bgShapes[1]}
-                size={120}
-                color="rgba(255,255,255,0.05)"
-                style={styles.bgShape2}
-            />
 
-            {/* Accent badge (top right) */}
-            <View style={[styles.accentBadge, { backgroundColor: `${slide.accentColor}20`, borderColor: `${slide.accentColor}40` }]}>
-                <Ionicons name={slide.accentIcon} size={16} color={slide.accentColor} />
-                <Text style={[styles.accentBadgeText, { color: slide.accentColor }]}>VERIFIED</Text>
-            </View>
 
-            {/* Main icon */}
-            <View style={styles.mainIconFrame}>
-                <View style={styles.mainIconOuter}>
-                    <Ionicons name={slide.icon} size={slide.iconSize} color="rgba(255,255,255,0.95)" />
-                </View>
-            </View>
-
-            {/* Slide number indicator */}
-            <View style={styles.slideNumRow}>
-                <Text style={styles.slideNum}>0{index + 1}</Text>
-                <Text style={styles.slideNumOf}> / 0{slides.length}</Text>
-            </View>
-        </LinearGradient>
-    );
-}
-
-export default function OnboardingCarousel() {
+export default function OnboardingCarousel({ navigation }) {
     const [currentSlide, setCurrentSlide] = useState(0);
     const { setHasSeenOnboarding } = useAppContext();
     const scrollViewRef = useRef(null);
@@ -140,21 +83,10 @@ export default function OnboardingCarousel() {
     const onPressOut = () =>
         Animated.spring(buttonScale, { toValue: 1, useNativeDriver: true }).start();
 
-    const slide = slides[currentSlide];
-
     return (
         <View style={styles.container}>
-            <FocusAwareStatusBar barStyle="light-content" statusBgColor="#0A1E3F" />
+            <FocusAwareStatusBar barStyle="dark-content" statusBgColor={C.offWhite} />
 
-            {/* Skip button — top right */}
-            {currentSlide < slides.length - 1 && (
-                <TouchableOpacity style={styles.skipTopBtn} onPress={handleSkip}>
-                    <Text style={styles.skipTopText}>Skip</Text>
-                    <Ionicons name="chevron-forward" size={14} color={C.textTertiary} />
-                </TouchableOpacity>
-            )}
-
-            {/* Horizontal scroll for slides */}
             <ScrollView
                 ref={scrollViewRef}
                 horizontal
@@ -167,86 +99,95 @@ export default function OnboardingCarousel() {
                 {slides.map((s, index) => (
                     <View key={index} style={[styles.slide, { width }]}>
 
-                        {/* Top: Illustrated card */}
-                        <View style={styles.cardFrame}>
-                            <IllustrationCard slide={s} index={index} />
+                        {/* ── Large rounded image card ── */}
+                        <View style={styles.imageContainer}>
+                            <Image
+                                source={s.image}
+                                style={styles.slideImage}
+                                resizeMode="cover"
+                            />
+                            {/* Accent top bar */}
+                            <View style={[styles.accentBar, { backgroundColor: s.accent }]} />
+                            {/* Fade-out at bottom so it blends into page */}
+                            <LinearGradient
+                                colors={['transparent', 'rgba(248,249,251,0.55)', C.offWhite]}
+                                style={styles.imageGradient}
+                            />
                         </View>
 
-                        {/* Bottom: Text + chips */}
+                        {/* ── Icon badge overlapping image bottom ── */}
+                        <View style={[styles.iconBadge, { backgroundColor: s.iconBg }]}>
+                            <Ionicons name={s.icon} size={32} color={s.iconColor} />
+                        </View>
+
+                        {/* ── Text ── */}
                         <View style={styles.textSection}>
                             <Text style={styles.slideTitle}>{s.title}</Text>
                             <Text style={styles.slideDescription}>{s.description}</Text>
-
-                            {/* Feature chips */}
-                            <View style={styles.chipRow}>
-                                {s.chips.map((chip, ci) => (
-                                    <View key={ci} style={styles.chip}>
-                                        <Ionicons name="checkmark" size={10} color={C.navy} />
-                                        <Text style={styles.chipText}>{chip}</Text>
-                                    </View>
-                                ))}
-                            </View>
                         </View>
                     </View>
                 ))}
             </ScrollView>
 
-            {/* Bottom controls */}
+            {/* ── Bottom Controls ── */}
             <View style={styles.bottomSection}>
-
-                {/* Pill dots */}
                 <View style={styles.indicators}>
-                    {slides.map((_, index) => (
-                        <TouchableOpacity
+                    {slides.map((s, index) => (
+                        <View
                             key={index}
-                            onPress={() => {
-                                setCurrentSlide(index);
-                                scrollViewRef.current?.scrollTo({ x: width * index, animated: true });
-                            }}
-                        >
-                            <View
-                                style={[
-                                    styles.indicator,
-                                    index === currentSlide
-                                        ? [styles.indicatorActive, { backgroundColor: C.navy }]
-                                        : styles.indicatorInactive,
-                                ]}
-                            />
-                        </TouchableOpacity>
+                            style={[
+                                styles.indicator,
+                                index === currentSlide
+                                    ? [styles.indicatorActive, { backgroundColor: s.accent }]
+                                    : styles.indicatorInactive,
+                            ]}
+                        />
                     ))}
                 </View>
 
-                {/* CTA row */}
-                <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-                    <TouchableOpacity
-                        style={styles.nextButton}
-                        onPress={handleNext}
-                        onPressIn={onPressIn}
-                        onPressOut={onPressOut}
-                        activeOpacity={0.9}
-                    >
-                        <LinearGradient
-                            colors={currentSlide === slides.length - 1 ? [C.amberDark, C.amber] : [C.navy, C.navyMid]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={styles.nextButtonGradient}
-                        >
-                            <Text style={styles.nextButtonText}>
-                                {currentSlide === slides.length - 1 ? 'Get Started' : 'Continue'}
-                            </Text>
-                            <Ionicons
-                                name={currentSlide === slides.length - 1 ? 'checkmark-circle' : 'arrow-forward'}
-                                size={20}
-                                color={C.white}
-                            />
-                        </LinearGradient>
-                    </TouchableOpacity>
-                </Animated.View>
+                <View style={styles.ctaRow}>
+                    {!(currentSlide === slides.length - 1) && (
+                        <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
+                            <Text style={styles.skipText}>Skip</Text>
+                        </TouchableOpacity>
+                    )}
 
-                {/* Trust line */}
+                    <Animated.View
+                        style={[
+                            styles.nextButtonWrapper,
+                            { flex: 1 },
+                            { transform: [{ scale: buttonScale }] },
+                        ]}
+                    >
+                        <TouchableOpacity
+                            style={styles.nextButton}
+                            onPress={handleNext}
+                            onPressIn={onPressIn}
+                            onPressOut={onPressOut}
+                            activeOpacity={0.9}
+                        >
+                            <LinearGradient
+                                colors={currentSlide === slides.length - 1 ? [C.amberDark, C.amber] : [C.navy, C.navyMid]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={styles.nextButtonGradient}
+                            >
+                                <Text style={styles.nextButtonText}>
+                                    {currentSlide === slides.length - 1 ? 'Get Started' : 'Continue'}
+                                </Text>
+                                <Ionicons
+                                    name={currentSlide === slides.length - 1 ? 'checkmark' : 'arrow-forward'}
+                                    size={18}
+                                    color={C.white}
+                                />
+                            </LinearGradient>
+                        </TouchableOpacity>
+                    </Animated.View>
+                </View>
+
                 <View style={styles.trustRow}>
-                    <Ionicons name="lock-closed" size={11} color={C.textTertiary} />
-                    <Text style={styles.trustText}>Government Approved  ·  Secure  ·  Privacy Protected</Text>
+                    <Ionicons name="shield-checkmark" size={12} color={C.textTertiary} />
+                    <Text style={styles.trustText}>Government approved  •  Secure  •  Private</Text>
                 </View>
             </View>
         </View>
@@ -254,202 +195,160 @@ export default function OnboardingCarousel() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: C.offWhite },
-    scrollView: { flex: 1 },
-
-    skipTopBtn: {
-        position: 'absolute',
-        top: 56,
-        right: 20,
-        zIndex: 10,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 2,
-        paddingVertical: 6,
-        paddingHorizontal: 12,
-        backgroundColor: 'rgba(255,255,255,0.8)',
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: C.border,
+    container: {
+        flex: 1,
+        backgroundColor: C.offWhite,
     },
-    skipTopText: {
-        fontSize: 13,
-        fontFamily: 'Nunito-SemiBold',
-        color: C.textTertiary,
+    scrollView: {
+        flex: 1,
     },
-
     slide: {
         flex: 1,
         backgroundColor: C.offWhite,
     },
 
-    // Illustration card
-    cardFrame: {
-        marginTop: 56,
-        marginHorizontal: 20,
+    // ── Large card image (replaces small circle) ──
+    imageContainer: {
+        width: width - 32,
+        height: 310,
+        alignSelf: 'center',
         borderRadius: 28,
         overflow: 'hidden',
-        height: 300,
-        shadowColor: '#0F2C59',
+        marginTop: 52,
+        // Shadow
+        shadowColor: '#1B3A6B',
         shadowOffset: { width: 0, height: 16 },
-        shadowOpacity: 0.2,
-        shadowRadius: 32,
-        elevation: 14,
+        shadowOpacity: 0.18,
+        shadowRadius: 30,
+        elevation: 12,
     },
-    illustration: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        position: 'relative',
-    },
-    bgShape1: {
+    accentBar: {
         position: 'absolute',
-        top: -30,
-        right: -40,
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 5,
+        zIndex: 1,
     },
-    bgShape2: {
+    slideImage: {
+        width: '100%',
+        height: '100%',
+    },
+    imageGradient: {
         position: 'absolute',
-        bottom: -20,
-        left: -20,
-    },
-    accentBadge: {
-        position: 'absolute',
-        top: 18,
-        right: 18,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 20,
-        borderWidth: 1,
-    },
-    accentBadgeText: {
-        fontSize: 9,
-        fontFamily: 'Nunito-ExtraBold',
-        letterSpacing: 0.8,
-    },
-    mainIconFrame: {
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    mainIconOuter: {
-        width: 144,
-        height: 144,
-        borderRadius: 72,
-        backgroundColor: 'rgba(255,255,255,0.08)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 1.5,
-        borderColor: 'rgba(255,255,255,0.12)',
-    },
-    slideNumRow: {
-        position: 'absolute',
-        bottom: 18,
-        left: 20,
-        flexDirection: 'row',
-        alignItems: 'baseline',
-    },
-    slideNum: {
-        fontSize: 22,
-        fontFamily: 'Nunito-ExtraBold',
-        color: 'rgba(255,255,255,0.5)',
-    },
-    slideNumOf: {
-        fontSize: 13,
-        fontFamily: 'Nunito-Medium',
-        color: 'rgba(255,255,255,0.3)',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 110,
     },
 
-    // Text
+    // ── Icon badge ──
+    iconBadge: {
+        width: 68,
+        height: 68,
+        borderRadius: 24,
+        justifyContent: 'center',
+        alignItems: 'center',
+        alignSelf: 'center',
+        marginTop: -22,
+        zIndex: 10,
+        shadowColor: '#1B3A6B',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.12,
+        shadowRadius: 16,
+        elevation: 6,
+    },
+
+    // ── Text section ──
     textSection: {
-        paddingHorizontal: 24,
-        paddingTop: 28,
+        paddingHorizontal: 28,
+        paddingTop: 22,
         alignItems: 'center',
     },
     slideTitle: {
-        fontFamily: 'Nunito-ExtraBold',
-        fontSize: 26,
-        color: C.textPrimary,
+        fontFamily: 'Nunito-Bold',
+        fontSize: 28,
+        color: C.navy,
         letterSpacing: -0.5,
         marginBottom: 10,
         textAlign: 'center',
     },
     slideDescription: {
         fontFamily: 'Nunito-Regular',
-        fontSize: 14,
+        fontSize: 15,
         color: C.textSecondary,
         textAlign: 'center',
-        lineHeight: 22,
+        lineHeight: 24,
         maxWidth: 320,
-        marginBottom: 16,
+        marginBottom: 18,
     },
 
-    // Chips
-    chipRow: {
-        flexDirection: 'row',
-        gap: 8,
-        flexWrap: 'wrap',
-        justifyContent: 'center',
-    },
-    chip: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        backgroundColor: '#EFF6FF',
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: '#BFDBFE',
-    },
-    chipText: {
-        fontSize: 11,
-        fontFamily: 'Nunito-SemiBold',
-        color: C.navy,
-    },
 
-    // Bottom
+    // ── Bottom controls ──
     bottomSection: {
-        paddingHorizontal: 24,
-        paddingBottom: 40,
+        paddingHorizontal: 28,
+        paddingBottom: 44,
         backgroundColor: C.offWhite,
-        gap: 16,
     },
     indicators: {
         flexDirection: 'row',
         justifyContent: 'center',
-        gap: 6,
-        marginTop: 4,
+        gap: 8,
+        marginBottom: 24,
     },
-    indicator: { height: 6, borderRadius: 3 },
-    indicatorActive: { width: 28 },
+    indicator: {
+        height: 6,
+        borderRadius: 3,
+    },
+    indicatorActive: { width: 30 },
     indicatorInactive: { width: 6, backgroundColor: '#D1D5DB' },
 
-    nextButton: { borderRadius: 18, overflow: 'hidden' },
+    ctaRow: {
+        flexDirection: 'row',
+        gap: 16,
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    skipButton: {
+        paddingHorizontal: 22,
+        paddingVertical: 18,
+        borderRadius: 16,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    skipText: {
+        fontFamily: 'Nunito-SemiBold',
+        fontSize: 15,
+        color: C.textTertiary,
+    },
+    nextButtonWrapper: {},
+    nextButton: {
+        borderRadius: 18,
+        overflow: 'hidden',
+    },
     nextButtonGradient: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 10,
         paddingVertical: 18,
+        paddingHorizontal: 28,
     },
     nextButtonText: {
         fontFamily: 'Nunito-Bold',
         fontSize: 17,
         color: C.white,
     },
-
     trustRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 6,
+        gap: 8,
     },
     trustText: {
         fontFamily: 'Nunito-Medium',
-        fontSize: 11,
+        fontSize: 12,
         color: C.textTertiary,
-        textAlign: 'center',
     },
 });
