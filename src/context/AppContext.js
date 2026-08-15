@@ -1,10 +1,11 @@
-import React, { createContext, useState, useContext } from 'react';
+import React, { createContext, useState, useContext, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
   const [showSplash, setShowSplash] = useState(true);
-  const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
+  const [hasSeenOnboarding, setHasSeenOnboardingState] = useState(false);
   const [userRole, setUserRole] = useState(null); // 'citizen' or 'officer'
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentReport, setCurrentReport] = useState(null);
@@ -16,6 +17,16 @@ export const AppProvider = ({ children }) => {
     phone: '+1 234 567 8900',
     avatar: null,
   });
+
+  useEffect(() => {
+    // We intentionally removed the AsyncStorage check here to ensure Onboarding 
+    // always shows on app start, per the desired flow: Splash -> Onboarding -> Role Selection
+  }, []);
+
+  const setHasSeenOnboarding = async (value) => {
+    setHasSeenOnboardingState(value);
+    // No longer persisting to AsyncStorage to enforce the strict app flow
+  };
 
   const value = {
     showSplash,

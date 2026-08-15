@@ -106,33 +106,110 @@ export default function ImageCropModal({ visible, imageUri, onCropDone, onCancel
         ]).start();
     };
 
-    // Finalize with processing (compress/resize)
+    // Extracts the exact region the user framed via pan + zoom and saves it
     const handleCropAndSave = async () => {
         if (!imageUri) return;
         try {
             setProcessing(true);
 
+            // ── Step 1: Get natural image dimensions ────────────────────────
+            const { natW, natH } = await new Promise((resolve, reject) => {
+                Image.getSize(
+                    imageUri,
+                    (w, h) => resolve({ natW: w, natH: h }),
+                    (err) => reject(new Error(`Image.getSize failed: ${err}`))
+                );
+            });
+
+            console.log(`[Crop] Input: ${natW}×${natH}`);
+
+            // ── Step 2: Compute how the image renders inside the square
+            //           CROP_SIZE × CROP_SIZE viewport (contain mode) ─────────
+            const imgAspect = natW / natH;
+            let renderedW, renderedH;
+            if (imgAspect >= 1) {
+                renderedW = CROP_SIZE;
+                renderedH = CROP_SIZE / imgAspect;
+            } else {
+                renderedH = CROP_SIZE;
+                renderedW = CROP_SIZE * imgAspect;
+            }
+
+            // ── Step 3: Back-project the viewport window into rendered coords ─
+            // The scaled image center is at viewport point:
+            //   cx = CROP_SIZE/2 + panX
+            //   cy = CROP_SIZE/2 + panY
+            // So the rendered image occupies viewport coords:
+            //   left  = cx - (renderedW * s / 2)
+            //   top   = cy - (renderedH * s / 2)
+            const panX = pan.x._value;
+            const panY = pan.y._value;
+            const s = Math.max(scale, 1);
+
+            const imgLeft = (CROP_SIZE / 2 + panX) - (renderedW * s) / 2;
+            const imgTop  = (CROP_SIZE / 2 + panY) - (renderedH * s) / 2;
+
+            // Viewport edges [0, CROP_SIZE] in rendered (unscaled) image coords:
+            const rLeft   = (0          - imgLeft) / s;
+            const rRight  = (CROP_SIZE  - imgLeft) / s;
+            const rTop    = (0          - imgTop)  / s;
+            const rBottom = (CROP_SIZE  - imgTop)  / s;
+
+            // Clamp to the actual rendered image bounds [0, renderedW/H]
+            const cl = Math.max(0, Math.min(renderedW, rLeft));
+            const cr = Math.max(0, Math.min(renderedW, rRight));
+            const ct = Math.max(0, Math.min(renderedH, rTop));
+            const cb = Math.max(0, Math.min(renderedH, rBottom));
+
+            // ── Step 4: Convert rendered coords → natural pixel coords ───────
+            // Use SEPARATE scale factors for X and Y — critical for portrait images
+            const scaleX = natW / renderedW;
+            const scaleY = natH / renderedH;
+
+            const cropX = Math.round(cl * scaleX);
+            const cropY = Math.round(ct * scaleY);
+            const cropW = Math.round((cr - cl) * scaleX);
+            const cropH = Math.round((cb - ct) * scaleY);
+
+            console.log(`[Crop] Rendered region: (${cl.toFixed(1)},${ct.toFixed(1)}) → (${cr.toFixed(1)},${cb.toFixed(1)})`);
+            console.log(`[Crop] NaturalCrop: x=${cropX}, y=${cropY}, w=${cropW}, h=${cropH}`);
+
+            // ── Step 5: Execute manipulation ─────────────────────────────────
+            const actions = [];
+
+            // Always apply crop — at scale=1 this trims letterbox bars so the
+            // preview matches exactly what was shown in the frame
+            const safeX = Math.max(0, cropX);
+            const safeY = Math.max(0, cropY);
+            const safeW = Math.min(natW - safeX, Math.max(1, cropW));
+            const safeH = Math.min(natH - safeY, Math.max(1, cropH));
+
+            if (safeW > 20 && safeH > 20 &&
+                (safeX > 0 || safeY > 0 || safeW < natW || safeH < natH)) {
+                actions.push({ crop: { originX: safeX, originY: safeY, width: safeW, height: safeH } });
+            }
+
+            actions.push({ resize: { width: 1200 } });
+
             const manipResult = await ImageManipulator.manipulateAsync(
                 imageUri,
-                [{ resize: { width: 1200 } }],
+                actions,
                 { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
             );
 
+            console.log(`[Crop] Success: ${manipResult.uri}`);
             onCropDone(manipResult.uri);
+
         } catch (error) {
-            console.error('Error cropping image:', error);
-            // If crop fails, just use original
+            console.error('[Crop] Process failed:', error);
             onCropDone(imageUri);
         } finally {
             setProcessing(false);
         }
     };
 
-    // Use image as-is without any processing
     const handleUseAsIs = () => {
-        if (imageUri) {
-            onCropDone(imageUri);
-        }
+        handleCropAndSave();
     };
 
     if (!visible) return null;
@@ -248,8 +325,8 @@ export default function ImageCropModal({ visible, imageUri, onCropDone, onCancel
                                 <ActivityIndicator size="small" color={COLORS.white} />
                             ) : (
                                 <>
-                                    <Ionicons name="crop" size={18} color={COLORS.white} />
-                                    <Text style={styles.confirmText}>Crop & Use</Text>
+                                    <Ionicons name="checkmark-done-circle" size={18} color={COLORS.white} />
+                                    <Text style={styles.confirmText}>Done</Text>
                                 </>
                             )}
                         </LinearGradient>
@@ -288,7 +365,7 @@ const styles = StyleSheet.create({
     headerTitle: {
         color: COLORS.white,
         fontSize: FONT_SIZES.md,
-        fontWeight: FONT_WEIGHTS.bold,
+        fontFamily: 'Nunito-Bold',
         letterSpacing: 0.3,
     },
     instructionBanner: {
@@ -307,7 +384,7 @@ const styles = StyleSheet.create({
     instructionText: {
         color: 'rgba(45, 212, 191, 0.8)',
         fontSize: FONT_SIZES.xs,
-        fontWeight: FONT_WEIGHTS.medium,
+        fontFamily: 'Nunito-Medium',
     },
     cropWrapper: {
         flex: 1,
@@ -383,7 +460,7 @@ const styles = StyleSheet.create({
     zoomText: {
         color: '#2DD4BF',
         fontSize: FONT_SIZES.xs,
-        fontWeight: FONT_WEIGHTS.bold,
+        fontFamily: 'Nunito-Bold',
     },
     zoomControls: {
         flexDirection: 'row',
@@ -427,7 +504,7 @@ const styles = StyleSheet.create({
     useImageText: {
         color: COLORS.white,
         fontSize: FONT_SIZES.lg,
-        fontWeight: FONT_WEIGHTS.bold,
+        fontFamily: 'Nunito-Bold',
         letterSpacing: 0.3,
     },
     // Bottom row buttons
@@ -452,7 +529,7 @@ const styles = StyleSheet.create({
     cancelText: {
         color: 'rgba(255,255,255,0.7)',
         fontSize: FONT_SIZES.sm,
-        fontWeight: FONT_WEIGHTS.semibold,
+        fontFamily: 'Nunito-SemiBold',
     },
     confirmBtn: {
         flex: 1,
@@ -470,6 +547,6 @@ const styles = StyleSheet.create({
     confirmText: {
         color: COLORS.white,
         fontSize: FONT_SIZES.sm,
-        fontWeight: FONT_WEIGHTS.bold,
+        fontFamily: 'Nunito-Bold',
     },
 });

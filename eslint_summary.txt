@@ -1,0 +1,6 @@
+
+--- D:\Traffic_Eye\src\components\common\Button.js
+no-dupe-keys: Duplicate key 'soft'. (Line 132)
+
+--- D:\Traffic_Eye\src\services\auth\index.js
+no-dupe-keys: Duplicate key 'signInWithGoogle'. (Line 225)

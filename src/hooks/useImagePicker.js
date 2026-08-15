@@ -5,6 +5,8 @@ import { useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
 
+const VIDEO_SIZE_LIMIT_BYTES = 5 * 1024 * 1024; // 5 MB
+
 export default function useImagePicker() {
     const [image, setImage] = useState(null);
     const [exifData, setExifData] = useState(null);
@@ -20,17 +22,21 @@ export default function useImagePicker() {
             }
 
             const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: false,
-                quality: 0.8,
+                mediaTypes: ['images'],
+                allowsEditing: true,
+                quality: 1,
                 exif: true,
+                legacy: true,
             });
 
             if (!result.canceled && result.assets?.length > 0) {
                 const asset = result.assets[0];
-                setImage(asset.uri);
+                // BUG FIX: Do NOT call setImage here. NewReport opens the crop
+                // modal after this returns. image is only committed once the user
+                // confirms crop via handleCropDone → setImage(croppedUri).
                 setExifData(asset.exif || null);
-                return { uri: asset.uri, exif: asset.exif || null };
+                // Return assetId so NewReport can use MediaLibrary for GPS lookup
+                return { uri: asset.uri, exif: asset.exif || null, assetId: asset.assetId || null };
             }
             return { uri: null, location: null };
         } catch (error) {
@@ -52,16 +58,19 @@ export default function useImagePicker() {
             }
 
             const result = await ImagePicker.launchCameraAsync({
-                allowsEditing: false,
-                quality: 0.8,
+                mediaTypes: ['images'],
+                allowsEditing: true,
+                quality: 1,
                 exif: true,
             });
 
             if (!result.canceled && result.assets?.length > 0) {
                 const asset = result.assets[0];
-                setImage(asset.uri);
+                // BUG FIX: Do NOT set image here — the caller (NewReport) opens
+                // the crop modal first. image is only set after crop is confirmed
+                // via handleCropDone → setImage(croppedUri).
                 setExifData(asset.exif || null);
-                return { uri: asset.uri, exif: asset.exif || null };
+                return { uri: asset.uri, exif: asset.exif || null, assetId: asset.assetId || null };
             }
             return { uri: null, location: null };
         } catch (error) {
@@ -83,14 +92,22 @@ export default function useImagePicker() {
             }
 
             const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+                mediaTypes: ['videos'],
                 allowsEditing: false,
                 quality: 0.8,
+                exif: true,
             });
 
             if (!result.canceled && result.assets?.length > 0) {
-                const uri = result.assets[0].uri;
-                return uri;
+                const asset = result.assets[0];
+                if (asset.fileSize && asset.fileSize > VIDEO_SIZE_LIMIT_BYTES) {
+                    Alert.alert(
+                        'Video Too Large',
+                        `Please select a video under 5 MB. This video is ${(asset.fileSize / (1024 * 1024)).toFixed(1)} MB.`
+                    );
+                    return null;
+                }
+                return { uri: asset.uri, exif: asset.exif || null };
             }
             return null;
         } catch (error) {
@@ -112,14 +129,22 @@ export default function useImagePicker() {
             }
 
             const result = await ImagePicker.launchCameraAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+                mediaTypes: ['videos'],
                 allowsEditing: false,
                 quality: 0.8,
+                exif: true,
             });
 
             if (!result.canceled && result.assets?.length > 0) {
-                const uri = result.assets[0].uri;
-                return uri;
+                const asset = result.assets[0];
+                if (asset.fileSize && asset.fileSize > VIDEO_SIZE_LIMIT_BYTES) {
+                    Alert.alert(
+                        'Video Too Large',
+                        `The recorded video exceeds 5 MB (${(asset.fileSize / (1024 * 1024)).toFixed(1)} MB). Please record a shorter clip.`
+                    );
+                    return null;
+                }
+                return { uri: asset.uri, exif: asset.exif || null };
             }
             return null;
         } catch (error) {

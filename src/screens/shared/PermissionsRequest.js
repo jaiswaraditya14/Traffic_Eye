@@ -1,10 +1,22 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MobileContainer } from '../../components';
-import { Button } from '../../components';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppContext } from '../../context/AppContext';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from '../../utils/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { FocusAwareStatusBar } from '../../components';
+
+const C = {
+    navy: '#0A1E3F',
+    navyMid: '#0F2C59',
+    amber: '#D97706',
+    white: '#FFFFFF',
+    offWhite: '#F4F6F9',
+    surface: '#FFFFFF',
+    textPrimary: '#0F172A',
+    textSecondary: '#475569',
+    border: '#CBD5E1',
+};
 
 export default function PermissionsRequest({ navigation }) {
     const { userRole } = useAppContext();
@@ -18,68 +30,81 @@ export default function PermissionsRequest({ navigation }) {
     };
 
     return (
-        <MobileContainer>
-            <View style={styles.container}>
-                <View style={styles.content}>
-                    <View style={styles.iconContainer}>
-                        <Ionicons name="shield-checkmark" size={80} color={COLORS.primary} />
+        <View style={styles.container}>
+            <FocusAwareStatusBar barStyle="dark-content" statusBgColor={C.offWhite} />
+            <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+                
+                <ScrollView contentContainerStyle={styles.content}>
+                    <View style={styles.iconBox}>
+                        <Ionicons name="shield-checkmark" size={48} color={C.amber} />
                     </View>
                     <Text style={styles.title}>Permissions Required</Text>
-                    <Text style={styles.subtitle}>
-                        To provide the best experience, we need access to:
-                    </Text>
+                    <Text style={styles.subtitle}>To provide the best experience and ensure accurate reports, Traffic Eye needs access to the following:</Text>
 
-                    <View style={styles.permissions}>
-                        <View style={styles.permission}>
-                            <Ionicons name="camera" size={24} color={COLORS.primary} />
-                            <View style={styles.permissionText}>
-                                <Text style={styles.permissionTitle}>Camera</Text>
-                                <Text style={styles.permissionDesc}>To capture violation photos</Text>
+                    <View style={styles.card}>
+                        <View style={styles.row}>
+                            <View style={[styles.iconBg, { backgroundColor: '#E0E7FF' }]}><Ionicons name="camera" size={20} color={C.navyMid} /></View>
+                            <View style={styles.textCol}>
+                                <Text style={styles.rowTitle}>Camera</Text>
+                                <Text style={styles.rowDesc}>To capture clear violation evidence</Text>
                             </View>
                         </View>
-                        <View style={styles.permission}>
-                            <Ionicons name="location" size={24} color={COLORS.primary} />
-                            <View style={styles.permissionText}>
-                                <Text style={styles.permissionTitle}>Location</Text>
-                                <Text style={styles.permissionDesc}>To tag violation locations</Text>
+                        <View style={styles.divider} />
+                        <View style={styles.row}>
+                            <View style={[styles.iconBg, { backgroundColor: '#D1FAE5' }]}><Ionicons name="location" size={20} color="#059669" /></View>
+                            <View style={styles.textCol}>
+                                <Text style={styles.rowTitle}>Location</Text>
+                                <Text style={styles.rowDesc}>To precisely tag violation locations</Text>
                             </View>
                         </View>
-                        <View style={styles.permission}>
-                            <Ionicons name="images" size={24} color={COLORS.primary} />
-                            <View style={styles.permissionText}>
-                                <Text style={styles.permissionTitle}>Photo Library</Text>
-                                <Text style={styles.permissionDesc}>To upload existing photos</Text>
+                        <View style={styles.divider} />
+                        <View style={styles.row}>
+                            <View style={[styles.iconBg, { backgroundColor: '#FEF3C7' }]}><Ionicons name="images" size={20} color={C.amber} /></View>
+                            <View style={styles.textCol}>
+                                <Text style={styles.rowTitle}>Photo Library</Text>
+                                <Text style={styles.rowDesc}>To upload existing media for reports</Text>
                             </View>
                         </View>
                     </View>
-                </View>
+                </ScrollView>
 
                 <View style={styles.footer}>
-                    <Button onPress={handleContinue} fullWidth>
-                        Grant Permissions
-                    </Button>
-                    <Button variant="ghost" onPress={handleContinue} fullWidth>
-                        Skip for Now
-                    </Button>
+                    <TouchableOpacity style={styles.primaryBtn} onPress={handleContinue} activeOpacity={0.88}>
+                        <LinearGradient colors={[C.navy, C.navyMid]} style={styles.primaryBtnGradient} start={{x:0,y:0}} end={{x:1,y:0}}>
+                            <Text style={styles.primaryBtnText}>Grant Permissions</Text>
+                        </LinearGradient>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.ghostBtn} onPress={handleContinue} activeOpacity={0.7}>
+                        <Text style={styles.ghostBtnText}>Skip for Now</Text>
+                    </TouchableOpacity>
                 </View>
-            </View>
-        </MobileContainer>
+
+            </SafeAreaView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: COLORS.background, justifyContent: 'space-between' },
-    content: { flex: 1, paddingHorizontal: SPACING.lg, paddingTop: SPACING.xxl, alignItems: 'center' },
-    iconContainer: { marginBottom: SPACING.xl },
-    title: { fontSize: FONT_SIZES.xxl, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary, marginBottom: SPACING.sm, textAlign: 'center' },
-    subtitle: { fontSize: FONT_SIZES.md, color: COLORS.textSecondary, textAlign: 'center', marginBottom: SPACING.xl },
-    permissions: { width: '100%', gap: SPACING.lg },
-    permission: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
-    permissionText: { flex: 1 },
-    permissionTitle: { fontSize: FONT_SIZES.md, fontWeight: FONT_WEIGHTS.semibold, color: COLORS.textPrimary },
-    permissionDesc: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary },
-    footer: { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.xl, gap: SPACING.sm },
+    container: { flex: 1, backgroundColor: C.offWhite },
+    safeArea: { flex: 1 },
+    content: { padding: 24, alignItems: 'center', paddingTop: 60 },
+    
+    iconBox: { width: 88, height: 88, borderRadius: 24, backgroundColor: C.navyMid, justifyContent: 'center', alignItems: 'center', marginBottom: 24, shadowColor: C.navyMid, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 8 },
+    title: { fontSize: 26, fontFamily: 'Nunito-Bold', color: C.navy, marginBottom: 12, letterSpacing: -0.5 },
+    subtitle: { fontSize: 15, color: C.textSecondary, textAlign: 'center', lineHeight: 22, marginBottom: 40, paddingHorizontal: 10 },
+
+    card: { width: '100%', backgroundColor: C.surface, borderRadius: 20, padding: 8, shadowColor: C.navyMid, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2, borderWidth: 1, borderColor: C.border },
+    row: { flexDirection: 'row', alignItems: 'center', padding: 16 },
+    iconBg: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+    textCol: { flex: 1 },
+    rowTitle: { fontSize: 16, fontFamily: 'Nunito-Bold', color: C.textPrimary, marginBottom: 2 },
+    rowDesc: { fontSize: 13, color: C.textSecondary },
+    divider: { height: 1, backgroundColor: '#F2F4F6', marginLeft: 76 },
+
+    footer: { padding: 24, paddingBottom: 32 },
+    primaryBtn: { borderRadius: 14, overflow: 'hidden', marginBottom: 16, shadowColor: C.navy, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 6 },
+    primaryBtnGradient: { paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
+    primaryBtnText: { fontSize: 16, fontFamily: 'Nunito-Bold', color: C.white },
+    ghostBtn: { paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
+    ghostBtnText: { fontSize: 15, fontFamily: 'Nunito-SemiBold', color: C.textSecondary },
 });
-
-
-

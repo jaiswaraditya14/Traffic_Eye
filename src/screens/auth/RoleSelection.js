@@ -1,255 +1,404 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated } from 'react-native';
+import {
+    View, Text, StyleSheet, TouchableOpacity, ScrollView,
+    Animated, StatusBar, Platform,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { MobileContainer } from '../../components';
-import { useAppContext } from '../../context';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, GRADIENTS, ROLES } from '../../utils';
+import { MobileContainer, FocusAwareStatusBar } from '../../components';
+import { useAppContext, useAuth } from '../../context';
+import { ROLES } from '../../utils';
+import {
+    COLORS, SPACING, FONT_FAMILIES, FONT_SIZES, BORDER_RADIUS,
+} from '../../utils/theme';
 
-export default function RoleSelection({ navigation }) {
+// ── Design tokens ──────────────────────────────────────────────────────────────
+const C = {
+    bg: '#F4F6FA',           // soft off-white background
+    white: '#FFFFFF',
+    navy: COLORS.primaryDark,  // #002452
+    navyMid: COLORS.primary,      // #1B3A6B
+    accent: '#1B3A6B',           // primary CTA colour (navy)
+    accentSurface: '#E8EDF5',           // very light navy tint
+    textPrimary: COLORS.textPrimary,
+    textSecondary: COLORS.textSecondary,
+    textMuted: COLORS.textTertiary,
+    border: '#DDE3EE',
+};
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ROLE SELECTION — Citizen-First Layout
+// ═════════════════════════════════════════════════════════════════════════════
+
+export default function RoleSelection({ navigation, onConfirm }) {
     const { setUserRole } = useAppContext();
-    const fadeAnim = useRef(new Animated.Value(0)).current;
-    const slideAnim1 = useRef(new Animated.Value(40)).current;
-    const slideAnim2 = useRef(new Animated.Value(40)).current;
+    const { isAuthenticated, profile, signOut } = useAuth();
+
+    // ── Animations ──
+    const headerFade = useRef(new Animated.Value(0)).current;
+    const headerSlide = useRef(new Animated.Value(-24)).current;
+    const cardScale = useRef(new Animated.Value(0.94)).current;
+    const cardFade = useRef(new Animated.Value(0)).current;
+    const footerFade = useRef(new Animated.Value(0)).current;
+
+    // Subtle icon pulse
+    const iconPulse = useRef(new Animated.Value(1)).current;
 
     useEffect(() => {
+        // Entrance sequence
         Animated.sequence([
-            Animated.timing(fadeAnim, {
-                toValue: 1,
-                duration: 400,
-                useNativeDriver: true,
-            }),
-            Animated.stagger(150, [
-                Animated.spring(slideAnim1, {
-                    toValue: 0,
-                    tension: 80,
-                    friction: 10,
-                    useNativeDriver: true,
-                }),
-                Animated.spring(slideAnim2, {
-                    toValue: 0,
-                    tension: 80,
-                    friction: 10,
-                    useNativeDriver: true,
-                }),
+            Animated.parallel([
+                Animated.timing(headerFade, { toValue: 1, duration: 450, useNativeDriver: true }),
+                Animated.spring(headerSlide, { toValue: 0, tension: 55, friction: 11, useNativeDriver: true }),
             ]),
+            Animated.parallel([
+                Animated.spring(cardScale, { toValue: 1, tension: 60, friction: 9, useNativeDriver: true }),
+                Animated.timing(cardFade, { toValue: 1, duration: 400, useNativeDriver: true }),
+            ]),
+            Animated.timing(footerFade, { toValue: 1, duration: 300, useNativeDriver: true }),
         ]).start();
+
+        // Gentle icon breathe loop
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(iconPulse, { toValue: 1.06, duration: 1800, useNativeDriver: true }),
+                Animated.timing(iconPulse, { toValue: 1.00, duration: 1800, useNativeDriver: true }),
+            ])
+        ).start();
     }, []);
 
-    const handleRoleSelect = (role) => {
+    // ── Role selection handler ──
+    const handleRoleSelect = async (role) => {
         setUserRole(role);
-        if (role === ROLES.CITIZEN) {
-            navigation.navigate('CitizenSignIn');
-        } else {
-            navigation.navigate('OfficerSignIn');
+
+        if (isAuthenticated && profile && profile.role !== role) {
+            await signOut();
+        }
+
+        if (onConfirm) onConfirm();
+
+        if (!isAuthenticated || (profile && profile.role !== role)) {
+            if (role === ROLES.CITIZEN) {
+                navigation.navigate('CitizenSignIn');
+            } else {
+                navigation.navigate('OfficerSignIn');
+            }
         }
     };
 
     return (
         <MobileContainer>
+            <FocusAwareStatusBar barStyle="dark-content" statusBgColor={C.bg} />
             <ScrollView
-                style={styles.scrollView}
+                style={styles.scroll}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
+                bounces={false}
             >
-                {/* Header */}
-                <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
-                    <View style={styles.logoBadge}>
-                        <Text style={styles.logoEmoji}>🚦</Text>
+                {/* ── App Identity Header ── */}
+                <Animated.View
+                    style={[
+                        styles.header,
+                        { opacity: headerFade, transform: [{ translateY: headerSlide }] },
+                    ]}
+                >
+                    {/* App logo mark */}
+                    <View style={styles.logoMark}>
+                        <Ionicons name="shield-checkmark" size={30} color="#0F2C59" />
                     </View>
-                    <Text style={styles.title}>Welcome to TrafficEye</Text>
-                    <Text style={styles.subtitle}>
-                        Select how you'd like to use the platform
+                    <Text style={styles.appName}>TrafficEye</Text>
+                    <Text style={styles.tagline}>Traffic Enforcement Portal • Govt Civic Service</Text>
+                </Animated.View>
+
+                {/* ── Heading ── */}
+                <Animated.View style={[styles.headingBlock, { opacity: headerFade }]}>
+                    <Text style={styles.heading}>Select Portal Access</Text>
+                    <Text style={styles.subheading}>Choose your role to proceed to the official traffic enforcement portal.</Text>
+                </Animated.View>
+
+                {/* ── Citizen Card (Primary) ── */}
+                <Animated.View
+                    style={[
+                        styles.cardWrap,
+                        { opacity: cardFade, transform: [{ scale: cardScale }] },
+                    ]}
+                >
+                    <TouchableOpacity
+                        style={styles.citizenCard}
+                        onPress={() => handleRoleSelect(ROLES.CITIZEN)}
+                        activeOpacity={0.88}
+                    >
+                        {/* Large icon area */}
+                        <Animated.View
+                            style={[
+                                styles.iconArea,
+                                { transform: [{ scale: iconPulse }] },
+                            ]}
+                        >
+                            <View style={styles.iconOuter}>
+                                <View style={styles.iconInner}>
+                                    <Ionicons name="person" size={36} color="#0F2C59" />
+                                </View>
+                            </View>
+                        </Animated.View>
+
+                        {/* Text block */}
+                        <Text style={styles.citizenTitle}>Citizen Portal</Text>
+                        <Text style={styles.citizenSubtitle}>
+                            Report traffic violations, track submitted e-challan status, check penalties, and contribute to public road safety.
+                        </Text>
+
+                        {/* CTA Button */}
+                        <View style={styles.ctaButton}>
+                            <Text style={styles.ctaText}>Enter Citizen Portal</Text>
+                            <Ionicons name="arrow-forward" size={18} color={C.white} />
+                        </View>
+                    </TouchableOpacity>
+                </Animated.View>
+
+                {/* ── Officer Text Link (Secondary) ── */}
+                <Animated.View style={[styles.officerSection, { opacity: footerFade }]}>
+                    <View style={styles.dividerRow}>
+                        <View style={styles.dividerLine} />
+                        <Text style={styles.dividerText}>or</Text>
+                        <View style={styles.dividerLine} />
+                    </View>
+
+                    <TouchableOpacity
+                        style={styles.officerLink}
+                        onPress={() => handleRoleSelect(ROLES.OFFICER)}
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons name="shield" size={18} color="#0F2C59" />
+                        <Text style={styles.officerLinkText}>
+                            Police Officer Access •{' '}
+                            <Text style={styles.officerLinkAccent}>Sign In Here →</Text>
+                        </Text>
+                    </TouchableOpacity>
+
+                    <Text style={styles.footerNote}>
+                        Restricted to registered Traffic Enforcement Officers & Station Personnel
                     </Text>
                 </Animated.View>
 
-                <View style={styles.content}>
-                    {/* Citizen Card */}
-                    <TouchableOpacity
-                        style={styles.card}
-                        onPress={() => handleRoleSelect(ROLES.CITIZEN)}
-                        activeOpacity={0.85}
-                    >
-                        <View style={styles.cardHeader}>
-                            <LinearGradient
-                                colors={GRADIENTS.primary}
-                                style={styles.iconContainer}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                            >
-                                <Ionicons name="person" size={28} color="#FFFFFF" />
-                            </LinearGradient>
-                            <View style={styles.cardHeaderText}>
-                                <Text style={styles.cardTitle}>Citizen</Text>
-                                <Text style={styles.cardBadge}>REPORTER</Text>
-                            </View>
-                            <Ionicons name="chevron-forward" size={22} color={COLORS.textTertiary} />
-                        </View>
-                        <Text style={styles.cardDescription}>
-                            Report traffic violations and earn rewards for making your community safer
-                        </Text>
-                        <View style={styles.features}>
-                            {['Report violations', 'Earn rewards', 'Track reports'].map((text, i) => (
-                                <View key={i} style={styles.feature}>
-                                    <View style={styles.featureCheck}>
-                                        <Ionicons name="checkmark" size={12} color={COLORS.success} />
-                                    </View>
-                                    <Text style={styles.featureText}>{text}</Text>
-                                </View>
-                            ))}
-                        </View>
-                    </TouchableOpacity>
-
-                    {/* Officer Card */}
-                    <TouchableOpacity
-                        style={styles.card}
-                        onPress={() => handleRoleSelect(ROLES.OFFICER)}
-                        activeOpacity={0.85}
-                    >
-                        <View style={styles.cardHeader}>
-                            <LinearGradient
-                                colors={GRADIENTS.secondary}
-                                style={styles.iconContainer}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                            >
-                                <Ionicons name="shield-checkmark" size={28} color="#FFFFFF" />
-                            </LinearGradient>
-                            <View style={styles.cardHeaderText}>
-                                <Text style={styles.cardTitle}>Traffic Officer</Text>
-                                <Text style={[styles.cardBadge, styles.cardBadgeSecondary]}>AUTHORITY</Text>
-                            </View>
-                            <Ionicons name="chevron-forward" size={22} color={COLORS.textTertiary} />
-                        </View>
-                        <Text style={styles.cardDescription}>
-                            Verify reports, manage violations, and maintain traffic safety
-                        </Text>
-                        <View style={styles.features}>
-                            {['Verify reports', 'View analytics', 'Manage queue'].map((text, i) => (
-                                <View key={i} style={styles.feature}>
-                                    <View style={[styles.featureCheck, { backgroundColor: COLORS.secondarySurface }]}>
-                                        <Ionicons name="checkmark" size={12} color={COLORS.secondary} />
-                                    </View>
-                                    <Text style={styles.featureText}>{text}</Text>
-                                </View>
-                            ))}
-                        </View>
-                    </TouchableOpacity>
-                </View>
             </ScrollView>
         </MobileContainer>
     );
 }
 
+
+// ═════════════════════════════════════════════════════════════════════════════
+// STYLES
+// ═════════════════════════════════════════════════════════════════════════════
+
 const styles = StyleSheet.create({
-    scrollView: {
+
+    scroll: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: C.bg,
     },
     scrollContent: {
-        paddingBottom: SPACING.xxl,
-    },
-    header: {
-        paddingHorizontal: SPACING.xl,
-        paddingTop: SPACING.xxxl,
-        paddingBottom: SPACING.xl,
+        flexGrow: 1,
+        paddingBottom: 48,
+        paddingHorizontal: SPACING.lg,
         alignItems: 'center',
-    },
-    logoBadge: {
-        width: 64,
-        height: 64,
-        borderRadius: BORDER_RADIUS.xl,
-        backgroundColor: COLORS.primarySurface,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: SPACING.lg,
-    },
-    logoEmoji: {
-        fontSize: 32,
     },
 
-    title: {
-        fontSize: FONT_SIZES.xxl,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
-        marginBottom: SPACING.sm,
+    // ── App identity header ──
+    header: {
+        alignItems: 'center',
+        marginTop: Platform.OS === 'ios' ? 64 : 52,
+        marginBottom: 4,
+    },
+    logoMark: {
+        width: 56,
+        height: 56,
+        borderRadius: 18,
+        backgroundColor: C.accentSurface,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 12,
+        borderWidth: 1.5,
+        borderColor: C.border,
+    },
+    appName: {
+        fontFamily: FONT_FAMILIES.bold,
+        fontSize: 20,
+        color: C.navy,
         letterSpacing: -0.3,
+    },
+    tagline: {
+        fontFamily: FONT_FAMILIES.regular,
+        fontSize: FONT_SIZES.xs,
+        color: C.textMuted,
+        marginTop: 3,
+        letterSpacing: 0.5,
+    },
+
+    // ── Heading ──
+    headingBlock: {
+        alignSelf: 'flex-start',
+        marginTop: 36,
+        marginBottom: 24,
+        paddingHorizontal: 4,
+    },
+    heading: {
+        fontFamily: FONT_FAMILIES.bold,
+        fontSize: 28,
+        color: C.textPrimary,
+        lineHeight: 36,
+        letterSpacing: -0.6,
+    },
+
+    // ── Citizen card ──
+    cardWrap: {
+        width: '100%',
+    },
+    citizenCard: {
+        width: '100%',
+        backgroundColor: C.white,
+        borderRadius: 20,
+        padding: 28,
+        borderWidth: 1.5,
+        borderColor: C.border,
+        // Subtle shadow
+        shadowColor: C.navy,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.08,
+        shadowRadius: 16,
+        elevation: 5,
+    },
+
+    // Icon area
+    iconArea: {
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    iconOuter: {
+        width: 96,
+        height: 96,
+        borderRadius: 48,
+        backgroundColor: C.accentSurface,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    iconInner: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        backgroundColor: '#D4DCF0',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    // Card text
+    citizenTitle: {
+        fontFamily: FONT_FAMILIES.bold,
+        fontSize: 24,
+        color: C.textPrimary,
         textAlign: 'center',
+        letterSpacing: -0.4,
+        marginBottom: 8,
     },
-    subtitle: {
-        fontSize: FONT_SIZES.md,
-        color: COLORS.textSecondary,
+    citizenSubtitle: {
+        fontFamily: FONT_FAMILIES.regular,
+        fontSize: FONT_SIZES.sm,
+        color: C.textSecondary,
         textAlign: 'center',
+        lineHeight: 21,
+        marginBottom: 20,
+        paddingHorizontal: 4,
     },
-    content: {
-        paddingHorizontal: SPACING.lg,
-        gap: SPACING.md,
+
+    // Feature chips
+    chipRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 8,
+        marginBottom: 24,
+        flexWrap: 'wrap',
     },
-    card: {
-        backgroundColor: COLORS.surface,
-        borderRadius: BORDER_RADIUS.xl,
-        padding: SPACING.xl,
+    chip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 11,
+        paddingVertical: 6,
+        backgroundColor: C.accentSurface,
+        borderRadius: 20,
         borderWidth: 1,
-        borderColor: COLORS.border,
-        ...SHADOWS.sm,
+        borderColor: C.border,
     },
-    cardHeader: {
+    chipText: {
+        fontFamily: FONT_FAMILIES.semibold,
+        fontSize: 11,
+        color: C.accent,
+        letterSpacing: 0.2,
+    },
+
+    // CTA button
+    ctaButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: SPACING.md,
-    },
-    iconContainer: {
-        width: 52,
-        height: 52,
-        borderRadius: BORDER_RADIUS.lg,
         justifyContent: 'center',
-        alignItems: 'center',
-    },
-    cardHeaderText: {
-        flex: 1,
-        marginLeft: SPACING.md,
-    },
-    cardTitle: {
-        fontSize: FONT_SIZES.lg,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
-        letterSpacing: -0.2,
-    },
-    cardBadge: {
-        fontSize: FONT_SIZES.xxs,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.primary,
-        letterSpacing: 1.5,
-        marginTop: 2,
-    },
-    cardBadgeSecondary: {
-        color: COLORS.secondary,
-    },
-    cardDescription: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.textSecondary,
-        marginBottom: SPACING.lg,
-        lineHeight: 20,
-    },
-    features: {
-        gap: SPACING.md,
-    },
-    feature: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: SPACING.md,
-    },
-    featureCheck: {
-        width: 24,
-        height: 24,
+        backgroundColor: C.accent,
         borderRadius: 12,
-        backgroundColor: COLORS.successSurface,
-        justifyContent: 'center',
-        alignItems: 'center',
+        height: 52,
+        gap: 8,
     },
-    featureText: {
+    ctaText: {
+        fontFamily: FONT_FAMILIES.bold,
+        fontSize: FONT_SIZES.md,
+        color: C.white,
+        letterSpacing: 0.1,
+    },
+
+    // ── Officer secondary section ──
+    officerSection: {
+        width: '100%',
+        alignItems: 'center',
+        marginTop: 32,
+    },
+    dividerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        width: '100%',
+        gap: 12,
+        marginBottom: 20,
+    },
+    dividerLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: C.border,
+    },
+    dividerText: {
+        fontFamily: FONT_FAMILIES.regular,
+        fontSize: FONT_SIZES.xs,
+        color: C.textMuted,
+    },
+    officerLink: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+    },
+    officerLinkText: {
+        fontFamily: FONT_FAMILIES.regular,
         fontSize: FONT_SIZES.sm,
-        color: COLORS.textPrimary,
-        fontWeight: FONT_WEIGHTS.medium,
+        color: C.textMuted,
+    },
+    officerLinkAccent: {
+        fontFamily: FONT_FAMILIES.semibold,
+        color: C.navyMid,
+        textDecorationLine: 'underline',
+    },
+    footerNote: {
+        fontFamily: FONT_FAMILIES.regular,
+        fontSize: FONT_SIZES.xs,
+        color: C.textMuted,
+        textAlign: 'center',
+        marginTop: 12,
+        paddingHorizontal: 24,
+        lineHeight: 18,
     },
 });

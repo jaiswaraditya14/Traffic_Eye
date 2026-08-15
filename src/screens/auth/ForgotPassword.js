@@ -1,193 +1,176 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator, Animated } from 'react-native';
+import {
+    View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView,
+    Platform, ScrollView, Alert, ActivityIndicator, Animated,
+    TextInput,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MobileContainer, Button, Input } from '../../components';
-import { useAuth } from '../../context';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, isValidEmail } from '../../utils';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MobileContainer, FocusAwareStatusBar } from '../../components';
+import { supabase } from '../../services';
+import { isValidEmail } from '../../utils';
+
+const C = {
+    navy: '#002452',
+    navyMid: '#1B3A6B',
+    amber: '#F59E0B',
+    white: '#FFFFFF',
+    offWhite: '#F8F9FB',
+    surface: '#FFFFFF',
+    surfaceInput: '#F2F4F6',
+    textPrimary: '#191C1E',
+    textSecondary: '#44474F',
+    textTertiary: '#747780',
+    border: '#C4C6D0',
+    error: '#BA1A1A',
+    errorSurface: '#FFDAD6',
+    primarySurface: '#D7E2FF',
+};
 
 export default function ForgotPassword({ navigation }) {
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
-    const [sent, setSent] = useState(false);
+    const [focused, setFocused] = useState(false);
+    const [error, setError] = useState('');
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
-    const slideAnim = useRef(new Animated.Value(30)).current;
-    const successAnim = useRef(new Animated.Value(0)).current;
-    const successScaleAnim = useRef(new Animated.Value(0.5)).current;
-
-    const { resetPassword } = useAuth();
 
     useEffect(() => {
-        Animated.parallel([
-            Animated.timing(fadeAnim, {
-                toValue: 1,
-                duration: 500,
-                useNativeDriver: true,
-            }),
-            Animated.timing(slideAnim, {
-                toValue: 0,
-                duration: 500,
-                useNativeDriver: true,
-            }),
-        ]).start();
+        Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
     }, []);
 
-    const playSuccessAnimation = () => {
-        Animated.parallel([
-            Animated.spring(successScaleAnim, {
-                toValue: 1,
-                tension: 60,
-                friction: 8,
-                useNativeDriver: true,
-            }),
-            Animated.timing(successAnim, {
-                toValue: 1,
-                duration: 500,
-                useNativeDriver: true,
-            }),
-        ]).start();
-    };
-
     const handleResetPassword = async () => {
-        if (!email.trim()) {
-            Alert.alert('Error', 'Please enter your email address');
-            return;
-        }
-
-        if (!isValidEmail(email.trim())) {
-            Alert.alert('Error', 'Please enter a valid email address');
-            return;
-        }
+        setError('');
+        if (!email.trim()) { setError('Please enter your email address.'); return; }
+        if (!isValidEmail(email.trim())) { setError('Please enter a valid email address.'); return; }
 
         setLoading(true);
         try {
-            const { error } = await resetPassword(email.trim());
+            const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+                redirectTo: 'trafficeye://auth/callback',
+            });
 
-            if (error) {
-                Alert.alert('Error', error.message);
+            if (resetError) {
+                setError(resetError.message || 'Failed to send reset email. Please try again.');
                 return;
             }
 
-            setSent(true);
-            playSuccessAnimation();
-        } catch (error) {
-            Alert.alert('Error', 'Something went wrong. Please try again.');
-            console.error(error);
+            // Navigate to OTP entry screen, passing the email
+            navigation.navigate('OtpVerification', { email: email.trim() });
+        } catch (err) {
+            setError('Something went wrong. Please try again.');
+            console.error(err);
         } finally {
             setLoading(false);
         }
     };
 
-    if (sent) {
-        return (
-            <MobileContainer>
-                <View style={styles.container}>
-                    <Animated.View style={[styles.successContainer, {
-                        opacity: successAnim,
-                        transform: [{ scale: successScaleAnim }],
-                    }]}>
-                        <View style={styles.successIcon}>
-                            <View style={styles.successIconInner}>
-                                <Ionicons name="mail-outline" size={48} color={COLORS.primary} />
-                            </View>
-                        </View>
-                        <Text style={styles.successTitle}>Check Your Email</Text>
-                        <Text style={styles.successText}>
-                            We've sent a password reset link to{'\n'}
-                            <Text style={styles.emailHighlight}>{email}</Text>
-                        </Text>
-                        <Text style={styles.instructionText}>
-                            Click the link in the email to reset your password. If you don't see the email, check your spam folder.
-                        </Text>
-
-                        <Button
-                            onPress={() => navigation.navigate('CitizenSignIn')}
-                            fullWidth
-                            style={styles.backToLoginButton}
-                            size="lg"
-                        >
-                            Back to Sign In
-                        </Button>
-
-                        <TouchableOpacity
-                            onPress={() => {
-                                setSent(false);
-                                setEmail('');
-                            }}
-                            style={styles.resendLink}
-                        >
-                            <Ionicons name="refresh" size={16} color={COLORS.primary} />
-                            <Text style={styles.resendText}>Didn't receive the email? Try again</Text>
-                        </TouchableOpacity>
-                    </Animated.View>
-                </View>
-            </MobileContainer>
-        );
-    }
-
     return (
         <MobileContainer>
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.container}
             >
-                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                    <Animated.View style={[styles.header, {
-                        opacity: fadeAnim,
-                        transform: [{ translateY: slideAnim }],
-                    }]}>
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    {/* Navy Header */}
+                    <LinearGradient colors={[C.navy, C.navyMid]} style={styles.header}>
                         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                            <View style={styles.backButtonCircle}>
-                                <Ionicons name="arrow-back" size={20} color={COLORS.textPrimary} />
-                            </View>
+                            <Ionicons name="arrow-back" size={20} color={C.white} />
                         </TouchableOpacity>
-
-                        <View style={styles.iconContainer}>
-                            <View style={styles.iconInner}>
-                                <Ionicons name="lock-closed-outline" size={36} color={COLORS.primary} />
-                            </View>
+                        <View style={styles.lockIconBg}>
+                            <Ionicons name="shield-half" size={36} color={C.amber} />
                         </View>
-
-                        <Text style={styles.title}>Forgot Password?</Text>
-                        <Text style={styles.subtitle}>
-                            No worries! Enter your email address and we'll send you a link to reset your password.
+                        <Text style={styles.headerTitle}>Access Recovery</Text>
+                        <Text style={styles.headerSubtitle}>
+                            Initiate security protocol to reset your credentials
                         </Text>
-                    </Animated.View>
+                    </LinearGradient>
 
-                    <Animated.View style={[styles.form, {
-                        opacity: fadeAnim,
-                        transform: [{ translateY: slideAnim }],
-                    }]}>
-                        <Input
-                            label="Email Address"
-                            placeholder="Enter your email"
-                            value={email}
-                            onChangeText={setEmail}
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                        />
+                    {/* Form */}
+                    <Animated.View style={[styles.formContainer, { opacity: fadeAnim }]}>
+                        <View style={styles.authCard}>
+                            <Text style={styles.welcomeText}>Verify Identity</Text>
+                            <Text style={styles.subWelcomeText}>
+                                We'll send an 8-digit OTP to your registered email
+                            </Text>
 
-                        <Button
-                            onPress={handleResetPassword}
-                            fullWidth
-                            style={styles.resetButton}
-                            disabled={loading}
-                            size="lg"
-                        >
-                            {loading ? (
-                                <ActivityIndicator color={COLORS.white} />
-                            ) : (
-                                'Send Reset Link'
+                            <View style={styles.fieldGroup}>
+                                <Text style={styles.fieldLabel}>REGISTERED EMAIL</Text>
+                                <View style={[styles.inputRow, focused && styles.inputRowFocused, !!error && styles.inputRowError]}>
+                                    <Ionicons
+                                        name="mail"
+                                        size={17}
+                                        color={focused ? C.navyMid : '#94A3B8'}
+                                    />
+                                    <TextInput
+                                        style={styles.textInput}
+                                        placeholder="you@authority.com"
+                                        placeholderTextColor="#94A3B8"
+                                        value={email}
+                                        onChangeText={v => { setEmail(v); setError(''); }}
+                                        keyboardType="email-address"
+                                        autoCapitalize="none"
+                                        onFocus={() => setFocused(true)}
+                                        onBlur={() => setFocused(false)}
+                                    />
+                                </View>
+                            </View>
+
+                            {/* Error */}
+                            {!!error && (
+                                <View style={styles.errorBadge}>
+                                    <Ionicons name="alert-circle" size={14} color={C.error} />
+                                    <Text style={styles.errorText}>{error}</Text>
+                                </View>
                             )}
-                        </Button>
 
-                        <TouchableOpacity
-                            onPress={() => navigation.navigate('CitizenSignIn')}
-                            style={styles.backLink}
-                        >
-                            <Ionicons name="arrow-back" size={16} color={COLORS.primary} />
-                            <Text style={styles.backLinkText}>Back to Sign In</Text>
-                        </TouchableOpacity>
+                            {/* Info banner */}
+                            <View style={styles.infoBanner}>
+                                <Ionicons name="information-circle" size={16} color={C.navyMid} />
+                                <Text style={styles.infoText}>
+                                    An 8-digit code will be sent to your email. It expires in 10 minutes.
+                                </Text>
+                            </View>
+
+                            {/* Reset Button */}
+                            <TouchableOpacity
+                                style={[styles.resetButton, loading && { opacity: 0.6 }]}
+                                onPress={handleResetPassword}
+                                disabled={loading}
+                                activeOpacity={0.88}
+                            >
+                                <LinearGradient
+                                    colors={[C.navy, C.navyMid]}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={styles.resetGradient}
+                                >
+                                    {loading ? (
+                                        <ActivityIndicator color={C.white} />
+                                    ) : (
+                                        <>
+                                            <Text style={styles.resetText}>Send OTP Code</Text>
+                                            <Ionicons name="paper-plane" size={15} color={C.white} style={{ marginLeft: 8 }} />
+                                        </>
+                                    )}
+                                </LinearGradient>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.backLink}
+                                onPress={() => navigation.goBack()}
+                            >
+                                <Text style={styles.backLinkText}>Return to Secure Login</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <Text style={styles.legalNotice}>
+                            If you no longer have access to this email, contact administration.
+                        </Text>
                     </Animated.View>
                 </ScrollView>
             </KeyboardAvoidingView>
@@ -196,143 +179,104 @@ export default function ForgotPassword({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: COLORS.background,
-    },
-    scrollContent: {
-        flexGrow: 1,
-    },
+    container: { flex: 1, backgroundColor: C.offWhite },
+    scrollContent: { flexGrow: 1 },
+
     header: {
-        paddingHorizontal: SPACING.lg,
-        paddingTop: SPACING.xl,
-        paddingBottom: SPACING.lg,
+        paddingTop: 52,
+        paddingBottom: 32,
+        paddingHorizontal: 24,
         alignItems: 'center',
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28,
     },
     backButton: {
         alignSelf: 'flex-start',
-        marginBottom: SPACING.lg,
+        width: 36, height: 36,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        justifyContent: 'center', alignItems: 'center',
+        marginBottom: 24,
     },
-    backButtonCircle: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        backgroundColor: COLORS.surface,
-        justifyContent: 'center',
-        alignItems: 'center',
-        ...SHADOWS.sm,
+    lockIconBg: {
+        width: 80, height: 80,
+        borderRadius: 22,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
+        justifyContent: 'center', alignItems: 'center',
+        marginBottom: 20,
     },
-    iconContainer: {
-        width: 90,
-        height: 90,
-        borderRadius: 45,
-        backgroundColor: COLORS.primarySoft || '#EFF6FF',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: SPACING.lg,
+    headerTitle: {
+        fontSize: 22, fontFamily: 'Nunito-Bold',
+        color: C.white, letterSpacing: -0.4, marginBottom: 8,
     },
-    iconInner: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
-        backgroundColor: `${COLORS.primary}15`,
-        justifyContent: 'center',
-        alignItems: 'center',
+    headerSubtitle: {
+        fontSize: 13, color: 'rgba(255,255,255,0.6)',
+        textAlign: 'center', lineHeight: 20, paddingHorizontal: 16,
     },
-    title: {
-        fontSize: FONT_SIZES.xxxl,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
-        marginBottom: SPACING.sm,
-        textAlign: 'center',
+
+    formContainer: { marginTop: -32, paddingHorizontal: 16, paddingBottom: 40 },
+    authCard: {
+        backgroundColor: C.white, borderRadius: 32, padding: 24,
+        shadowColor: C.navy, shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.1, shadowRadius: 24, elevation: 8,
     },
-    subtitle: {
-        fontSize: FONT_SIZES.md,
-        color: COLORS.textSecondary,
-        textAlign: 'center',
-        lineHeight: 24,
-        paddingHorizontal: SPACING.md,
+    welcomeText: {
+        fontSize: 22, fontFamily: 'Nunito-Bold',
+        color: C.navy, textAlign: 'center',
     },
-    form: {
-        paddingHorizontal: SPACING.lg,
-        marginTop: SPACING.lg,
+    subWelcomeText: {
+        fontSize: 14, color: C.textSecondary, fontFamily: 'Nunito-Medium',
+        textAlign: 'center', marginTop: 4, marginBottom: 28,
     },
-    resetButton: {
-        marginTop: SPACING.md,
+
+    fieldGroup: { marginBottom: 16 },
+    fieldLabel: {
+        fontSize: 10, fontFamily: 'Nunito-ExtraBold',
+        color: C.textTertiary, marginBottom: 8, letterSpacing: 1.2, marginLeft: 4,
     },
-    backLink: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: SPACING.xl,
-        gap: SPACING.xs,
+    inputRow: {
+        flexDirection: 'row', alignItems: 'center',
+        backgroundColor: C.offWhite, borderRadius: 16,
+        paddingHorizontal: 16, paddingVertical: 14,
+        gap: 12, borderWidth: 1, borderColor: '#E2E8F0',
     },
-    backLinkText: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.primary,
-        fontWeight: FONT_WEIGHTS.medium,
+    inputRowFocused: { borderColor: C.navyMid, backgroundColor: C.white },
+    inputRowError: { borderColor: C.error },
+    textInput: {
+        flex: 1, fontSize: 15, color: C.textPrimary,
+        fontFamily: 'Nunito-SemiBold', padding: 0,
     },
-    // Success state styles
-    successContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: SPACING.xl,
+
+    errorBadge: {
+        flexDirection: 'row', alignItems: 'center', gap: 6,
+        backgroundColor: C.errorSurface, borderRadius: 10,
+        paddingHorizontal: 12, paddingVertical: 8, marginBottom: 16,
     },
-    successIcon: {
-        width: 110,
-        height: 110,
-        borderRadius: 55,
-        backgroundColor: COLORS.primarySoft || '#EFF6FF',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: SPACING.xl,
+    errorText: { flex: 1, fontSize: 13, color: C.error, fontFamily: 'Nunito-SemiBold' },
+
+    infoBanner: {
+        flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+        backgroundColor: '#EEF2FF', borderRadius: 12,
+        paddingHorizontal: 12, paddingVertical: 10, marginBottom: 24,
     },
-    successIconInner: {
-        width: 76,
-        height: 76,
-        borderRadius: 38,
-        backgroundColor: `${COLORS.primary}15`,
-        justifyContent: 'center',
-        alignItems: 'center',
+    infoText: {
+        flex: 1, fontSize: 12, color: C.navyMid,
+        fontFamily: 'Nunito-Medium', lineHeight: 17,
     },
-    successTitle: {
-        fontSize: FONT_SIZES.xxl + 2,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
-        marginBottom: SPACING.md,
+
+    resetButton: { borderRadius: 16, overflow: 'hidden', marginBottom: 24, elevation: 4 },
+    resetGradient: {
+        flexDirection: 'row', alignItems: 'center',
+        justifyContent: 'center', paddingVertical: 18,
     },
-    successText: {
-        fontSize: FONT_SIZES.md,
-        color: COLORS.textSecondary,
-        textAlign: 'center',
-        marginBottom: SPACING.md,
-        lineHeight: 24,
-    },
-    emailHighlight: {
-        color: COLORS.primary,
-        fontWeight: FONT_WEIGHTS.semibold,
-    },
-    instructionText: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.textSecondary,
-        textAlign: 'center',
-        lineHeight: 22,
-        marginBottom: SPACING.xl,
-    },
-    backToLoginButton: {
-        marginTop: SPACING.md,
-    },
-    resendLink: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: SPACING.xs,
-        marginTop: SPACING.lg,
-        padding: SPACING.sm,
-    },
-    resendText: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.primary,
-        fontWeight: FONT_WEIGHTS.medium,
+    resetText: { fontSize: 16, fontFamily: 'Nunito-Bold', color: C.white },
+
+    backLink: { alignItems: 'center', paddingVertical: 12 },
+    backLinkText: { fontSize: 14, color: C.navyMid, fontFamily: 'Nunito-Bold' },
+
+    legalNotice: {
+        fontSize: 11, color: '#94A3B8', textAlign: 'center',
+        marginTop: 24, fontFamily: 'Nunito-Medium', paddingHorizontal: 16,
     },
 });

@@ -1,474 +1,753 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Animated } from 'react-native';
+import {
+    View, Text, StyleSheet, ScrollView, TouchableOpacity,
+    Animated, StatusBar,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MobileContainer, Button } from '../../components';
 import { useAuth } from '../../context';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, GRADIENTS, formatNumber } from '../../utils';
+import { FocusAwareStatusBar } from '../../components';
+import { formatNumber } from '../../utils';
+import { fetchCitizenReports, subscribeToReportUpdates, fetchNotifications } from '../../services/reports';
+import { useFocusEffect } from '@react-navigation/native';
+
+// ── Design Tokens (Civic Authority) ──
+const C = {
+    navy: '#0A1E3F',
+    navyMid: '#0F2C59',
+    navyLight: '#1E3A8A',
+    amber: '#D97706',
+    amberDark: '#B45309',
+    amberSurface: '#FEF3C7',
+    white: '#FFFFFF',
+    offWhite: '#F4F6F9',
+    surface: '#FFFFFF',
+    surfaceLow: '#F8FAFC',
+    textPrimary: '#0F172A',
+    textSecondary: '#475569',
+    textTertiary: '#64748B',
+    border: '#CBD5E1',
+    success: '#15803D',
+    successSurface: '#DCFCE7',
+    warning: '#B45309',
+    warningSurface: '#FEF3C7',
+    error: '#B91C1C',
+    errorSurface: '#FEE2E2',
+    primarySurface: '#EFF6FF',
+};
 
 export default function CitizenHome({ navigation }) {
     const { profile } = useAuth();
     const userPoints = profile?.points_balance || 0;
+    const firstName = profile?.full_name?.split(' ')[0] || 'User';
+
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnims = useRef([0, 1, 2, 3].map(() => new Animated.Value(30))).current;
 
     useEffect(() => {
-        Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 400,
-            useNativeDriver: true,
-        }).start();
-
-        Animated.stagger(100, slideAnims.map(anim =>
-            Animated.spring(anim, {
-                toValue: 0,
-                tension: 80,
-                friction: 12,
-                useNativeDriver: true,
-            })
+        Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+        Animated.stagger(80, slideAnims.map(anim =>
+            Animated.spring(anim, { toValue: 0, tension: 80, friction: 12, useNativeDriver: true })
         )).start();
     }, []);
 
+    // Stats data
+    const [reports, setReports] = React.useState([]);
+    const [unreadCount, setUnreadCount] = React.useState(0);
+
+    const loadData = React.useCallback(async () => {
+        if (!profile?.id) return;
+        const [reportsResult, notifsResult] = await Promise.all([
+            fetchCitizenReports(profile.id),
+            fetchNotifications(profile.id),
+        ]);
+        if (!reportsResult.error && reportsResult.data) {
+            setReports(reportsResult.data);
+        }
+        if (!notifsResult.error && notifsResult.data) {
+            setUnreadCount(notifsResult.data.filter(n => !n.is_read).length);
+        }
+    }, [profile?.id]);
+
+    useFocusEffect(
+        React.useCallback(() => {
+            loadData();
+        }, [loadData])
+    );
+
+    useFocusEffect(
+        React.useCallback(() => {
+            if (!profile?.id) return;
+            const ch = subscribeToReportUpdates(
+                profile.id,
+                (payload) => setReports(prev => prev.map(r => r.id === payload.new.id ? { ...r, ...payload.new } : r)),
+                (payload) => setReports(prev => [payload.new, ...prev]),
+            );
+            return () => { if (ch) ch.unsubscribe(); };
+        }, [profile?.id])
+    );
+
     const quickStats = [
-        { label: 'Reports', value: '12', icon: 'document-text', color: COLORS.primary, bg: COLORS.primarySurface },
-        { label: 'Verified', value: '8', icon: 'checkmark-circle', color: COLORS.success, bg: COLORS.successSurface },
-        { label: 'Points', value: formatNumber(userPoints), icon: 'trophy', color: COLORS.accent, bg: COLORS.accentSurface },
+        { label: 'Reports', value: reports.length.toString(), icon: 'document-text', color: C.navyMid, bg: C.primarySurface },
+        { label: 'Verified', value: reports.filter(r => r.status === 'approved').length.toString(), icon: 'checkmark-circle', color: C.success, bg: C.successSurface },
+        { label: 'Points', value: formatNumber(userPoints), icon: 'trophy', color: C.amberDark, bg: C.amberSurface },
     ];
-
-    const recentActivity = [
-        { id: 1, type: 'Illegal Parking', desc: 'At Downtown St.', time: 'Today, 10:45 AM', status: 'pending' },
-        { id: 2, type: 'Red Light Violation', desc: 'At Main intersection', time: 'Oct 12, 4:20 PM', status: 'success' },
-    ];
-
-    const firstName = profile?.full_name?.split(' ')[0] || 'User';
 
     const getStatusConfig = (status) => ({
-        success: { icon: 'checkmark-circle', color: COLORS.success, bg: COLORS.successSurface, label: 'Verified' },
-        pending: { icon: 'time', color: COLORS.warning, bg: COLORS.warningSurface, label: 'Pending' },
-        rejected: { icon: 'close-circle', color: COLORS.error, bg: COLORS.errorSurface, label: 'Rejected' },
-    }[status]);
+        approved: { icon: 'checkmark-circle', color: C.success, bg: C.successSurface, label: 'Verified', barColor: C.success },
+        pending: { icon: 'time', color: C.warning, bg: C.warningSurface, label: 'Pending', barColor: C.amber },
+        rejected: { icon: 'close-circle', color: C.error, bg: C.errorSurface, label: 'Rejected', barColor: C.error },
+    }[status] || { icon: 'time', color: C.warning, bg: C.warningSurface, label: 'Pending', barColor: C.amber });
+
+    const recentActivity = reports.slice(0, 3).map(r => ({
+        id: r.id,
+        type: r.violation_type || 'Traffic Violation',
+        desc: r.location_address || 'Report submitted',
+        time: new Date(r.submitted_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
+        status: r.status,
+    }));
 
     // Navigate to Reports tab within the bottom tab navigator
-    const handleSeeAllReports = () => {
-        navigation.navigate('Reports');
+    const handleSeeAllReports = () => navigation.navigate('Reports');
+
+    // ── Traffic Info Cards Data (no images — code-driven) ──
+    const TRAFFIC_INFO = [
+        {
+            id: '1',
+            title: 'Offences & Fines',
+            sub: 'Know your penalties',
+            screen: 'FineInformation',
+            icon: 'document-text',
+            accent: '#F59E0B',
+            accentBg: '#FEF3C7',
+            stat: '96', statLabel: 'Offences listed',
+            gradColors: [C.navy, C.navyMid],
+        },
+        {
+            id: '2',
+            title: 'Traffic Signs',
+            sub: 'Visual guide & meanings',
+            screen: 'TrafficSigns',
+            icon: 'warning',
+            accent: '#DC2626',
+            accentBg: '#FEE2E2',
+            stat: '14+', statLabel: 'Signs explained',
+            gradColors: ['#1D4ED8', '#1E3A8A'],
+        },
+        {
+            id: '3',
+            title: 'Road Safety',
+            sub: 'Rules & best practices',
+            screen: 'SafetyTips',
+            icon: 'shield-checkmark',
+            accent: '#34D399',
+            accentBg: '#D1FAE5',
+            stat: '10+', statLabel: 'Safety tips',
+            gradColors: ['#065F46', '#059669'],
+        },
+    ];
+
+    const QUICK_SERVICES = [
+        { id: '5', title: 'Speed Limits',      icon: 'speedometer',      color: '#6366F1', bg: '#EDE9FE', screen: 'SpeedLimits' },
+        { id: '6', title: 'Emergency',          icon: 'call',             color: '#EF4444', bg: '#FEE2E2', screen: 'EmergencyContacts' },
+        { id: '7', title: 'My Image Reports',   icon: 'shield-checkmark', color: '#059669', bg: '#D1FAE5', screen: 'ImageReportStatus' },
+        { id: '8', title: 'Fine Calculator',    icon: 'calculator',       color: '#D97706', bg: '#FEF3C7', screen: 'FineCalculator' },
+    ];
+
+    const insets = useSafeAreaInsets();
+    
+    const getTimeOfDay = () => {
+        const h = new Date().getHours();
+        if (h < 12) return 'Good Morning';
+        if (h < 17) return 'Good Afternoon';
+        return 'Good Evening';
     };
 
     return (
-        <MobileContainer>
-            <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.container}>
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
+            <SafeAreaView style={styles.safeArea} edges={['bottom']}>
                 <ScrollView showsVerticalScrollIndicator={false}>
-                    {/* Header */}
-                    <View style={styles.header}>
-                        <View style={styles.headerLeft}>
-                            <Text style={styles.greeting}>Hello, {firstName}</Text>
-                            <Text style={styles.headerSubtitle}>Let's keep the roads safe today</Text>
+
+                    {/* ── Navy Header ── */}
+                    <LinearGradient
+                        colors={[C.navy, C.navyMid]}
+                        style={[styles.header, { paddingTop: insets.top + 16 }]}
+                    >
+                        <View style={styles.headerTop}>
+                            <View style={styles.headerLeft}>
+                                <Text style={styles.greeting}>{getTimeOfDay()}, {firstName}</Text>
+                                <View style={styles.locationRow}>
+                                    <Ionicons name="location" size={12} color="rgba(255,255,255,0.6)" />
+                                    <Text style={styles.locationText}>Mumbai, Maharashtra</Text>
+                                </View>
+                            </View>
+                            <TouchableOpacity
+                                onPress={() =>
+                                    navigation.getParent()?.navigate('Notifications') ??
+                                    navigation.navigate('Notifications')
+                                }
+                                style={styles.notifButton}
+                            >
+                                <Ionicons name="notifications-outline" size={20} color={C.white} />
+                                {unreadCount > 0 && (
+                                <View style={styles.notifBadge}>
+                                    <Text style={styles.notifBadgeText}>
+                                        {unreadCount > 99 ? '99+' : unreadCount}
+                                    </Text>
+                                </View>
+                            )}
+                            </TouchableOpacity>
                         </View>
-                        <TouchableOpacity
-                            onPress={() => navigation.getParent()?.navigate('Notifications') ?? navigation.navigate('Notifications')}
-                            style={styles.notificationBtn}
-                        >
-                            <View style={styles.notificationBtnInner}>
-                                <Ionicons name="notifications-outline" size={22} color={COLORS.textPrimary} />
-                                <View style={styles.badge}>
-                                    <Text style={styles.badgeText}>3</Text>
-                                </View>
-                            </View>
-                        </TouchableOpacity>
-                    </View>
 
-                    {/* Quick Stats */}
-                    <View style={styles.statsContainer}>
-                        {quickStats.map((stat, index) => (
-                            <View key={index} style={styles.statCard}>
-                                <View style={[styles.statIcon, { backgroundColor: stat.bg }]}>
-                                    <Ionicons name={stat.icon} size={22} color={stat.color} />
-                                </View>
-                                <Text style={styles.statValue}>{stat.value}</Text>
-                                <Text style={styles.statLabel}>{stat.label}</Text>
-                            </View>
-                        ))}
-                    </View>
+                        {/* Stats bar inside header */}
+                        <View style={styles.statsBar}>
+                            {quickStats.map((stat, idx) => (
+                                <React.Fragment key={idx}>
+                                    <View style={styles.statItem}>
+                                        <Text style={styles.statValue}>{stat.value}</Text>
+                                        <Text style={styles.statLabel}>{stat.label}</Text>
+                                    </View>
+                                    {idx < quickStats.length - 1 && (
+                                        <View style={styles.statDivider} />
+                                    )}
+                                </React.Fragment>
+                            ))}
+                        </View>
+                    </LinearGradient>
 
-                    {/* Primary CTA — Report Button with real image */}
-                    <View style={styles.reportSection}>
-                        <TouchableOpacity
-                            activeOpacity={0.9}
-                            onPress={() => navigation.getParent()?.navigate('NewReport') ?? navigation.navigate('NewReport')}
+                    {/* ── Content Area ── */}
+                    <View style={styles.content}>
+
+                        {/* ── Dashboard Hero: Report Violation ── */}
+                        <Animated.View
+                            style={{
+                                opacity: fadeAnim,
+                                transform: [{ translateY: slideAnims[0] }],
+                            }}
                         >
-                            <View style={styles.reportCard}>
-                                <Image
-                                    source={require('../../../assets/images/hero_image.png')}
-                                    style={styles.reportCardBgImage}
-                                    resizeMode="cover"
-                                />
+                            <TouchableOpacity
+                                activeOpacity={0.9}
+                                onPress={() =>
+                                    navigation.getParent()?.navigate('NewReport') ??
+                                    navigation.navigate('NewReport')
+                                }
+                                style={styles.heroOuter}
+                            >
                                 <LinearGradient
-                                    colors={['rgba(79, 70, 229, 0.92)', 'rgba(99, 102, 241, 0.88)']}
+                                    colors={[C.amberDark, C.amber]}
                                     start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 0 }}
-                                    style={styles.reportCardOverlay}
+                                    end={{ x: 1, y: 1 }}
+                                    style={styles.reportHero}
                                 >
-                                    <View style={styles.reportCardContent}>
-                                        <View style={styles.reportCardLeft}>
-                                            <Text style={styles.reportCardTitle}>Report a Violation</Text>
-                                            <Text style={styles.reportCardSubtitle}>
-                                                Capture photo or video evidence
-                                            </Text>
+                                    {/* Glassy overlay effect */}
+                                    <View style={styles.heroOverlay}>
+                                        <View style={styles.heroContent}>
+                                            <View style={styles.heroBadge}>
+                                                <Ionicons name="flash" size={10} color={C.white} />
+                                                <Text style={styles.heroBadgeText}>AI-POWERED</Text>
+                                            </View>
+                                            <Text style={styles.heroTitle}>Report Violation</Text>
+                                            <Text style={styles.heroSubtitle}>Ensure road safety with instant AI verification</Text>
+
+                                            <View style={styles.heroActionBtn}>
+                                                <Text style={styles.heroActionText}>Start Scan</Text>
+                                                <Ionicons name="camera" size={16} color={C.amberDark} />
+                                            </View>
                                         </View>
-                                        <View style={styles.reportCardIcon}>
-                                            <Ionicons name="camera" size={28} color="rgba(255,255,255,0.9)" />
+
+                                        {/* Stylized camera icon circle frame */}
+                                        <View style={styles.heroIconFrame}>
+                                            <Ionicons name="scan-outline" size={80} color="rgba(255,255,255,0.15)" />
                                         </View>
                                     </View>
                                 </LinearGradient>
+                            </TouchableOpacity>
+                        </Animated.View>
+
+
+                        {/* ── Traffic Info ── */}
+                        <Animated.View
+                            style={[
+                                styles.section,
+                                { opacity: fadeAnim, transform: [{ translateY: slideAnims[1] }] },
+                            ]}
+                        >
+                            <View style={styles.sectionHeader}>
+                                <Text style={styles.sectionTitle}>Traffic Information</Text>
                             </View>
-                        </TouchableOpacity>
-                    </View>
 
-                    {/* Quick Actions Flex Grid */}
-                    <Animated.View style={[styles.section, {
-                        opacity: fadeAnim,
-                        transform: [{ translateY: slideAnims[1] }],
-                    }]}>
-                        <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Quick Actions</Text>
-                        </View>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trafficInfoScroll}>
+                                {TRAFFIC_INFO.map((item) => (
+                                    <TouchableOpacity
+                                        key={item.id}
+                                        activeOpacity={0.85}
+                                        onPress={() =>
+                                            navigation.getParent()?.navigate(item.screen) ??
+                                            navigation.navigate(item.screen)
+                                        }
+                                    >
+                                        <LinearGradient
+                                            colors={item.gradColors}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 1 }}
+                                            style={styles.infoCard}
+                                        >
+                                            {/* Top row: icon + stat */}
+                                            <View style={styles.infoCardTop}>
+                                                <View style={[styles.infoIconCircle, { backgroundColor: item.accent + '28' }]}>
+                                                    <Ionicons name={item.icon} size={22} color={item.accent} />
+                                                </View>
+                                                <View style={styles.infoStatBox}>
+                                                    <Text style={[styles.infoStatNum, { color: item.accent }]}>{item.stat}</Text>
+                                                    <Text style={styles.infoStatLabel}>{item.statLabel}</Text>
+                                                </View>
+                                            </View>
 
-                        <View style={styles.informationGrid}>
-                            <TouchableOpacity
-                                style={styles.infoCard}
-                                onPress={() => navigation.getParent()?.navigate('SafetyTips') ?? navigation.navigate('SafetyTips')}
-                                activeOpacity={0.7}
-                            >
-                                <View style={[styles.infoIconContainer, { backgroundColor: COLORS.primarySurface }]}>
-                                    <Image
-                                        source={require('../../../assets/images/helmet.png')}
-                                        style={styles.infoImage}
-                                        resizeMode="contain"
-                                    />
-                                </View>
-                            </TouchableOpacity>
+                                            {/* Decorative dots */}
+                                            <View style={styles.infoDots}>
+                                                <View style={[styles.infoDot, { backgroundColor: item.accent + '60' }]} />
+                                                <View style={[styles.infoDot, { width: 6, height: 6, backgroundColor: item.accent + '30' }]} />
+                                                <View style={[styles.infoDot, { width: 4, height: 4, backgroundColor: item.accent + '20' }]} />
+                                            </View>
 
-                            <TouchableOpacity
-                                style={styles.infoCard}
-                                onPress={() => navigation.getParent()?.navigate('TrafficSigns') ?? navigation.navigate('TrafficSigns')}
-                                activeOpacity={0.7}
-                            >
-                                <View style={[styles.infoIconContainer, { backgroundColor: COLORS.errorSurface }]}>
-                                    <Image
-                                        source={require('../../../assets/images/crosspath.png')}
-                                        style={styles.infoImage}
-                                        resizeMode="contain"
-                                    />
-                                </View>
-                            </TouchableOpacity>
+                                            {/* Bottom text */}
+                                            <Text style={styles.infoTitle}>{item.title}</Text>
+                                            <View style={styles.infoBottom}>
+                                                <Text style={styles.infoSub}>{item.sub}</Text>
+                                                <Ionicons name="arrow-forward" size={14} color="rgba(255,255,255,0.6)" />
+                                            </View>
+                                        </LinearGradient>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </Animated.View>
 
-                            <TouchableOpacity
-                                style={styles.infoCard}
-                                onPress={() => navigation.getParent()?.navigate('FineInformation') ?? navigation.navigate('FineInformation')}
-                                activeOpacity={0.7}
-                            >
-                                <View style={[styles.infoIconContainer, { backgroundColor: COLORS.successSurface }]}>
-                                    <Image
-                                        source={require('../../../assets/images/image.png')}
-                                        style={styles.infoImage}
-                                        resizeMode="contain"
-                                    />
-                                </View>
-                                <Text style={styles.infoCardTitle}>Fine Info</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </Animated.View>
+                        {/* ── Quick Services ── */}
+                        <Animated.View
+                            style={[
+                                styles.section,
+                                { opacity: fadeAnim, transform: [{ translateY: slideAnims[2] }] },
+                            ]}
+                        >
+                            <View style={styles.sectionHeader}>
+                                <Text style={styles.sectionTitle}>Quick Services</Text>
+                            </View>
 
-                    {/* Recent Activity */}
-                    <View style={[styles.section, { marginBottom: SPACING.xxl }]}>
-                        <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Recent Activity</Text>
-                            <TouchableOpacity onPress={handleSeeAllReports}>
-                                <Text style={styles.seeAll}>See All</Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        {recentActivity.map((activity) => {
-                            const config = getStatusConfig(activity.status);
-                            return (
-                                <TouchableOpacity
-                                    key={activity.id}
-                                    style={styles.activityCard}
-                                    activeOpacity={0.7}
-                                    onPress={() => navigation.getParent()?.navigate('ReportDetail', { reportId: activity.id }) ?? navigation.navigate('ReportDetail', { reportId: activity.id })}
-                                >
-                                    <View style={[styles.activityIcon, { backgroundColor: config.bg }]}>
-                                        <Ionicons name={config.icon} size={22} color={config.color} />
-                                    </View>
-                                    <View style={styles.activityContent}>
-                                        <View style={styles.activityTopRow}>
-                                            <Text style={styles.activityType}>{activity.type}</Text>
-                                            <View style={[styles.statusDot, { backgroundColor: config.color }]} />
+                            <View style={styles.servicesGrid}>
+                                {QUICK_SERVICES.map((action) => (
+                                    <TouchableOpacity
+                                        key={action.id}
+                                        style={styles.serviceCard}
+                                        activeOpacity={0.75}
+                                        onPress={() =>
+                                            navigation.getParent()?.navigate(action.screen) ??
+                                            navigation.navigate(action.screen)
+                                        }
+                                    >
+                                        <View style={[styles.serviceIcon, { backgroundColor: action.bg }]}>
+                                            <Ionicons name={action.icon} size={22} color={action.color} />
                                         </View>
-                                        <Text style={styles.activityDesc}>{activity.desc}</Text>
-                                    </View>
-                                    <Text style={styles.activityTime}>{activity.time}</Text>
+                                        <Text style={styles.serviceText}>{action.title}</Text>
+                                        <Ionicons name="chevron-forward" size={13} color="rgba(0,0,0,0.2)" style={{ marginTop: 2 }} />
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </Animated.View>
+
+                        {/* ── Recent Activity ── */}
+                        <Animated.View
+                            style={[
+                                styles.section,
+                                { opacity: fadeAnim, transform: [{ translateY: slideAnims[3] }], marginBottom: 32 },
+                            ]}
+                        >
+                            <View style={styles.sectionHeader}>
+                                <Text style={styles.sectionTitle}>Recent Activity</Text>
+                                <TouchableOpacity onPress={handleSeeAllReports}>
+                                    <Text style={styles.seeAll}>See All</Text>
                                 </TouchableOpacity>
-                            );
-                        })}
+                            </View>
+
+                            {recentActivity.map((activity) => {
+                                const config = getStatusConfig(activity.status);
+                                return (
+                                    <TouchableOpacity
+                                        key={activity.id}
+                                        style={styles.activityCard}
+                                        activeOpacity={0.8}
+                                        onPress={() =>
+                                            navigation.getParent()?.navigate('ReportDetail', { reportId: activity.id }) ??
+                                            navigation.navigate('ReportDetail', { reportId: activity.id })
+                                        }
+                                    >
+                                        {/* Left colored bar */}
+                                        <View style={[styles.cardBar, { backgroundColor: config.barColor }]} />
+
+                                        {/* Icon */}
+                                        <View style={[styles.activityIcon, { backgroundColor: config.bg }]}>
+                                            <Ionicons name={config.icon} size={20} color={config.color} />
+                                        </View>
+
+                                        {/* Content */}
+                                        <View style={styles.activityContent}>
+                                            <Text style={styles.activityType}>{activity.type}</Text>
+                                            <Text style={styles.activityDesc}>{activity.desc}</Text>
+                                            <Text style={styles.activityTime}>{activity.time}</Text>
+                                        </View>
+
+                                        {/* Status chip */}
+                                        <View style={[styles.statusChip, { backgroundColor: config.bg }]}>
+                                            <Text style={[styles.statusChipText, { color: config.color }]}>
+                                                {config.label}
+                                            </Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </Animated.View>
                     </View>
                 </ScrollView>
             </SafeAreaView>
-        </MobileContainer>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: C.offWhite,
     },
-    // ── Header ──
+    safeArea: {
+        flex: 1,
+    },
+
+    // ── Navy Header ──
     header: {
+        paddingHorizontal: 22,
+        paddingTop: 16,
+        paddingBottom: 24,
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28,
+    },
+    headerTop: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
-        paddingHorizontal: SPACING.xl,
-        paddingTop: SPACING.lg,
-        paddingBottom: SPACING.lg,
+        marginBottom: 20,
     },
-    headerLeft: {
-        flex: 1,
-    },
+    headerLeft: {},
     greeting: {
-        fontSize: FONT_SIZES.xxl,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
+        fontSize: 20,
+        fontFamily: 'Nunito-Bold',
+        color: C.white,
         letterSpacing: -0.3,
     },
-    headerSubtitle: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.textSecondary,
-        marginTop: SPACING.xxs,
+    locationRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        marginTop: 4,
     },
-    notificationBtn: {
-        marginTop: SPACING.xs,
+    locationText: {
+        fontSize: 12,
+        color: 'rgba(255,255,255,0.6)',
+        fontFamily: 'Nunito-Medium',
     },
-    notificationBtnInner: {
-        width: 44,
-        height: 44,
-        borderRadius: BORDER_RADIUS.lg,
-        backgroundColor: COLORS.surface,
-        borderWidth: 1,
-        borderColor: COLORS.border,
+    notifButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: 'rgba(255,255,255,0.12)',
         justifyContent: 'center',
         alignItems: 'center',
         position: 'relative',
     },
-    badge: {
+    notifBadge: {
         position: 'absolute',
-        top: -4,
-        right: -4,
-        backgroundColor: COLORS.error,
-        borderRadius: 10,
-        width: 20,
-        height: 20,
+        top: -2,
+        right: -2,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: C.amber,
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 2,
-        borderColor: COLORS.background,
+        borderWidth: 1.5,
+        borderColor: C.navyMid,
     },
-    badgeText: {
-        color: '#FFFFFF',
-        fontSize: 10,
-        fontWeight: FONT_WEIGHTS.bold,
+    notifBadgeText: {
+        fontSize: 9,
+        color: C.navy,
+        fontFamily: 'Nunito-Bold',
     },
 
-    // ── Stats ──
-    statsContainer: {
+    // Stats bar
+    statsBar: {
         flexDirection: 'row',
-        paddingHorizontal: SPACING.xl,
-        gap: SPACING.md,
-        marginBottom: SPACING.lg,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderRadius: 16,
+        paddingVertical: 14,
+        paddingHorizontal: 8,
     },
-    statCard: {
+    statItem: {
         flex: 1,
-        backgroundColor: COLORS.surface,
-        borderRadius: BORDER_RADIUS.xl,
-        padding: SPACING.lg,
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        ...SHADOWS.xs,
-    },
-    statIcon: {
-        width: 44,
-        height: 44,
-        borderRadius: BORDER_RADIUS.lg,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: SPACING.sm,
     },
     statValue: {
-        fontSize: FONT_SIZES.xl,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
-        letterSpacing: -0.3,
+        fontSize: 22,
+        fontFamily: 'Nunito-Bold',
+        color: C.white,
+        letterSpacing: -0.5,
     },
     statLabel: {
-        fontSize: FONT_SIZES.xxs,
-        color: COLORS.textTertiary,
-        fontWeight: FONT_WEIGHTS.medium,
+        fontSize: 11,
+        color: 'rgba(255,255,255,0.6)',
+        fontFamily: 'Nunito-Medium',
         marginTop: 2,
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
+    },
+    statDivider: {
+        width: 1,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        marginVertical: 4,
     },
 
-    // ── Report CTA ──
-    reportSection: {
-        paddingHorizontal: SPACING.xl,
-        marginBottom: SPACING.xl,
+    // ── Content ──
+    content: {
+        paddingHorizontal: 20,
+        paddingTop: 20,
     },
-    reportCard: {
-        borderRadius: BORDER_RADIUS.xl,
+
+    // Hero
+    heroOuter: {
+        marginBottom: 28,
+        shadowColor: C.amber,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.25,
+        shadowRadius: 20,
+        elevation: 8,
+    },
+    reportHero: {
+        borderRadius: 24,
         overflow: 'hidden',
-        ...SHADOWS.primary,
+        height: 180, // 16:9 ish
     },
-    reportCardBgImage: {
-        position: 'absolute',
-        width: '100%',
-        height: '100%',
-    },
-    reportCardOverlay: {
-        padding: SPACING.xl,
-    },
-    reportCardContent: {
+    heroOverlay: {
+        flex: 1,
+        padding: 24,
         flexDirection: 'row',
-        alignItems: 'center',
         justifyContent: 'space-between',
     },
-    reportCardLeft: {
+    heroContent: {
         flex: 1,
-    },
-    reportCardTitle: {
-        fontSize: FONT_SIZES.lg,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: '#FFFFFF',
-        marginBottom: SPACING.xxs,
-        letterSpacing: -0.2,
-    },
-    reportCardSubtitle: {
-        fontSize: FONT_SIZES.sm,
-        color: 'rgba(255, 255, 255, 0.85)',
-    },
-    reportCardIcon: {
-        width: 56,
-        height: 56,
-        borderRadius: BORDER_RADIUS.lg,
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
         justifyContent: 'center',
+    },
+    heroBadge: {
+        flexDirection: 'row',
         alignItems: 'center',
-        marginLeft: SPACING.md,
+        gap: 4,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+        alignSelf: 'flex-start',
+        marginBottom: 10,
+    },
+    heroBadgeText: {
+        fontSize: 9,
+        fontFamily: 'Nunito-ExtraBold',
+        color: C.white,
+        letterSpacing: 0.5,
+    },
+    heroTitle: {
+        fontSize: 24,
+        fontFamily: 'Nunito-Bold',
+        color: C.white,
+        letterSpacing: -0.5,
+    },
+    heroSubtitle: {
+        fontSize: 13,
+        color: 'rgba(255,255,255,0.85)',
+        marginTop: 4,
+        lineHeight: 18,
+        maxWidth: '80%',
+    },
+    heroActionBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: C.white,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 12,
+        alignSelf: 'flex-start',
+        marginTop: 16,
+    },
+    heroActionText: {
+        fontSize: 14,
+        fontFamily: 'Nunito-Bold',
+        color: C.amberDark,
+    },
+    heroIconFrame: {
+        position: 'absolute',
+        right: -20,
+        bottom: -20,
     },
 
-    // ── Sections ──
+    // Section
     section: {
-        paddingHorizontal: SPACING.xl,
-        marginBottom: SPACING.lg,
+        marginBottom: 24,
     },
     sectionHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: SPACING.lg,
+        marginBottom: 16,
     },
     sectionTitle: {
-        fontSize: FONT_SIZES.lg,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
-        letterSpacing: -0.2,
+        fontSize: 18,
+        fontFamily: 'Nunito-Bold',
+        color: C.textPrimary,
+        letterSpacing: -0.3,
     },
     seeAll: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.primary,
-        fontWeight: FONT_WEIGHTS.semibold,
+        fontSize: 13,
+        color: C.amber,
+        fontFamily: 'Nunito-Bold',
     },
 
-    // ── Info Cards ──
-    informationGrid: {
-        flexDirection: 'row',
-        gap: SPACING.md,
-        justifyContent: 'space-between',
+    // ── Traffic Info Horizontal Scroll ──
+    trafficInfoScroll: {
+        paddingRight: 20,
+        gap: 14,
     },
     infoCard: {
-        flex: 1,
-        backgroundColor: COLORS.surface,
-        borderRadius: BORDER_RADIUS.xl,
-        padding: SPACING.lg,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        ...SHADOWS.xs,
+        width: 200,
+        height: 170,
+        borderRadius: 22,
+        padding: 16,
+        justifyContent: 'space-between',
+        shadowColor: C.navy,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.18,
+        shadowRadius: 16,
+        elevation: 8,
+        overflow: 'hidden',
     },
-    infoIconContainer: {
-        width: 52,
-        height: 52,
-        borderRadius: BORDER_RADIUS.lg,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: SPACING.sm,
+    infoCardTop: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
     },
-    infoImage: {
-        width: 30,
-        height: 30,
+    infoIconCircle: {
+        width: 40, height: 40, borderRadius: 12,
+        justifyContent: 'center', alignItems: 'center',
     },
-    infoCardTitle: {
-        fontSize: FONT_SIZES.xs,
-        fontWeight: FONT_WEIGHTS.semibold,
-        color: COLORS.textPrimary,
-        textAlign: 'center',
+    infoStatBox: { alignItems: 'flex-end' },
+    infoStatNum: { fontSize: 20, fontFamily: 'Nunito-Bold', lineHeight: 24 },
+    infoStatLabel: { fontSize: 9, fontFamily: 'Nunito-SemiBold', color: 'rgba(255,255,255,0.6)', marginTop: 1 },
+    infoDots: { flexDirection: 'row', gap: 4, alignItems: 'center' },
+    infoDot: { width: 8, height: 8, borderRadius: 4 },
+    infoTitle: {
+        fontSize: 15,
+        fontFamily: 'Nunito-Bold',
+        color: C.white,
+        letterSpacing: -0.2,
+    },
+    infoBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    infoSub: {
+        fontSize: 11,
+        fontFamily: 'Nunito-Medium',
+        color: 'rgba(255,255,255,0.7)',
     },
 
-    // ── Activity Cards ──
+    // ── Quick Services Grid ──
+    servicesGrid: {
+        gap: 10,
+    },
+    serviceCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: C.white,
+        borderRadius: 16,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        gap: 14,
+        shadowColor: C.navy,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    serviceIcon: {
+        width: 46,
+        height: 46,
+        borderRadius: 13,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    serviceText: {
+        flex: 1,
+        fontSize: 14,
+        fontFamily: 'Nunito-Bold',
+        color: C.textPrimary,
+    },
+
+    // Activity cards
     activityCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: COLORS.surface,
-        borderRadius: BORDER_RADIUS.xl,
-        padding: SPACING.lg,
-        marginBottom: SPACING.sm,
-        borderWidth: 1,
-        borderColor: COLORS.border,
-        ...SHADOWS.xs,
+        backgroundColor: C.surface,
+        borderRadius: 16,
+        marginBottom: 10,
+        overflow: 'hidden',
+        shadowColor: C.navyMid,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    cardBar: {
+        width: 4,
+        alignSelf: 'stretch',
     },
     activityIcon: {
-        width: 44,
-        height: 44,
-        borderRadius: BORDER_RADIUS.lg,
+        width: 42,
+        height: 42,
+        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: SPACING.md,
+        margin: 14,
     },
     activityContent: {
         flex: 1,
-    },
-    activityTopRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: SPACING.sm,
+        paddingVertical: 14,
     },
     activityType: {
-        fontSize: FONT_SIZES.sm,
-        fontWeight: FONT_WEIGHTS.semibold,
-        color: COLORS.textPrimary,
-    },
-    statusDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
+        fontSize: 14,
+        fontFamily: 'Nunito-SemiBold',
+        color: C.textPrimary,
     },
     activityDesc: {
-        fontSize: FONT_SIZES.xs,
-        color: COLORS.textSecondary,
+        fontSize: 12,
+        color: C.textSecondary,
         marginTop: 2,
     },
     activityTime: {
-        fontSize: FONT_SIZES.xxs,
-        color: COLORS.textTertiary,
-        fontWeight: FONT_WEIGHTS.medium,
+        fontSize: 11,
+        color: C.textTertiary,
+        marginTop: 3,
+        fontFamily: 'Nunito-Medium',
+    },
+    statusChip: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 20,
+        marginRight: 14,
+    },
+    statusChipText: {
+        fontSize: 11,
+        fontFamily: 'Nunito-Bold',
     },
 });

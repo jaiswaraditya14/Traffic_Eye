@@ -1,21 +1,37 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator, Animated } from 'react-native';
+import {
+    View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView,
+    Platform, ScrollView, Alert, ActivityIndicator, Animated,
+    StatusBar, TextInput,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MobileContainer, Button, Input } from '../../components';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MobileContainer, FocusAwareStatusBar } from '../../components';
 import { useAuth } from '../../context';
 import {
-    COLORS,
-    SPACING,
-    FONT_SIZES,
-    FONT_WEIGHTS,
-    BORDER_RADIUS,
-    SHADOWS,
-    isValidEmail,
-    isValidPassword,
-    isValidPhone,
-    validateRequiredFields,
-    passwordsMatch
+    isValidEmail, isValidPassword, isValidPhone,
+    validateRequiredFields, passwordsMatch,
 } from '../../utils';
+
+// ── Design Tokens ──
+const C = {
+    navy: '#002452',
+    navyMid: '#1B3A6B',
+    amber: '#F59E0B',
+    amberDark: '#D97706',
+    white: '#FFFFFF',
+    offWhite: '#F8F9FB',
+    surface: '#FFFFFF',
+    surfaceInput: '#F2F4F6',
+    textPrimary: '#191C1E',
+    textSecondary: '#44474F',
+    textTertiary: '#747780',
+    border: '#C4C6D0',
+    success: '#059669',
+    successSurface: '#D1FAE5',
+    primarySurface: '#D7E2FF',
+    error: '#BA1A1A',
+};
 
 export default function CitizenSignUp({ navigation }) {
     const [name, setName] = useState('');
@@ -28,108 +44,48 @@ export default function CitizenSignUp({ navigation }) {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [signUpSuccess, setSignUpSuccess] = useState(false);
 
-    // Animations
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const successScaleAnim = useRef(new Animated.Value(0.5)).current;
     const successFadeAnim = useRef(new Animated.Value(0)).current;
     const envelopeAnim = useRef(new Animated.Value(0)).current;
 
+    // ── BACKEND INTACT: uses signUpCitizen from useAuth ──
     const { signUpCitizen } = useAuth();
 
     useEffect(() => {
-        Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 400,
-            useNativeDriver: true,
-        }).start();
+        Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
     }, []);
 
     const playSuccessAnimation = () => {
         Animated.parallel([
-            Animated.spring(successScaleAnim, {
-                toValue: 1,
-                tension: 60,
-                friction: 8,
-                useNativeDriver: true,
-            }),
-            Animated.timing(successFadeAnim, {
-                toValue: 1,
-                duration: 500,
-                useNativeDriver: true,
-            }),
+            Animated.spring(successScaleAnim, { toValue: 1, tension: 60, friction: 8, useNativeDriver: true }),
+            Animated.timing(successFadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
         ]).start(() => {
-            // Envelope float animation
             Animated.loop(
                 Animated.sequence([
-                    Animated.timing(envelopeAnim, {
-                        toValue: -8,
-                        duration: 1200,
-                        useNativeDriver: true,
-                    }),
-                    Animated.timing(envelopeAnim, {
-                        toValue: 0,
-                        duration: 1200,
-                        useNativeDriver: true,
-                    }),
+                    Animated.timing(envelopeAnim, { toValue: -8, duration: 1200, useNativeDriver: true }),
+                    Animated.timing(envelopeAnim, { toValue: 0, duration: 1200, useNativeDriver: true }),
                 ])
             ).start();
         });
     };
 
     const validateForm = () => {
-        const requiredFields = {
-            'Full Name': name,
-            'Email': email,
-            'Phone Number': phone,
-            'Password': password
-        };
-
-        const validation = validateRequiredFields(requiredFields);
-        if (!validation.valid) {
-            Alert.alert('Error', validation.errors[0]);
-            return false;
-        }
-
-        if (!isValidEmail(email.trim())) {
-            Alert.alert('Error', 'Please enter a valid email address');
-            return false;
-        }
-
-        if (!isValidPassword(password)) {
-            Alert.alert('Error', 'Password must be at least 6 characters');
-            return false;
-        }
-
-        if (!passwordsMatch(password, confirmPassword)) {
-            Alert.alert('Error', 'Passwords do not match');
-            return false;
-        }
-
-        if (!isValidPhone(phone.trim())) {
-            Alert.alert('Error', 'Please enter a valid phone number');
-            return false;
-        }
-
+        const validation = validateRequiredFields({ 'Full Name': name, 'Email': email, 'Phone': phone, 'Password': password });
+        if (!validation.valid) { Alert.alert('Error', validation.errors[0]); return false; }
+        if (!isValidEmail(email.trim())) { Alert.alert('Error', 'Please enter a valid email address'); return false; }
+        if (!isValidPassword(password)) { Alert.alert('Error', 'Password must be at least 6 characters'); return false; }
+        if (!passwordsMatch(password, confirmPassword)) { Alert.alert('Error', 'Passwords do not match'); return false; }
+        if (!isValidPhone(phone.trim())) { Alert.alert('Error', 'Please enter a valid phone number'); return false; }
         return true;
     };
 
     const handleSignUp = async () => {
         if (!validateForm()) return;
-
         setLoading(true);
         try {
-            const { error } = await signUpCitizen(
-                email.trim(),
-                password,
-                name.trim(),
-                phone.trim()
-            );
-
-            if (error) {
-                Alert.alert('Sign Up Failed', error.message || 'Could not create account');
-                return;
-            }
-
+            const { error } = await signUpCitizen(email.trim(), password, name.trim(), phone.trim());
+            if (error) { Alert.alert('Sign Up Failed', error.message || 'Could not create account'); return; }
             setSignUpSuccess(true);
             playSuccessAnimation();
         } catch (error) {
@@ -140,380 +96,543 @@ export default function CitizenSignUp({ navigation }) {
         }
     };
 
-    const handleResendEmail = async () => {
-        try {
-            // Re-trigger signup to resend confirmation email
-            Alert.alert(
-                'Email Resent',
-                `A new verification email has been sent to ${email}. Please check your inbox and spam folder.`
-            );
-        } catch (error) {
-            Alert.alert('Error', 'Failed to resend email. Please try again.');
-        }
+    const handleResendEmail = () => {
+        Alert.alert('Email Resent', `A new verification email has been sent to ${email}. Please check your inbox and spam folder.`);
     };
 
+    // ── Success: Email Verification Screen ──
     if (signUpSuccess) {
         return (
             <MobileContainer>
-                <Animated.View style={[styles.successContainer, {
-                    opacity: successFadeAnim,
-                    transform: [{ scale: successScaleAnim }],
-                }]}>
-                    {/* Email Verification Illustration */}
-                    <Animated.View style={[
-                        styles.successIconContainer,
-                        { transform: [{ translateY: envelopeAnim }] },
-                    ]}>
-                        <View style={styles.successIconInner}>
-                            <Ionicons name="mail" size={48} color={COLORS.primary} />
-                        </View>
-                    </Animated.View>
-
-                    <View style={styles.successCheckBadge}>
-                        <Ionicons name="checkmark-circle" size={28} color={COLORS.success} />
-                    </View>
-
-                    <Text style={styles.successTitle}>Verify Your Email</Text>
-
-                    <Text style={styles.successMessage}>
-                        We've sent a confirmation link to
-                    </Text>
-                    <Text style={styles.successEmail}>{email}</Text>
-
-                    <View style={styles.stepsContainer}>
-                        <View style={styles.stepItem}>
-                            <View style={[styles.stepNumber, { backgroundColor: COLORS.primarySoft }]}>
-                                <Text style={[styles.stepNumberText, { color: COLORS.primary }]}>1</Text>
-                            </View>
-                            <Text style={styles.stepText}>Open your email inbox</Text>
-                        </View>
-                        <View style={styles.stepItem}>
-                            <View style={[styles.stepNumber, { backgroundColor: COLORS.primarySoft }]}>
-                                <Text style={[styles.stepNumberText, { color: COLORS.primary }]}>2</Text>
-                            </View>
-                            <Text style={styles.stepText}>Click the verification link</Text>
-                        </View>
-                        <View style={styles.stepItem}>
-                            <View style={[styles.stepNumber, { backgroundColor: COLORS.primarySoft }]}>
-                                <Text style={[styles.stepNumberText, { color: COLORS.primary }]}>3</Text>
-                            </View>
-                            <Text style={styles.stepText}>Come back and sign in</Text>
-                        </View>
-                    </View>
-
-                    <Button
-                        onPress={() => navigation.navigate('CitizenSignIn')}
-                        fullWidth
-                        style={styles.successButton}
-                        size="lg"
+                <View style={styles.successPage}>
+                    <Animated.View
+                        style={[
+                            styles.successContent,
+                            { opacity: successFadeAnim, transform: [{ scale: successScaleAnim }] },
+                        ]}
                     >
-                        Continue to Sign In
-                    </Button>
+                        {/* Envelope */}
+                        <Animated.View style={[styles.envelopeContainer, { transform: [{ translateY: envelopeAnim }] }]}>
+                            <View style={styles.envelopeOuter}>
+                                <View style={styles.envelopeInner}>
+                                    <Ionicons name="mail" size={48} color={C.navyMid} />
+                                </View>
+                            </View>
+                            {/* Check badge */}
+                            <View style={styles.checkBadge}>
+                                <Ionicons name="checkmark-circle" size={28} color={C.success} />
+                            </View>
+                        </Animated.View>
 
-                    <TouchableOpacity onPress={handleResendEmail} style={styles.resendLink}>
-                        <Ionicons name="refresh" size={16} color={COLORS.primary} />
-                        <Text style={styles.resendText}>Didn't receive the email? Resend</Text>
-                    </TouchableOpacity>
+                        <Text style={styles.successTitle}>Account Created! 🎉</Text>
+                        <Text style={styles.successDesc}>Verify your email to get started</Text>
+                        <View style={styles.emailPill}>
+                            <Ionicons name="mail-outline" size={14} color={C.navyMid} />
+                            <Text style={styles.emailPillText}>{email}</Text>
+                        </View>
 
-                    <Text style={styles.spamNote}>
-                        Check your spam folder if you don't see the email
-                    </Text>
-                </Animated.View>
+                        {/* Steps */}
+                        <View style={styles.stepsList}>
+                            {[
+                                { n: '1', text: 'Open your email inbox' },
+                                { n: '2', text: 'Click the verification link' },
+                                { n: '3', text: 'Come back and sign in' },
+                            ].map((step, idx) => (
+                                <View key={idx} style={styles.stepRow}>
+                                    <View style={styles.stepNum}>
+                                        <Text style={styles.stepNumText}>{step.n}</Text>
+                                    </View>
+                                    <Text style={styles.stepText}>{step.text}</Text>
+                                </View>
+                            ))}
+                        </View>
+
+                        {/* CTA */}
+                        <TouchableOpacity
+                            style={styles.successCTA}
+                            onPress={() => navigation.navigate('CitizenSignIn')}
+                            activeOpacity={0.88}
+                        >
+                            <LinearGradient
+                                colors={[C.navy, C.navyMid]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={styles.successCTAGradient}
+                            >
+                                <Text style={styles.successCTAText}>Continue to Sign In</Text>
+                                <Ionicons name="arrow-forward" size={16} color={C.white} />
+                            </LinearGradient>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.resendRow} onPress={handleResendEmail}>
+                            <Ionicons name="refresh" size={14} color={C.navyMid} />
+                            <Text style={styles.resendText}>Didn't receive the email? Resend</Text>
+                        </TouchableOpacity>
+
+                        <Text style={styles.spamNote}>Check your spam folder if not found</Text>
+                    </Animated.View>
+                </View>
             </MobileContainer>
         );
     }
 
+    // ── Sign Up Form ──
     return (
-        <MobileContainer>
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
-                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                    <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
+        <View style={styles.container}>
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor="#0F2C59" />
+            <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="always"
+                >
+                    {/* Navy Header */}
+                    <LinearGradient colors={[C.navy, C.navyMid]} style={styles.header}>
                         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                            <View style={styles.backButtonCircle}>
-                                <Ionicons name="arrow-back" size={20} color={COLORS.textPrimary} />
-                            </View>
+                            <Ionicons name="arrow-back" size={20} color={C.white} />
                         </TouchableOpacity>
-                        <Text style={styles.title}>Create Account</Text>
-                        <Text style={styles.subtitle}>Join us in making roads safer</Text>
-                    </Animated.View>
+                        <View style={styles.headerContent}>
+                            <View style={styles.logoMark}>
+                                <Ionicons name="person-add" size={28} color={C.amber} />
+                            </View>
+                            <Text style={styles.headerTitle}>Join the Force</Text>
+                            <Text style={styles.headerSubtitle}></Text>
+                        </View>
+                    </LinearGradient>
 
-                    <Animated.View style={[styles.form, { opacity: fadeAnim }]}>
-                        <Input
-                            label="Full Name"
-                            placeholder="Enter your name"
-                            value={name}
-                            onChangeText={setName}
-                        />
-                        <Input
-                            label="Email"
-                            placeholder="Enter your email"
-                            value={email}
-                            onChangeText={setEmail}
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                        />
-                        <Input
-                            label="Phone Number"
-                            placeholder="Enter your phone"
-                            value={phone}
-                            onChangeText={setPhone}
-                            keyboardType="phone-pad"
-                        />
+                    {/* Form — Enrollment Card */}
+                    <View style={styles.formContainer}>
+                        <View style={styles.authCard}>
+                            <Text style={styles.welcomeText}>New Enrollment</Text>
+                            <Text style={styles.subWelcomeText}>Provide your credentials to begin service</Text>
 
-                        <View style={styles.passwordContainer}>
-                            <Input
-                                label="Password"
-                                placeholder="Create password (min 6 characters)"
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry={!showPassword}
-                            />
+                            {/* Full Name */}
+                            <View style={styles.fieldGroup}>
+                                <Text style={styles.fieldLabel}>FULL IDENTITY NAME</Text>
+                                <View style={styles.inputRow}>
+                                    <Ionicons name="person" size={17} color="#94A3B8" />
+                                    <TextInput
+                                        style={styles.textInput}
+                                        placeholder="Full Name"
+                                        placeholderTextColor="#94A3B8"
+                                        value={name}
+                                        onChangeText={setName}
+                                    />
+                                </View>
+                            </View>
+
+                            {/* Email */}
+                            <View style={styles.fieldGroup}>
+                                <Text style={styles.fieldLabel}>AUTHORITY EMAIL</Text>
+                                <View style={styles.inputRow}>
+                                    <Ionicons name="mail" size={17} color="#94A3B8" />
+                                    <TextInput
+                                        style={styles.textInput}
+                                        placeholder="you@authority.com"
+                                        placeholderTextColor="#94A3B8"
+                                        value={email}
+                                        onChangeText={setEmail}
+                                        keyboardType="email-address"
+                                        autoCapitalize="none"
+                                    />
+                                </View>
+                            </View>
+
+                            {/* Phone */}
+                            <View style={styles.fieldGroup}>
+                                <Text style={styles.fieldLabel}>CONTACT NUMBER</Text>
+                                <View style={styles.inputRow}>
+                                    <Ionicons name="call" size={17} color="#94A3B8" />
+                                    <TextInput
+                                        style={styles.textInput}
+                                        placeholder="+91 00000 00000"
+                                        placeholderTextColor="#94A3B8"
+                                        value={phone}
+                                        onChangeText={setPhone}
+                                        keyboardType="phone-pad"
+                                    />
+                                </View>
+                            </View>
+
+                            {/* Password */}
+                            <View style={styles.fieldGroup}>
+                                <Text style={styles.fieldLabel}>SECURE PASSWORD</Text>
+                                <View style={styles.inputRow}>
+                                    <Ionicons name="lock-closed" size={17} color="#94A3B8" />
+                                    <TextInput
+                                        style={styles.textInput}
+                                        placeholder="Min 8 unique characters"
+                                        placeholderTextColor="#94A3B8"
+                                        value={password}
+                                        onChangeText={setPassword}
+                                        secureTextEntry={!showPassword}
+                                    />
+                                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                                        <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={17} color="#94A3B8" />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            {/* Confirm Password */}
+                            <View style={styles.fieldGroup}>
+                                <Text style={styles.fieldLabel}>CONFIRM PASSWORD</Text>
+                                <View style={styles.inputRow}>
+                                    <Ionicons name="shield-checkmark" size={17} color="#94A3B8" />
+                                    <TextInput
+                                        style={styles.textInput}
+                                        placeholder="Re-enter password"
+                                        placeholderTextColor="#94A3B8"
+                                        value={confirmPassword}
+                                        onChangeText={setConfirmPassword}
+                                        secureTextEntry={!showConfirmPassword}
+                                    />
+                                    <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+                                        <Ionicons name={showConfirmPassword ? 'eye-off' : 'eye'} size={17} color="#94A3B8" />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            {/* Sign Up Button */}
                             <TouchableOpacity
-                                style={styles.eyeIcon}
-                                onPress={() => setShowPassword(!showPassword)}
+                                style={[styles.signUpButton, loading && { opacity: 0.6 }]}
+                                onPress={handleSignUp}
+                                disabled={loading}
+                                activeOpacity={0.88}
                             >
-                                <Ionicons
-                                    name={showPassword ? 'eye-off' : 'eye'}
-                                    size={20}
-                                    color={COLORS.gray400}
-                                />
+                                <LinearGradient
+                                    colors={[C.navy, C.navyMid]}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 0 }}
+                                    style={styles.signUpGradient}
+                                >
+                                    {loading ? (
+                                        <ActivityIndicator color={C.white} />
+                                    ) : (
+                                        <>
+                                            <Text style={styles.signUpText}>Submit Enrollment</Text>
+                                            <Ionicons name="chevron-forward" size={16} color={C.white} />
+                                        </>
+                                    )}
+                                </LinearGradient>
                             </TouchableOpacity>
-                        </View>
 
-                        <View style={styles.passwordContainer}>
-                            <Input
-                                label="Confirm Password"
-                                placeholder="Confirm password"
-                                value={confirmPassword}
-                                onChangeText={setConfirmPassword}
-                                secureTextEntry={!showConfirmPassword}
-                            />
-                            <TouchableOpacity
-                                style={styles.eyeIcon}
-                                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                            >
-                                <Ionicons
-                                    name={showConfirmPassword ? 'eye-off' : 'eye'}
-                                    size={20}
-                                    color={COLORS.gray400}
-                                />
-                            </TouchableOpacity>
+                            {/* Footer */}
+                            <View style={styles.footer}>
+                                <Text style={styles.footerText}>Found your badge? </Text>
+                                <TouchableOpacity onPress={() => navigation.navigate('CitizenSignIn')}>
+                                    <Text style={styles.signInLink}>Sign In Here</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
-
-                        <Button
-                            onPress={handleSignUp}
-                            fullWidth
-                            style={styles.signUpButton}
-                            disabled={loading}
-                            size="lg"
-                        >
-                            {loading ? (
-                                <ActivityIndicator color={COLORS.white} />
-                            ) : (
-                                'Sign Up'
-                            )}
-                        </Button>
-
-                        <View style={styles.footer}>
-                            <Text style={styles.footerText}>Already have an account? </Text>
-                            <TouchableOpacity onPress={() => navigation.navigate('CitizenSignIn')}>
-                                <Text style={styles.signInLink}>Sign In</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </Animated.View>
+                        <Text style={styles.legalNotice}></Text>
+                    </View>
                 </ScrollView>
-            </KeyboardAvoidingView>
-        </MobileContainer>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: COLORS.background },
+    container: { flex: 1, backgroundColor: C.offWhite },
     scrollContent: { flexGrow: 1 },
-    header: { paddingHorizontal: SPACING.lg, paddingTop: SPACING.xl, paddingBottom: SPACING.lg },
-    backButton: { marginBottom: SPACING.lg },
-    backButtonCircle: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        backgroundColor: COLORS.surface,
-        justifyContent: 'center',
-        alignItems: 'center',
-        ...SHADOWS.sm,
-    },
-    title: { fontSize: FONT_SIZES.xxxl, fontWeight: FONT_WEIGHTS.bold, color: COLORS.textPrimary, marginBottom: SPACING.xs },
-    subtitle: { fontSize: FONT_SIZES.md, color: COLORS.textSecondary },
-    form: { paddingHorizontal: SPACING.lg },
-    passwordContainer: { position: 'relative' },
-    eyeIcon: {
-        position: 'absolute',
-        right: SPACING.md,
-        top: 40,
-        padding: 4,
-    },
-    signUpButton: { marginTop: SPACING.sm },
-    footer: { flexDirection: 'row', justifyContent: 'center', marginTop: SPACING.lg, marginBottom: SPACING.xl },
-    footerText: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary },
-    signInLink: { fontSize: FONT_SIZES.sm, color: COLORS.primary, fontWeight: FONT_WEIGHTS.semibold },
 
-    // Success / Email Verification Screen
-    successContainer: {
-        flex: 1,
+    // Header
+    header: {
+        paddingTop: 52,
+        paddingBottom: 28,
+        paddingHorizontal: 24,
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28,
+    },
+    backButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.12)',
         justifyContent: 'center',
         alignItems: 'center',
-        paddingHorizontal: SPACING.xl,
-        backgroundColor: COLORS.background,
+        marginBottom: 16,
     },
-    successIconContainer: {
+    headerContent: { alignItems: 'center' },
+    logoMark: {
+        width: 62,
+        height: 62,
+        borderRadius: 18,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 14,
+    },
+    headerTitle: {
+        fontSize: 22,
+        fontFamily: 'Nunito-Bold',
+        color: C.white,
+        letterSpacing: -0.4,
+    },
+    headerSubtitle: {
+        fontSize: 13,
+        color: 'rgba(255,255,255,0.6)',
+        marginTop: 4,
+    },
+
+    // Form Container & Card
+    formContainer: {
+        marginTop: -32,
+        paddingHorizontal: 16,
+        paddingBottom: 40,
+    },
+    authCard: {
+        backgroundColor: C.white,
+        borderRadius: 32,
+        padding: 24,
+        shadowColor: C.navy,
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.1,
+        shadowRadius: 24,
+        elevation: 8,
+    },
+    welcomeText: {
+        fontSize: 22,
+        fontFamily: 'Nunito-Bold',
+        color: C.navy,
+        textAlign: 'center',
+    },
+    subWelcomeText: {
+        fontSize: 14,
+        color: C.textSecondary,
+        fontFamily: 'Nunito-Medium',
+        textAlign: 'center',
+        marginTop: 4,
+        marginBottom: 32,
+    },
+
+    // Fields
+    fieldGroup: {
+        marginBottom: 20,
+    },
+    fieldLabel: {
+        fontSize: 10,
+        fontFamily: 'Nunito-ExtraBold',
+        color: C.textTertiary,
+        marginBottom: 8,
+        letterSpacing: 1.2,
+        marginLeft: 4,
+    },
+    inputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: C.offWhite,
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        gap: 12,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+    },
+    textInput: {
+        flex: 1,
+        fontSize: 15,
+        color: C.textPrimary,
+        fontFamily: 'Nunito-SemiBold',
+        padding: 0,
+    },
+
+    // Sign Up Button
+    signUpButton: {
+        borderRadius: 16,
+        overflow: 'hidden',
+        marginTop: 12,
+        marginBottom: 24,
+        elevation: 4,
+    },
+    signUpGradient: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        paddingVertical: 18,
+    },
+    signUpText: {
+        fontSize: 16,
+        fontFamily: 'Nunito-Bold',
+        color: C.white,
+    },
+    footer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+    },
+    footerText: {
+        fontSize: 14,
+        color: C.textSecondary,
+        fontFamily: 'Nunito-Medium',
+    },
+    signInLink: {
+        fontSize: 14,
+        fontFamily: 'Nunito-Bold',
+        color: C.amberDark,
+    },
+    legalNotice: {
+        fontSize: 11,
+        color: '#94A3B8',
+        textAlign: 'center',
+        marginTop: 24,
+        fontFamily: 'Nunito-Medium',
+    },
+
+    // Success Page
+    successPage: {
+        flex: 1,
+        backgroundColor: C.offWhite,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 32,
+    },
+    successContent: {
+        width: '100%',
+        alignItems: 'center',
+    },
+    envelopeContainer: {
         width: 120,
         height: 120,
-        borderRadius: 60,
-        backgroundColor: COLORS.primarySoft || '#EFF6FF',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: SPACING.md,
+        marginBottom: 16,
     },
-    successIconInner: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: `${COLORS.primary}15`,
+    envelopeOuter: {
+        width: 100,
+        height: 100,
+        borderRadius: 32,
+        backgroundColor: C.white,
         justifyContent: 'center',
         alignItems: 'center',
+        shadowColor: C.navyMid,
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+        elevation: 6,
     },
-    successCheckBadge: {
-        marginTop: -SPACING.md,
-        marginBottom: SPACING.lg,
-        backgroundColor: COLORS.surface,
+    envelopeInner: {
+        width: 72,
+        height: 72,
         borderRadius: 20,
-        padding: 4,
-        ...SHADOWS.sm,
+        backgroundColor: C.primarySurface,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    checkBadge: {
+        position: 'absolute',
+        bottom: 15,
+        right: 15,
+        backgroundColor: C.white,
+        borderRadius: 12,
+        padding: 2,
+        shadowColor: C.navyMid,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
     },
     successTitle: {
-        fontSize: FONT_SIZES.xxl + 2,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
-        marginBottom: SPACING.sm,
+        fontSize: 26,
+        fontFamily: 'Nunito-Bold',
+        color: C.navy,
         textAlign: 'center',
+        marginTop: 8,
+        letterSpacing: -0.5,
     },
-    successMessage: {
-        fontSize: FONT_SIZES.md,
-        color: COLORS.textSecondary,
+    successDesc: {
+        fontSize: 15,
+        color: C.textSecondary,
         textAlign: 'center',
-        lineHeight: 22,
+        marginTop: 6,
+        marginBottom: 16,
+        fontFamily: 'Nunito-Medium',
     },
-    successEmail: {
-        fontSize: FONT_SIZES.md,
-        color: COLORS.primary,
-        fontWeight: FONT_WEIGHTS.semibold,
-        textAlign: 'center',
-        marginBottom: SPACING.lg,
-    },
-    stepsContainer: {
-        alignSelf: 'stretch',
-        backgroundColor: COLORS.surface,
-        borderRadius: BORDER_RADIUS.xl,
-        padding: SPACING.lg,
-        marginBottom: SPACING.lg,
-        gap: SPACING.md,
-        ...SHADOWS.sm,
-    },
-    stepItem: {
+    emailPill: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: SPACING.md,
+        gap: 8,
+        backgroundColor: C.primarySurface,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 24,
+        marginBottom: 32,
     },
-    stepNumber: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+    emailPillText: {
+        fontSize: 14,
+        fontFamily: 'Nunito-Bold',
+        color: C.navyMid,
+    },
+    stepsList: {
+        alignSelf: 'stretch',
+        backgroundColor: C.white,
+        borderRadius: 24,
+        padding: 20,
+        marginBottom: 32,
+        gap: 16,
+        shadowColor: C.navyMid,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.05,
+        shadowRadius: 16,
+        elevation: 3,
+    },
+    stepRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 16,
+    },
+    stepNum: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: C.primarySurface,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    stepNumberText: {
-        fontSize: FONT_SIZES.sm,
-        fontWeight: FONT_WEIGHTS.bold,
+    stepNumText: {
+        fontSize: 14,
+        fontFamily: 'Nunito-ExtraBold',
+        color: C.navyMid,
     },
     stepText: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.textPrimary,
-        fontWeight: FONT_WEIGHTS.medium,
+        fontSize: 15,
+        color: C.textPrimary,
+        fontFamily: 'Nunito-SemiBold',
     },
-    successButton: {
-        marginTop: SPACING.sm,
+    successCTA: {
+        alignSelf: 'stretch',
+        borderRadius: 16,
+        overflow: 'hidden',
+        elevation: 4,
     },
-    resendLink: {
+    successCTAGradient: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: SPACING.xs,
-        marginTop: SPACING.lg,
-        padding: SPACING.sm,
+        justifyContent: 'center',
+        gap: 10,
+        paddingVertical: 18,
+    },
+    successCTAText: {
+        fontSize: 16,
+        fontFamily: 'Nunito-Bold',
+        color: C.white,
+    },
+    resendRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 24,
     },
     resendText: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.primary,
-        fontWeight: FONT_WEIGHTS.medium,
+        fontSize: 14,
+        color: C.navyMid,
+        fontFamily: 'Nunito-Bold',
     },
     spamNote: {
-        fontSize: FONT_SIZES.xs,
-        color: COLORS.textTertiary,
+        fontSize: 12,
+        color: C.textTertiary,
         textAlign: 'center',
-        marginTop: SPACING.sm,
-    },
-    divider: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginVertical: SPACING.lg,
-    },
-    dividerLine: {
-        flex: 1,
-        height: 1,
-        backgroundColor: COLORS.gray300,
-    },
-    dividerText: {
-        marginHorizontal: SPACING.md,
-        color: COLORS.textSecondary,
-        fontSize: FONT_SIZES.sm,
-    },
-    socialButton: {
-        marginBottom: SPACING.md,
-    },
-    socialButtonContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: SPACING.sm,
-    },
-    socialButtonText: {
-        fontSize: FONT_SIZES.md,
-        color: COLORS.textPrimary,
-        fontWeight: FONT_WEIGHTS.medium,
-    },
-    divider: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginVertical: SPACING.lg,
-    },
-    dividerLine: {
-        flex: 1,
-        height: 1,
-        backgroundColor: COLORS.gray300,
-    },
-    dividerText: {
-        marginHorizontal: SPACING.md,
-        color: COLORS.textSecondary,
-        fontSize: FONT_SIZES.sm,
-    },
-    socialButton: {
-        marginBottom: SPACING.md,
-    },
-    socialButtonContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: SPACING.sm,
-    },
-    socialButtonText: {
-        fontSize: FONT_SIZES.md,
-        color: COLORS.textPrimary,
-        fontWeight: FONT_WEIGHTS.medium,
+        marginTop: 8,
+        fontFamily: 'Nunito-Medium',
     },
 });

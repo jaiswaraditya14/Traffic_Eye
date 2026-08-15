@@ -1,247 +1,205 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Dimensions } from 'react-native';
+import {
+    View, Text, StyleSheet, ScrollView,
+    TouchableOpacity, StatusBar,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MobileContainer } from '../../components';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS } from '../../utils';
+import { LinearGradient } from 'expo-linear-gradient';
+import { TRAFFIC_RULES, SAFETY_TIPS } from '../../data/trafficData';
+import { FocusAwareStatusBar } from '../../components';
 
-const { width } = Dimensions.get('window');
-
-const TIPS_DATA = {
-    helmet: {
-        title: 'Helmet Tips',
-        image: require('../../../assets/images/helmet.png'),
-        sections: [
-            {
-                title: 'Safety Tips: Always Wear a Helmet',
-                content: 'A helmet is the single most effective way to reduce head injuries and fatalities from motorcycle and bicycle crashes.'
-            },
-            {
-                title: 'Basic Construction',
-                content: '• Rigid outer shell\n• Impact absorbing liner\n• Comfort/fit padding\n• Retention system (strap)\n• Face shield / Eye protection'
-            },
-            {
-                title: 'Material & Protective Quality',
-                content: 'Ensure your helmet meets safety standards (like DOT, ECE, or ISI). High-quality materials like polycarbonate or carbon fiber provide better protection.'
-            },
-            {
-                title: 'Sizes & Fitment',
-                content: 'A helmet should fit snugly but not be painfully tight. It should stay in place when you shake your head.'
-            },
-            {
-                title: 'Helmet Rules',
-                content: 'Both rider and pillion must wear BIS-certified helmets. Failure to do so can result in heavy fines and license suspension.'
-            }
-        ]
-    },
-    seatbelt: {
-        title: 'Seat Belt Tips',
-        image: require('../../../assets/images/seatbelt.png'),
-        sections: [
-            {
-                title: 'Latching the 3-Point Seat Belt',
-                content: '1. Adjust seat to proper driving position.\n2. Pull belt across body without twisting.\n3. Insert latch into buckle until it clicks.\n4. Tug to ensure it is securely fastened.\n5. Snug belt across hips/thighs and center shoulder belt across chest.'
-            },
-            {
-                title: 'Safety Benefits',
-                content: 'Seat belts keep you inside the vehicle and prevent you from being thrown against the interior or through the windshield during a crash.'
-            }
-        ]
-    },
-    speeding: {
-        title: 'Speeding Tips',
-        image: require('../../../assets/images/crosspath.png'),
-        sections: [
-            {
-                title: 'Common Crash Scenarios',
-                content: '• Right Hook: Vehicle turns right into opposite direction cyclist.\n• Left Hook: Vehicle turns left while cyclist is traveling straight.'
-            },
-            {
-                title: 'Defensive Driving',
-                content: '• Don\'t change position abruptly in a group.\n• Don\'t ride the brakes unnecessarily - maintain smooth control.\n• Brake early when you see others braking ahead.'
-            },
-            {
-                title: 'Impact of Speed',
-                content: 'Higher speeds reduce your reaction time and increase the severity of any impact. Always follow posted speed limits.'
-            }
-        ]
-    }
+const C = {
+    navy: '#002452', navyMid: '#1B3A6B',
+    amber: '#F59E0B', amberSurface: '#FEF3C7',
+    white: '#FFFFFF', offWhite: '#F8F9FB', surface: '#FFFFFF',
+    textPrimary: '#191C1E', textSecondary: '#44474F', textTertiary: '#747780',
+    border: '#EAECEF',
+    success: '#059669', successSurface: '#D1FAE5',
+    error: '#BA1A1A', errorSurface: '#FEF2F2',
 };
 
+const TABS = ['Traffic Rules', 'Safety Checklist'];
+
 export default function SafetyTips({ navigation }) {
-    const [activeTab, setActiveTab] = useState('helmet');
-
-    const renderHeader = () => (
-        <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Safety Tips</Text>
-            <View style={{ width: 40 }} />
-        </View>
-    );
-
-    const renderTabs = () => (
-        <View style={styles.tabContainer}>
-            <TouchableOpacity
-                style={[styles.tab, activeTab === 'helmet' && styles.activeTab]}
-                onPress={() => setActiveTab('helmet')}
-            >
-                <Ionicons name="bicycle" size={24} color={activeTab === 'helmet' ? COLORS.primary : COLORS.gray500} />
-                <Text style={[styles.tabText, activeTab === 'helmet' && styles.activeTabText]}>Helmet</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-                style={[styles.tab, activeTab === 'seatbelt' && styles.activeTab]}
-                onPress={() => setActiveTab('seatbelt')}
-            >
-                <Ionicons name="shield-checkmark" size={23} color={activeTab === 'seatbelt' ? COLORS.primary : COLORS.gray500} />
-                <Text style={[styles.tabText, activeTab === 'seatbelt' && styles.activeTabText]}>Seat Belt</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-                style={[styles.tab, activeTab === 'speeding' && styles.activeTab]}
-                onPress={() => setActiveTab('speeding')}
-            >
-                <Ionicons name="speedometer" size={24} color={activeTab === 'speeding' ? COLORS.primary : COLORS.gray500} />
-                <Text style={[styles.tabText, activeTab === 'speeding' && styles.activeTabText]}>Speeding</Text>
-            </TouchableOpacity>
-        </View>
-    );
-
-    const data = TIPS_DATA[activeTab];
+    const [activeTab, setActiveTab] = useState(0);
 
     return (
-        <MobileContainer>
-            <SafeAreaView style={styles.container} edges={['top']}>
-                {renderHeader()}
-                {renderTabs()}
+        <View style={s.root}>
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
+            <SafeAreaView style={s.safe} edges={['top']}>
 
-                <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-                    <View style={styles.imageContainer}>
-                        <Image
-                            source={data.image}
-                            style={styles.mainImage}
-                            resizeMode="contain"
-                        />
+                {/* Header */}
+                <LinearGradient colors={[C.navy, C.navyMid]} style={s.header}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
+                        <Ionicons name="arrow-back" size={20} color={C.white} />
+                    </TouchableOpacity>
+                    <View style={{ flex: 1 }}>
+                        <Text style={s.headerTitle}>Road Safety Guide</Text>
+                        <Text style={s.headerSub}>MoRTH · MV Act 1988 · IRC Guidelines</Text>
                     </View>
+                    <View style={s.headerIcon}>
+                        <Ionicons name="shield-checkmark" size={22} color={C.amber} />
+                    </View>
+                </LinearGradient>
 
-                    <Text style={styles.screenTitle}>{data.title}</Text>
+                {/* Tabs */}
+                <View style={s.tabBar}>
+                    {TABS.map((tab, idx) => {
+                        const active = idx === activeTab;
+                        return (
+                            <TouchableOpacity
+                                key={idx}
+                                style={[s.tab, active && s.tabActive]}
+                                onPress={() => setActiveTab(idx)}
+                                activeOpacity={0.8}
+                            >
+                                <Ionicons
+                                    name={idx === 0 ? 'book-outline' : 'checkmark-circle-outline'}
+                                    size={16}
+                                    color={active ? C.navy : C.textTertiary}
+                                />
+                                <Text style={[s.tabText, active && s.tabTextActive]}>{tab}</Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
 
-                    {data.sections.map((section, index) => (
-                        <View key={index} style={styles.sectionCard}>
-                            <View style={styles.sectionHeader}>
-                                <Ionicons name="chevron-down" size={20} color={COLORS.primary} />
-                                <Text style={styles.sectionTitle}>{section.title}</Text>
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
+                    {activeTab === 0 ? (
+                        // ── Traffic Rules Tab ──
+                        <>
+                            {TRAFFIC_RULES.map((category, cidx) => (
+                                <View key={cidx} style={s.categoryBlock}>
+                                    {/* Category header */}
+                                    <View style={s.categoryHeader}>
+                                        <View style={[s.catIconBox, { backgroundColor: category.color + '18' }]}>
+                                            <Ionicons name={category.icon} size={18} color={category.color} />
+                                        </View>
+                                        <Text style={[s.categoryTitle, { color: category.color }]}>{category.category}</Text>
+                                    </View>
+
+                                    {/* Rules */}
+                                    {category.rules.map((rule, ridx) => (
+                                        <View key={ridx} style={[s.ruleCard, { borderLeftColor: category.color }]}>
+                                            <View style={s.ruleTop}>
+                                                <Text style={s.ruleTitle}>{rule.title}</Text>
+                                                <View style={s.shieldBadge}>
+                                                    <Ionicons name="shield-checkmark" size={14} color={C.success} />
+                                                </View>
+                                            </View>
+                                            <Text style={s.ruleExp}>{rule.explanation}</Text>
+                                            <View style={s.whyBox}>
+                                                <Text style={s.whyLabel}>WHY IT MATTERS</Text>
+                                                <Text style={s.whyText}>{rule.whyItMatters}</Text>
+                                            </View>
+                                        </View>
+                                    ))}
+                                </View>
+                            ))}
+                        </>
+                    ) : (
+                        // ── Safety Checklist Tab ──
+                        <View style={s.checklistCard}>
+                            <View style={s.checklistHeader}>
+                                <Ionicons name="checkmark-done-circle" size={22} color={C.success} />
+                                <Text style={s.checklistTitle}>Daily Safety Checklist</Text>
                             </View>
-                            <Text style={styles.sectionContent}>{section.content}</Text>
+                            <Text style={s.checklistSub}>Follow these every time you drive</Text>
+                            {SAFETY_TIPS.map((tip, idx) => (
+                                <View key={idx} style={s.tipRow}>
+                                    <View style={s.tipNumber}>
+                                        <Text style={s.tipNumberText}>{idx + 1}</Text>
+                                    </View>
+                                    <Text style={s.tipText}>{tip}</Text>
+                                </View>
+                            ))}
                         </View>
-                    ))}
-
+                    )}
                     <View style={{ height: 40 }} />
                 </ScrollView>
             </SafeAreaView>
-        </MobileContainer>
+        </View>
     );
 }
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: COLORS.background,
-    },
+const s = StyleSheet.create({
+    root: { flex: 1, backgroundColor: C.offWhite },
+    safe: { flex: 1 },
+
+    // Header
     header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: SPACING.md,
-        paddingVertical: SPACING.md,
-        backgroundColor: COLORS.white,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.gray100,
-        ...SHADOWS.sm
+        flexDirection: 'row', alignItems: 'center',
+        paddingHorizontal: 18, paddingTop: 14, paddingBottom: 20,
+        borderBottomLeftRadius: 24, borderBottomRightRadius: 24, gap: 12,
     },
-    backButton: {
-        padding: SPACING.xs,
+    backBtn: {
+        width: 36, height: 36, borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        justifyContent: 'center', alignItems: 'center',
     },
-    headerTitle: {
-        fontSize: FONT_SIZES.lg,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
+    headerTitle: { fontSize: 19, fontFamily: 'Nunito-Bold', color: C.white, letterSpacing: -0.3 },
+    headerSub: { fontSize: 11, fontFamily: 'Nunito-Medium', color: 'rgba(255,255,255,0.65)', marginTop: 2 },
+    headerIcon: {
+        width: 38, height: 38, borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        justifyContent: 'center', alignItems: 'center',
     },
-    tabContainer: {
-        flexDirection: 'row',
-        backgroundColor: COLORS.white,
-        paddingVertical: SPACING.sm,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.gray100,
+
+    // Tabs
+    tabBar: {
+        flexDirection: 'row', marginHorizontal: 18, marginTop: 16,
+        backgroundColor: C.surface, borderRadius: 12, padding: 4,
+        shadowColor: C.navy, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
     },
     tab: {
-        flex: 1,
-        alignItems: 'center',
-        paddingVertical: SPACING.xs,
-        borderBottomWidth: 2,
-        borderBottomColor: 'transparent',
+        flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        paddingVertical: 10, gap: 6, borderRadius: 10,
     },
-    activeTab: {
-        borderBottomColor: COLORS.primary,
+    tabActive: { backgroundColor: C.offWhite },
+    tabText: { fontSize: 13, fontFamily: 'Nunito-SemiBold', color: C.textTertiary },
+    tabTextActive: { color: C.navy, fontFamily: 'Nunito-Bold' },
+
+    scrollContent: { paddingHorizontal: 18, paddingTop: 16 },
+
+    // Category blocks (Rules tab)
+    categoryBlock: { marginBottom: 24 },
+    categoryHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+    catIconBox: { width: 38, height: 38, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+    categoryTitle: { fontSize: 16, fontFamily: 'Nunito-Bold' },
+
+    ruleCard: {
+        backgroundColor: C.surface, borderRadius: 16, padding: 16, marginBottom: 10,
+        borderLeftWidth: 4,
+        shadowColor: C.navy, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
     },
-    tabText: {
-        fontSize: 10,
-        color: COLORS.gray500,
-        fontWeight: FONT_WEIGHTS.medium,
-        marginTop: 2,
+    ruleTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+    ruleTitle: { fontSize: 15, fontFamily: 'Nunito-Bold', color: C.textPrimary, flex: 1 },
+    shieldBadge: {
+        width: 26, height: 26, borderRadius: 13,
+        backgroundColor: C.successSurface, justifyContent: 'center', alignItems: 'center',
     },
-    activeTabText: {
-        color: COLORS.primary,
-        fontWeight: FONT_WEIGHTS.bold,
+    ruleExp: { fontSize: 13, color: C.textSecondary, fontFamily: 'Nunito-Medium', lineHeight: 19 },
+    whyBox: {
+        marginTop: 12, padding: 10,
+        backgroundColor: C.amberSurface, borderRadius: 10,
     },
-    content: {
-        flex: 1,
-        padding: SPACING.lg,
+    whyLabel: { fontSize: 9, fontFamily: 'Nunito-ExtraBold', color: C.textTertiary, letterSpacing: 0.5, marginBottom: 3 },
+    whyText: { fontSize: 12, fontFamily: 'Nunito-SemiBold', color: C.textPrimary, lineHeight: 17 },
+
+    // Checklist tab
+    checklistCard: {
+        backgroundColor: C.surface, borderRadius: 20, padding: 20,
+        shadowColor: C.navy, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.07, shadowRadius: 14, elevation: 4,
     },
-    imageContainer: {
-        width: '100%',
-        height: 220,
-        backgroundColor: COLORS.white,
-        borderRadius: BORDER_RADIUS.xl,
-        overflow: 'hidden',
-        marginBottom: SPACING.lg,
-        justifyContent: 'center',
-        alignItems: 'center',
-        ...SHADOWS.md
+    checklistHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 },
+    checklistTitle: { fontSize: 17, fontFamily: 'Nunito-Bold', color: C.textPrimary },
+    checklistSub: { fontSize: 12, color: C.textTertiary, fontFamily: 'Nunito-Medium', marginBottom: 18, marginLeft: 2 },
+    tipRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 14 },
+    tipNumber: {
+        width: 26, height: 26, borderRadius: 8,
+        backgroundColor: C.navy + '12', justifyContent: 'center', alignItems: 'center', marginTop: 1,
     },
-    mainImage: {
-        width: '90%',
-        height: '90%',
-    },
-    screenTitle: {
-        fontSize: FONT_SIZES.xl,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
-        marginBottom: SPACING.md,
-    },
-    sectionCard: {
-        backgroundColor: COLORS.white,
-        borderRadius: BORDER_RADIUS.lg,
-        padding: SPACING.md,
-        marginBottom: SPACING.md,
-        ...SHADOWS.sm,
-    },
-    sectionHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: SPACING.sm,
-        gap: SPACING.xs
-    },
-    sectionTitle: {
-        fontSize: FONT_SIZES.md,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
-    },
-    sectionContent: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.textSecondary,
-        lineHeight: 20,
-    }
+    tipNumberText: { fontSize: 11, fontFamily: 'Nunito-ExtraBold', color: C.navy },
+    tipText: { flex: 1, fontSize: 14, color: C.textSecondary, fontFamily: 'Nunito-Medium', lineHeight: 20 },
 });

@@ -1,37 +1,54 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, ScrollView, ActivityIndicator, Animated, Modal } from 'react-native';
+import {
+    View, Text, StyleSheet, TouchableOpacity, Image, Alert, ScrollView,
+    ActivityIndicator, Animated, Modal, StatusBar, TextInput,
+} from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MobileContainer, Button, Input, ImageCropModal } from '../../components';
+import { MobileContainer, FocusAwareStatusBar } from '../../components';
 import { useAppContext } from '../../context';
 import { useImagePicker, useLocation } from '../../hooks';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS, GRADIENTS } from '../../utils';
+import * as MediaLibrary from 'expo-media-library';
+import { parseExifGPS } from '../../utils';
+
+// ── Design Tokens ──
+const C = {
+    navy: '#0A1E3F',
+    navyMid: '#0F2C59',
+    amber: '#D97706',
+    amberDark: '#B45309',
+    white: '#FFFFFF',
+    offWhite: '#F4F6F9',
+    surface: '#FFFFFF',
+    surfaceInput: '#F1F5F9',
+    textPrimary: '#0F172A',
+    textSecondary: '#475569',
+    textTertiary: '#64748B',
+    border: '#CBD5E1',
+    success: '#15803D',
+    successSurface: '#DCFCE7',
+    warning: '#B45309',
+    warningSurface: '#FEF3C7',
+    error: '#B91C1C',
+    primarySurface: '#EFF6FF',
+    info: '#0F2C59',
+};
 
 export default function NewReport({ navigation }) {
     const {
-        image,
-        setImage,
-        exifData,
-        pickFromGallery: pickImageGallery,
-        captureFromCamera: takePhoto,
-        pickVideoFromGallery: pickVideoGallery,
-        captureVideoFromCamera: recordVideo
+        image, setImage, pickFromGallery, captureFromCamera,
+        pickVideoFromGallery, captureVideoFromCamera
     } = useImagePicker();
+    const insets = useSafeAreaInsets();
 
     const {
-        location,
-        address,
-        setAddress,
-        loading: loadingLocation,
-        detectLocation,
-        setManualLocation,
-        reverseGeocodeFromCoords
+        location, address, setAddress, locationSource, loading: loadingLocation,
+        detectLocation, setManualLocation, reverseGeocodeFromCoords
     } = useLocation();
 
-    const [trustLevel, setTrustLevel] = useState(null); // 'Verified Location', 'Gallery Upload', 'Needs Verification / Manual Location'
-    
+    const [trustLevel, setTrustLevel] = useState(null);
     const [isMapVisible, setIsMapVisible] = useState(false);
     const [selectedCoordinate, setSelectedCoordinate] = useState(null);
     const [mapRegion, setMapRegion] = useState({
@@ -44,13 +61,10 @@ export default function NewReport({ navigation }) {
     const [video, setVideo] = useState(null);
     const [mediaType, setMediaType] = useState(null);
     const [description, setDescription] = useState('');
+    const [focusedDesc, setFocusedDesc] = useState(false);
+    const [fullscreenImage, setFullscreenImage] = useState(null);
 
-    // Crop modal state
-    const [showCropModal, setShowCropModal] = useState(false);
-    const [pendingCropUri, setPendingCropUri] = useState(null);
-    const [pendingExif, setPendingExif] = useState(null);
 
-    // Auto-fill animation state: null | 'extracting' | 'fallback-gps' | 'success' | 'no-gps'
     const [autoFillStatus, setAutoFillStatus] = useState(null);
     const bannerAnim = useRef(new Animated.Value(0)).current;
     const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -58,33 +72,21 @@ export default function NewReport({ navigation }) {
 
     const { setCurrentReport } = useAppContext();
 
-    // Animate banner in
     const showBanner = useCallback((status) => {
         if (bannerTimer.current) clearTimeout(bannerTimer.current);
         setAutoFillStatus(status);
         bannerAnim.setValue(0);
-        Animated.spring(bannerAnim, {
-            toValue: 1,
-            friction: 8,
-            tension: 40,
-            useNativeDriver: true,
-        }).start();
+        Animated.spring(bannerAnim, { toValue: 1, friction: 8, tension: 40, useNativeDriver: true }).start();
     }, [bannerAnim]);
 
-    // Animate banner out
     const hideBanner = useCallback((delay = 3000) => {
         bannerTimer.current = setTimeout(() => {
-            Animated.timing(bannerAnim, {
-                toValue: 0,
-                duration: 300,
-                useNativeDriver: true,
-            }).start(() => setAutoFillStatus(null));
+            Animated.timing(bannerAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => setAutoFillStatus(null));
         }, delay);
     }, [bannerAnim]);
 
-    // Pulse animation for the extracting/fallback states
     useEffect(() => {
-        if (autoFillStatus === 'extracting' || autoFillStatus === 'fallback-gps') {
+        if (autoFillStatus === 'extracting' || autoFillStatus === 'fallback-gps' || autoFillStatus === 'reading') {
             const pulse = Animated.loop(
                 Animated.sequence([
                     Animated.timing(pulseAnim, { toValue: 0.6, duration: 600, useNativeDriver: true }),
@@ -98,118 +100,113 @@ export default function NewReport({ navigation }) {
         }
     }, [autoFillStatus, pulseAnim]);
 
-    // Cleanup timer on unmount
-    useEffect(() => {
-        return () => { if (bannerTimer.current) clearTimeout(bannerTimer.current); };
-    }, []);
+    useEffect(() => { return () => { if (bannerTimer.current) clearTimeout(bannerTimer.current); }; }, []);
 
-    // Extract GPS from EXIF data and auto-fill address with visual feedback
-    // Falls back to live GPS if no EXIF location found
-    const extractAddressFromExif = useCallback(async (exif) => {
-        const lat = exif?.GPSLatitude;
-        const lng = exif?.GPSLongitude;
+    const handleLocationExtraction = useCallback(async (exif, source, assetId) => {
+        // Show reading banner immediately for instant feedback
+        showBanner('reading');
 
-        if (lat && lng && lat !== 0 && lng !== 0) {
-            // Show extracting state
-            showBanner('extracting');
+        let lat = null;
+        let lng = null;
+        let coordSource = null; // 'IMAGE_EXIF' | 'MEDIA_LIBRARY'
 
-            const result = await reverseGeocodeFromCoords(lat, lng);
-            if (result) {
-                // Show success state
-                showBanner('success');
-                hideBanner(4000);
+        // ── Strategy 1: EXIF GPS Parsing (Android flat keys, iOS {GPS}, DMS, rationals) ──
+        if (exif) {
+            console.log(`[GPS Extraction] Strategy 1 — Parsing raw ${source} image EXIF data...`);
+            const exifCoords = parseExifGPS(exif);
+            if (exifCoords) {
+                lat = exifCoords.lat;
+                lng = exifCoords.lng;
+                coordSource = 'IMAGE_EXIF';
+                console.log(`[GPS Extraction] ✅ EXIF GPS: lat=${lat}, lng=${lng}`);
             } else {
-                // Geocoding failed, fallback to live GPS
-                showBanner('fallback-gps');
-                const gpsResult = await detectLocation();
-                if (gpsResult) {
-                    showBanner('success');
-                    hideBanner(4000);
-                } else {
-                    showBanner('no-gps');
-                    hideBanner(3000);
+                console.log('[GPS Extraction] EXIF data present but no valid GPS coordinates');
+            }
+        }
+
+        // ── Strategy 2: MediaLibrary.getAssetInfoAsync (Android EXIF stripped fallback) ──
+        if (lat === null && assetId) {
+            try {
+                console.log('[GPS Extraction] Strategy 2 — Trying MediaLibrary lookup for assetId:', assetId);
+                const { status } = await MediaLibrary.requestPermissionsAsync();
+                const locPerm = await MediaLibrary.requestPermissionsAsync(true);
+                console.log('[GPS Extraction] MediaLibrary permission:', status, '| loc access:', locPerm.accessPrivileges);
+                if (status === 'granted') {
+                    const info = await MediaLibrary.getAssetInfoAsync(assetId, { shouldDownloadFromNetwork: false });
+                    console.log('[GPS Extraction] MediaLibrary location:', JSON.stringify(info?.location));
+                    const mlLat = info?.location?.latitude;
+                    const mlLng = info?.location?.longitude;
+                    if (
+                        mlLat != null && mlLng != null &&
+                        isFinite(mlLat) && isFinite(mlLng) &&
+                        !(mlLat === 0 && mlLng === 0) &&
+                        Math.abs(mlLat) <= 90 && Math.abs(mlLng) <= 180
+                    ) {
+                        lat = mlLat;
+                        lng = mlLng;
+                        coordSource = 'MEDIA_LIBRARY';
+                        console.log(`[GPS Extraction] ✅ MediaLibrary GPS: lat=${lat}, lng=${lng}`);
+                    } else {
+                        console.log('[GPS Extraction] MediaLibrary returned invalid/empty location');
+                    }
                 }
+            } catch (e) {
+                console.warn('[GPS Extraction] MediaLibrary lookup failed:', e.message);
+            }
+        }
+
+        // ── Reverse-geocode if valid image GPS coordinates were found ──────────────
+        if (lat !== null && lng !== null) {
+            showBanner('extracting');
+            try {
+                // guardUserInput=true: do NOT overwrite an address the user already typed
+                const result = await reverseGeocodeFromCoords(lat, lng, coordSource, true);
+                if (result) { showBanner('success'); hideBanner(4000); }
+                else { showBanner('no-gps'); hideBanner(3000); }
+            } catch (e) {
+                console.warn('[GPS Extraction] Reverse geocoding failed:', e.message);
+                showBanner('no-gps'); hideBanner(3000);
             }
         } else {
-            // No EXIF GPS — fallback to live GPS automatically
+            // ── Strategy 3: Fallback to live device GPS ───────────────────────────
+            console.log('[GPS Extraction] ⚠️ No image GPS — falling back to live device GPS (≤10m radius)');
             showBanner('fallback-gps');
-            const gpsResult = await detectLocation();
+            // guardUserInput=true: do NOT overwrite user-typed address
+            const gpsResult = await detectLocation(true, true);
             if (gpsResult) {
                 showBanner('success');
                 hideBanner(4000);
             } else {
+                console.log('[GPS Extraction] Live GPS also unavailable — user must enter manually');
                 showBanner('no-gps');
                 hideBanner(3000);
+                setAutoFillStatus(null);
             }
         }
     }, [reverseGeocodeFromCoords, detectLocation, showBanner, hideBanner]);
 
     const handleTakePhoto = async () => {
-        const result = await takePhoto();
-        if (result) {
-            setVideo(null);
-            setMediaType('image');
-            // Open crop modal to allow zoom/crop
-            setPendingCropUri(result.uri);
-            setPendingExif(result.exif || null);
-            setShowCropModal(true);
+        const result = await captureFromCamera();
+        if (result?.uri) {
+            setVideo(null); setMediaType('image');
+            // Native OS crop already applied — use the URI directly
+            await handleCropDone(result.uri, result.exif || null, 'camera');
         }
     };
 
     const handlePickImage = async () => {
-        const result = await pickImageGallery();
-        if (result) {
-            setVideo(null);
-            setMediaType('image');
-            // Open crop modal to allow zoom/crop
-            setPendingCropUri(result.uri);
-            setPendingExif(result.exif || null);
-            setShowCropModal(true);
+        const result = await pickFromGallery();
+        if (result?.uri) {
+            setVideo(null); setMediaType('image');
+            await handleCropDone(result.uri, result.exif || null, 'gallery', result.assetId || null);
         }
     };
 
-    // Called when user finishes cropping or skips
-    const handleCropDone = async (croppedUri) => {
-        setShowCropModal(false);
-        setImage(croppedUri);
-        setPendingCropUri(null);
-        // Extract address from EXIF GPS (if available)
-        await extractAddressFromExif(pendingExif);
-        setPendingExif(null);
-    };
-
-    const handleCropCancel = async () => {
-        setShowCropModal(false);
-        // Use original image without cropping
-        if (pendingCropUri) {
-            setImage(pendingCropUri);
-        }
-        setPendingCropUri(null);
-        // Still extract address from EXIF GPS
-        await extractAddressFromExif(pendingExif);
-        setPendingExif(null);
-    };
-
-    const handleRecordVideo = async () => {
-        const uri = await recordVideo();
-        if (uri) {
-            setImage(null);
-            setVideo(uri);
-            setMediaType('video');
-            setTrustLevel('Verified Location');
-            detectLocation();
-        }
-    };
-
-    const handlePickVideo = async () => {
-        const uri = await pickVideoGallery();
-        if (uri) {
-            setImage(null);
-            setVideo(uri);
-            setMediaType('video');
-            setTrustLevel('Needs Verification / Manual Location');
-            Alert.alert('Notice', 'Please use the GPS button or enter the location manually.');
-        }
+    const handleCropDone = async (uri, exif, source, assetId = null) => {
+        // Add cache-buster to force refresh
+        const uriWithCache = `${uri}?t=${new Date().getTime()}`;
+        setImage(uriWithCache);
+        await handleLocationExtraction(exif, source, assetId);
     };
 
     const handleDetectLocation = async () => {
@@ -221,17 +218,10 @@ export default function NewReport({ navigation }) {
     };
 
     const handleSubmit = () => {
-        if (!image && !video) {
-            Alert.alert('Error', 'Please capture or select an image or video');
-            return;
-        }
+        if (!image && !video) { Alert.alert('Error', 'Please capture or select an image or video'); return; }
         setCurrentReport({
-            image,
-            video,
-            mediaType,
-            description,
-            address,
-            location,
+            image, video, mediaType, description, address, location,
+            locationSource: locationSource || null,
             trustLevel: trustLevel || 'Needs Verification / Manual Location',
             timestamp: new Date()
         });
@@ -239,576 +229,522 @@ export default function NewReport({ navigation }) {
     };
 
     return (
-        <>
-            <MobileContainer>
-                <SafeAreaView style={styles.container} edges={['top']}>
-                    {/* Header */}
-                    <View style={styles.header}>
-                        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                            <Ionicons name="arrow-back" size={20} color={COLORS.textPrimary} />
+        <View style={styles.container}>
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
+            <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+                {/* ── Navy Header ── */}
+                <LinearGradient colors={[C.navy, C.navyMid]} style={[styles.header, { paddingTop: insets.top + 16 }]}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                        <Ionicons name="arrow-back" size={20} color={C.white} />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>New Report</Text>
+                    <View style={{ width: 36 }} />
+                </LinearGradient>
+
+                {/* ── Report Type Toggle ── */}
+                <View style={styles.reportTypeBar}>
+                    <View style={styles.reportTypeToggle}>
+                        <View style={styles.reportTypeActiveTab}>
+                            <Ionicons name="flash" size={14} color={C.navy} />
+                            <Text style={styles.reportTypeActiveText}>AI Powered</Text>
+                        </View>
+                        <TouchableOpacity
+                            style={styles.reportTypeInactiveTab}
+                            onPress={() => navigation.replace('VideoReport')}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="videocam-outline" size={14} color={C.textTertiary} />
+                            <Text style={styles.reportTypeInactiveText}>Video </Text>
                         </TouchableOpacity>
-                        <Text style={styles.title}>New Report</Text>
-                        <View style={{ width: 40 }} />
+                    </View>
+                </View>
+
+                <ScrollView
+                    style={styles.scrollContent}
+                    contentContainerStyle={styles.scrollInner}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    {/* ── Steps ── */}
+                    <View style={styles.stepIndicator}>
+                        <View style={styles.stepDotActive}>
+                            <Text style={styles.stepDotTextActive}>1</Text>
+                        </View>
+                        <View style={styles.stepLineActive} />
+                        <View style={image || video ? styles.stepDotActive : styles.stepDot}>
+                            <Text style={image || video ? styles.stepDotTextActive : styles.stepDotText}>2</Text>
+                        </View>
+                        <View style={styles.stepLine} />
+                        <View style={styles.stepDot}>
+                            <Text style={styles.stepDotText}>3</Text>
+                        </View>
+                    </View>
+                    <Text style={styles.stepHeader}>Step 1: Capture Evidence</Text>
+
+                    {/* ── Media Preview ── */}
+                    <TouchableOpacity
+                        style={styles.imageContainer}
+                        onPress={() => image ? setFullscreenImage(image) : undefined}
+                        activeOpacity={image ? 0.9 : 1}
+                    >
+                        {image ? (
+                            <>
+                                <Image
+                                    key={image}
+                                    source={{ uri: image }}
+                                    style={styles.mediaImage}
+                                />
+                                {/* Tap-to-preview hint badge */}
+                                <View style={styles.changeImgBadge}>
+                                    <Ionicons name="expand" size={14} color={C.white} />
+                                    <Text style={styles.changeImgText}>Tap to preview</Text>
+                                </View>
+                            </>
+                        ) : (
+                            <View style={styles.cameraPlaceholder}>
+                                <Ionicons name="camera-outline" size={48} color={C.textTertiary} />
+                                <Text style={styles.placeholderText}>Capture Evidence</Text>
+                                <Text style={styles.placeholderSub}>AI will auto-detect plate & violation</Text>
+                                <View style={styles.scannerOverlay}>
+                                    <View style={styles.scannerCorners} />
+                                </View>
+                            </View>
+                        )}
+                    </TouchableOpacity>
+
+                    {/* ── Action Buttons ── */}
+                    <View style={styles.mediaBtnRow}>
+                        {!image && (
+                            <TouchableOpacity style={styles.mediaBtn} onPress={handleTakePhoto} activeOpacity={0.8}>
+                                <LinearGradient colors={[C.navy, C.navyMid]} style={styles.mediaBtnGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                                    <Ionicons name="camera" size={18} color={C.white} />
+                                    <Text style={styles.mediaBtnText}>Photo</Text>
+                                </LinearGradient>
+                            </TouchableOpacity>
+                        )}
+                        <TouchableOpacity style={image ? styles.retakeBtn : styles.mediaBtnOutline} onPress={handlePickImage} activeOpacity={0.8}>
+                            <Ionicons name={image ? "refresh" : "images"} size={18} color={image ? C.textSecondary : C.navyMid} />
+                            <Text style={image ? styles.retakeBtnText : styles.mediaBtnOutlineText}>{image ? 'Choose Another' : 'Gallery'}</Text>
+                        </TouchableOpacity>
                     </View>
 
-                    <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                        <View style={styles.content}>
-                            {/* Step Indicator */}
-                            <View style={styles.stepIndicator}>
-                                <View style={styles.stepDot}>
-                                    <Text style={styles.stepDotText}>1</Text>
-                                </View>
-                                <View style={styles.stepLine} />
-                                <View style={[styles.stepDot, !image && !video && styles.stepDotInactive]}>
-                                    <Text style={[styles.stepDotText, !image && !video && styles.stepDotTextInactive]}>2</Text>
-                                </View>
-                                <View style={styles.stepLine} />
-                                <View style={[styles.stepDot, styles.stepDotInactive]}>
-                                    <Text style={[styles.stepDotText, styles.stepDotTextInactive]}>3</Text>
-                                </View>
-                            </View>
 
-                            {/* Media Capture Area */}
-                            <View style={styles.imageContainer}>
-                                {image ? (
-                                    <Image source={{ uri: image }} style={styles.image} />
-                                ) : video ? (
-                                    <View style={styles.videoPlaceholder}>
-                                        <View style={styles.videoIconBg}>
-                                            <Ionicons name="videocam" size={40} color={COLORS.primary} />
-                                        </View>
-                                        <Text style={styles.videoText}>Video Selected</Text>
-                                        <Text style={styles.videoSubtext}>Ready to submit</Text>
-                                    </View>
-                                ) : (
-                                    <View style={styles.placeholder}>
-                                        <View style={styles.placeholderIconBg}>
-                                            <Ionicons name="camera" size={36} color={COLORS.textTertiary} />
-                                        </View>
-                                        <Text style={styles.placeholderText}>
-                                            Capture or select violation evidence
-                                        </Text>
-                                        <Text style={styles.placeholderSubtext}>
-                                            Photo or video up to 15 seconds
-                                        </Text>
-                                    </View>
-                                )}
-                            </View>
-
-                            {/* Photo Buttons */}
-                            <View style={styles.mediaButtons}>
-                                <TouchableOpacity onPress={handleTakePhoto} style={styles.mediaBtn} activeOpacity={0.7}>
-                                    <LinearGradient colors={GRADIENTS.primary} style={styles.mediaBtnGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                                        <Ionicons name="camera" size={20} color="#FFF" />
-                                        <Text style={styles.mediaBtnText}>Photo</Text>
-                                    </LinearGradient>
-                                </TouchableOpacity>
-                                <TouchableOpacity onPress={handlePickImage} style={[styles.mediaBtn, styles.mediaBtnOutline]} activeOpacity={0.7}>
-                                    <Ionicons name="images" size={20} color={COLORS.primary} />
-                                    <Text style={styles.mediaBtnOutlineText}>Gallery</Text>
-                                </TouchableOpacity>
-                            </View>
-
-                            <View style={styles.mediaButtons}>
-                                <TouchableOpacity onPress={handleRecordVideo} style={styles.mediaBtn} activeOpacity={0.7}>
-                                    <LinearGradient colors={GRADIENTS.secondary} style={styles.mediaBtnGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                                        <Ionicons name="videocam" size={20} color="#FFF" />
-                                        <Text style={styles.mediaBtnText}>Record</Text>
-                                    </LinearGradient>
-                                </TouchableOpacity>
-                                <TouchableOpacity onPress={handlePickVideo} style={[styles.mediaBtn, styles.mediaBtnOutline]} activeOpacity={0.7}>
-                                    <Ionicons name="film" size={20} color={COLORS.secondary} />
-                                    <Text style={[styles.mediaBtnOutlineText, { color: COLORS.secondary }]}>Pick Video</Text>
-                                </TouchableOpacity>
-                            </View>
-
-                            {/* Auto-fill Status Banner */}
-                            {autoFillStatus && (
-                                <Animated.View
-                                    style={[
-                                        styles.autoFillBanner,
-                                        autoFillStatus === 'extracting' && styles.autoFillBannerExtracting,
-                                        autoFillStatus === 'fallback-gps' && styles.autoFillBannerExtracting,
-                                        autoFillStatus === 'success' && styles.autoFillBannerSuccess,
-                                        autoFillStatus === 'no-gps' && styles.autoFillBannerWarning,
-                                        {
-                                            opacity: bannerAnim,
-                                            transform: [{
-                                                translateY: bannerAnim.interpolate({
-                                                    inputRange: [0, 1],
-                                                    outputRange: [-20, 0],
-                                                }),
-                                            }, {
-                                                scale: bannerAnim.interpolate({
-                                                    inputRange: [0, 1],
-                                                    outputRange: [0.95, 1],
-                                                }),
-                                            }],
-                                        },
-                                    ]}
-                                >
-                                    {autoFillStatus === 'extracting' && (
-                                        <>
-                                            <Animated.View style={{ opacity: pulseAnim }}>
-                                                <View style={styles.autoFillIconBg}>
-                                                    <Ionicons name="scan" size={18} color={COLORS.primary} />
-                                                </View>
-                                            </Animated.View>
-                                            <View style={styles.autoFillTextContainer}>
-                                                <Text style={styles.autoFillTitle}>Scanning image metadata...</Text>
-                                                <Text style={styles.autoFillSubtitle}>Extracting GPS location from photo</Text>
-                                            </View>
-                                            <ActivityIndicator size="small" color={COLORS.primary} />
-                                        </>
-                                    )}
-                                    {autoFillStatus === 'fallback-gps' && (
-                                        <>
-                                            <Animated.View style={{ opacity: pulseAnim }}>
-                                                <View style={styles.autoFillIconBg}>
-                                                    <Ionicons name="navigate" size={18} color={COLORS.info} />
-                                                </View>
-                                            </Animated.View>
-                                            <View style={styles.autoFillTextContainer}>
-                                                <Text style={[styles.autoFillTitle, { color: COLORS.info }]}>Using live GPS...</Text>
-                                                <Text style={styles.autoFillSubtitle}>No image GPS found, detecting your location</Text>
-                                            </View>
-                                            <ActivityIndicator size="small" color={COLORS.info} />
-                                        </>
-                                    )}
-                                    {autoFillStatus === 'success' && (
-                                        <>
-                                            <View style={[styles.autoFillIconBg, styles.autoFillIconSuccess]}>
-                                                <Ionicons name="checkmark-circle" size={18} color={COLORS.success} />
-                                            </View>
-                                            <View style={styles.autoFillTextContainer}>
-                                                <Text style={[styles.autoFillTitle, { color: COLORS.success }]}>Address auto-filled!</Text>
-                                                <Text style={styles.autoFillSubtitle}>Location detected successfully</Text>
-                                            </View>
-                                            <Ionicons name="checkmark-done" size={18} color={COLORS.success} />
-                                        </>
-                                    )}
-                                    {autoFillStatus === 'no-gps' && (
-                                        <>
-                                            <View style={[styles.autoFillIconBg, styles.autoFillIconWarning]}>
-                                                <Ionicons name="warning" size={18} color={COLORS.warning} />
-                                            </View>
-                                            <View style={styles.autoFillTextContainer}>
-                                                <Text style={[styles.autoFillTitle, { color: COLORS.warning }]}>Could not detect location</Text>
-                                                <Text style={styles.autoFillSubtitle}>Please enter address manually</Text>
-                                            </View>
-                                            <Ionicons name="create" size={18} color={COLORS.warning} />
-                                        </>
-                                    )}
-                                </Animated.View>
+                    {/* ── Auto Fill Banner ── */}
+                    {autoFillStatus && (
+                        <Animated.View
+                            style={[
+                                styles.banner,
+                                autoFillStatus === 'success' && { backgroundColor: C.successSurface, borderColor: C.success + '40' },
+                                autoFillStatus === 'no-gps' && { backgroundColor: C.warningSurface, borderColor: C.warning + '40' },
+                                { opacity: bannerAnim, transform: [{ scale: bannerAnim.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1] }) }] }
+                            ]}
+                        >
+                            {(autoFillStatus === 'extracting' || autoFillStatus === 'reading' || autoFillStatus === 'fallback-gps') && (
+                                <ActivityIndicator size="small" color={C.navyMid} style={{ marginRight: 4 }} />
                             )}
+                            {(autoFillStatus === 'success') && (
+                                <Ionicons name="checkmark-circle" size={20} color={C.success} />
+                            )}
+                            {(autoFillStatus === 'no-gps') && (
+                                <Ionicons name="warning" size={20} color={C.warning} />
+                            )}
+                            <Text style={[
+                                styles.bannerText,
+                                { color: autoFillStatus === 'success' ? C.success : autoFillStatus === 'no-gps' ? C.warning : C.navyMid }
+                            ]}>
+                                {autoFillStatus === 'reading' && 'Reading image metadata...'}
+                                {autoFillStatus === 'extracting' && 'Detecting location from photo...'}
+                                {autoFillStatus === 'fallback-gps' && 'Getting your current location...'}
+                                {autoFillStatus === 'success' && 'Location auto-detected!'}
+                                {autoFillStatus === 'no-gps' && 'No GPS data in this photo — enter manually'}
+                            </Text>
+                        </Animated.View>
+                    )}
 
-                            {/* Address with Auto-Detect */}
-                            <View style={styles.addressContainer}>
-                                <Input
-                                    label="Location Address"
-                                    placeholder="Enter address or use GPS..."
-                                    value={address}
-                                    onChangeText={setAddress}
-                                    multiline
-                                    numberOfLines={2}
-                                    inputStyle={styles.addressInput}
-                                />
-                                <View style={styles.locationButtonsWrapper}>
-                                    <TouchableOpacity
-                                        style={styles.mapButton}
-                                        onPress={() => setIsMapVisible(true)}
-                                        activeOpacity={0.8}
-                                    >
-                                        <LinearGradient
-                                            colors={GRADIENTS.secondary}
-                                            style={styles.locationButtonInner}
-                                            start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 1 }}
-                                        >
-                                            <Ionicons name="map" size={22} color={COLORS.white} />
-                                        </LinearGradient>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={styles.locationButtonRight}
-                                        onPress={handleDetectLocation}
-                                        disabled={loadingLocation}
-                                        activeOpacity={0.8}
-                                    >
-                                        <LinearGradient
-                                            colors={GRADIENTS.primary}
-                                            style={styles.locationButtonInner}
-                                            start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 1 }}
-                                        >
-                                            {loadingLocation ? (
-                                                <ActivityIndicator size="small" color={COLORS.white} />
-                                            ) : (
-                                                <Ionicons name="location" size={22} color={COLORS.white} />
-                                            )}
-                                        </LinearGradient>
-                                    </TouchableOpacity>
-                                </View>
+                    {/* ── Details ── */}
+                    <Text style={styles.stepHeader}>Step 2: Add Details</Text>
+
+                    <Text style={styles.fieldLabel}>Location Address</Text>
+                    <View style={styles.addressBox}>
+                        {/* Inline geocoding spinner — visible only while reverse geocoding */}
+                        {autoFillStatus === 'extracting' && (
+                            <View style={styles.inlineGeocodeRow}>
+                                <ActivityIndicator size="small" color={C.navyMid} />
+                                <Text style={styles.inlineGeocodeText}>Detecting location from image…</Text>
                             </View>
-
-                            {/* Description */}
-                            <Input
-                                label="Description"
-                                placeholder="Add details about the violation..."
-                                value={description}
-                                onChangeText={setDescription}
-                                multiline
-                                numberOfLines={4}
-                                helperText="Optional — AI will also generate a description"
-                            />
-
-                            {/* Submit Button */}
-                            <Button onPress={handleSubmit} fullWidth size="lg" disabled={!image && !video}>
-                                Analyze with AI
-                            </Button>
-
-                            <View style={{ height: SPACING.xxl }} />
+                        )}
+                        <TextInput
+                            style={styles.addressInput}
+                            placeholder="Enter address..."
+                            value={address}
+                            onChangeText={setAddress}
+                            multiline
+                            numberOfLines={4}
+                        />
+                        <View style={styles.addressBtns}>
+                            <TouchableOpacity style={styles.addrBtnWithText} onPress={() => setIsMapVisible(true)}>
+                                <Ionicons name="map" size={16} color={C.white} />
+                                <Text style={styles.addrBtnText}>Map</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.addrBtnWithText, { backgroundColor: C.amber }]} onPress={handleDetectLocation}>
+                                {loadingLocation ? <ActivityIndicator size="small" color={C.navy} /> : <Ionicons name="location" size={16} color={C.navy} />}
+                                <Text style={[styles.addrBtnText, { color: C.navy }]}>Detect</Text>
+                            </TouchableOpacity>
                         </View>
-                    </ScrollView>
-                </SafeAreaView>
-            </MobileContainer>
+                    </View>
 
-            {/* Map Picker Modal */}
+                    <Text style={styles.fieldLabel}>Description (Optional)</Text>
+                    <View style={[styles.descBox, focusedDesc && { borderColor: C.navyMid, backgroundColor: C.surface }]}>
+                        <TextInput
+                            style={styles.descInput}
+                            placeholder="Add specifics about the violation... AI will analyze the rest."
+                            value={description}
+                            onChangeText={setDescription}
+                            multiline
+                            numberOfLines={3}
+                            onFocus={() => setFocusedDesc(true)}
+                            onBlur={() => setFocusedDesc(false)}
+                        />
+                    </View>
+
+                    {/* ── Submit ── */}
+                    <TouchableOpacity
+                        style={[styles.submitBtn, (!image && !video) && { opacity: 0.5 }]}
+                        onPress={handleSubmit}
+                        activeOpacity={0.88}
+                        disabled={!image && !video}
+                    >
+                        <LinearGradient colors={[C.amberDark, C.amber]} style={styles.submitGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                            <Ionicons name="sparkles" size={18} color={C.navy} />
+                            <Text style={styles.submitText}>Analyze with AI</Text>
+                        </LinearGradient>
+                    </TouchableOpacity>
+
+                </ScrollView>
+            </SafeAreaView>
+
+            {/* Modals are unchanged visually for brevity, standard map picker */}
             <Modal visible={isMapVisible} animationType="slide">
                 <View style={styles.mapContainer}>
-                    <MapView
-                        style={styles.map}
-                        region={mapRegion}
-                        onRegionChangeComplete={setMapRegion}
-                        onPress={(e) => setSelectedCoordinate(e.nativeEvent.coordinate)}
-                        showsUserLocation={true}
-                    >
-                        {selectedCoordinate && (
-                            <Marker coordinate={selectedCoordinate} />
-                        )}
-                        {!selectedCoordinate && location && (
-                            <Marker coordinate={location} pinColor="blue" />
-                        )}
+                    <MapView style={styles.map} region={mapRegion} onRegionChangeComplete={setMapRegion} onPress={(e) => setSelectedCoordinate(e.nativeEvent.coordinate)} showsUserLocation={true}>
+                        {selectedCoordinate && <Marker coordinate={selectedCoordinate} />}
+                        {!selectedCoordinate && location && <Marker coordinate={location} pinColor="blue" />}
                     </MapView>
-                    
-                    <View style={styles.mapHeader}>
-                        <Text style={styles.mapTitle}>Tap Map to Select Location</Text>
-                        <TouchableOpacity onPress={() => setIsMapVisible(false)} style={styles.closeMapButton}>
-                            <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+                    <View style={styles.mapHeaderLine}>
+                        <Text style={styles.mapTitle}>Pin Location</Text>
+                        <TouchableOpacity onPress={() => setIsMapVisible(false)} style={styles.closeMap}>
+                            <Ionicons name="close" size={24} color={C.textPrimary} />
                         </TouchableOpacity>
                     </View>
-
-                    <View style={styles.mapFooter}>
-                        <Button 
-                            fullWidth 
-                            disabled={!selectedCoordinate && !location}
-                            onPress={() => {
-                                setIsMapVisible(false);
-                                setTrustLevel('Manual Location');
-                                if (selectedCoordinate) {
-                                    setManualLocation(selectedCoordinate);
-                                } else if (location) {
-                                    setManualLocation(location);
-                                }
-                            }}
-                        >
-                            Confirm Location
-                        </Button>
-                    </View>
+                    <TouchableOpacity style={styles.mapConfirm} onPress={() => { setIsMapVisible(false); if (selectedCoordinate) setManualLocation(selectedCoordinate); else if (location) setManualLocation(location); }}>
+                        <Text style={styles.mapConfirmText}>Confirm Selected</Text>
+                    </TouchableOpacity>
                 </View>
             </Modal>
 
-            {/* Image Crop/Zoom Modal */}
-            <ImageCropModal
-                visible={showCropModal}
-                imageUri={pendingCropUri}
-                onCropDone={handleCropDone}
-                onCancel={handleCropCancel}
-            />
-        </>
+            {/* Fullscreen Image Modal with Pinch-to-Zoom */}
+            <Modal visible={!!fullscreenImage} transparent={true} animationType="fade" onRequestClose={() => setFullscreenImage(null)}>
+                <View style={styles.modalBg}>
+                    <TouchableOpacity style={styles.modalClose} onPress={() => setFullscreenImage(null)}>
+                        <Ionicons name="close" size={28} color={C.white} />
+                    </TouchableOpacity>
+                    {fullscreenImage && (
+                        <ScrollView
+                            maximumZoomScale={5}
+                            minimumZoomScale={1}
+                            showsHorizontalScrollIndicator={false}
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={{ flex: 1, width: '100%', justifyContent: 'center', alignItems: 'center' }}
+                            style={{ width: '100%', height: '100%' }}
+                        >
+                            <Image source={{ uri: fullscreenImage }} style={styles.modalImg} resizeMode="contain" />
+                        </ScrollView>
+                    )}
+                </View>
+            </Modal>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: COLORS.background,
-    },
+    container: { flex: 1, backgroundColor: C.offWhite },
+    safeArea: { flex: 1 },
+
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: SPACING.xl,
-        paddingVertical: SPACING.lg,
-        backgroundColor: COLORS.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        paddingBottom: 24,
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
     },
-    backBtn: {
-        width: 40,
-        height: 40,
-        borderRadius: BORDER_RADIUS.lg,
-        backgroundColor: COLORS.background,
-        borderWidth: 1,
-        borderColor: COLORS.border,
+    backButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        backgroundColor: 'rgba(255,255,255,0.12)',
         justifyContent: 'center',
         alignItems: 'center',
     },
-    title: {
-        fontSize: FONT_SIZES.lg,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.textPrimary,
-        letterSpacing: -0.2,
-    },
-    scrollContent: {
-        flex: 1,
-    },
-    content: {
-        flex: 1,
-        paddingHorizontal: SPACING.xl,
-        paddingTop: SPACING.xl,
-    },
+    headerTitle: { fontSize: 20, fontFamily: 'Nunito-Bold', color: C.white },
 
-    // ── Step Indicator ──
+    scrollContent: { flex: 1 },
+    scrollInner: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
+
     stepIndicator: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: SPACING.xl,
-        gap: SPACING.sm,
+        marginBottom: 20,
+        gap: 8,
     },
     stepDot: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        backgroundColor: COLORS.primary,
-        justifyContent: 'center',
-        alignItems: 'center',
+        width: 26, height: 26, borderRadius: 13,
+        backgroundColor: '#E5E7EB',
+        justifyContent: 'center', alignItems: 'center'
     },
-    stepDotInactive: {
-        backgroundColor: COLORS.gray200,
+    stepDotActive: {
+        width: 26, height: 26, borderRadius: 13,
+        backgroundColor: C.amber,
+        justifyContent: 'center', alignItems: 'center'
     },
-    stepDotText: {
-        fontSize: FONT_SIZES.xs,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: '#FFFFFF',
-    },
-    stepDotTextInactive: {
-        color: COLORS.textTertiary,
-    },
-    stepLine: {
-        width: 40,
-        height: 2,
-        backgroundColor: COLORS.gray200,
-        borderRadius: 1,
-    },
+    stepDotText: { fontSize: 12, fontFamily: 'Nunito-Bold', color: C.textTertiary },
+    stepDotTextActive: { fontSize: 12, fontFamily: 'Nunito-Bold', color: C.navy },
+    stepLine: { width: 30, height: 2, backgroundColor: '#E5E7EB' },
+    stepLineActive: { width: 30, height: 2, backgroundColor: C.amber },
 
-    // ── Media Area ──
+    stepHeader: {
+        fontSize: 15,
+        fontFamily: 'Nunito-Bold',
+        color: C.navyMid,
+    },
     imageContainer: {
         width: '100%',
         height: 280,
-        borderRadius: BORDER_RADIUS.xl,
+        backgroundColor: '#111827',
+        borderRadius: 24,
         overflow: 'hidden',
-        marginBottom: SPACING.lg,
-        backgroundColor: COLORS.surface,
-        borderWidth: 2,
-        borderColor: COLORS.border,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
+        position: 'relative',
+        borderWidth: 1.5,
+        borderColor: '#E5E7EB',
+    },
+    mediaImage: { width: '100%', height: '100%', resizeMode: 'contain' },
+    changeImgBadge: {
+        position: 'absolute',
+        bottom: 14,
+        right: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: 'rgba(0,0,0,0.55)',
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderRadius: 20,
+    },
+    changeImgText: {
+        color: C.white,
+        fontSize: 12,
+        fontFamily: 'Nunito-Bold',
+    },
+    retakeBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 14,
+        borderRadius: 16,
+        borderWidth: 1.5,
+        borderColor: C.border,
         borderStyle: 'dashed',
     },
-    image: {
-        width: '100%',
-        height: '100%',
-        resizeMode: 'contain',
+    retakeBtnText: {
+        fontSize: 14,
+        fontFamily: 'Nunito-Bold',
+        color: C.textSecondary,
     },
-    placeholder: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: COLORS.gray50,
-        padding: SPACING.xl,
+    // Fullscreen Modal
+    modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
+    modalClose: {
+        position: 'absolute', top: 60, right: 24, zIndex: 10,
+        width: 44, height: 44, borderRadius: 22,
+        backgroundColor: 'rgba(255,255,255,0.25)',
+        justifyContent: 'center', alignItems: 'center',
     },
-    placeholderIconBg: {
-        width: 72,
-        height: 72,
-        borderRadius: BORDER_RADIUS.xl,
-        backgroundColor: COLORS.gray100,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: SPACING.lg,
-    },
-    placeholderText: {
-        fontSize: FONT_SIZES.md,
-        textAlign: 'center',
-        color: COLORS.textSecondary,
-        fontWeight: FONT_WEIGHTS.semibold,
-    },
-    placeholderSubtext: {
-        fontSize: FONT_SIZES.sm,
-        textAlign: 'center',
-        color: COLORS.textTertiary,
-        marginTop: SPACING.xxs,
-    },
-    videoPlaceholder: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: COLORS.primarySurface,
-    },
-    videoIconBg: {
-        width: 72,
-        height: 72,
-        borderRadius: BORDER_RADIUS.xl,
-        backgroundColor: COLORS.surface,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: SPACING.md,
-        ...SHADOWS.sm,
-    },
-    videoText: {
-        fontSize: FONT_SIZES.lg,
-        fontWeight: FONT_WEIGHTS.bold,
-        color: COLORS.primary,
-    },
-    videoSubtext: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.textSecondary,
-        marginTop: SPACING.xxs,
-    },
+    modalImg: { width: '100%', height: '85%' },
 
-    // ── Media Buttons ──
-    mediaButtons: {
-        flexDirection: 'row',
-        gap: SPACING.md,
-        marginBottom: SPACING.md,
+
+
+    scannerOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        justifyContent: 'space-between',
+        padding: 20,
     },
-    mediaBtn: {
+    scannerCorners: {
         flex: 1,
-        borderRadius: BORDER_RADIUS.lg,
-        overflow: 'hidden',
+        borderWidth: 2,
+        borderColor: 'rgba(255,255,255,0.4)',
+        borderRadius: 12,
+        borderStyle: 'dashed',
     },
-    mediaBtnGradient: {
-        flexDirection: 'row',
-        gap: SPACING.sm,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingVertical: SPACING.md + 2,
-        borderRadius: BORDER_RADIUS.lg,
-    },
-    mediaBtnText: {
-        fontWeight: FONT_WEIGHTS.semibold,
-        color: '#FFFFFF',
-        fontSize: FONT_SIZES.sm,
-    },
+    cameraPlaceholder: { alignItems: 'center', padding: 32 },
+    placeholderText: { fontSize: 15, fontFamily: 'Nunito-Bold', color: C.textSecondary, marginTop: 12 },
+    placeholderSub: { fontSize: 13, color: C.textTertiary, marginTop: 6, textAlign: 'center' },
+
+    mediaBtnRow: { flexDirection: 'row', gap: 14, marginBottom: 14 },
+    mediaBtn: { flex: 1, borderRadius: 16, overflow: 'hidden' },
+    mediaBtnGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
+    mediaBtnText: { fontSize: 15, fontFamily: 'Nunito-Bold', color: C.white },
     mediaBtnOutline: {
-        flexDirection: 'row',
-        gap: SPACING.sm,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingVertical: SPACING.md + 2,
-        borderWidth: 1.5,
-        borderColor: COLORS.border,
-        backgroundColor: COLORS.surface,
-    },
-    mediaBtnOutlineText: {
-        fontWeight: FONT_WEIGHTS.semibold,
-        color: COLORS.primary,
-        fontSize: FONT_SIZES.sm,
-    },
-
-    // ── Auto-fill Banner ──
-    autoFillBanner: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: SPACING.md,
-        paddingVertical: SPACING.sm + 2,
-        borderRadius: BORDER_RADIUS.lg,
-        marginBottom: SPACING.md,
-        borderWidth: 1,
-        gap: SPACING.sm,
-    },
-    autoFillBannerExtracting: {
-        backgroundColor: COLORS.primarySurface,
-        borderColor: COLORS.primary + '30',
-    },
-    autoFillBannerSuccess: {
-        backgroundColor: COLORS.successSurface,
-        borderColor: COLORS.success + '30',
-    },
-    autoFillBannerWarning: {
-        backgroundColor: COLORS.warningSurface,
-        borderColor: COLORS.warning + '30',
-    },
-    autoFillIconBg: {
-        width: 32,
-        height: 32,
-        borderRadius: BORDER_RADIUS.md,
-        backgroundColor: COLORS.primary + '15',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    autoFillIconSuccess: {
-        backgroundColor: COLORS.success + '15',
-    },
-    autoFillIconWarning: {
-        backgroundColor: COLORS.warning + '15',
-    },
-    autoFillTextContainer: {
         flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 14,
+        borderRadius: 16,
+        borderWidth: 1.5,
+        borderColor: '#C4C6D0',
+        backgroundColor: C.surface
     },
-    autoFillTitle: {
-        fontSize: FONT_SIZES.sm,
-        fontWeight: FONT_WEIGHTS.semibold,
-        color: COLORS.primary,
-        letterSpacing: -0.1,
+    mediaBtnOutlineText: { fontSize: 15, fontFamily: 'Nunito-Bold', color: C.navyMid },
+
+    banner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        padding: 14,
+        backgroundColor: '#E0E7FF',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(27,58,107,0.1)',
+        marginBottom: 24
     },
-    autoFillSubtitle: {
-        fontSize: FONT_SIZES.xxs,
-        color: COLORS.textSecondary,
-        marginTop: 1,
+    bannerText: { fontSize: 13, fontFamily: 'Nunito-Bold' },
+
+    fieldLabel: { fontSize: 13, fontFamily: 'Nunito-Bold', color: C.navy, marginBottom: 10, marginTop: 12 },
+    addressBox: {
+        flexDirection: 'column',
+        backgroundColor: '#F1F5F9', // Subtle distinct color 
+        borderRadius: 20,
+        paddingLeft: 18,
+        paddingRight: 18,
+        paddingTop: 14,
+        paddingBottom: 14,
+        minHeight: 150, // Massive box
+        borderWidth: 1.5,
+        borderColor: '#E2E8F0',
+        shadowColor: '#1B3A6B',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 10,
+    },
+    addressInput: { flex: 1, fontSize: 14, color: C.textPrimary, fontFamily: 'Nunito-Medium', textAlignVertical: 'top', minHeight: 70 },
+    addressBtns: { flexDirection: 'row', gap: 8, alignSelf: 'flex-end', marginTop: 10 },
+    addrBtnWithText: { flexDirection: 'row', gap: 6, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, backgroundColor: C.navyMid, justifyContent: 'center', alignItems: 'center' },
+    addrBtnText: { color: C.white, fontSize: 13, fontFamily: 'Nunito-Bold' },
+    // Inline geocoding spinner inside the address box
+    inlineGeocodeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingBottom: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0,0,0,0.05)',
+        marginBottom: 8,
+    },
+    inlineGeocodeText: {
+        fontSize: 12,
+        fontFamily: 'Nunito-SemiBold',
+        color: C.navyMid,
     },
 
-    // ── Address ──
-    addressContainer: {
-        position: 'relative',
-        marginBottom: SPACING.sm,
+    descBox: {
+        backgroundColor: C.surface,
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.08)',
+        marginBottom: 32,
+        shadowColor: '#1B3A6B',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 6,
     },
-    addressInput: {
-        paddingRight: 110,
+    descInput: { fontSize: 14, color: C.textPrimary, textAlignVertical: 'top', height: 90, fontFamily: 'Nunito-Medium' },
+
+    submitBtn: {
+        borderRadius: 18,
+        overflow: 'hidden',
+        shadowColor: C.amberDark,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.4,
+        shadowRadius: 12,
+        elevation: 8,
+        marginBottom: 20,
     },
-    locationButtonsWrapper: {
-        position: 'absolute',
-        right: 8,
-        top: 36,
+    submitGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 18 },
+    submitText: { fontSize: 17, fontFamily: 'Nunito-ExtraBold', color: C.navy, letterSpacing: 0.5 },
+
+    mapContainer: { flex: 1, backgroundColor: C.offWhite },
+    map: { flex: 1 },
+    mapHeaderLine: { position: 'absolute', top: 50, left: 20, right: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: C.surface, padding: 16, borderRadius: 16, elevation: 4 },
+    mapTitle: { fontSize: 16, fontFamily: 'Nunito-Bold', color: C.textPrimary },
+    closeMap: { padding: 4 },
+    mapConfirm: { position: 'absolute', bottom: 40, left: 20, right: 20, backgroundColor: C.navyMid, padding: 16, borderRadius: 14, alignItems: 'center', elevation: 4 },
+    mapConfirmText: { color: C.white, fontSize: 16, fontFamily: 'Nunito-Bold' },
+    // Report Type Toggle Bar
+    reportTypeBar: {
+        backgroundColor: C.surface,
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0,0,0,0.04)',
+    },
+    reportTypeToggle: {
         flexDirection: 'row',
-        gap: SPACING.sm,
+        backgroundColor: C.surfaceInput,
+        borderRadius: 14,
+        padding: 4,
     },
-    mapButton: {
-        borderRadius: BORDER_RADIUS.lg,
-        ...SHADOWS.sm,
-    },
-    locationButtonRight: {
-        borderRadius: BORDER_RADIUS.lg,
-        ...SHADOWS.sm,
-    },
-    locationButtonInner: {
-        width: 44,
-        height: 44,
-        borderRadius: BORDER_RADIUS.lg,
-        justifyContent: 'center',
+    reportTypeActiveTab: {
+        flex: 1,
+        flexDirection: 'row',
         alignItems: 'center',
-    },
-    locationButtonRight: {
-        backgroundColor: COLORS.primary,
-        width: 44,
-        height: 44,
-        borderRadius: BORDER_RADIUS.md,
         justifyContent: 'center',
-        alignItems: 'center',
-        ...SHADOWS.md,
+        gap: 6,
+        paddingVertical: 9,
+        backgroundColor: C.amber,
+        borderRadius: 11,
+        shadowColor: C.amberDark,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+        elevation: 3,
     },
-    mapContainer: { flex: 1, backgroundColor: COLORS.white },
-    map: { width: '100%', height: '100%' },
-    mapHeader: { position: 'absolute', top: 50, left: SPACING.lg, right: SPACING.lg, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.white, padding: SPACING.md, borderRadius: BORDER_RADIUS.lg, ...SHADOWS.md },
-    mapTitle: { fontSize: FONT_SIZES.md, fontWeight: FONT_WEIGHTS.bold },
-    closeMapButton: { padding: SPACING.xs },
-    mapFooter: { position: 'absolute', bottom: 40, left: SPACING.lg, right: SPACING.lg, backgroundColor: COLORS.white, padding: SPACING.md, borderRadius: BORDER_RADIUS.lg, ...SHADOWS.lg },
+    reportTypeActiveText: {
+        fontSize: 13,
+        fontFamily: 'Nunito-Bold',
+        color: C.navy,
+    },
+    reportTypeInactiveTab: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingVertical: 9,
+        borderRadius: 11,
+    },
+    reportTypeInactiveText: {
+        fontSize: 13,
+        fontFamily: 'Nunito-Medium',
+        color: C.textTertiary,
+    },
 });

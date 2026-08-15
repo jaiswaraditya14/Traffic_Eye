@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { TextInput, View, Text, StyleSheet, Animated } from 'react-native';
-import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS, SHADOWS } from '../../utils/theme';
+import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, FONT_FAMILIES, BORDER_RADIUS, SHADOWS } from '../../utils/theme';
 
 export const Input = ({
     label,
@@ -69,17 +69,17 @@ export const Input = ({
 
 const styles = StyleSheet.create({
     container: {
-        marginBottom: SPACING.lg,
+        marginBottom: SPACING.md + 4,
     },
     labelContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: SPACING.sm,
+        marginBottom: 6,
     },
     label: {
-        fontSize: FONT_SIZES.sm,
-        color: COLORS.textSecondary,
-        fontWeight: FONT_WEIGHTS.medium,
+        fontFamily: FONT_FAMILIES.semibold,
+        fontSize: FONT_SIZES.sm + 1,
+        color: COLORS.textPrimary,
         letterSpacing: 0.1,
     },
     labelError: {
@@ -87,31 +87,32 @@ const styles = StyleSheet.create({
     },
     required: {
         color: COLORS.error,
-        fontSize: FONT_SIZES.sm,
-        marginLeft: SPACING.xxs,
+        fontSize: FONT_SIZES.sm + 1,
+        marginLeft: 4,
+        fontWeight: 'bold',
     },
     inputWrapper: {
         borderWidth: 1.5,
         borderColor: COLORS.border,
-        borderRadius: BORDER_RADIUS.lg,
+        borderRadius: BORDER_RADIUS.md,
         backgroundColor: COLORS.surface,
         overflow: 'hidden',
     },
     inputWrapperFocused: {
         borderColor: COLORS.primary,
         backgroundColor: COLORS.white,
-        ...SHADOWS.xs,
+        borderWidth: 2,
     },
     inputWrapperError: {
         borderColor: COLORS.error,
         backgroundColor: COLORS.errorSurface,
     },
     input: {
-        paddingHorizontal: SPACING.lg,
-        paddingVertical: SPACING.md + 2,
+        paddingHorizontal: SPACING.md + 2,
+        paddingVertical: SPACING.md,
+        fontFamily: FONT_FAMILIES.regular,
         fontSize: FONT_SIZES.md,
         color: COLORS.textPrimary,
-        fontWeight: FONT_WEIGHTS.regular,
     },
     multiline: {
         minHeight: 100,
@@ -119,18 +120,19 @@ const styles = StyleSheet.create({
         paddingTop: SPACING.md,
     },
     errorContainer: {
-        marginTop: SPACING.xs,
-        paddingHorizontal: SPACING.xs,
+        marginTop: 4,
+        paddingHorizontal: 2,
     },
     errorText: {
+        fontFamily: FONT_FAMILIES.semibold,
         color: COLORS.error,
-        fontSize: FONT_SIZES.xs,
-        fontWeight: FONT_WEIGHTS.medium,
+        fontSize: FONT_SIZES.xs + 1,
     },
     helperText: {
+        fontFamily: FONT_FAMILIES.regular,
         color: COLORS.textTertiary,
-        fontSize: FONT_SIZES.xs,
-        marginTop: SPACING.xs,
-        paddingHorizontal: SPACING.xs,
+        fontSize: FONT_SIZES.xs + 1,
+        marginTop: 4,
+        paddingHorizontal: 2,
     },
 });

@@ -1,0 +1,56 @@
+{
+  "env": {
+    "es2021": true,
+    "react-native/react-native": true
+  },
+  "extends": [
+    "eslint:recommended",
+    "plugin:react/recommended",
+    "plugin:react-native/all"
+  ],
+  "parserOptions": {
+    "ecmaFeatures": {
+      "jsx": true
+    },
+    "ecmaVersion": 12,
+    "sourceType": "module"
+  },
+  "plugins": [
+    "react",
+    "react-native"
+  ],
+  "rules": {
+    "react/prop-types": 0,
+    "react/react-in-jsx-scope": 0,
+    "react-native/no-inline-styles": 0,
+    "react-native/no-color-literals": 0,
+    "react-native/sort-styles": 0,
+    "react-native/no-raw-text": 0,
+    "no-undef": 2,
+    "no-unused-vars": 0
+  },
+  "globals": {
+    "require": true,
+    "process": true,
+    "console": true,
+    "module": true,
+    "__dirname": true,
+    "Promise": true,
+    "setTimeout": true,
+    "clearTimeout": true,
+    "setInterval": true,
+    "clearInterval": true,
+    "fetch": true,
+    "alert": true,
+    "FormData": true,
+    "Blob": true,
+    "File": true,
+    "window": true,
+    "document": true,
+    "navigator": true,
+    "global": true,
+    "globalThis": true,
+    "URL": true,
+    "AbortController": true
+  }
+}
