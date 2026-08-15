@@ -10,13 +10,13 @@ import { TRAFFIC_RULES, SAFETY_TIPS } from '../../data/trafficData';
 import { FocusAwareStatusBar } from '../../components';
 
 const C = {
-    navy: '#002452', navyMid: '#1B3A6B',
+    navy: '#0A1E3F', navyMid: '#0F2C59',
     amber: '#F59E0B', amberSurface: '#FEF3C7',
-    white: '#FFFFFF', offWhite: '#F8F9FB', surface: '#FFFFFF',
-    textPrimary: '#191C1E', textSecondary: '#44474F', textTertiary: '#747780',
-    border: '#EAECEF',
+    white: '#FFFFFF', offWhite: '#F4F6F9', surface: '#FFFFFF',
+    textPrimary: '#0F172A', textSecondary: '#475569', textTertiary: '#64748B',
+    border: '#E2E8F0',
     success: '#059669', successSurface: '#D1FAE5',
-    error: '#BA1A1A', errorSurface: '#FEF2F2',
+    error: '#B91C1C', errorSurface: '#FEF2F2',
 };
 
 const TABS = ['Traffic Rules', 'Safety Checklist'];

@@ -6,12 +6,12 @@ import { MobileContainer, FocusAwareStatusBar } from '../../components';
 
 // ── Design Tokens ──
 const C = {
-    navy: '#002452',
-    navyMid: '#1B3A6B',
+    navy: '#0A1E3F',
+    navyMid: '#0F2C59',
     white: '#FFFFFF',
-    offWhite: '#F8F9FB',
-    textPrimary: '#191C1E',
-    textSecondary: '#44474F',
+    offWhite: '#F4F6F9',
+    textPrimary: '#0F172A',
+    textSecondary: '#475569',
     success: '#059669',
 };
 

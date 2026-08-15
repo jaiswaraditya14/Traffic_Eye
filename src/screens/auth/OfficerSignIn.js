@@ -63,7 +63,7 @@ export default function OfficerSignIn({ navigation }) {
                 >
                     {/* ── Navy Hero Header (40% screen) ── */}
                     <LinearGradient
-                        colors={[C.navy, C.navyMid, '#1B3A6B']}
+                        colors={[C.navy, C.navyMid, '#0F2C59']}
                         style={styles.hero}
                     >
                         {/* Back button */}

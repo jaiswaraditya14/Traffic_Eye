@@ -6,15 +6,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FocusAwareStatusBar } from '../../components';
 
 const C = {
-    navy: '#002452',
-    navyMid: '#1B3A6B',
+    navy: '#0A1E3F',
+    navyMid: '#0F2C59',
     amber: '#F59E0B',
     white: '#FFFFFF',
-    offWhite: '#F8F9FB',
+    offWhite: '#F4F6F9',
     surface: '#FFFFFF',
-    textPrimary: '#191C1E',
-    textSecondary: '#44474F',
-    textTertiary: '#747780',
+    textPrimary: '#0F172A',
+    textSecondary: '#475569',
+    textTertiary: '#64748B',
     success: '#059669',
     successSurface: '#D1FAE5',
     infoSurface: '#E0E7FF',

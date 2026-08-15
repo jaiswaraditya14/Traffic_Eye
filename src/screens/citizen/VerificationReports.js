@@ -13,14 +13,14 @@ import { useAuth } from '../../context';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const C = {
-    navy: '#002452',
-    navyMid: '#1B3A6B',
+    navy: '#0A1E3F',
+    navyMid: '#0F2C59',
     amber: '#F59E0B',
     white: '#FFFFFF',
-    offWhite: '#F8F9FB',
-    textPrimary: '#191C1E',
-    textSecondary: '#44474F',
-    textTertiary: '#747780',
+    offWhite: '#F4F6F9',
+    textPrimary: '#0F172A',
+    textSecondary: '#475569',
+    textTertiary: '#64748B',
     border: '#E2E8F0',
     pending: '#F59E0B',
     pendingSurface: '#FEF3C7',
@@ -305,7 +305,7 @@ const cardStyles = StyleSheet.create({
     rawResult: { marginTop: 4 },
     rawResultText: {
         fontSize: 12, fontFamily: 'Nunito-Medium', color: C.textSecondary,
-        backgroundColor: '#F8F9FB', borderRadius: 10, padding: 10, lineHeight: 18,
+        backgroundColor: '#F4F6F9', borderRadius: 10, padding: 10, lineHeight: 18,
         marginTop: 4,
     },
     failedBanner: {
