@@ -11,18 +11,18 @@ import { supabase } from '../../services';
 import { isValidEmail } from '../../utils';
 
 const C = {
-    navy: '#002452',
-    navyMid: '#1B3A6B',
+    navy: '#0A1E3F',
+    navyMid: '#0F2C59',
     amber: '#F59E0B',
     white: '#FFFFFF',
-    offWhite: '#F8F9FB',
+    offWhite: '#F4F6F9',
     surface: '#FFFFFF',
     surfaceInput: '#F2F4F6',
-    textPrimary: '#191C1E',
-    textSecondary: '#44474F',
-    textTertiary: '#747780',
-    border: '#C4C6D0',
-    error: '#BA1A1A',
+    textPrimary: '#0F172A',
+    textSecondary: '#475569',
+    textTertiary: '#64748B',
+    border: '#CBD5E1',
+    error: '#B91C1C',
     errorSurface: '#FFDAD6',
     primarySurface: '#D7E2FF',
 };

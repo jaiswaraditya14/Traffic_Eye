@@ -15,9 +15,9 @@ import {
 const C = {
     bg: '#F4F6FA',           // soft off-white background
     white: '#FFFFFF',
-    navy: COLORS.primaryDark,  // #002452
-    navyMid: COLORS.primary,      // #1B3A6B
-    accent: '#1B3A6B',           // primary CTA colour (navy)
+    navy: COLORS.primaryDark,  // #0A1E3F
+    navyMid: COLORS.primary,      // #0F2C59
+    accent: '#0F2C59',           // primary CTA colour (navy)
     accentSurface: '#E8EDF5',           // very light navy tint
     textPrimary: COLORS.textPrimary,
     textSecondary: COLORS.textSecondary,

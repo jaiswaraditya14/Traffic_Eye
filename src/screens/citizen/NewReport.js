@@ -609,7 +609,7 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         borderRadius: 16,
         borderWidth: 1.5,
-        borderColor: '#C4C6D0',
+        borderColor: '#CBD5E1',
         backgroundColor: C.surface
     },
     mediaBtnOutlineText: { fontSize: 15, fontFamily: 'Nunito-Bold', color: C.navyMid },
@@ -639,7 +639,7 @@ const styles = StyleSheet.create({
         minHeight: 150, // Massive box
         borderWidth: 1.5,
         borderColor: '#E2E8F0',
-        shadowColor: '#1B3A6B',
+        shadowColor: '#0F2C59',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.08,
         shadowRadius: 10,
@@ -672,7 +672,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(0,0,0,0.08)',
         marginBottom: 32,
-        shadowColor: '#1B3A6B',
+        shadowColor: '#0F2C59',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.04,
         shadowRadius: 6,

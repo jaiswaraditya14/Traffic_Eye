@@ -10,17 +10,17 @@ import { supabase } from '../../services';
 import { FocusAwareStatusBar } from '../../components';
 
 const C = {
-    navy: '#002452',
-    navyMid: '#1B3A6B',
+    navy: '#0A1E3F',
+    navyMid: '#0F2C59',
     amber: '#F59E0B',
     white: '#FFFFFF',
-    offWhite: '#F8F9FB',
+    offWhite: '#F4F6F9',
     surface: '#FFFFFF',
-    textPrimary: '#191C1E',
-    textSecondary: '#44474F',
-    textTertiary: '#747780',
+    textPrimary: '#0F172A',
+    textSecondary: '#475569',
+    textTertiary: '#64748B',
     border: '#E5E7EB',
-    error: '#BA1A1A',
+    error: '#B91C1C',
     errorSurface: '#FFDAD6',
     success: '#059669',
     successSurface: '#D1FAE5',
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
     menuGroup: { backgroundColor: C.surface, borderRadius: 20, marginBottom: 24, shadowColor: C.navyMid, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: '#F2F4F6' },
     menuItem: { flexDirection: 'row', alignItems: 'center', padding: 16 },
     menuDivider: { height: 1, backgroundColor: '#F2F4F6', marginLeft: 64 },
-    menuIconBg: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F8F9FB', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+    menuIconBg: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F4F6F9', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
     menuItemText: { flex: 1, fontSize: 16, fontFamily: 'Nunito-SemiBold', color: C.textPrimary },
 
     footerVersion: { alignItems: 'center', marginTop: 10 },

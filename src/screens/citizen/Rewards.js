@@ -48,7 +48,7 @@ const TAG_COLORS = {
     'ESSENTIAL': { bg: '#FEE2E2', text: '#DC2626' },
     'PREMIUM': { bg: '#FEF3C7', text: '#D97706' },
     'TOP TIER': { bg: '#DBEAFE', text: '#1D4ED8' },
-    'ULTIMATE': { bg: '#D7E2FF', text: '#002452' },
+    'ULTIMATE': { bg: '#D7E2FF', text: '#0A1E3F' },
 };
 
 export default function Rewards() {

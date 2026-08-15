@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
         overflow: 'hidden', 
         backgroundColor: C.surface, 
         marginBottom: 24, 
-        shadowColor: '#1B3A6B', 
+        shadowColor: '#0F2C59', 
         shadowOffset: { width: 0, height: 12 }, 
         shadowOpacity: 0.12, 
         shadowRadius: 20, 

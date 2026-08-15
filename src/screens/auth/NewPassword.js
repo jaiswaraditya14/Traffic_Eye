@@ -10,15 +10,15 @@ import { MobileContainer, FocusAwareStatusBar } from '../../components';
 import { supabase } from '../../services';
 
 const C = {
-    navy: '#002452',
-    navyMid: '#1B3A6B',
+    navy: '#0A1E3F',
+    navyMid: '#0F2C59',
     amber: '#F59E0B',
     white: '#FFFFFF',
-    offWhite: '#F8F9FB',
-    textPrimary: '#191C1E',
-    textSecondary: '#44474F',
-    textTertiary: '#747780',
-    error: '#BA1A1A',
+    offWhite: '#F4F6F9',
+    textPrimary: '#0F172A',
+    textSecondary: '#475569',
+    textTertiary: '#64748B',
+    error: '#B91C1C',
     errorSurface: '#FFDAD6',
     success: '#059669',
     successSurface: '#D1FAE5',

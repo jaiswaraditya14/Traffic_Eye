@@ -4,21 +4,23 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FocusAwareStatusBar } from '../../components';
+import { useAuth } from '../../context';
 
 const C = {
-    navy: '#002452',
-    navyMid: '#1B3A6B',
-    amber: '#F59E0B',
+    navy: '#0A1E3F',
+    navyMid: '#0F2C59',
+    amber: '#D97706',
     white: '#FFFFFF',
-    offWhite: '#F8F9FB',
+    offWhite: '#F4F6F9',
     surface: '#FFFFFF',
-    textPrimary: '#191C1E',
-    textSecondary: '#44474F',
-    textTertiary: '#747780',
-    border: '#E5E7EB',
+    textPrimary: '#0F172A',
+    textSecondary: '#475569',
+    textTertiary: '#64748B',
+    border: '#E2E8F0',
 };
 
 export default function OfficerSettings({ navigation }) {
+    const { profile } = useAuth();
     const [notifications, setNotifications] = useState(true);
     const [soundEnabled, setSoundEnabled] = useState(true);
     const [vibrationEnabled, setVibrationEnabled] = useState(true);
@@ -55,6 +57,26 @@ export default function OfficerSettings({ navigation }) {
                 </LinearGradient>
 
                 <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+
+                    {/* Officer identity card */}
+                    {profile && (
+                        <View style={styles.identityCard}>
+                            <View style={styles.identityIconFrame}>
+                                <Ionicons name="shield" size={28} color={C.navyMid} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.identityName}>{profile.full_name || 'Officer'}</Text>
+                                <Text style={styles.identityBadge}>Badge: {profile.badge_id || 'N/A'}</Text>
+                                {profile.jurisdiction ? (
+                                    <Text style={styles.identityJurisdiction}>Station: {profile.jurisdiction}</Text>
+                                ) : null}
+                            </View>
+                            <View style={styles.activeBadge}>
+                                <View style={styles.activeDot} />
+                                <Text style={styles.activeText}>On Duty</Text>
+                            </View>
+                        </View>
+                    )}
                     
                     <Text style={styles.sectionTitle}>Alerts & Notifications</Text>
                     <View style={styles.cardGroup}>
@@ -101,8 +123,9 @@ export default function OfficerSettings({ navigation }) {
                     </View>
 
                     <View style={styles.footer}>
-                        <Text style={styles.copyrightText}>© 2024 TrafficEye System. Law Enforcement Use Only.</Text>
-                    </View>
+                            <Ionicons name="shield-checkmark" size={14} color={C.textTertiary} />
+                            <Text style={styles.copyrightText}>TrafficEye Officer Edition v1.0  ·  Law Enforcement Use Only  ·  © 2026</Text>
+                        </View>
                 </ScrollView>
             </SafeAreaView>
         </View>
@@ -136,7 +159,7 @@ const styles = StyleSheet.create({
     noBorder: {},
     divider: { height: 1, backgroundColor: '#F2F4F6', marginLeft: 64 },
     
-    iconBox: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F8F9FB', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+    iconBox: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F4F6F9', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
     textCol: { flex: 1 },
     label: { fontSize: 16, fontFamily: 'Nunito-SemiBold', color: C.textPrimary, marginBottom: 2 },
     description: { fontSize: 13, color: C.textSecondary },
@@ -147,6 +170,65 @@ const styles = StyleSheet.create({
     secureBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#D1FAE5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
     secureText: { fontSize: 12, fontFamily: 'Nunito-Bold', color: '#059669' },
 
-    footer: { alignItems: 'center', marginTop: 12 },
-    copyrightText: { fontSize: 12, color: C.textTertiary, textAlign: 'center' },
+    footer: { alignItems: 'center', marginTop: 12, flexDirection: 'row', gap: 6, justifyContent: 'center' },
+    copyrightText: { fontSize: 11, color: '#94A3B8', textAlign: 'center', fontFamily: 'Nunito-Medium' },
+
+    // Officer identity card
+    identityCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 14,
+        backgroundColor: '#EFF6FF',
+        borderRadius: 20,
+        padding: 18,
+        marginBottom: 24,
+        borderWidth: 1,
+        borderColor: '#BFDBFE',
+    },
+    identityIconFrame: {
+        width: 52,
+        height: 52,
+        borderRadius: 16,
+        backgroundColor: '#DBEAFE',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    identityName: {
+        fontSize: 15,
+        fontFamily: 'Nunito-Bold',
+        color: '#0F172A',
+    },
+    identityBadge: {
+        fontSize: 12,
+        fontFamily: 'Nunito-SemiBold',
+        color: '#475569',
+        marginTop: 2,
+    },
+    identityJurisdiction: {
+        fontSize: 11,
+        fontFamily: 'Nunito-Medium',
+        color: '#64748B',
+        marginTop: 1,
+    },
+    activeBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: '#D1FAE5',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 20,
+    },
+    activeDot: {
+        width: 7,
+        height: 7,
+        borderRadius: 3.5,
+        backgroundColor: '#15803D',
+    },
+    activeText: {
+        fontSize: 10,
+        fontFamily: 'Nunito-ExtraBold',
+        color: '#15803D',
+    },
 });
+

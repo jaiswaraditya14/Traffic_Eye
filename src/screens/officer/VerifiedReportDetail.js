@@ -25,19 +25,19 @@ import { fetchReportById } from '../../services/reports';
 
 // ── Tokens ────────────────────────────────────────────────────────────────
 const C = {
-    navy:           '#002452',
+    navy:           '#0A1E3F',
     navyDeep:       '#00102B',
-    navyMid:        '#1B3A6B',
+    navyMid:        '#0F2C59',
     amber:          '#F59E0B',
     amberDark:      '#D97706',
     amberSurface:   '#FEF3C7',
     white:          '#FFFFFF',
-    offWhite:       '#F8F9FB',
+    offWhite:       '#F4F6F9',
     surface:        '#FFFFFF',
     surfaceLow:     '#F2F4F6',
-    textPrimary:    '#191C1E',
-    textSecondary:  '#44474F',
-    textTertiary:   '#747780',
+    textPrimary:    '#0F172A',
+    textSecondary:  '#475569',
+    textTertiary:   '#64748B',
     border:         '#E2E8F0',
     success:        '#059669',
     successSurface: '#D1FAE5',
@@ -161,25 +161,25 @@ export default function VerifiedReportDetail({ route, navigation }) {
 <head>
   <meta charset="UTF-8"/>
   <style>
-    body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 32px; color: #191C1E; background: #fff; }
-    .header { background: linear-gradient(135deg, #002452, #1B3A6B); color: #fff; border-radius: 12px; padding: 28px 32px; margin-bottom: 28px; }
+    body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 32px; color: #0F172A; background: #fff; }
+    .header { background: linear-gradient(135deg, #0A1E3F, #0F2C59); color: #fff; border-radius: 12px; padding: 28px 32px; margin-bottom: 28px; }
     .header h1 { margin: 0 0 6px; font-size: 22px; font-weight: 800; }
     .header p  { margin: 0; opacity: 0.7; font-size: 13px; }
     .badge-row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
     .badge { padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; display: inline-block; }
     .badge-approved { background: #D1FAE5; color: #059669; }
     .badge-sev { background: ${sevCfg.bg}; color: ${sevCfg.color}; }
-    .section { background: #F8F9FB; border-radius: 10px; padding: 20px 24px; margin-bottom: 20px; }
-    .section h2 { margin: 0 0 14px; font-size: 14px; font-weight: 700; color: #1B3A6B; text-transform: uppercase; letter-spacing: 0.5px; }
+    .section { background: #F4F6F9; border-radius: 10px; padding: 20px 24px; margin-bottom: 20px; }
+    .section h2 { margin: 0 0 14px; font-size: 14px; font-weight: 700; color: #0F2C59; text-transform: uppercase; letter-spacing: 0.5px; }
     .row { display: flex; justify-content: space-between; border-bottom: 1px solid #E2E8F0; padding: 9px 0; }
     .row:last-child { border-bottom: none; }
-    .lbl { font-size: 13px; color: #44474F; }
-    .val { font-size: 13px; font-weight: 600; color: #191C1E; text-align: right; }
+    .lbl { font-size: 13px; color: #475569; }
+    .val { font-size: 13px; font-weight: 600; color: #0F172A; text-align: right; }
     .reward-box { background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 10px; padding: 16px 20px; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
     .reward-pts { font-size: 26px; font-weight: 900; color: #D97706; }
     .evidence-section { margin-bottom: 20px; }
-    .evidence-section h2 { font-size: 14px; font-weight: 700; color: #1B3A6B; text-transform: uppercase; margin-bottom: 12px; }
-    .footer { margin-top: 36px; text-align: center; font-size: 11px; color: #747780; border-top: 1px solid #E2E8F0; padding-top: 16px; }
+    .evidence-section h2 { font-size: 14px; font-weight: 700; color: #0F2C59; text-transform: uppercase; margin-bottom: 12px; }
+    .footer { margin-top: 36px; text-align: center; font-size: 11px; color: #64748B; border-top: 1px solid #E2E8F0; padding-top: 16px; }
   </style>
 </head>
 <body>

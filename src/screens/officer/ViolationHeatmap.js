@@ -574,7 +574,7 @@ export default function ViolationHeatmap({ navigation }) {
 
     return (
         <View style={styles.container}>
-            <FocusAwareStatusBar barStyle="dark-content" statusBgColor="#F8F9FB" />
+            <FocusAwareStatusBar barStyle="dark-content" statusBgColor="#F4F6F9" />
 
             {/* ── Map ── */}
             <MapView

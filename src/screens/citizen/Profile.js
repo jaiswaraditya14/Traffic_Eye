@@ -13,26 +13,26 @@ import { supabase } from '../../services/supabase';
 
 // ── Design Tokens ──
 const C = {
-    navy: '#002452',
-    navyMid: '#1B3A6B',
-    amber: '#F59E0B',
-    amberDark: '#D97706',
+    navy: '#0A1E3F',
+    navyMid: '#0F2C59',
+    amber: '#D97706',
+    amberDark: '#B45309',
     amberSurface: '#FEF3C7',
     white: '#FFFFFF',
-    offWhite: '#F8F9FB',
+    offWhite: '#F4F6F9',
     surface: '#FFFFFF',
-    surfaceLow: '#F2F4F6',
-    textPrimary: '#191C1E',
-    textSecondary: '#44474F',
-    textTertiary: '#747780',
-    border: '#C4C6D0',
-    success: '#059669',
-    successSurface: '#D1FAE5',
-    error: '#BA1A1A',
-    errorSurface: '#FFDAD6',
-    primarySurface: '#D7E2FF',
-    info: '#1B3A6B',
-    infoSurface: '#D7E2FF',
+    surfaceLow: '#F8FAFC',
+    textPrimary: '#0F172A',
+    textSecondary: '#475569',
+    textTertiary: '#64748B',
+    border: '#CBD5E1',
+    success: '#15803D',
+    successSurface: '#DCFCE7',
+    error: '#B91C1C',
+    errorSurface: '#FEE2E2',
+    primarySurface: '#EFF6FF',
+    info: '#0F2C59',
+    infoSurface: '#EFF6FF',
 };
 
 export default function Profile({ navigation }) {
@@ -140,6 +140,10 @@ export default function Profile({ navigation }) {
                                     <Text style={styles.heroName}>{displayName}</Text>
                                 </View>
                                 <Text style={styles.heroEmail}>{displayEmail}</Text>
+                                <View style={styles.memberBadge}>
+                                    <Ionicons name="shield-checkmark" size={9} color={C.amber} />
+                                    <Text style={styles.memberBadgeText}>CITIZEN</Text>
+                                </View>
                             </View>
                         </View>
 
@@ -211,6 +215,16 @@ export default function Profile({ navigation }) {
                                 </Text>
                             </View>
                         </TouchableOpacity>
+
+                        {/* Version footer */}
+                        <View style={styles.versionFooter}>
+                            <View style={styles.versionLogoRow}>
+                                <Ionicons name="shield-checkmark" size={14} color={C.textTertiary} />
+                                <Text style={styles.versionAppName}>TrafficEye</Text>
+                            </View>
+                            <Text style={styles.versionText}>Version 1.0.0 · Traffic Enforcement Portal</Text>
+                            <Text style={styles.versionGov}>Government Civic Service · Maharashtra</Text>
+                        </View>
 
                         <View style={{ height: 40 }} />
                     </View>
@@ -459,6 +473,35 @@ const styles = StyleSheet.create({
     signOutText: {
         fontSize: 16,
         fontFamily: 'Nunito-Bold',
-        color: C.error,
+        color: '#B91C1C',
+    },
+
+    // Version footer
+    versionFooter: {
+        alignItems: 'center',
+        paddingVertical: 20,
+        gap: 4,
+    },
+    versionLogoRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        marginBottom: 2,
+    },
+    versionAppName: {
+        fontSize: 13,
+        fontFamily: 'Nunito-Bold',
+        color: '#64748B',
+    },
+    versionText: {
+        fontSize: 11,
+        fontFamily: 'Nunito-Medium',
+        color: '#94A3B8',
+    },
+    versionGov: {
+        fontSize: 10,
+        fontFamily: 'Nunito-Regular',
+        color: '#CBD5E1',
     },
 });
+
