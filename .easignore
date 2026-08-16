@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Expo / build artifacts
+.expo/
+dist/
+web-build/
+
+# Native folders (let EAS run prebuild cleanly)
+android/
+ios/
+
+# Git
+.git/
+
+# Database dumps / temp
+database/
+supabase/.temp/
+docs/
+
+# IDE / System
+.DS_Store
+*.log
