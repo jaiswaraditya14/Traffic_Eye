@@ -134,11 +134,11 @@ export default function AIProcessing({ navigation }) {
 
                 if (!results.violationDetected) {
                     Alert.alert(
-                        'No Violation Detected',
-                        results.description || 'No traffic violation detected in this image.',
+                        'Could Not Detect Violation',
+                        'We could not identify a violation in this image.\n\nYou can try again with a clearer photo, or enter the violation details manually.',
                         [
                             { text: 'Try Again',      style: 'cancel', onPress: () => navigation.goBack() },
-                            { text: 'Enter Manually', onPress: () => navigation.replace('AIResultsVerification', {
+                            { text: 'Enter Manually', style: 'default', onPress: () => navigation.replace('AIResultsVerification', {
                                 aiResults: results,
                                 possibleDuplicate,
                                 duplicateExistingId,
@@ -159,12 +159,13 @@ export default function AIProcessing({ navigation }) {
                 didNavigate = true;
                 console.error('[AIProcessing] Pipeline error:', err);
                 Alert.alert(
-                    'Analysis Note',
-                    'Could not auto-detect violation. Please fill details manually.',
-                    [{ text: 'Continue', onPress: () => navigation.replace('AIResultsVerification', {
+                    'Analysis Unavailable',
+                    'We could not analyze this image right now.\n\nPlease enter the violation details manually.',
+                    [{ text: 'Enter Manually', style: 'default', onPress: () => navigation.replace('AIResultsVerification', {
                         aiResults: {
                             violationDetected: false, vehicleNumber: '', violationType: '',
                             allViolations: [], severity: 'None', confidence: 0,
+                            description: 'Image could not be analyzed. Please enter the violation details manually.',
                         },
                     })}]
                 );

@@ -75,57 +75,68 @@ const logDiagnostics = () => {
 
 // ─── Stage 1 prompt: Violation detection (All Indian MVA Rules) ─────────────────
 const VIOLATION_PROMPT = `
-Analyze the image strictly for ANY clearly visible traffic violation under Indian Motor Vehicles Act (MVA) and Traffic Rules involving the PRIMARY vehicle.
+You are a Forensic Traffic Enforcement AI and Indian Motor Vehicles Act (MVA) expert.
+Your SOLE job is to identify traffic violations. Do NOT comment on registration, legality, or road safety in general.
+Detect violations ONLY — report what is wrong, not what is acceptable.
 
-PRIMARY VEHICLE:
-- Focus on the main vehicle in the photo (motorcycle, scooter, car, auto-rickshaw, truck, bus, tempo, e-rickshaw, commercial goods vehicle).
-- Evaluate violations ONLY for this primary vehicle. Do not transfer violations from background or adjacent vehicles.
+━━ PRIMARY VEHICLE RULE ━━
+Focus exclusively on the MAIN vehicle in frame (motorcycle, scooter, car, auto-rickshaw, truck, bus, tempo, e-rickshaw).
+DO NOT attribute violations from background or adjacent vehicles to the primary vehicle.
 
-STRICT EVIDENCE RULES:
-* Detect ONLY what is directly and unambiguously visible in the image.
-* NEVER guess, assume, infer, or fabricate a violation.
-* Do NOT explain traffic laws or write long reasoning.
-* If evidence is unclear or doubtful, omit that violation.
-* Output strictly valid JSON.
+━━ ABSENCE-IS-EVIDENCE RULE (CRITICAL) ━━
+For safety-gear violations, ABSENCE of the gear IS the evidence:
+• No Helmet: If the rider's or pillion's head has NO helmet visible → VIOLATION. Do NOT say "cannot determine". The head is visible; the helmet is not. That IS a violation.
+• No Seat Belt: If no seatbelt strap is visible across the driver/passenger's chest → VIOLATION.
+• Do NOT hedge with phrases like "we cannot determine" or "unable to assess". If a person's bare head is visible on a two-wheeler → flag No Helmet.
 
-INDIAN TRAFFIC VIOLATIONS TO DETECT (ALL VEHICLES):
-1. TWO-WHEELERS (Motorcycles, Scooters, Mopeds):
-   • "Triple Riding": 3 or more people physically on one two-wheeler.
-   • "No Helmet": Rider or pillion passenger clearly not wearing a helmet.
-   • "Footpath Driving": Riding on a pedestrian footpath / pavement / sidewalk.
+━━ EVIDENCE GATE ━━
+• Confidence ≥ 0.75: Flag the violation confidently.
+• Confidence 0.50–0.74: Flag the violation with that confidence value — do NOT drop it.
+• Confidence < 0.50: Exclude entirely (face not visible, image fully obscured, etc.).
+• Keep evidence descriptions to exactly 1 concise sentence stating what you see (or do NOT see).
 
-2. FOUR-WHEELERS & PASSENGER CARS (Cars, Taxis, SUVs):
-   • "No Seat Belt": Driver or front-seat passenger without seatbelt.
-   • "Tinted Glass": Dark / black sunfilm on windows obstructing clear visibility.
-   • "Passenger Overcrowding": Carrying excess passengers beyond licensed capacity.
+━━ MULTI-VIOLATION MANDATE ━━
+If MULTIPLE violations are simultaneously visible (e.g. Triple Riding + No Helmet, or Red Light Jump + Wrong Side Driving), you MUST list ALL verified violations in the violations[] array. Never silently drop a secondary violation.
 
-3. AUTO-RICKSHAWS & THREE-WHEELERS:
-   • "Auto Overcrowding": Excess passengers (e.g. passengers seated next to driver or overcrowded cabin).
-   • "Dangerous Passenger Posture": Passengers hanging outside the auto body.
+━━ VIOLATION TAXONOMY (Indian MVA) ━━
+TWO-WHEELERS (Motorcycles, Scooters, Mopeds):
+  "No Helmet" — rider or pillion's head visible WITHOUT a helmet on it
+  "Triple Riding" — 3+ people physically seated on one two-wheeler
+  "Footpath Driving" — riding on pedestrian pavement/sidewalk
 
-4. COMMERCIAL, GOODS & HEAVY VEHICLES (Trucks, Tempos, Lorries, Buses):
-   • "Overloading Goods": Cargo overflowing, spilling over the sides, or dangerously stacked beyond the vehicle body.
-   • "Protruding Cargo": Unsecured long iron rods, pipes, or timber protruding without safety markers.
-   • "Carrying Passengers in Goods Vehicle": People transported in open goods carriage bed.
-   • "Footboard Travelling": Passengers hanging or standing on the bus footboard/door.
-   • "Roof Travelling": People travelling on the roof of a bus or vehicle.
+FOUR-WHEELERS (Cars, SUVs, Taxis):
+  "No Seat Belt" — no seatbelt strap visible across driver or front-passenger
+  "Tinted Glass" — illegal dark sunfilm blocking visibility into vehicle
+  "Passenger Overcrowding" — passengers visibly beyond seating capacity
 
-5. MOVING & DRIVING VIOLATIONS (ALL VEHICLES):
-   • "Red Light Violation": Crossing stop line or intersection during a red traffic signal.
-   • "Wrong Side Driving": Driving against designated one-way or opposing traffic flow.
-   • "Speeding": Excessive speed clearly supported by strong motion blur or context.
-   • "Rash Driving": Reckless zigzagging, stunt riding, or dangerous erratic driving.
-   • "Mobile Phone Use": Driver/rider holding or using a mobile phone while operating the vehicle.
-   • "Lane Cutting": Abrupt unsafe lane change without indicator or crossing solid dividing lines.
-   • "Illegal U-Turn": Making a U-turn or prohibited turn where disallowed.
-   • "Drunk Driving": Visibly erratic out-of-control vehicle state with clear evidence.
+AUTO-RICKSHAWS:
+  "Auto Overcrowding" — excess passengers or passenger seated beside driver
+  "Dangerous Passenger Posture" — passengers visibly hanging outside the body
 
-6. PARKING & REGULATORY VIOLATIONS (ALL VEHICLES):
-   • "Wrong Parking": Vehicle parked in a "No Parking" zone (sign/marking visible), on zebra crossing, bus stop, yellow line, or causing obstruction.
-   • "Footpath Parking": Parked on a pedestrian footpath or sidewalk.
-   • "No Registration Plate": Number plate missing, covered, tampered, or completely unreadable.
+HEAVY/GOODS VEHICLES (Trucks, Buses, Tempos):
+  "Overloading Goods" — cargo overflowing or stacked visibly beyond the body
+  "Protruding Cargo" — unsecured rods/pipes/timber protruding without markers
+  "Carrying Passengers in Goods Vehicle" — people visible in open goods carriage
+  "Footboard Travelling" — passengers hanging or standing on bus footboard/door
+  "Roof Travelling" — people visible on vehicle roof
 
-Return ONLY valid JSON. No reasoning, explanation, Markdown, or extra text.
+MOVING VIOLATIONS (ALL):
+  "Red Light Violation" — vehicle crossing stop line while signal is red
+  "Wrong Side Driving" — driving against one-way or opposing traffic direction
+  "Speeding" — excessive speed evidenced by strong motion blur
+  "Rash Driving" — reckless zigzag, stunts, or erratic behavior
+  "Mobile Phone Use" — driver/rider visibly holding a phone while moving
+  "Lane Cutting" — abrupt unsafe lane change across a solid dividing line
+  "Illegal U-Turn" — U-turn at a clearly prohibited location
+  "Drunk Driving" — clearly out-of-control vehicle behavior
+
+PARKING/REGULATORY (ALL):
+  "Wrong Parking" — in No-Parking zone, zebra crossing, bus stop, or yellow line
+  "Footpath Parking" — vehicle parked on pedestrian footpath
+  "No Registration Plate" — plate missing, covered, removed, or tampered
+
+━━ OUTPUT ━━
+Return ONLY raw valid JSON. No markdown, no preamble, no backticks, no commentary, no explanation.
 
 If violation(s) detected:
 {
@@ -137,12 +148,12 @@ If violation(s) detected:
     {
       "type": "Triple Riding",
       "confidence": 0.98,
-      "evidence": "Three people are clearly visible on one motorcycle."
+      "evidence": "Three people are clearly seated on one motorcycle."
     },
     {
       "type": "No Helmet",
-      "confidence": 0.98,
-      "evidence": "The riders are clearly visible without helmets."
+      "confidence": 0.96,
+      "evidence": "All three riders have no protective headgear visible."
     }
   ],
   "severity": "high",
@@ -163,20 +174,21 @@ If NO violation detected:
 
 // ─── Stage 1.5 prompt: Reasoning validation ───────────────────────────────────
 const REASONING_PROMPT = `
-You are a senior traffic police officer evaluating a preliminary traffic violation report generated by a vision AI.
-Review the following initial detection data carefully and determine if it constitutes a definitive, legally binding traffic violation under Indian Motor Vehicles Act.
-Apply strict logic based on Indian traffic rules.
+You are a senior traffic police officer validating a vision AI's traffic violation report.
+Your job is to CONFIRM real violations, not to dismiss them. Apply Indian MVA rules.
 
 Initial Report:
 __RAW_JSON__
 
-MANDATORY RULES:
-1. Triple Riding requires exactly 3 or more people ON the two-wheeler. 1 or 2 people is NOT a violation.
-2. Overloading only applies to goods clearly spilling out of goods vehicles, not passenger bags.
-3. If the violation is doubtful based on the description, mark violation_detected as false and violations as [].
-4. Ensure the output is strictly valid JSON matching the exact schema of the input.
+VALIDATION RULES:
+1. "Triple Riding" is valid ONLY if person_count >= 3 on a two-wheeler. With 1–2 people, remove it.
+2. "Overloading Goods" is valid ONLY if cargo is visibly spilling beyond the truck/tempo body. Bags/luggage don't count.
+3. "No Helmet" is valid if the rider/pillion's head is visible WITHOUT a helmet. A registered vehicle does NOT exempt from helmet rules. KEEP this violation if the vision AI flagged it.
+4. "No Seat Belt" is valid if no seatbelt strap is visible on the driver/front-passenger. KEEP it if flagged.
+5. Only remove a violation if it is factually impossible based on the description (e.g. Triple Riding with person_count=2). DO NOT remove violations simply because they seem uncertain — the vision AI already applied a confidence threshold.
+6. Preserve the exact JSON schema of the input. Do not add or remove fields.
 
-Output ONLY the final evaluated JSON. No markdown, no explanations.
+Output ONLY the final validated JSON. No markdown, no explanations.
 `;
 
 // ─── Stage 2 prompt: High-accuracy plate OCR ─────────────────────────────────
@@ -553,7 +565,7 @@ export const aiService = {
         } catch (error) {
             console.warn('[AI] Analysis warning/error:', error?.message || error);
 
-            // Development safety fallback — keeps the UI unblocked during quota outage
+            // Development safety fallback — keeps the UI unblocked during failures
             if (__DEV__) {
                 console.warn('[AI] 🛡️ SAFETY FALLBACK: Simulated result due to API outage/quota.');
                 return {
@@ -563,7 +575,7 @@ export const aiService = {
                     allViolations:     [],
                     severity:          'None',
                     confidence:        0,
-                    description:       'AI analysis could not complete (API outage/quota). Please fill details manually.',
+                    description:       'Image could not be analyzed. Please enter the violation details manually.',
                     isMock:            true,
                 };
             }
@@ -575,7 +587,7 @@ export const aiService = {
                 allViolations:     [],
                 severity:          'None',
                 confidence:        0,
-                description:       'AI analysis encountered an error. Please fill details manually.',
+                description:       'Image could not be analyzed. Please enter the violation details manually.',
             };
         }
     },

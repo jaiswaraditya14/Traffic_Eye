@@ -8,9 +8,9 @@
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/images/splash.png",
+      "image": "./assets/images/splash_new.jpg",
       "resizeMode": "cover",
-      "backgroundColor": "#050309"
+      "backgroundColor": "#0A1E3F"
     },
     "ios": {
       "supportsTablet": true,
@@ -24,6 +24,11 @@
       "package": "com.anonymous.TrafficEye",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#0A1E3F"
+      },
+      "splash": {
+        "image": "./assets/images/splash_new.jpg",
+        "resizeMode": "cover",
         "backgroundColor": "#0A1E3F"
       },
       "permissions": [
