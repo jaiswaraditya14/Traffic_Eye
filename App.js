@@ -7,6 +7,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { AppProvider, AuthProvider } from './src/context';
 import { AppNavigator } from './src/navigation';
 import { useDMSansFonts } from './src/utils/fonts';
+import ErrorBoundary from './src/components/common/ErrorBoundary';
 
 // Complete any pending auth sessions
 WebBrowser.maybeCompleteAuthSession();
@@ -17,18 +18,20 @@ export default function App() {
   // Hold splash until fonts are ready
   if (!fontsLoaded && !fontError) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#002452' }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0A1E3F' }}>
         <ActivityIndicator color="#F59E0B" size="large" />
       </View>
     );
   }
 
   return (
-    <AuthProvider>
-      <AppProvider>
-        <StatusBar style="auto" />
-        <AppNavigator />
-      </AppProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppProvider>
+          <StatusBar style="auto" />
+          <AppNavigator />
+        </AppProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

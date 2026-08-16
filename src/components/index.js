@@ -8,5 +8,6 @@ export * from './common/FocusAwareStatusBar';
 export { default as ImageCropModal } from './common/ImageCropModal';
 export { default as ScreenHeader } from './common/ScreenHeader';
 export { default as EmptyState } from './common/EmptyState';
+export { default as ErrorBoundary } from './common/ErrorBoundary';
 
 // Feature-specific components can be added as modules grow

@@ -296,7 +296,6 @@ const cardStyles = StyleSheet.create({
 
     // Expanded
     expandedSection: { paddingHorizontal: 16, paddingBottom: 16, overflow: 'hidden' },
-    failedSection: {},
     separator: { height: 1, backgroundColor: C.border, marginVertical: 12 },
     detailRow: { marginBottom: 12 },
     detailLabel: { fontSize: 11, color: C.textTertiary, fontFamily: 'Nunito-ExtraBold', letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 2 },

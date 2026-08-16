@@ -265,7 +265,7 @@ function PopupSheet({ item, onClose }) {
                     <View style={[sheetStyles.severityPill, { backgroundColor: cfg.color }]}>
                         <Text style={sheetStyles.severityText}>{cfg.label.toUpperCase()}</Text>
                     </View>
-                    <View style={[sheetStyles.statusPill]}>
+                    <View style={sheetStyles.statusPill}>
                         <Ionicons name="checkmark-circle" size={14} color={COLORS.success} />
                         <Text style={sheetStyles.statusText}>Approved</Text>
                     </View>

@@ -137,7 +137,7 @@ export default function SpeedLimits({ navigation }) {
                             <View style={styles.vehicleHero}>
                                 <Ionicons name="information-circle" size={16} color={C.navyMid} />
                                 <Text style={styles.vehicleHeroText}>
-                                    Speed limits differ by vehicle class under MoRTH SO 5505(E), 2018. All values are in km/h. "—" means the vehicle is not permitted on that road type.
+                                    Speed limits differ by vehicle class under MoRTH SO 5505(E), 2018. All values are in km/h. &quot;—&quot; means the vehicle is not permitted on that road type.
                                 </Text>
                             </View>
 

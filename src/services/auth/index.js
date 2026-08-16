@@ -10,42 +10,27 @@ export const authService = {
     /**
      * Sign up a new citizen
      */
-    signUpCitizen: async (email, password, fullName, phone, referralCode = null) => {
+    signUpCitizen: async (email, password, fullName, phone) => {
         try {
-            console.log('🚀 Starting signup process for:', email);
-            console.log('📋 User data:', { fullName, phone, referralCode });
-
             const { data, error } = await supabase.auth.signUp({
                 email,
                 password,
                 options: {
-                    emailRedirectTo: Linking.createURL('signup-success'), // Redirects back to app -> signup-success
+                    emailRedirectTo: Linking.createURL('signup-success'),
                     data: {
                         full_name: fullName,
                         phone: phone,
                         role: 'citizen',
-                        referral_code: referralCode,
                     },
                 },
             });
 
             if (error) {
-                console.error('❌ Supabase signup error:', error);
-                console.error('Error details:', {
-                    message: error.message,
-                    status: error.status,
-                    code: error.code,
-                });
                 return { data: null, error };
             }
 
-            console.log('✅ Signup successful:', data);
-
-            // If user was created but profile might not exist, wait and check
+            // Give trigger time to execute and create the profile row
             if (data?.user) {
-                console.log('👤 User created with ID:', data.user.id);
-
-                // Give trigger time to execute
                 await new Promise(resolve => setTimeout(resolve, 2000));
 
                 // Verify profile was created
@@ -57,9 +42,6 @@ export const authService = {
                         .single();
 
                     if (profileError) {
-                        console.error('⚠️ Profile check failed:', profileError);
-                        console.error('Creating profile manually as fallback...');
-
                         // Manual profile creation as fallback
                         const { error: insertError } = await supabase
                             .from('profiles')
@@ -72,28 +54,19 @@ export const authService = {
                             });
 
                         if (insertError) {
-                            console.error('❌ Manual profile creation failed:', insertError);
                             return {
                                 data: null,
-                                error: {
-                                    message: 'Database error saving new user',
-                                    details: insertError
-                                }
+                                error: { message: 'Database error saving new user', details: insertError }
                             };
-                        } else {
-                            console.log('✅ Profile created manually');
                         }
-                    } else {
-                        console.log('✅ Profile exists:', profile);
                     }
                 } catch (checkError) {
-                    console.error('❌ Error checking/creating profile:', checkError);
+                    // Non-fatal — auth succeeded, profile may still be created by trigger
                 }
             }
 
             return { data, error: null };
         } catch (err) {
-            console.error('❌ Unexpected error during signup:', err);
             return {
                 data: null,
                 error: { message: err.message || 'An unexpected error occurred' }
@@ -132,20 +105,19 @@ export const authService = {
 
 
     /**
-     * Sign in with badge ID (for officers)
+     * Sign in with badge ID (for officers).
+     * Uses a SECURITY DEFINER RPC to retrieve the officer's email without
+     * exposing the profiles table to direct enumeration.
      */
     signInWithBadge: async (badgeId, password) => {
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('email')
-            .eq('badge_id', badgeId)
-            .single();
+        const { data: email, error } = await supabase
+            .rpc('get_officer_email_by_badge', { p_badge_id: badgeId });
 
-        if (error || !data) {
+        if (error || !email) {
             throw new Error('Invalid Badge ID');
         }
 
-        return await authService.signIn(data.email, password);
+        return await authService.signIn(email, password);
     },
 
     /**

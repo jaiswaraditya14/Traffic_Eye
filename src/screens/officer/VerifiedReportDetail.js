@@ -504,16 +504,6 @@ const s = StyleSheet.create({
     sevPill:       { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
     sevPillText:   { fontSize: 11, fontFamily: 'Nunito-Bold' },
 
-    // Evidence image
-    imgCard: {
-        borderRadius: 18, overflow: 'hidden', marginBottom: 16,
-        height: 220, backgroundColor: C.surfaceLow, position: 'relative',
-    },
-    evidenceImg: { width: '100%', height: '100%' },
-    imgBadge: {
-        position: 'absolute', bottom: 10, right: 10,
-        backgroundColor: 'rgba(0,0,0,0.5)', padding: 8, borderRadius: 10,
-    },
 
     // Cards
     card: {

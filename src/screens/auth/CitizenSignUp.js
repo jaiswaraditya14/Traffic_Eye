@@ -166,7 +166,7 @@ export default function CitizenSignUp({ navigation }) {
 
                         <TouchableOpacity style={styles.resendRow} onPress={handleResendEmail}>
                             <Ionicons name="refresh" size={14} color={C.navyMid} />
-                            <Text style={styles.resendText}>Didn't receive the email? Resend</Text>
+                            <Text style={styles.resendText}>Didn&apos;t receive the email? Resend</Text>
                         </TouchableOpacity>
 
                         <Text style={styles.spamNote}>Check your spam folder if not found</Text>

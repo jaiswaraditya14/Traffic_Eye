@@ -109,7 +109,7 @@ export function parseCoordinateComponent(val) {
         }
 
         // Formatted DMS strings with symbols (e.g., "19 deg 4' 33.59\" N", "19° 4' 33.59\"", "19:4:33.59")
-        const dmsRegex = /^(-?[\d\.]+)[°\sdeg:]+([\d\.]+)?['\smin:]*([\d\.]+)?["\ssec]*([NSEW])?$/i;
+        const dmsRegex = /^(-?[\d.]+)[°\sdeg:]+([\d.]+)?['\smin:]*([\d.]+)?["\ssec]*([NSEW])?$/i;
         const match = str.match(dmsRegex);
         if (match) {
             const d = parseFloat(match[1]);

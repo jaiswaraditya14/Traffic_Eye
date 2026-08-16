@@ -310,29 +310,6 @@ const styles = StyleSheet.create({
 
     content: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
 
-    // Image
-    imageContainer: {
-        width: '100%', height: 260, borderRadius: 20, overflow: 'hidden',
-        marginBottom: 16, shadowColor: C.navyMid,
-        shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15,
-        shadowRadius: 10, elevation: 6,
-    },
-    evidenceImage: { width: '100%', height: '100%' },
-    imageOverlay: {
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        paddingTop: 40, paddingBottom: 16, paddingHorizontal: 16,
-    },
-    imageTag: {
-        flexDirection: 'row', alignItems: 'center', gap: 6,
-        backgroundColor: C.amber, paddingHorizontal: 10, paddingVertical: 4,
-        borderRadius: 12, alignSelf: 'flex-start', marginBottom: 8,
-    },
-    imageTagText: { fontSize: 11, color: C.navy, fontFamily: 'Nunito-Bold', letterSpacing: 0.2 },
-    imageDate: { fontSize: 13, color: 'rgba(255,255,255,0.9)', fontFamily: 'Nunito-Medium' },
-    expandBtn: {
-        position: 'absolute', top: 12, right: 12,
-        backgroundColor: 'rgba(255,255,255,0.92)', padding: 8, borderRadius: 10,
-    },
 
     // Status + Reward
     statusSection: {

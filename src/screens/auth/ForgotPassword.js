@@ -96,7 +96,7 @@ export default function ForgotPassword({ navigation }) {
                         <View style={styles.authCard}>
                             <Text style={styles.welcomeText}>Verify Identity</Text>
                             <Text style={styles.subWelcomeText}>
-                                We'll send an 8-digit OTP to your registered email
+                                We&apos;ll send an 8-digit OTP to your registered email
                             </Text>
 
                             <View style={styles.fieldGroup}>

@@ -158,7 +158,8 @@ export async function checkImageHashExists(hash) {
 
 /**
  * Check whether a vehicle plate has already been reported recently.
- * Catches duplicate reports even if the image was cropped or screenshotted.
+ * Uses a SECURITY DEFINER RPC to check across ALL citizens' reports
+ * (the direct client query fails silently under RLS).
  *
  * @param {string} vehicleNumber - e.g. "MH02CR7036"
  * @returns {Promise<{ isDuplicate: boolean, existingReportId: string|null }>}
@@ -169,27 +170,22 @@ export async function checkPlateDuplicate(vehicleNumber) {
     }
     try {
         const normalized = vehicleNumber.replace(/\s+/g, '').toUpperCase();
-        const { data, error } = await supabase
-            .from('image_reports')
-            .select('id, submitted_at, vehicle_number, status')
-            .eq('vehicle_number', normalized)
-            .neq('status', 'rejected')
-            .limit(1)
-            .maybeSingle();
+        const { data, error } = await supabase.rpc('check_plate_duplicate', {
+            p_vehicle_number: normalized,
+        });
 
         if (error) {
-            console.warn('[PlateDuplicateCheck] Query warning:', error.message);
+            console.warn('[PlateDuplicateCheck] RPC warning:', error.message);
             return { isDuplicate: false, existingReportId: null };
         }
 
-        if (data) {
-            console.log(`[PlateDuplicateCheck] Vehicle plate duplicate match found! Plate=${normalized}, report id=${data.id}`);
-            return { isDuplicate: true, existingReportId: data.id };
+        if (data?.is_duplicate) {
+            return { isDuplicate: true, existingReportId: data.existing_report_id };
         }
 
         return { isDuplicate: false, existingReportId: null };
     } catch (err) {
-        console.warn('[PlateDuplicateCheck] Error checking plate duplicate:', err.message);
+        console.warn('[PlateDuplicateCheck] Error:', err.message);
         return { isDuplicate: false, existingReportId: null };
     }
 }

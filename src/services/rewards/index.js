@@ -262,142 +262,86 @@ export const rewardService = {
     },
 
     /**
-     * Instantly award points to the user profile.
+     * Instantly award points to the user profile via server-side RPC.
+     * This is a lightweight convenience wrapper for UI preview purposes.
+     * Actual post-approval reward is awarded by submit_officer_review on the server.
      * @param {string} violationType
-     * @param {string} [severity] - preferred: awards correct tier points directly
+     * @param {string} [severity] - preferred: 'Low' | 'Medium' | 'High' | 'Critical'
      */
     async awardPointsForReport(violationType, severity = null) {
-        try {
-            const pointsToAward = this.getPointsForViolation(violationType, severity);
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error('Not authenticated');
-
-            const { data: profile, error: readError } = await supabase
-                .from('profiles')
-                .select('points_balance')
-                .eq('id', user.id)
-                .single();
-
-            if (readError) throw readError;
-
-            const newBalance = (profile?.points_balance || 0) + pointsToAward;
-
-            const { error: updateError } = await supabase
-                .from('profiles')
-                .update({ points_balance: newBalance })
-                .eq('id', user.id);
-
-            if (updateError) throw updateError;
-
-            return { success: true, pointsAwarded: pointsToAward, newBalance };
-        } catch (error) {
-            console.error('Error awarding points:', error);
-            return { success: false, error: error.message };
-        }
+        // Return the calculated preview amount (actual award done server-side on approval)
+        const pointsToAward = this.getPointsForViolation(violationType, severity);
+        return { success: true, pointsAwarded: pointsToAward };
     },
 
     /**
-     * Award base submission points immediately upon saving a report
+     * Award base submission points via atomic server-side RPC.
+     * The RPC is idempotent — repeated calls for the same reportId are a no-op.
      */
     async awardBaseSubmissionPoints(reportId) {
         try {
-            const pointsToAward = 10;
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error('Not authenticated');
 
-            const { data: profile, error: readError } = await supabase
-                .from('profiles')
-                .select('points_balance')
-                .eq('id', user.id)
-                .single();
-
-            if (readError) throw readError;
-
-            const newBalance = (profile?.points_balance || 0) + pointsToAward;
-
-            const { error: updateError } = await supabase
-                .from('profiles')
-                .update({ points_balance: newBalance })
-                .eq('id', user.id);
-
-            if (updateError) throw updateError;
-
-            // Record transaction
-            await supabase.from('point_transactions').insert({
-                user_id: user.id,
-                amount: pointsToAward,
-                type: 'earned',
-                action: 'report_submitted',
-                reference_id: reportId || null,
-                description: 'Base reward for submitting a traffic report'
+            const { data, error } = await supabase.rpc('award_submission_points', {
+                p_user_id:   user.id,
+                p_report_id: reportId,
             });
 
-            return { success: true, pointsAwarded: pointsToAward, newBalance };
+            if (error) throw error;
+
+            return {
+                success: true,
+                pointsAwarded: data?.pointsAwarded ?? 10,
+                skipped: data?.skipped ?? false,
+            };
         } catch (error) {
-            console.error('Error awarding submission points:', error);
+            console.error('[RewardService] Error awarding submission points:', error);
             return { success: false, error: error.message };
         }
     },
 
     /**
-     * Handle item redemption — generates coupon code, deducts points,
-     * and persists the redemption (couponCode + expiresAt) to point_transactions
+     * Handle item redemption via atomic server-side RPC.
+     * The RPC uses SELECT ... FOR UPDATE to prevent race-condition double-spending.
      */
     async redeemItem(item) {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error('Not authenticated');
 
-            // 1. Fresh read of user profile
-            const { data: profile, error: readError } = await supabase
-                .from('profiles')
-                .select('points_balance')
-                .eq('id', user.id)
-                .single();
-
-            if (readError) throw readError;
-
-            const currentPoints = profile?.points_balance || 0;
-
-            if (currentPoints < item.pts) {
-                return { success: false, error: 'Insufficient points balance.' };
-            }
-
-            // 2. Deduct points
-            const newBalance = currentPoints - item.pts;
-            const { error: updateError } = await supabase
-                .from('profiles')
-                .update({ points_balance: newBalance })
-                .eq('id', user.id);
-
-            if (updateError) throw updateError;
-
-            // 3. Generate coupon code + 15-day expiry
+            // Generate coupon code + 15-day expiry on client (used as input to RPC)
             const couponCode = generateCouponCode();
-            const unlockedAt = new Date().toISOString();
             const expiresAt = new Date(
                 Date.now() + 15 * 24 * 60 * 60 * 1000
             ).toISOString();
 
-            // 4. Persist redemption as a point_transaction (type: redeemed)
-            await supabase.from('point_transactions').insert({
-                user_id: user.id,
-                amount: item.pts,
-                type: 'redeemed',
-                action: 'gift_redeemed',
-                description: JSON.stringify({
-                    itemId: item.id,
-                    itemTitle: item.title,
-                    couponCode,
-                    unlockedAt,
-                    expiresAt,
-                }),
+            const { data, error } = await supabase.rpc('redeem_reward_item', {
+                p_user_id:    user.id,
+                p_item_id:    item.id,
+                p_points:     item.pts,
+                p_item_title: item.title,
+                p_coupon:     couponCode,
+                p_expires_at: expiresAt,
             });
 
-            return { success: true, newBalance, itemRedeemed: item, couponCode, unlockedAt, expiresAt };
+            if (error) throw error;
+
+            if (!data?.success) {
+                return { success: false, error: data?.error || 'Redemption failed.' };
+            }
+
+            return {
+                success:      true,
+                newBalance:   data.newBalance,
+                itemRedeemed: item,
+                couponCode:   data.couponCode,
+                unlockedAt:   data.unlockedAt,
+                expiresAt:    data.expiresAt,
+            };
 
         } catch (error) {
-            console.error('Error redeeming item:', error);
+            console.error('[RewardService] Error redeeming item:', error);
             return { success: false, error: error.message };
         }
     },
@@ -480,7 +424,7 @@ export const rewardService = {
             const history = (data || []).map(t => {
                 if (t.type === 'redeemed') {
                     let meta = {};
-                    try { meta = JSON.parse(t.description); } catch (_) {}
+                    try { meta = JSON.parse(t.description); } catch (_e) { /* skip malformed */ }
                     return {
                         id: t.id,
                         type: 'spent',

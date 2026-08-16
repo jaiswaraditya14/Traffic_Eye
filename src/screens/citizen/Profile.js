@@ -401,59 +401,6 @@ const styles = StyleSheet.create({
         fontFamily: 'Nunito-SemiBold',
     },
 
-    // Referral card
-    referralCard: {
-        borderRadius: 20,
-        overflow: 'hidden',
-        marginBottom: 24,
-        elevation: 2,
-    },
-    referralGradient: {
-        padding: 18,
-    },
-    referralHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        marginBottom: 12,
-    },
-    giftIconFrame: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        backgroundColor: 'rgba(245,158,11,0.1)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    referralTitle: {
-        fontSize: 15,
-        fontFamily: 'Nunito-Bold',
-        color: C.amberDark,
-    },
-    codeContainer: {
-        backgroundColor: 'rgba(255,255,255,0.6)',
-        borderRadius: 12,
-        paddingVertical: 12,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 10,
-        borderWidth: 1,
-        borderColor: 'rgba(245,158,11,0.1)',
-    },
-    referralCode: {
-        fontSize: 20,
-        fontFamily: 'Nunito-ExtraBold',
-        color: C.navyMid,
-        letterSpacing: 4,
-    },
-    referralInfo: {
-        fontSize: 12,
-        color: C.textSecondary,
-        textAlign: 'center',
-        marginTop: 10,
-        fontFamily: 'Nunito-Medium',
-    },
 
     // Sign out
     signOutButton: {

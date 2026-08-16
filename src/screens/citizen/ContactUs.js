@@ -53,7 +53,7 @@ export default function ContactUs({ navigation }) {
                         <View style={styles.heroIconBg}>
                             <Ionicons name="chatbubbles" size={36} color={C.navyMid} />
                         </View>
-                        <Text style={styles.heroTitle}>We're Here to Help</Text>
+                        <Text style={styles.heroTitle}>We&apos;re Here to Help</Text>
                         <Text style={styles.heroText}>
                             Having trouble with the app or need assistance regarding a report? Reach out to our support team.
                         </Text>

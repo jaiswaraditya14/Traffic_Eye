@@ -259,11 +259,6 @@ const styles = StyleSheet.create({
     cardId: { fontSize: 11, fontFamily: 'Nunito-Medium', color: C.textTertiary },
     metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     metaText: { fontSize: 11, color: C.textSecondary, fontFamily: 'Nunito-Medium', flex: 1 },
-    pointsBadge: {
-        flexDirection: 'row', alignItems: 'center', gap: 5,
-        backgroundColor: C.amberSurface, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start',
-    },
-    pointsText: { fontSize: 11, color: C.amberDark, fontFamily: 'Nunito-Bold' },
     arrowWrap: {
         width: 28, height: 28, borderRadius: 8,
         backgroundColor: C.primarySurface, justifyContent: 'center', alignItems: 'center', marginRight: 12,

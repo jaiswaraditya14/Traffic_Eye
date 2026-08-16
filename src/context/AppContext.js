@@ -10,22 +10,34 @@ export const AppProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentReport, setCurrentReport] = useState(null);
   const [reports, setReports] = useState([]);
-  const [userPoints, setUserPoints] = useState(120);
-  const [user, setUser] = useState({
-    name: 'John Doe',
-    email: 'john.doe@example.com',
-    phone: '+1 234 567 8900',
-    avatar: null,
-  });
+  // NOTE: userPoints and user are legacy convenience state — source of truth
+  // is AuthContext profile.points_balance and profile fields.
+  const [userPoints, setUserPoints] = useState(0);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
-    // We intentionally removed the AsyncStorage check here to ensure Onboarding 
-    // always shows on app start, per the desired flow: Splash -> Onboarding -> Role Selection
+    // Read persisted onboarding flag from AsyncStorage on mount.
+    // This ensures onboarding only appears on the very first app launch.
+    const loadOnboardingState = async () => {
+      try {
+        const value = await AsyncStorage.getItem('@traffic_eye_has_seen_onboarding');
+        if (value === 'true') {
+          setHasSeenOnboardingState(true);
+        }
+      } catch (e) {
+        // AsyncStorage read failure — default to showing onboarding (safe fallback)
+      }
+    };
+    loadOnboardingState();
   }, []);
 
   const setHasSeenOnboarding = async (value) => {
     setHasSeenOnboardingState(value);
-    // No longer persisting to AsyncStorage to enforce the strict app flow
+    try {
+      await AsyncStorage.setItem('@traffic_eye_has_seen_onboarding', value ? 'true' : 'false');
+    } catch (e) {
+      // AsyncStorage write failure — non-fatal
+    }
   };
 
   const value = {

@@ -434,7 +434,7 @@ export default function Rewards() {
                     <View style={styles.stepNum}><Text style={styles.stepNumText}>4</Text></View>
                     <View style={{flex: 1}}>
                         <Text style={styles.stepTitle}>Points Credited</Text>
-                        <Text style={styles.stepDesc}>Once approved, points are added to your balance. Check 'My Activity' for logs.</Text>
+                        <Text style={styles.stepDesc}>Once approved, points are added to your balance. Check &apos;My Activity&apos; for logs.</Text>
                     </View>
                 </View>
             </View>
@@ -450,7 +450,7 @@ export default function Rewards() {
                     <Text style={styles.guideText}>
                         1. Navigate to the <Text style={{fontFamily:'Nunito-Bold'}}>Gifts</Text> tab.{"\n"}
                         2. Choose any unlocked item and tap <Text style={{fontFamily:'Nunito-Bold'}}>Redeem</Text>.{"\n"}
-                        3. You'll receive a unique code instantly.{"\n"}
+                        3. You&apos;ll receive a unique code instantly.{"\n"}
                         4. Copy the code and use it at checkout with our partners.
                     </Text>
                 </LinearGradient>
@@ -776,20 +776,6 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between', 
         alignItems: 'center', 
         marginBottom: 20 
-    },
-    clearBtn: { 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        gap: 6,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 12,
-        backgroundColor: C.errorSurface,
-    },
-    clearBtnText: { 
-        fontSize: 12, 
-        fontFamily: 'Nunito-Bold', 
-        color: C.error 
     },
     emptyActivity: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, paddingHorizontal: 20 },
     emptyIconCircle: { 

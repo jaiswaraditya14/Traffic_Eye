@@ -45,14 +45,16 @@ const ProfileLoadingScreen = () => (
 
 export default function AppNavigator() {
     const { hasSeenOnboarding, showSplash } = useAppContext();
-    const { isAuthenticated, loading, profile, signOut } = useAuth();
-    const [hasConfirmedRole, setHasConfirmedRole] = React.useState(false);
+    const { isAuthenticated, loading, profile } = useAuth();
 
-    // We enforce a strict funnel on every launch. User must flow through:
-    // Splash -> Onboarding -> Role Selection -> Login OR User Dashboard.
-    // hasSeenOnboarding is always false on app start now (AppContext modification).
-    // hasConfirmedRole is always false until they click a role on the RoleSelection screen.
-    // If they click the correct role, and have an active session, they see the Dashboard.
+    // Navigation funnel:
+    //  1. SplashScreen  — always shown first on cold start
+    //  2. Auth loading  — while session is being restored
+    //  3. If authenticated + profile exists → go directly to role dashboard
+    //     (skip Onboarding and RoleSelection for returning logged-in users)
+    //  4. Onboarding    — only on very first launch (persisted via AsyncStorage)
+    //  5. Auth stack    — RoleSelection → SignIn / SignUp
+    //  6. Role dashboards (Citizen / Officer)
 
     return (
         <NavigationContainer linking={linking}>
@@ -63,55 +65,50 @@ export default function AppNavigator() {
                     animationDuration: 250,
                 }}
             >
-                {/* 1. Initial App Splash (Mandatory) */}
+                {/* 1. Initial App Splash */}
                 {showSplash ? (
                     <Stack.Screen name="Splash" component={SplashScreen} />
                 ) : loading ? (
-                    /* 2. Authentication Loading State */
+                    /* 2. Restoring session */
                     <Stack.Screen name="AuthLoading" component={SplashScreen} />
+                ) : isAuthenticated && profile ? (
+                    /* 3. Authenticated — go directly to role dashboard */
+                    profile.role === 'citizen' ? (
+                        <Stack.Screen
+                            name="Citizen"
+                            component={CitizenNavigator}
+                            options={{ animation: 'fade' }}
+                        />
+                    ) : (
+                        <Stack.Screen
+                            name="Officer"
+                            component={OfficerNavigator}
+                            options={{ animation: 'fade' }}
+                        />
+                    )
+                ) : isAuthenticated && !profile ? (
+                    /* 4. Authenticated but profile still loading */
+                    <Stack.Screen name="ProfileLoading" component={ProfileLoadingScreen} />
                 ) : !hasSeenOnboarding ? (
-                    /* 3. Onboarding Flow (Must see first time) */
-                    <Stack.Screen 
-                        name="Onboarding" 
+                    /* 5. First launch — show onboarding */
+                    <Stack.Screen
+                        name="Onboarding"
                         component={OnboardingCarousel}
                         options={{ animation: 'fade' }}
                     />
-                ) : (!isAuthenticated || !hasConfirmedRole) ? (
-                    /* 4. Auth Stack Gate (Must pass Role Selection) */
+                ) : (
+                    /* 6. Unauthenticated — Auth stack */
                     <>
-                        <Stack.Screen
-                            name="RoleSelection"
-                        >
-                            {(props) => <RoleSelection {...props} onConfirm={() => setHasConfirmedRole(true)} />}
-                        </Stack.Screen>
+                        <Stack.Screen name="RoleSelection" component={RoleSelection} />
                         <Stack.Screen name="CitizenSignIn" component={CitizenSignIn} />
                         <Stack.Screen name="CitizenSignUp" component={CitizenSignUp} />
                         <Stack.Screen name="SignUpSuccess" component={SignUpSuccess} />
                         <Stack.Screen name="OfficerSignIn" component={OfficerSignIn} />
                         <Stack.Screen name="ForgotPassword" component={ForgotPassword} />
                         <Stack.Screen name="OtpVerification" component={OtpVerification} />
+                        <Stack.Screen name="NewPassword" component={NewPassword} />
                     </>
-                ) : !profile ? (
-                    /* 5. Profile Loading State */
-                    <Stack.Screen name="ProfileLoading" component={ProfileLoadingScreen} />
-                ) : profile.role === 'citizen' ? (
-                    /* 6. Citizen Flow */
-                    <Stack.Screen
-                        name="Citizen"
-                        component={CitizenNavigator}
-                        options={{ animation: 'fade' }}
-                    />
-                ) : (
-                    /* 7. Officer Flow */
-                    <Stack.Screen
-                        name="Officer"
-                        component={OfficerNavigator}
-                        options={{ animation: 'fade' }}
-                    />
                 )}
-
-                {/* ── New Password Screen (Accessible during auth / deep linking) ── */}
-                <Stack.Screen name="NewPassword" component={NewPassword} />
             </Stack.Navigator>
         </NavigationContainer>
     );

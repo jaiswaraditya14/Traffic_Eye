@@ -11,14 +11,24 @@ export function AuthProvider({ children }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Enterprise Security Requirement: Clear any cached session on app launch
-        // to strictly enforce the "Sign In -> User Dashboard" flow every time.
-        const enforceStrictAuth = async () => {
-            await supabase.auth.signOut();
-            setLoading(false);
+        // Restore session from storage on app launch — do NOT sign out.
+        // The onAuthStateChange listener fires with the persisted session
+        // automatically; we only need to set loading=false if there is none.
+        const initAuth = async () => {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.user) {
+                    setUser(session.user);
+                    await fetchProfile(session.user.id);
+                }
+            } catch (error) {
+                console.error('[Auth] Session restore error:', error);
+            } finally {
+                setLoading(false);
+            }
         };
-        
-        enforceStrictAuth();
+
+        initAuth();
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
@@ -30,7 +40,7 @@ export function AuthProvider({ children }) {
                         setProfile(null);
                     }
                 } catch (error) {
-                    console.error('Auth state change error:', error);
+                    console.error('[Auth] State change error:', error);
                 } finally {
                     setLoading(false);
                 }
@@ -58,31 +68,29 @@ export function AuthProvider({ children }) {
         try {
             const { data, error } = await authService.getProfile(userId);
             if (error || !data) {
-                // If profile doesn't exist, check if user is logged in and create a default one
-                const { data: { user }, error: userError } = await supabase.auth.getUser();
-                if (userError || !user) {
-                    console.error('User not found or session invalid', userError);
+                // Profile missing — attempt to create a default one for OAuth / edge cases.
+                const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
+                if (userError || !currentUser) {
                     setUser(null);
                     setProfile(null);
                     await supabase.auth.signOut();
                     return;
                 }
-                
+
                 const newProfile = {
-                    id: user.id,
-                    full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-                    email: user.email,
-                    role: 'citizen', // Default to citizen for OAuth
+                    id: currentUser.id,
+                    full_name: currentUser.user_metadata?.full_name ||
+                               currentUser.email?.split('@')[0] || 'User',
+                    email: currentUser.email,
+                    role: 'citizen',
                     points_balance: 0,
                     created_at: new Date().toISOString(),
                 };
-                
-                // Use upsert to ensure it correctly creates the profile if missing
+
                 const { error: insertError } = await supabase.from('profiles').upsert(newProfile);
                 if (!insertError) {
                     setProfile(newProfile);
                 } else {
-                    console.error('Failed to create profile:', insertError);
                     setUser(null);
                     setProfile(null);
                     await supabase.auth.signOut();
@@ -91,7 +99,7 @@ export function AuthProvider({ children }) {
                 setProfile(data);
             }
         } catch (err) {
-            console.error('Fatal error fetching profile:', err);
+            console.error('[Auth] Fatal error fetching profile:', err);
             setUser(null);
             setProfile(null);
             await supabase.auth.signOut();

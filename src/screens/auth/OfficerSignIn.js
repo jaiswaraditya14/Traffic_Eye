@@ -44,7 +44,6 @@ export default function OfficerSignIn({ navigation }) {
         try {
             const { data, error } = await signInWithBadge(badgeId.trim(), password);
             if (error) { Alert.alert('Sign In Failed', error.message); return; }
-            console.log('Officer sign in successful. AuthContext will update AppNavigator.');
         } catch (error) {
             Alert.alert('Error', 'Something went wrong. Please try again.');
             console.error(error);
@@ -175,7 +174,10 @@ export default function OfficerSignIn({ navigation }) {
                                 </LinearGradient>
                             </TouchableOpacity>
 
-                            <TouchableOpacity style={styles.contactRow}>
+                            <TouchableOpacity
+                                style={styles.contactRow}
+                                onPress={() => navigation.navigate('ForgotPassword')}
+                            >
                                 <Text style={styles.contactText}>Forgot Password?</Text>
                             </TouchableOpacity>
                         </View>
@@ -292,15 +294,6 @@ const styles = StyleSheet.create({
         fontStyle: 'italic',
         fontFamily: 'Nunito-Medium',
         marginTop: 5,
-    },
-    diagonalAccent: {
-        position: 'absolute',
-        bottom: -40,
-        right: -40,
-        width: 120,
-        height: 120,
-        borderRadius: 60,
-        backgroundColor: 'rgba(255,255,255,0.03)',
     },
 
     // ── Form Container & Auth Card ──

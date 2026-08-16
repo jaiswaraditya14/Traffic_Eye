@@ -358,7 +358,7 @@ export default function OfficerReportExport({ navigation }) {
                             <View style={styles.errorBanner}>
                                 <Ionicons name="alert-circle" size={18} color={C.error} />
                                 <Text style={styles.errorBannerText}>
-                                    Invalid date range: "From Date" cannot be after "To Date".
+                                    Invalid date range: &quot;From Date&quot; cannot be after &quot;To Date&quot;.
                                 </Text>
                             </View>
                         )}

@@ -292,7 +292,7 @@ export default function Notifications({ navigation }) {
                 {/* Unread banner */}
                 {filteredUnread > 0 && (
                     <View style={s.unreadBanner}>
-                        <View style={[s.unreadDot]} />
+                        <View style={s.unreadDot} />
                         <Text style={s.unreadBannerText}>
                             {filteredUnread} unread
                         </Text>

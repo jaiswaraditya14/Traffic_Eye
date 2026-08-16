@@ -309,31 +309,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 4,
     },
 
-    // Feature chips
-    chipRow: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        gap: 8,
-        marginBottom: 24,
-        flexWrap: 'wrap',
-    },
-    chip: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 5,
-        paddingHorizontal: 11,
-        paddingVertical: 6,
-        backgroundColor: C.accentSurface,
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: C.border,
-    },
-    chipText: {
-        fontFamily: FONT_FAMILIES.semibold,
-        fontSize: 11,
-        color: C.accent,
-        letterSpacing: 0.2,
-    },
 
     // CTA button
     ctaButton: {
