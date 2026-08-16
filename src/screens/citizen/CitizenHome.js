@@ -8,6 +8,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context';
 import { FocusAwareStatusBar } from '../../components';
+import * as Location from 'expo-location';
 import { formatNumber } from '../../utils';
 import { fetchCitizenReports, subscribeToReportUpdates, fetchNotifications } from '../../services/reports';
 import { useFocusEffect } from '@react-navigation/native';
@@ -41,9 +42,39 @@ export default function CitizenHome({ navigation }) {
     const { profile } = useAuth();
     const userPoints = profile?.points_balance || 0;
     const firstName = profile?.full_name?.split(' ')[0] || 'User';
+    const [userCity, setUserCity] = React.useState(profile?.jurisdiction || 'Mumbai, Maharashtra');
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnims = useRef([0, 1, 2, 3].map(() => new Animated.Value(30))).current;
+
+    useEffect(() => {
+        const fetchCity = async () => {
+            try {
+                const { status } = await Location.getForegroundPermissionsAsync();
+                if (status === 'granted') {
+                    const pos = await Location.getLastKnownPositionAsync();
+                    if (pos?.coords) {
+                        const rev = await Location.reverseGeocodeAsync({
+                            latitude: pos.coords.latitude,
+                            longitude: pos.coords.longitude,
+                        });
+                        if (rev?.[0]) {
+                            const city = rev[0].city || rev[0].district || rev[0].subregion;
+                            const region = rev[0].region || rev[0].country;
+                            if (city && region) {
+                                setUserCity(`${city}, ${region}`);
+                            } else if (city) {
+                                setUserCity(city);
+                            }
+                        }
+                    }
+                }
+            } catch (_) {
+                // Non-fatal — keep default
+            }
+        };
+        fetchCity();
+    }, []);
 
     useEffect(() => {
         Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
@@ -180,7 +211,7 @@ export default function CitizenHome({ navigation }) {
                                 <Text style={styles.greeting}>{getTimeOfDay()}, {firstName}</Text>
                                 <View style={styles.locationRow}>
                                     <Ionicons name="location" size={12} color="rgba(255,255,255,0.6)" />
-                                    <Text style={styles.locationText}>Mumbai, Maharashtra</Text>
+                                    <Text style={styles.locationText}>{userCity}</Text>
                                 </View>
                             </View>
                             <TouchableOpacity

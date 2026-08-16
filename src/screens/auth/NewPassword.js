@@ -158,7 +158,13 @@ export default function NewPassword({ navigation, route }) {
                         </Text>
                         <TouchableOpacity
                             style={styles.successCTA}
-                            onPress={() => navigation.navigate('CitizenSignIn')}
+                            onPress={() => {
+                                if (route.params?.role === 'officer') {
+                                    navigation.navigate('OfficerSignIn');
+                                } else {
+                                    navigation.navigate('CitizenSignIn');
+                                }
+                            }}
                             activeOpacity={0.88}
                         >
                             <LinearGradient

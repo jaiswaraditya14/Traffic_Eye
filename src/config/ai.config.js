@@ -58,10 +58,12 @@ export const AI_CONFIG = {
         process.env.EXPO_PUBLIC_GEMINI_API_KEY_1,   // Gemini slot #1
         process.env.EXPO_PUBLIC_GEMINI_API_KEY_2,   // Gemini slot #2
         process.env.EXPO_PUBLIC_GEMINI_API_KEY_3,
+        process.env.EXPO_PUBLIC_GEMINI_API_KEY,     // Default Gemini Key
     ].filter(Boolean),
 
     nvidiaApiKeys: [
         process.env.EXPO_PUBLIC_NVIDIA_API_KEY_1,
+        process.env.EXPO_PUBLIC_NVIDIA_API_KEY,     // Default NVIDIA Key
     ].filter(Boolean),
 
     nvidiaModels: NVIDIA_MODELS,
