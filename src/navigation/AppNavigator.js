@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Text, TouchableOpacity, Animated, StyleSheet } from 'react-native';
 import * as Linking from 'expo-linking';
 import { useAppContext, useAuth } from '../context';
 
@@ -33,31 +33,105 @@ const linking = {
         screens: {
             SignUpSuccess: 'signup-success',
             OtpVerification: 'auth/callback',
+            NewPassword: 'reset-password',
         }
     }
 };
 
-const ProfileLoadingScreen = () => (
-    <View style={{ flex: 1, backgroundColor: '#050309', justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#3B82F6" />
-    </View>
-);
+function ProfileLoadingScreen() {
+    const { signOut } = useAuth();
+    const [showCancel, setShowCancel] = useState(false);
+    const fadeAnim = useRef(new Animated.Value(0)).current;
 
-export default function AppNavigator() {
+    useEffect(() => {
+        // Fade in the main content
+        Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+        // Show cancel button after 8 seconds
+        const timer = setTimeout(() => setShowCancel(true), 8000);
+        return () => clearTimeout(timer);
+    }, []);
+
+    return (
+        <Animated.View style={[profileLoadingStyles.container, { opacity: fadeAnim }]}>
+            <View style={profileLoadingStyles.iconWrap}>
+                <ActivityIndicator size="large" color="#F59E0B" />
+            </View>
+            <Text style={profileLoadingStyles.title}>Setting up your account…</Text>
+            <Text style={profileLoadingStyles.subtitle}>This usually takes a few seconds</Text>
+            {showCancel && (
+                <TouchableOpacity
+                    style={profileLoadingStyles.cancelBtn}
+                    onPress={() => signOut()}
+                    activeOpacity={0.8}
+                >
+                    <Text style={profileLoadingStyles.cancelText}>Cancel &amp; Sign In Again</Text>
+                </TouchableOpacity>
+            )}
+        </Animated.View>
+    );
+}
+
+const profileLoadingStyles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#0A1E3F',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 32,
+    },
+    iconWrap: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        backgroundColor: 'rgba(245,158,11,0.15)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    title: {
+        fontSize: 20,
+        fontFamily: 'Nunito-Bold',
+        color: '#FFFFFF',
+        textAlign: 'center',
+        marginBottom: 8,
+    },
+    subtitle: {
+        fontSize: 14,
+        fontFamily: 'Nunito-Medium',
+        color: 'rgba(255,255,255,0.55)',
+        textAlign: 'center',
+        marginBottom: 40,
+    },
+    cancelBtn: {
+        paddingVertical: 12,
+        paddingHorizontal: 28,
+        borderRadius: 24,
+        borderWidth: 1,
+        borderColor: 'rgba(245,158,11,0.5)',
+    },
+    cancelText: {
+        fontSize: 14,
+        fontFamily: 'Nunito-Bold',
+        color: '#F59E0B',
+    },
+});
+
+export default function AppNavigator({ navigationRef }) {
     const { hasSeenOnboarding, showSplash } = useAppContext();
     const { isAuthenticated, loading, profile } = useAuth();
 
-    // Navigation funnel:
-    //  1. SplashScreen  — always shown first on cold start
-    //  2. Auth loading  — while session is being restored
-    //  3. If authenticated + profile exists → go directly to role dashboard
-    //     (skip Onboarding and RoleSelection for returning logged-in users)
-    //  4. Onboarding    — only on very first launch (persisted via AsyncStorage)
-    //  5. Auth stack    — RoleSelection → SignIn / SignUp
-    //  6. Role dashboards (Citizen / Officer)
+    // App is initializing while either splash animation is active OR auth session is restoring.
+    // Keeping a single screen name ("Splash") prevents unmounting/remounting or double loading.
+    const isAppInitializing = showSplash || loading;
 
+    // Navigation funnel:
+    //  1. SplashScreen  — shown once on cold start until ready (no double load)
+    //  2. If authenticated + profile exists → go directly to role dashboard
+    //  3. If authenticated + profile still fetching → ProfileLoading screen with retry
+    //  4. First launch → Onboarding
+    //  5. Auth stack → RoleSelection → Citizen/Officer Sign In
     return (
-        <NavigationContainer linking={linking}>
+        <NavigationContainer linking={linking} ref={navigationRef}>
             <Stack.Navigator
                 screenOptions={{
                     headerShown: false,
@@ -65,14 +139,15 @@ export default function AppNavigator() {
                     animationDuration: 250,
                 }}
             >
-                {/* 1. Initial App Splash */}
-                {showSplash ? (
-                    <Stack.Screen name="Splash" component={SplashScreen} />
-                ) : loading ? (
-                    /* 2. Restoring session */
-                    <Stack.Screen name="AuthLoading" component={SplashScreen} />
+                {/* 1. Single unified Splash Screen during initialization */}
+                {isAppInitializing ? (
+                    <Stack.Screen
+                        name="Splash"
+                        component={SplashScreen}
+                        options={{ animation: 'fade' }}
+                    />
                 ) : isAuthenticated && profile ? (
-                    /* 3. Authenticated — go directly to role dashboard */
+                    /* 2. Authenticated — go directly to role dashboard */
                     profile.role === 'citizen' ? (
                         <Stack.Screen
                             name="Citizen"
@@ -87,17 +162,17 @@ export default function AppNavigator() {
                         />
                     )
                 ) : isAuthenticated && !profile ? (
-                    /* 4. Authenticated but profile still loading */
+                    /* 3. Authenticated but profile still loading */
                     <Stack.Screen name="ProfileLoading" component={ProfileLoadingScreen} />
                 ) : !hasSeenOnboarding ? (
-                    /* 5. First launch — show onboarding */
+                    /* 4. First launch — show onboarding */
                     <Stack.Screen
                         name="Onboarding"
                         component={OnboardingCarousel}
                         options={{ animation: 'fade' }}
                     />
                 ) : (
-                    /* 6. Unauthenticated — Auth stack */
+                    /* 5. Unauthenticated — Auth stack */
                     <>
                         <Stack.Screen name="RoleSelection" component={RoleSelection} />
                         <Stack.Screen name="CitizenSignIn" component={CitizenSignIn} />
@@ -113,3 +188,4 @@ export default function AppNavigator() {
         </NavigationContainer>
     );
 }
+

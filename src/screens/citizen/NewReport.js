@@ -112,28 +112,25 @@ export default function NewReport({ navigation }) {
 
         // ── Strategy 1: EXIF GPS Parsing (Android flat keys, iOS {GPS}, DMS, rationals) ──
         if (exif) {
-            console.log(`[GPS Extraction] Strategy 1 — Parsing raw ${source} image EXIF data...`);
+            if (__DEV__) console.log(`[GPS Extraction] Strategy 1 — Parsing raw ${source} image EXIF data...`);
             const exifCoords = parseExifGPS(exif);
             if (exifCoords) {
                 lat = exifCoords.lat;
                 lng = exifCoords.lng;
                 coordSource = 'IMAGE_EXIF';
-                console.log(`[GPS Extraction] ✅ EXIF GPS: lat=${lat}, lng=${lng}`);
+                if (__DEV__) console.log('[GPS Extraction] ✅ EXIF GPS found');
             } else {
-                console.log('[GPS Extraction] EXIF data present but no valid GPS coordinates');
+                if (__DEV__) console.log('[GPS Extraction] EXIF data present but no valid GPS coordinates');
             }
         }
 
         // ── Strategy 2: MediaLibrary.getAssetInfoAsync (Android EXIF stripped fallback) ──
         if (lat === null && assetId) {
             try {
-                console.log('[GPS Extraction] Strategy 2 — Trying MediaLibrary lookup for assetId:', assetId);
+                if (__DEV__) console.log('[GPS Extraction] Strategy 2 — Trying MediaLibrary lookup...');
                 const { status } = await MediaLibrary.requestPermissionsAsync();
-                const locPerm = await MediaLibrary.requestPermissionsAsync(true);
-                console.log('[GPS Extraction] MediaLibrary permission:', status, '| loc access:', locPerm.accessPrivileges);
                 if (status === 'granted') {
                     const info = await MediaLibrary.getAssetInfoAsync(assetId, { shouldDownloadFromNetwork: false });
-                    console.log('[GPS Extraction] MediaLibrary location:', JSON.stringify(info?.location));
                     const mlLat = info?.location?.latitude;
                     const mlLng = info?.location?.longitude;
                     if (
@@ -145,45 +142,54 @@ export default function NewReport({ navigation }) {
                         lat = mlLat;
                         lng = mlLng;
                         coordSource = 'MEDIA_LIBRARY';
-                        console.log(`[GPS Extraction] ✅ MediaLibrary GPS: lat=${lat}, lng=${lng}`);
-                    } else {
-                        console.log('[GPS Extraction] MediaLibrary returned invalid/empty location');
+                        if (__DEV__) console.log('[GPS Extraction] ✅ MediaLibrary GPS found');
                     }
                 }
             } catch (e) {
-                console.warn('[GPS Extraction] MediaLibrary lookup failed:', e.message);
+                if (__DEV__) console.warn('[GPS Extraction] MediaLibrary lookup failed:', e.message);
             }
         }
 
-        // ── Reverse-geocode if valid image GPS coordinates were found ──────────────
+        // ── Check if valid image GPS coordinates were found ──────────────
         if (lat !== null && lng !== null) {
             showBanner('extracting');
             try {
-                // guardUserInput=true: do NOT overwrite an address the user already typed
-                const result = await reverseGeocodeFromCoords(lat, lng, coordSource, true);
-                if (result) { showBanner('success'); hideBanner(4000); }
-                else { showBanner('no-gps'); hideBanner(3000); }
+                const result = await reverseGeocodeFromCoords(lat, lng, coordSource, false);
+                if (result && result.address) {
+                    setTrustLevel('Verified Location (Image Metadata)');
+                    showBanner('success');
+                    hideBanner(4000);
+                } else {
+                    showBanner('no-gps');
+                }
             } catch (e) {
-                console.warn('[GPS Extraction] Reverse geocoding failed:', e.message);
-                showBanner('no-gps'); hideBanner(3000);
+                if (__DEV__) console.warn('[GPS Extraction] Reverse geocoding failed:', e.message);
+                showBanner('no-gps');
             }
         } else {
-            // ── Strategy 3: Fallback to live device GPS ───────────────────────────
-            console.log('[GPS Extraction] ⚠️ No image GPS — falling back to live device GPS (≤10m radius)');
-            showBanner('fallback-gps');
-            // guardUserInput=true: do NOT overwrite user-typed address
-            const gpsResult = await detectLocation(true, true);
-            if (gpsResult) {
-                showBanner('success');
+            // ── Fallback: No location found in image metadata ─────────────
+            // NEVER fabricate or guess location. Inform user and instruct to use Live Location.
+            if (__DEV__) console.log('[GPS Extraction] No GPS metadata in image. Prompting user to use Live Location.');
+            showBanner('no-gps');
+        }
+    }, [reverseGeocodeFromCoords, showBanner, hideBanner]);
+
+    const handleDetectLiveLocation = async () => {
+        try {
+            showBanner('detecting-live');
+            const result = await detectLocation(false, false);
+            if (result && result.coords) {
+                setTrustLevel('Verified Live Location');
+                showBanner('live-success');
                 hideBanner(4000);
             } else {
-                console.log('[GPS Extraction] Live GPS also unavailable — user must enter manually');
                 showBanner('no-gps');
-                hideBanner(3000);
-                setAutoFillStatus(null);
             }
+        } catch (error) {
+            if (__DEV__) console.warn('[Live Location] Detection failed:', error?.message);
+            showBanner('no-gps');
         }
-    }, [reverseGeocodeFromCoords, detectLocation, showBanner, hideBanner]);
+    };
 
     const handleTakePhoto = async () => {
         const result = await captureFromCamera();
@@ -209,19 +215,25 @@ export default function NewReport({ navigation }) {
         await handleLocationExtraction(exif, source, assetId);
     };
 
-    const handleDetectLocation = async () => {
-        const result = await detectLocation();
-        if (result) {
-            setTrustLevel('Verified Location');
-            Alert.alert('Success', 'Location detected successfully!');
-        }
-    };
-
     const handleSubmit = () => {
-        if (!image && !video) { Alert.alert('Error', 'Please capture or select an image or video'); return; }
+        if (!image && !video) {
+            Alert.alert('Evidence Required', 'Please capture or select an image or video before continuing.');
+            return;
+        }
+        if (!address.trim()) {
+            Alert.alert(
+                'Location Required',
+                'Please provide a location address. You can tap "Use Live Location", pick on the map, or type the address manually.',
+                [
+                    { text: 'Use Live Location', onPress: handleDetectLiveLocation },
+                    { text: 'OK', style: 'cancel' }
+                ]
+            );
+            return;
+        }
         setCurrentReport({
             image, video, mediaType, description, address, location,
-            locationSource: locationSource || null,
+            locationSource: locationSource || (location ? 'DEVICE_LOCATION' : 'MANUAL'),
             trustLevel: trustLevel || 'Needs Verification / Manual Location',
             timestamp: new Date()
         });
@@ -304,7 +316,7 @@ export default function NewReport({ navigation }) {
                             <View style={styles.cameraPlaceholder}>
                                 <Ionicons name="camera-outline" size={48} color={C.textTertiary} />
                                 <Text style={styles.placeholderText}>Capture Evidence</Text>
-                                <Text style={styles.placeholderSub}>AI will auto-detect plate & violation</Text>
+                                <Text style={styles.placeholderSub}>AI will auto-detect plate &amp; violation</Text>
                                 <View style={styles.scannerOverlay}>
                                     <View style={styles.scannerCorners} />
                                 </View>
@@ -328,36 +340,87 @@ export default function NewReport({ navigation }) {
                         </TouchableOpacity>
                     </View>
 
-
-                    {/* ── Auto Fill Banner ── */}
+                    {/* ── Auto Fill / Location Extraction Banner ── */}
                     {autoFillStatus && (
                         <Animated.View
                             style={[
                                 styles.banner,
-                                autoFillStatus === 'success' && { backgroundColor: C.successSurface, borderColor: C.success + '40' },
-                                autoFillStatus === 'no-gps' && { backgroundColor: C.warningSurface, borderColor: C.warning + '40' },
+                                (autoFillStatus === 'success' || autoFillStatus === 'live-success') && styles.bannerSuccess,
+                                autoFillStatus === 'no-gps' && styles.bannerNoGps,
+                                (autoFillStatus === 'reading' || autoFillStatus === 'extracting' || autoFillStatus === 'detecting-live') && styles.bannerLoading,
                                 { opacity: bannerAnim, transform: [{ scale: bannerAnim.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1] }) }] }
                             ]}
                         >
-                            {(autoFillStatus === 'extracting' || autoFillStatus === 'reading' || autoFillStatus === 'fallback-gps') && (
-                                <ActivityIndicator size="small" color={C.navyMid} style={{ marginRight: 4 }} />
+                            {/* Loading State */}
+                            {(autoFillStatus === 'reading' || autoFillStatus === 'extracting' || autoFillStatus === 'detecting-live') && (
+                                <View style={styles.bannerRow}>
+                                    <ActivityIndicator size="small" color={C.navyMid} style={{ marginRight: 6 }} />
+                                    <Text style={styles.bannerLoadingText}>
+                                        {autoFillStatus === 'reading' && 'Reading image metadata…'}
+                                        {autoFillStatus === 'extracting' && 'Extracting location from photo…'}
+                                        {autoFillStatus === 'detecting-live' && 'Fetching high-accuracy live location…'}
+                                    </Text>
+                                </View>
                             )}
-                            {(autoFillStatus === 'success') && (
-                                <Ionicons name="checkmark-circle" size={20} color={C.success} />
+
+                            {/* Metadata Success State */}
+                            {autoFillStatus === 'success' && (
+                                <View style={styles.bannerRow}>
+                                    <Ionicons name="checkmark-circle" size={22} color={C.success} />
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.bannerSuccessTitle}>Location Found in Image</Text>
+                                        <Text style={styles.bannerSuccessSubtitle}>Address auto-filled from image metadata</Text>
+                                    </View>
+                                </View>
                             )}
-                            {(autoFillStatus === 'no-gps') && (
-                                <Ionicons name="warning" size={20} color={C.warning} />
+
+                            {/* Live Location Success State */}
+                            {autoFillStatus === 'live-success' && (
+                                <View style={styles.bannerRow}>
+                                    <Ionicons name="checkmark-circle" size={22} color={C.success} />
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.bannerSuccessTitle}>Live Location Detected</Text>
+                                        <Text style={styles.bannerSuccessSubtitle}>Address updated to your current live location</Text>
+                                    </View>
+                                </View>
                             )}
-                            <Text style={[
-                                styles.bannerText,
-                                { color: autoFillStatus === 'success' ? C.success : autoFillStatus === 'no-gps' ? C.warning : C.navyMid }
-                            ]}>
-                                {autoFillStatus === 'reading' && 'Reading image metadata...'}
-                                {autoFillStatus === 'extracting' && 'Detecting location from photo...'}
-                                {autoFillStatus === 'fallback-gps' && 'Getting your current location...'}
-                                {autoFillStatus === 'success' && 'Location auto-detected!'}
-                                {autoFillStatus === 'no-gps' && 'No GPS data in this photo — enter manually'}
-                            </Text>
+
+                            {/* No Location Found State */}
+                            {autoFillStatus === 'no-gps' && (
+                                <View style={styles.bannerNoGpsCol}>
+                                    <View style={styles.bannerNoGpsHeader}>
+                                        <View style={styles.bannerWarnIconWrap}>
+                                            <Ionicons name="location-outline" size={18} color={C.warning} />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.bannerNoGpsTitle}>No location found from image.</Text>
+                                            <Text style={styles.bannerNoGpsSub}>
+                                                Please use Live Location to provide your position, or enter the address manually.
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    <TouchableOpacity
+                                        style={styles.useLiveLocationBtn}
+                                        onPress={handleDetectLiveLocation}
+                                        activeOpacity={0.85}
+                                        disabled={loadingLocation}
+                                    >
+                                        <LinearGradient
+                                            colors={[C.amberDark, C.amber]}
+                                            style={styles.useLiveLocationGradient}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 0 }}
+                                        >
+                                            {loadingLocation ? (
+                                                <ActivityIndicator size="small" color={C.navy} />
+                                            ) : (
+                                                <Ionicons name="navigate" size={16} color={C.navy} />
+                                            )}
+                                            <Text style={styles.useLiveLocationText}>Use Live Location</Text>
+                                        </LinearGradient>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
                         </Animated.View>
                     )}
 
@@ -366,29 +429,41 @@ export default function NewReport({ navigation }) {
 
                     <Text style={styles.fieldLabel}>Location Address</Text>
                     <View style={styles.addressBox}>
-                        {/* Inline geocoding spinner — visible only while reverse geocoding */}
-                        {autoFillStatus === 'extracting' && (
+                        {/* Inline geocoding spinner */}
+                        {(autoFillStatus === 'extracting' || autoFillStatus === 'detecting-live') && (
                             <View style={styles.inlineGeocodeRow}>
                                 <ActivityIndicator size="small" color={C.navyMid} />
-                                <Text style={styles.inlineGeocodeText}>Detecting location from image…</Text>
+                                <Text style={styles.inlineGeocodeText}>
+                                    {autoFillStatus === 'extracting' ? 'Extracting address from image…' : 'Getting live GPS location…'}
+                                </Text>
                             </View>
                         )}
                         <TextInput
                             style={styles.addressInput}
-                            placeholder="Enter address..."
+                            placeholder="Enter address or use Live Location..."
+                            placeholderTextColor={C.textTertiary}
                             value={address}
                             onChangeText={setAddress}
                             multiline
                             numberOfLines={4}
                         />
                         <View style={styles.addressBtns}>
-                            <TouchableOpacity style={styles.addrBtnWithText} onPress={() => setIsMapVisible(true)}>
-                                <Ionicons name="map" size={16} color={C.white} />
-                                <Text style={styles.addrBtnText}>Map</Text>
+                            <TouchableOpacity style={styles.addrBtnMap} onPress={() => setIsMapVisible(true)} activeOpacity={0.85}>
+                                <Ionicons name="map-outline" size={15} color={C.white} />
+                                <Text style={styles.addrBtnText}>Map Pin</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={[styles.addrBtnWithText, { backgroundColor: C.amber }]} onPress={handleDetectLocation}>
-                                {loadingLocation ? <ActivityIndicator size="small" color={C.navy} /> : <Ionicons name="location" size={16} color={C.navy} />}
-                                <Text style={[styles.addrBtnText, { color: C.navy }]}>Detect</Text>
+                            <TouchableOpacity
+                                style={styles.addrBtnLive}
+                                onPress={handleDetectLiveLocation}
+                                activeOpacity={0.85}
+                                disabled={loadingLocation}
+                            >
+                                {loadingLocation ? (
+                                    <ActivityIndicator size="small" color={C.navy} />
+                                ) : (
+                                    <Ionicons name="navigate" size={15} color={C.navy} />
+                                )}
+                                <Text style={styles.addrBtnLiveText}>Use Live Location</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -398,6 +473,7 @@ export default function NewReport({ navigation }) {
                         <TextInput
                             style={styles.descInput}
                             placeholder="Add specifics about the violation... AI will analyze the rest."
+                            placeholderTextColor={C.textTertiary}
                             value={description}
                             onChangeText={setDescription}
                             multiline
@@ -578,8 +654,6 @@ const styles = StyleSheet.create({
     },
     modalImg: { width: '100%', height: '85%' },
 
-
-
     scannerOverlay: {
         ...StyleSheet.absoluteFillObject,
         justifyContent: 'space-between',
@@ -614,29 +688,114 @@ const styles = StyleSheet.create({
     },
     mediaBtnOutlineText: { fontSize: 15, fontFamily: 'Nunito-Bold', color: C.navyMid },
 
+    // Banner styles
     banner: {
+        borderRadius: 18,
+        borderWidth: 1.5,
+        padding: 14,
+        marginBottom: 20,
+    },
+    bannerLoading: {
+        backgroundColor: '#EFF6FF',
+        borderColor: '#BFDBFE',
+    },
+    bannerSuccess: {
+        backgroundColor: C.successSurface,
+        borderColor: '#86EFAC',
+    },
+    bannerNoGps: {
+        backgroundColor: '#FFFBEB',
+        borderColor: '#FDE68A',
+        shadowColor: '#D97706',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+    bannerRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
-        padding: 14,
-        backgroundColor: '#E0E7FF',
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: 'rgba(27,58,107,0.1)',
-        marginBottom: 24
+        gap: 10,
     },
-    bannerText: { fontSize: 13, fontFamily: 'Nunito-Bold' },
+    bannerLoadingText: {
+        fontSize: 13,
+        fontFamily: 'Nunito-SemiBold',
+        color: C.navyMid,
+    },
+    bannerSuccessTitle: {
+        fontSize: 14,
+        fontFamily: 'Nunito-Bold',
+        color: C.success,
+    },
+    bannerSuccessSubtitle: {
+        fontSize: 12,
+        fontFamily: 'Nunito-Medium',
+        color: '#166534',
+        marginTop: 1,
+    },
+    bannerNoGpsCol: {
+        flexDirection: 'column',
+        gap: 12,
+    },
+    bannerNoGpsHeader: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 10,
+    },
+    bannerWarnIconWrap: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#FEF3C7',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 1,
+    },
+    bannerNoGpsTitle: {
+        fontSize: 14,
+        fontFamily: 'Nunito-Bold',
+        color: '#92400E',
+    },
+    bannerNoGpsSub: {
+        fontSize: 12,
+        fontFamily: 'Nunito-Medium',
+        color: '#B45309',
+        marginTop: 2,
+        lineHeight: 17,
+    },
+    useLiveLocationBtn: {
+        borderRadius: 14,
+        overflow: 'hidden',
+        shadowColor: C.amberDark,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.2,
+        shadowRadius: 5,
+        elevation: 3,
+    },
+    useLiveLocationGradient: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 11,
+        paddingHorizontal: 16,
+    },
+    useLiveLocationText: {
+        fontSize: 13,
+        fontFamily: 'Nunito-Bold',
+        color: C.navy,
+    },
 
     fieldLabel: { fontSize: 13, fontFamily: 'Nunito-Bold', color: C.navy, marginBottom: 10, marginTop: 12 },
     addressBox: {
         flexDirection: 'column',
-        backgroundColor: '#F1F5F9', // Subtle distinct color 
+        backgroundColor: '#F1F5F9',
         borderRadius: 20,
         paddingLeft: 18,
         paddingRight: 18,
         paddingTop: 14,
         paddingBottom: 14,
-        minHeight: 150, // Massive box
+        minHeight: 150,
         borderWidth: 1.5,
         borderColor: '#E2E8F0',
         shadowColor: '#0F2C59',
@@ -645,9 +804,35 @@ const styles = StyleSheet.create({
         shadowRadius: 10,
     },
     addressInput: { flex: 1, fontSize: 14, color: C.textPrimary, fontFamily: 'Nunito-Medium', textAlignVertical: 'top', minHeight: 70 },
-    addressBtns: { flexDirection: 'row', gap: 8, alignSelf: 'flex-end', marginTop: 10 },
-    addrBtnWithText: { flexDirection: 'row', gap: 6, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, backgroundColor: C.navyMid, justifyContent: 'center', alignItems: 'center' },
+    addressBtns: { flexDirection: 'row', gap: 10, alignSelf: 'flex-end', marginTop: 12 },
+    addrBtnMap: {
+        flexDirection: 'row',
+        gap: 6,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderRadius: 12,
+        backgroundColor: C.navyMid,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    addrBtnLive: {
+        flexDirection: 'row',
+        gap: 6,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderRadius: 12,
+        backgroundColor: C.amber,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: C.amberDark,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 2,
+    },
     addrBtnText: { color: C.white, fontSize: 13, fontFamily: 'Nunito-Bold' },
+    addrBtnLiveText: { color: C.navy, fontSize: 13, fontFamily: 'Nunito-Bold' },
+
     // Inline geocoding spinner inside the address box
     inlineGeocodeRow: {
         flexDirection: 'row',
@@ -748,3 +933,4 @@ const styles = StyleSheet.create({
         color: C.textTertiary,
     },
 });
+

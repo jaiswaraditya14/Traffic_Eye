@@ -25,6 +25,7 @@ import {
     markAllNotificationsRead,
     subscribeToNotifications,
 } from '../../services/reports';
+import { clearAllNotifications } from '../../services/notifications';
 
 const C = {
     navy: '#0A1E3F',
@@ -119,16 +120,30 @@ export default function Notifications({ navigation }) {
     const fadeAnim = useRef(new Animated.Value(0)).current;
 
     const load = useCallback(async (isRefresh = false) => {
-        if (!user?.id) return;
+        if (!user?.id) {
+            setLoading(false);
+            setRefreshing(false);
+            return;
+        }
         if (!isRefresh) setLoading(true);
-        const { data } = await fetchNotifications(user.id);
-        if (data) setNotifs(data);
-        setLoading(false);
-        setRefreshing(false);
-        Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
+        try {
+            const { data } = await fetchNotifications(user.id);
+            if (data) setNotifs(data);
+        } catch (err) {
+            if (__DEV__) console.warn('[Notifications] Load failed:', err?.message);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+            Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
+        }
     }, [user?.id]);
 
     useEffect(() => { load(); }, [load]);
+
+    // Clear OS notification banners + badge when user opens this screen
+    useEffect(() => {
+        clearAllNotifications();
+    }, []);
 
     // Realtime: new notifications arrive instantly
     useEffect(() => {

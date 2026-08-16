@@ -327,7 +327,11 @@ export default function VerificationReports({ navigation }) {
     const tabIndicator = useRef(new Animated.Value(0)).current;
 
     const fetchReports = useCallback(async () => {
-        if (!user?.id) return;
+        if (!user?.id) {
+            setLoading(false);
+            setRefreshing(false);
+            return;
+        }
         try {
             const { data: reportsData, error } = await supabase
                 .from('verification_reports')
@@ -342,7 +346,7 @@ export default function VerificationReports({ navigation }) {
                 setReports(reportsData);
             }
         } catch (err) {
-            console.error('Failed to fetch reports:', err);
+            if (__DEV__) console.error('Failed to fetch reports:', err);
         } finally {
             setLoading(false);
             setRefreshing(false);

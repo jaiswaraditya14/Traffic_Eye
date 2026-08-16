@@ -113,16 +113,29 @@ export default function ImageReportReview({ route, navigation }) {
     }, [reportId]);
 
     const loadReport = async () => {
+        if (!reportId) {
+            setLoading(false);
+            Alert.alert('Error', 'Invalid or missing report ID.');
+            navigation.goBack();
+            return;
+        }
         setLoading(true);
-        const { data, error } = await fetchReportById(reportId);
-        if (!error && data) {
-            setReport(data);
-            if (data.status !== 'pending') setAlreadyReviewed(true);
-        } else {
+        try {
+            const { data, error } = await fetchReportById(reportId);
+            if (!error && data) {
+                setReport(data);
+                if (data.status !== 'pending') setAlreadyReviewed(true);
+            } else {
+                Alert.alert('Error', 'Could not load report details.');
+                navigation.goBack();
+            }
+        } catch (err) {
+            if (__DEV__) console.warn('[ImageReportReview] Load failed:', err?.message);
             Alert.alert('Error', 'Could not load report details.');
             navigation.goBack();
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     const handleDecision = async (decision) => {

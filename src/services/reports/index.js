@@ -557,12 +557,47 @@ export async function fetchHeatmapPoints(bbox = null, daysBack = 30) {
     };
     const { data, error } = await supabase.rpc('get_approved_heatmap_points', params);
     if (error) {
-        // Graceful fallback to direct query if RPC is not yet deployed
-        console.warn('[Heatmap] RPC unavailable, falling back to direct query:', error.message);
-        return fetchApprovedMapReports();
+        // Graceful fallback: direct query when RPC is unavailable
+        if (__DEV__) console.warn('[Heatmap] RPC unavailable, using direct query fallback:', error.message);
+        const { data: fallbackData, error: fallbackError } = await supabase
+            .from('image_reports')
+            .select(`
+                id,
+                latitude,
+                longitude,
+                location_address,
+                violation_type,
+                severity,
+                reviewed_at,
+                submitted_at,
+                image_url,
+                officer_reviews (
+                    officer:profiles ( full_name, badge_id, jurisdiction )
+                )
+            `)
+            .eq('status', 'approved')
+            .order('reviewed_at', { ascending: false })
+            .limit(500);
+        if (fallbackError) {
+            if (__DEV__) console.warn('[Heatmap] Direct query fallback also failed:', fallbackError.message);
+            return { data: [], error: fallbackError };
+        }
+        // Normalize to match RPC shape
+        const normalized = (fallbackData || []).map(r => ({
+            ...r,
+            weight: (() => {
+                const s = (r.severity || 'low').toLowerCase();
+                return s === 'critical' ? 4 : s === 'high' ? 3 : s === 'medium' ? 2 : 1;
+            })(),
+            officer_name: r.officer_reviews?.[0]?.officer?.full_name ?? null,
+            officer_badge: r.officer_reviews?.[0]?.officer?.badge_id ?? null,
+            officer_jurisdiction: r.officer_reviews?.[0]?.officer?.jurisdiction ?? null,
+        }));
+        return { data: normalized, error: null };
     }
     return { data, error: null };
 }
+
 
 /**
  * Fetch reports within a specific date range for officer export.

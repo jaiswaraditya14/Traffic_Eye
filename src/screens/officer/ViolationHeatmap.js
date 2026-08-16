@@ -411,9 +411,10 @@ export default function ViolationHeatmap({ navigation }) {
     const [selectedItem, setSelectedItem] = useState(null);
     const [latDelta, setLatDelta]         = useState(0.1);
 
-    const mapRef    = useRef(null);
-    const bboxRef   = useRef(null);   // current visible bounding box
-    const pulseAnim = useRef(new Animated.Value(1)).current;
+    const mapRef              = useRef(null);
+    const bboxRef             = useRef(null);   // current visible bounding box
+    const pulseAnim           = useRef(new Animated.Value(1)).current;
+    const isMounted           = useRef(true);
 
     // Pulse animation for the live indicator
     useEffect(() => {
@@ -432,6 +433,7 @@ export default function ViolationHeatmap({ navigation }) {
 
     // ── Load data from Supabase ──────────────────────────────────────────────
     const loadData = useCallback(async (showSpinner = true, bbox = null) => {
+        if (!isMounted.current) return;
         if (showSpinner) setLoading(true);
         else             setRefreshing(true);
 
@@ -439,23 +441,25 @@ export default function ViolationHeatmap({ navigation }) {
         const { data, error } = await fetchHeatmapPoints(bbox || bboxRef.current, days);
 
         if (error) {
-            console.warn('[Heatmap] Load error:', error.message);
+            if (__DEV__) console.warn('[Heatmap] Load error:', error.message);
         } else if (data) {
             let processed = [];
+            let geocodeCalls = 0; // cap at 20 to avoid blocking the event loop
             for (let p of data) {
                 let lat = p.latitude;
                 let lng = p.longitude;
 
-                // Fallback 1: Geocode location_address if lat/lng is missing
-                if ((lat == null || lng == null || isNaN(parseFloat(lat)) || isNaN(parseFloat(lng))) && p.location_address) {
+                // Fallback 1: Geocode location_address if lat/lng is missing (max 20 to avoid blocking)
+                if ((lat == null || lng == null || isNaN(parseFloat(lat)) || isNaN(parseFloat(lng))) && p.location_address && geocodeCalls < 20) {
                     try {
+                        geocodeCalls++;
                         const geo = await Location.geocodeAsync(p.location_address);
                         if (geo && geo.length > 0) {
                             lat = geo[0].latitude;
                             lng = geo[0].longitude;
                         }
                     } catch (err) {
-                        console.log('[Heatmap] Geocode fallback failed for address:', p.location_address);
+                        if (__DEV__) console.warn('[Heatmap] Geocode fallback failed for address:', p.location_address);
                     }
                 }
 
@@ -482,19 +486,29 @@ export default function ViolationHeatmap({ navigation }) {
             setLastUpdated(new Date());
 
             // Auto-fit map to loaded points on first load
-            if (showSpinner && processed.length > 0 && mapRef.current) {
+            if (showSpinner && processed.length > 0) {
                 setTimeout(() => {
-                    mapRef.current?.fitToCoordinates(
-                        processed.map(p => ({ latitude: p.latitude, longitude: p.longitude })),
-                        { edgePadding: { top: 120, right: 60, bottom: 120, left: 60 }, animated: true }
-                    );
+                    if (isMounted.current && mapRef.current) {
+                        mapRef.current.fitToCoordinates(
+                            processed.map(p => ({ latitude: p.latitude, longitude: p.longitude })),
+                            { edgePadding: { top: 120, right: 60, bottom: 120, left: 60 }, animated: true }
+                        );
+                    }
                 }, 600);
             }
         }
 
-        setLoading(false);
-        setRefreshing(false);
+        if (isMounted.current) {
+            setLoading(false);
+            setRefreshing(false);
+        }
     }, [timeFilter]);
+
+    // Mount/unmount guard
+    useEffect(() => {
+        isMounted.current = true;
+        return () => { isMounted.current = false; };
+    }, []);
 
     // Re-fetch when time filter changes
     useEffect(() => {
@@ -504,7 +518,7 @@ export default function ViolationHeatmap({ navigation }) {
     // Real-time subscription: refresh on new approvals
     useEffect(() => {
         const channel = subscribeToApprovedMapReports(() => {
-            console.log('[Heatmap] New approval detected — refreshing map...');
+            if (__DEV__) console.log('[Heatmap] New approval detected — refreshing map...');
             loadData(false);
         });
         return () => supabase.removeChannel(channel);
@@ -526,9 +540,14 @@ export default function ViolationHeatmap({ navigation }) {
         // Debounce: only re-fetch after user stops panning for 800ms
         clearTimeout(regionChangeTimeout.current);
         regionChangeTimeout.current = setTimeout(() => {
-            loadData(false, newBbox);
+            if (isMounted.current) loadData(false, newBbox);
         }, 800);
     }, [loadData]);
+
+    // Clear debounce timer on unmount
+    useEffect(() => {
+        return () => { clearTimeout(regionChangeTimeout.current); };
+    }, []);
 
     // ── Build clusters from current points ────────────────────────────────────
     const clusters = useMemo(() => buildClusters(points, latDelta), [points, latDelta]);

@@ -312,12 +312,21 @@ export default function ImageReportStatus({ navigation }) {
     const slideAnim                  = useRef(new Animated.Value(24)).current;
 
     const load = useCallback(async (isRefresh = false) => {
-        if (!user?.id) return;
+        if (!user?.id) {
+            setLoading(false);
+            setRefreshing(false);
+            return;
+        }
         if (!isRefresh) setLoading(true);
-        const { data, error } = await fetchCitizenReports(user.id);
-        if (!error && data) setReports(data);
-        setLoading(false);
-        setRefreshing(false);
+        try {
+            const { data, error } = await fetchCitizenReports(user.id);
+            if (!error && data) setReports(data);
+        } catch (err) {
+            if (__DEV__) console.warn('[ImageReportStatus] Load failed:', err?.message);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
     }, [user?.id]);
 
     useEffect(() => {

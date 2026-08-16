@@ -71,32 +71,64 @@ export default function CitizenSignIn({ navigation }) {
     const handleGoogleSignIn = async () => {
         setGoogleLoading(true);
         try {
-            const redirectUri = AuthSession.makeRedirectUri({ useProxy: true });
+            // Production builds use the registered custom scheme, not the Expo proxy.
+            // NOTE: In Expo Go (dev), this will not work for OAuth because custom schemes
+            // are not supported there. Test Google sign-in in the APK/IPA build only.
+            const redirectUri = AuthSession.makeRedirectUri({ scheme: 'trafficeye' });
+
             const { data, error } = await signInWithGoogle(redirectUri);
-            if (error) { Alert.alert('Configuration Error', error.message); throw error; }
+            if (error) {
+                Alert.alert('Configuration Error', error.message);
+                return;
+            }
 
             if (data?.url) {
                 const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
+
                 if (result.type === 'success' && result.url) {
-                    const getParam = (url, param) => {
-                        const regex = new RegExp(`[#|?|&]${param}=([^&]*)`);
+                    const resultUrl = result.url;
+
+                    // ── OAuth error check ────────────────────────────────────────
+                    const errorMatch = resultUrl.match(/[?&]error=([^&]*)/);
+                    if (errorMatch) {
+                        const descMatch = resultUrl.match(/[?&]error_description=([^&]*)/);
+                        const desc = descMatch ? decodeURIComponent(descMatch[1].replace(/\+/g, ' ')) : 'Authentication error';
+                        throw new Error(desc);
+                    }
+
+                    // ── PKCE flow: URL contains ?code=XXX ───────────────────────
+                    const codeMatch = resultUrl.match(/[?&]code=([^&]*)/);
+                    if (codeMatch) {
+                        const code = decodeURIComponent(codeMatch[1]);
+                        const { error: sessionError } = await supabase.auth.exchangeCodeForSession(code);
+                        if (sessionError) throw sessionError;
+                        // AuthContext.onAuthStateChange handles profile creation/loading
+                        return;
+                    }
+
+                    // ── Implicit flow: URL contains #access_token=XXX ───────────
+                    const getFragment = (url, param) => {
+                        const regex = new RegExp(`[#&]${param}=([^&]*)`);
                         const match = url.match(regex);
                         return match ? decodeURIComponent(match[1]) : null;
                     };
-                    const access_token = getParam(result.url, 'access_token');
-                    const refresh_token = getParam(result.url, 'refresh_token');
+                    const access_token = getFragment(resultUrl, 'access_token');
+                    const refresh_token = getFragment(resultUrl, 'refresh_token');
                     if (access_token && refresh_token) {
                         const { error: sessionError } = await supabase.auth.setSession({ access_token, refresh_token });
                         if (sessionError) throw sessionError;
-                    } else {
-                        throw new Error('No authentication tokens found. Please try again.');
+                        return;
                     }
-                } else if (result.type === 'cancel') {
-                    Alert.alert('Cancelled', 'Sign in was cancelled');
+
+                    throw new Error('No authentication tokens received. Please try again.');
+
+                } else if (result.type === 'cancel' || result.type === 'dismiss') {
+                    // User dismissed — silently ignore
                 }
             }
         } catch (error) {
-            Alert.alert('Error', error.message || 'Failed to sign in with Google');
+            if (__DEV__) console.warn('[GoogleSignIn] Error:', error?.message);
+            Alert.alert('Sign-In Failed', error?.message || 'Failed to sign in with Google. Please try again.');
         } finally {
             setGoogleLoading(false);
         }

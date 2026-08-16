@@ -92,15 +92,22 @@ BEGIN
         r.status = 'approved'
         AND COALESCE(r.reviewed_at, r.submitted_at) >= v_cutoff
         AND (
-            p_min_lat IS NULL OR p_max_lat IS NULL OR p_min_lng IS NULL OR p_max_lng IS NULL
-            OR r.latitude IS NULL
-            OR (
-                r.latitude  BETWEEN p_min_lat AND p_max_lat
+            -- No bbox provided: return all approved reports (including those without coords)
+            (p_min_lat IS NULL OR p_max_lat IS NULL OR p_min_lng IS NULL OR p_max_lng IS NULL)
+            OR
+            -- Bbox provided: only return reports WITH valid coords that fall inside the bbox
+            -- (reports with null coords are intentionally excluded from bbox-filtered queries
+            --  to prevent them from always matching and flooding the map at fallback coordinates)
+            (
+                r.latitude  IS NOT NULL
+                AND r.longitude IS NOT NULL
+                AND r.latitude  BETWEEN p_min_lat AND p_max_lat
                 AND r.longitude BETWEEN p_min_lng AND p_max_lng
             )
         )
     ORDER BY COALESCE(r.reviewed_at, r.submitted_at) DESC
     LIMIT 500;
+
 END;
 $$;
 

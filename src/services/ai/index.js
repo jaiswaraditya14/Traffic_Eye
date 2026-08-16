@@ -410,8 +410,8 @@ const prepareViolationImage = async (imageUri) => {
     try {
         const img = await ImageManipulator.manipulateAsync(
             imageUri.split('?')[0],
-            [{ resize: { width: 1280 } }],
-            { compress: 0.88, format: ImageManipulator.SaveFormat.JPEG }
+            [{ resize: { width: 960 } }],      // 960px: sufficient for violation detection, 33% less data vs 1280
+            { compress: 0.82, format: ImageManipulator.SaveFormat.JPEG }
         );
         tempUri = img.uri;
         return await FileSystem.readAsStringAsync(tempUri, { encoding: 'base64' });
@@ -425,8 +425,8 @@ const prepareOCRImage = async (imageUri) => {
     try {
         const img = await ImageManipulator.manipulateAsync(
             imageUri.split('?')[0],
-            [{ resize: { width: 1600 } }],
-            { compress: 0.95, format: ImageManipulator.SaveFormat.JPEG }
+            [{ resize: { width: 1024 } }],     // 1024px: sharp enough for plate OCR, 36% less data vs 1600
+            { compress: 0.88, format: ImageManipulator.SaveFormat.JPEG }
         );
         tempUri = img.uri;
         return await FileSystem.readAsStringAsync(tempUri, { encoding: 'base64' });
@@ -459,22 +459,22 @@ export const aiService = {
             const ocrAttempts       = buildAttemptQueue(AI_CONFIG.ocrModels       || AI_CONFIG.visionModels || []);
 
             // ── Stage 1: Vision Detection (1280px) ───────────────────────────
-            console.log('[AI] Stage 1 — Preparing vision image...');
+            if (__DEV__) console.log('[AI] Stage 1 — Preparing vision image...');
             const violationB64 = await prepareViolationImage(imageUri);
 
-            console.log('[AI] Stage 1 — Vision detection executing...');
+            if (__DEV__) console.log('[AI] Stage 1 — Vision detection executing...');
             const { text: rawVision, winningAttempt: visionWinner } = await runWithRotation(
                 VIOLATION_PROMPT, violationB64, visionAttempts, 'S1-VISION',
-                { maxTokens: 2048, timeoutMs: 45000 }
+                { maxTokens: 512, timeoutMs: 30000 }  // 512 tokens covers full JSON; 30s safe for all providers
             );
-            console.log('[AI] Stage 1 — Raw output:', rawVision);
+            if (__DEV__) console.log('[AI] Stage 1 — Raw output:', rawVision);
 
             const s1Result = parseViolationResult(rawVision);
-            console.log('[AI] Stage 1 — Parsed result:', JSON.stringify(s1Result));
+            if (__DEV__) console.log('[AI] Stage 1 — Parsed result:', JSON.stringify(s1Result));
 
             // No violation → return immediately
             if (!s1Result.violationDetected) {
-                console.log('[AI] ⚡ Fast path: No violation — returning immediately');
+                if (__DEV__) console.log('[AI] ⚡ Fast path: No violation — returning immediately');
                 return s1Result;
             }
 
@@ -483,14 +483,14 @@ export const aiService = {
                 s1Result.vehicleNumber !== 'Not applicable' &&
                 s1Result.vehicleNumber.trim().length >= 4;
 
-            // Violation + readable plate + good confidence → fast path
-            if (hasValidPlate && (s1Result.confidence ?? 0) >= 60) {
-                console.log(`[AI] ⚡ Fast path: Violation="${s1Result.violationType}", Plate="${s1Result.vehicleNumber}" (${s1Result.confidence}%)`);
+            // Violation + readable plate + confidence ≥50% → fast path (skip Stage 1.5 + 2)
+            if (hasValidPlate && (s1Result.confidence ?? 0) >= 50) {
+                if (__DEV__) console.log(`[AI] ⚡ Fast path: Violation="${s1Result.violationType}", Plate="${s1Result.vehicleNumber}" (${s1Result.confidence}%)`);
                 return s1Result;
             }
 
             // ── Stage 1.5: Reasoning Validation (low confidence / ambiguous) ─
-            console.log('[AI] Stage 1.5 — Reasoning validation...');
+            if (__DEV__) console.log('[AI] Stage 1.5 — Reasoning validation...');
             let finalRaw = rawVision;
             if (reasoningAttempts.length > 0) {
                 try {
@@ -499,11 +499,11 @@ export const aiService = {
                         null,
                         reasoningAttempts,
                         'S1.5-REASONING',
-                        { maxTokens: 384, timeoutMs: 30000 }
+                        { maxTokens: 384, timeoutMs: 20000 }  // text-only — Groq responds in < 3s
                     );
                     finalRaw = reasonedText;
                 } catch (err) {
-                    console.warn('[AI] Stage 1.5 failed (non-fatal) — using Stage 1 result:', err.message);
+                    if (__DEV__) console.warn('[AI] Stage 1.5 failed (non-fatal) — using Stage 1 result:', err.message);
                 }
             }
 
@@ -516,16 +516,16 @@ export const aiService = {
                 violationResult.vehicleNumber === 'Not applicable';
 
             if (violationResult.violationDetected && plateMissing) {
-                console.log('[AI] Stage 2 — Lazy-loading high-res OCR image...');
+                if (__DEV__) console.log('[AI] Stage 2 — Lazy-loading OCR image...');
                 try {
                     const ocrB64 = await prepareOCRImage(imageUri);
                     // OCR uses its own dedicated queue: NVIDIA → Gemini #1 → Gemini #2
                     const { text: rawOCR } = await runWithRotation(
                         PLATE_OCR_PROMPT, ocrB64, ocrAttempts, 'S2-OCR',
-                        { maxTokens: 256, timeoutMs: 30000 }
+                        { maxTokens: 256, timeoutMs: 20000 }  // OCR JSON is tiny; 20s covers all providers
                     );
                     const ocr = extractJSON(rawOCR);
-                    console.log(`[AI] S2 OCR: "${ocr.plate_text}" @ ${ocr.confidence_percent}%`);
+                    if (__DEV__) console.log(`[AI] S2 OCR: "${ocr.plate_text}" @ ${ocr.confidence_percent}%`);
 
                     const plateValid =
                         ocr.plate_text &&

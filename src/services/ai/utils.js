@@ -122,7 +122,9 @@ export const callAI = async ({
                     ],
             }],
             generationConfig: {
-                temperature: 0.1,
+                temperature:      0.1,
+                maxOutputTokens:  maxTokens,   // ← was missing — Gemini was generating unbounded responses
+                candidateCount:   1,
                 responseMimeType: jsonMode ? 'application/json' : 'text/plain',
             },
         });

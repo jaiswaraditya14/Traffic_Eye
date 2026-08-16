@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useAppContext } from '../../context/AppContext';
+import { useAppContext, useAuth } from '../../context';
 import { FocusAwareStatusBar } from '../../components';
 
 const { width, height } = Dimensions.get('window');
@@ -27,6 +27,24 @@ const C = {
 
 export default function SplashScreen({ navigation }) {
     const { setShowSplash } = useAppContext();
+    const { loading: authLoading } = useAuth();
+    const minTimeElapsed = useRef(false);
+    const hasExited = useRef(false);
+
+    const checkAndExit = () => {
+        if (hasExited.current) return;
+        if (minTimeElapsed.current && !authLoading) {
+            hasExited.current = true;
+            setShowSplash(false);
+        }
+    };
+
+    // If auth state finishes after the minimum animation timer, exit smoothly
+    useEffect(() => {
+        if (!authLoading && minTimeElapsed.current) {
+            checkAndExit();
+        }
+    }, [authLoading]);
 
     // ── Animation values ──
 
@@ -175,10 +193,15 @@ export default function SplashScreen({ navigation }) {
         floatParticle(particle3Y, 3500).start();
 
 
-        // ── 3. EXIT TIMER (logic unchanged) ──
-        const timer = setTimeout(() => setShowSplash(false), 4200);
+        // ── 3. MINIMUM ENTRANCE DURATION (2800ms) ──
+        // Ensure user sees the entrance animation, then transition if auth is ready.
+        // If auth is still resolving (e.g. restoring session), it holds calmly on this screen.
+        const timer = setTimeout(() => {
+            minTimeElapsed.current = true;
+            checkAndExit();
+        }, 2800);
         return () => clearTimeout(timer);
-    }, []);
+    }, [authLoading]);
 
 
     // ── Interpolations ──
@@ -619,6 +642,7 @@ const styles = StyleSheet.create({
         height: '100%',
         borderRadius: 2,
         overflow: 'hidden',
+        backgroundColor: 'rgba(217, 119, 6, 0.55)', // amber fill — dimmer than the shimmer tip
     },
     barShimmer: {
         position: 'absolute',

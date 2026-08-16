@@ -62,11 +62,19 @@ export default function ReportDetail({ navigation, route }) {
     }, [reportId]);
 
     const loadReport = async () => {
-        if (!reportId) return;
+        if (!reportId) {
+            setLoading(false);
+            return;
+        }
         setLoading(true);
-        const { data, error } = await fetchReportById(reportId);
-        if (!error && data) setReport(data);
-        setLoading(false);
+        try {
+            const { data, error } = await fetchReportById(reportId);
+            if (!error && data) setReport(data);
+        } catch (err) {
+            if (__DEV__) console.warn('[ReportDetail] Failed to load report:', err?.message);
+        } finally {
+            setLoading(false);
+        }
     };
 
     if (loading) {
