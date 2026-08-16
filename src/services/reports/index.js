@@ -621,7 +621,7 @@ export async function fetchReportsByDateRange(fromDate, toDate, status = 'all', 
         const { data, error } = await query;
         return { data, error };
     } catch (error) {
-        console.error('[ExportService] Error fetching reports by date range:', error);
+        if (__DEV__) console.warn('[ExportService] Failed to fetch reports by date range:', error?.message || 'Unknown error');
         return { data: null, error };
     }
 }

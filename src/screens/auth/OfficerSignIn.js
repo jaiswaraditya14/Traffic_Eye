@@ -46,7 +46,7 @@ export default function OfficerSignIn({ navigation }) {
             if (error) { Alert.alert('Sign In Failed', error.message); return; }
         } catch (error) {
             Alert.alert('Error', 'Something went wrong. Please try again.');
-            console.error(error);
+            if (__DEV__) console.warn('Officer sign in error:', error?.message || 'Unknown error');
         } finally {
             setLoading(false);
         }

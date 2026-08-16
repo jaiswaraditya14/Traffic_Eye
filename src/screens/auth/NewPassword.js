@@ -130,7 +130,7 @@ export default function NewPassword({ navigation, route }) {
                 Animated.timing(successOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
             ]).start();
         } catch (err) {
-            console.error('[NewPassword] update error:', err);
+            if (__DEV__) console.warn('[NewPassword] update error:', err?.message || 'Unknown error');
             setError('Something went wrong. Please try again.');
             setLoading(false);
         } finally {

@@ -256,7 +256,7 @@ export const rewardService = {
             if (error) throw error;
             return { success: true, history: data || [] };
         } catch (error) {
-            console.error('Error fetching report history:', error);
+            if (__DEV__) console.warn('Failed to fetch report history:', error?.message || 'Unknown error');
             return { success: false, history: [], error: error.message };
         }
     },
@@ -296,7 +296,7 @@ export const rewardService = {
                 skipped: data?.skipped ?? false,
             };
         } catch (error) {
-            console.error('[RewardService] Error awarding submission points:', error);
+            if (__DEV__) console.warn('[RewardService] Award submission points failed:', error?.message || 'Unknown error');
             return { success: false, error: error.message };
         }
     },
@@ -341,7 +341,7 @@ export const rewardService = {
             };
 
         } catch (error) {
-            console.error('[RewardService] Error redeeming item:', error);
+            if (__DEV__) console.warn('[RewardService] Redeem item failed:', error?.message || 'Unknown error');
             return { success: false, error: error.message };
         }
     },
@@ -382,7 +382,7 @@ export const rewardService = {
 
             return { success: true, redeemed };
         } catch (error) {
-            console.error('Error fetching redeemed items:', error);
+            if (__DEV__) console.warn('Failed to fetch redeemed items:', error?.message || 'Unknown error');
             return { success: false, redeemed: {} };
         }
     },
@@ -452,7 +452,7 @@ export const rewardService = {
 
             return { success: true, history };
         } catch (error) {
-            console.error('Error fetching activity history:', error);
+            if (__DEV__) console.warn('Failed to fetch activity history:', error?.message || 'Unknown error');
             return { success: false, history: [], error: error.message };
         }
     },
@@ -473,7 +473,7 @@ export const rewardService = {
             if (error) throw error;
             return { success: true };
         } catch (error) {
-            console.error('Error clearing history:', error);
+            if (__DEV__) console.warn('Failed to clear history:', error?.message || 'Unknown error');
             return { success: false, error: error.message };
         }
     }

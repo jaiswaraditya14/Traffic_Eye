@@ -161,13 +161,17 @@ export const authService = {
     },
 
     /**
-     * Update user profile
+     * Update user profile (safe fields only).
+     * Routes through the safe_update_own_profile() SECURITY DEFINER RPC.
+     * Only full_name and avatar_url are accepted — role, badge_id, and
+     * points_balance are silently ignored even if passed.
      */
-    updateProfile: async (userId, updates) => {
-        return await supabase
-            .from('profiles')
-            .update(updates)
-            .eq('id', userId);
+    updateProfile: async (_userId, updates) => {
+        const { full_name, avatar_url } = updates || {};
+        return await supabase.rpc('safe_update_own_profile', {
+            p_full_name:  full_name  ?? null,
+            p_avatar_url: avatar_url ?? null,
+        });
     }
 };
 

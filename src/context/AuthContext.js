@@ -22,7 +22,7 @@ export function AuthProvider({ children }) {
                     await fetchProfile(session.user.id);
                 }
             } catch (error) {
-                console.error('[Auth] Session restore error:', error);
+                if (__DEV__) console.warn('[Auth] Session restore failed:', error?.message || 'Unknown error');
             } finally {
                 setLoading(false);
             }
@@ -40,7 +40,7 @@ export function AuthProvider({ children }) {
                         setProfile(null);
                     }
                 } catch (error) {
-                    console.error('[Auth] State change error:', error);
+                    if (__DEV__) console.warn('[Auth] State change failed:', error?.message || 'Unknown error');
                 } finally {
                     setLoading(false);
                 }
@@ -58,7 +58,7 @@ export function AuthProvider({ children }) {
                 await fetchProfile(session.user.id);
             }
         } catch (error) {
-            console.error('Session check error:', error);
+            if (__DEV__) console.warn('[Auth] Session check failed:', error?.message || 'Unknown error');
         } finally {
             setLoading(false);
         }
@@ -99,7 +99,7 @@ export function AuthProvider({ children }) {
                 setProfile(data);
             }
         } catch (err) {
-            console.error('[Auth] Fatal error fetching profile:', err);
+            if (__DEV__) console.warn('[Auth] Profile fetch failed:', err?.message || 'Unknown error');
             setUser(null);
             setProfile(null);
             await supabase.auth.signOut();

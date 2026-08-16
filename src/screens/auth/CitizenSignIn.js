@@ -61,7 +61,7 @@ export default function CitizenSignIn({ navigation }) {
                 return;
             }
         } catch (error) {
-            console.error('Sign in error:', error);
+            if (__DEV__) console.warn('Sign in error:', error?.message || 'Unknown error');
             Alert.alert('Error', 'Something went wrong. Please try again.');
         } finally {
             setLoading(false);
@@ -72,10 +72,6 @@ export default function CitizenSignIn({ navigation }) {
         setGoogleLoading(true);
         try {
             const redirectUri = AuthSession.makeRedirectUri({ useProxy: true });
-            console.log('\n\n======================================================');
-            console.log('🚀 EXACT REDIRECT URL TO PASTE INTO SUPABASE DASHBOARD:');
-            console.log(redirectUri);
-            console.log('======================================================\n\n');
             const { data, error } = await signInWithGoogle(redirectUri);
             if (error) { Alert.alert('Configuration Error', error.message); throw error; }
 
