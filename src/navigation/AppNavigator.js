@@ -117,12 +117,16 @@ const profileLoadingStyles = StyleSheet.create({
 });
 
 export default function AppNavigator({ navigationRef }) {
-    const { hasSeenOnboarding, showSplash } = useAppContext();
+    const { hasSeenOnboarding, showSplash, onboardingLoading } = useAppContext();
     const { isAuthenticated, loading, profile } = useAuth();
 
-    // App is initializing while either splash animation is active OR auth session is restoring.
-    // Keeping a single screen name ("Splash") prevents unmounting/remounting or double loading.
-    const isAppInitializing = showSplash || loading;
+    // App is initializing while:
+    //  - splash animation is active (showSplash), OR
+    //  - auth session is being restored from AsyncStorage (loading), OR
+    //  - onboarding flag is being read from AsyncStorage (onboardingLoading).
+    // All three must resolve before any route selection can occur.
+    // This prevents sign-in flash AND onboarding flash for returning users.
+    const isAppInitializing = showSplash || loading || onboardingLoading;
 
     // Navigation funnel:
     //  1. SplashScreen  — shown once on cold start until ready (no double load)

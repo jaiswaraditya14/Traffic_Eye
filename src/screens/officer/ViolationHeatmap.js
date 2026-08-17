@@ -13,7 +13,12 @@ import {
     Image,
     StatusBar,
 } from 'react-native';
-import MapView, { Circle, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import {
+    Map,
+    Camera,
+    GeoJSONSource,
+    Layer,
+} from '@maplibre/maplibre-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -28,105 +33,101 @@ import {
     SHADOWS,
 } from '../../utils';
 
+// MapLibre OpenFreeMap style (zero API key)
+const MAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
+
 const { width } = Dimensions.get('window');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const BASE_LAT = 19.0760;
 const BASE_LNG = 72.8777;
+const BASE_LAT = 19.0760;
 
-// Severity → visual mapping (Single-color concentric circular heat halos)
+// Severity → visual mapping
 const SEVERITY_CONFIG = {
-    critical: { 
-        color: '#2563EB', 
-        glowOuter: 'rgba(37, 99, 235, 0.22)', 
-        glowInner: 'rgba(37, 99, 235, 0.45)', 
-        label: 'Critical', 
-        weight: 4, 
-        order: 4 
+    critical: {
+        color: '#2563EB',
+        glowOuter: 'rgba(37, 99, 235, 0.22)',
+        glowInner: 'rgba(37, 99, 235, 0.45)',
+        label: 'Critical',
+        weight: 4,
+        order: 4,
     },
-    high: { 
-        color: '#EA580C', 
-        glowOuter: 'rgba(234, 88, 12, 0.22)', 
-        glowInner: 'rgba(234, 88, 12, 0.45)', 
-        label: 'High', 
-        weight: 3, 
-        order: 3 
+    high: {
+        color: '#EA580C',
+        glowOuter: 'rgba(234, 88, 12, 0.22)',
+        glowInner: 'rgba(234, 88, 12, 0.45)',
+        label: 'High',
+        weight: 3,
+        order: 3,
     },
-    medium: { 
-        color: '#D97706', 
-        glowOuter: 'rgba(217, 119, 6, 0.25)', 
-        glowInner: 'rgba(217, 119, 6, 0.50)', 
-        label: 'Medium', 
-        weight: 2, 
-        order: 2 
+    medium: {
+        color: '#D97706',
+        glowOuter: 'rgba(217, 119, 6, 0.25)',
+        glowInner: 'rgba(217, 119, 6, 0.50)',
+        label: 'Medium',
+        weight: 2,
+        order: 2,
     },
-    low: { 
-        color: '#16A34A', 
-        glowOuter: 'rgba(22, 163, 74, 0.22)', 
-        glowInner: 'rgba(22, 163, 74, 0.45)', 
-        label: 'Low', 
-        weight: 1, 
-        order: 1 
+    low: {
+        color: '#16A34A',
+        glowOuter: 'rgba(22, 163, 74, 0.22)',
+        glowInner: 'rgba(22, 163, 74, 0.45)',
+        label: 'Low',
+        weight: 1,
+        order: 1,
     },
 };
 
-// Days back per filter
 const TIME_FILTER_DAYS = { today: 1, '7_days': 7, '30_days': 30, all: 3650 };
 
-// ─── JS Clustering helpers ────────────────────────────────────────────────────
-// Groups nearby points into clusters based on a grid cell size (in degrees).
-// No external package needed.
-const CLUSTER_GRID_DEG = 0.008; // ~800m radius at equator
+// ─── Build GeoJSON FeatureCollection from valid report points ─────────────────
+// IMPORTANT: Points with invalid or missing coordinates are OMITTED.
+// We never fabricate/jitter coordinates.
+function buildGeoJSON(points) {
+    const features = [];
+    for (const p of points) {
+        const lat = typeof p.latitude === 'number' ? p.latitude : parseFloat(p.latitude);
+        const lng = typeof p.longitude === 'number' ? p.longitude : parseFloat(p.longitude);
 
-function buildClusters(points, latitudeDelta) {
-    if (!Array.isArray(points) || points.length === 0) return [];
-    // Scale cluster radius with zoom level
-    const safeDelta = (typeof latitudeDelta === 'number' && isFinite(latitudeDelta) && latitudeDelta > 0) ? latitudeDelta : 0.1;
-    const gridSize = Math.max(CLUSTER_GRID_DEG, safeDelta * 0.15);
-
-    const cells = {};
-    for (const pt of points) {
-        if (!pt || typeof pt.latitude !== 'number' || typeof pt.longitude !== 'number' || !isFinite(pt.latitude) || !isFinite(pt.longitude)) {
+        // Skip if coordinate is missing or not a valid finite number in range
+        if (!isFinite(lat) || !isFinite(lng) ||
+            Math.abs(lat) > 90 || Math.abs(lng) > 180 ||
+            (lat === 0 && lng === 0)) {
+            if (__DEV__) console.log('[Heatmap] Omitting point with invalid coords:', p.id, lat, lng);
             continue;
         }
-        const cellLat = Math.floor(pt.latitude  / gridSize);
-        const cellLng = Math.floor(pt.longitude / gridSize);
-        const key = `${cellLat}:${cellLng}`;
-        if (!cells[key]) cells[key] = [];
-        cells[key].push(pt);
+
+        const severityKey = (p.severity || 'low').toLowerCase();
+        const weight = SEVERITY_CONFIG[severityKey]?.weight ?? 1;
+
+        features.push({
+            type: 'Feature',
+            id: p.id || `report_${lat}_${lng}`,
+            geometry: {
+                type: 'Point',
+                coordinates: [lng, lat],
+            },
+            properties: {
+                id: p.id,
+                severity: severityKey,
+                weight,
+                violation_type: p.violation_type || '',
+                submitted_at: p.submitted_at || null,
+                reviewed_at: p.reviewed_at || null,
+                image_url: p.image_url || null,
+                officer_name: p.officer_name || p.officer_review?.[0]?.officer?.full_name || 'Verified Officer',
+                officer_badge: p.officer_badge || p.officer_review?.[0]?.officer?.badge_id || '',
+                officer_jurisdiction: p.officer_jurisdiction || '',
+                location_address: p.location_address || '',
+                // Encode topSeverity for cluster rendering — not available natively,
+                // but clusterProperties allows custom aggregation
+            },
+        });
     }
-
-    return Object.values(cells).map(group => {
-        if (!group || group.length === 0) return null;
-        // Average position of group
-        const lat = group.reduce((s, p) => s + p.latitude,  0) / group.length;
-        const lng = group.reduce((s, p) => s + p.longitude, 0) / group.length;
-
-        if (!isFinite(lat) || !isFinite(lng)) return null;
-
-        // Highest severity in group
-        const topSeverity = group.reduce((best, p) => {
-            const cur = SEVERITY_CONFIG[p.severity?.toLowerCase()] ?? SEVERITY_CONFIG.low;
-            const b   = SEVERITY_CONFIG[best?.toLowerCase()] ?? SEVERITY_CONFIG.low;
-            return cur.order > b.order ? p.severity : best;
-        }, group[0].severity);
-
-        // Unique violation types
-        const types = [...new Set(group.map(p => p.violation_type).filter(Boolean))];
-
-        return {
-            id:            `cluster_${lat.toFixed(5)}_${lng.toFixed(5)}`,
-            latitude:      lat,
-            longitude:     lng,
-            count:         group.length,
-            topSeverity:   (topSeverity || 'low').toLowerCase(),
-            types,
-            points:        group,
-            isCluster:     group.length > 1,
-            // For single points, expose details
-            ...(group.length === 1 ? group[0] : {}),
-        };
-    }).filter(Boolean);
+    return {
+        type: 'FeatureCollection',
+        features,
+    };
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -159,101 +160,13 @@ const legendStyles = StyleSheet.create({
     label: { fontFamily: 'Nunito-SemiBold', fontSize: 11, color: COLORS.textSecondary },
 });
 
-function ClusterMarker({ cluster, onPress }) {
-    const severityKey = (cluster.topSeverity || cluster.severity || 'low').toLowerCase();
-    const cfg = SEVERITY_CONFIG[severityKey] ?? SEVERITY_CONFIG.low;
-
-    if (!cluster.isCluster) {
-        // Single violation marker with concentric single-color heat halo circle
-        return (
-            <TouchableOpacity style={markerStyles.haloWrapper} onPress={onPress} activeOpacity={0.8}>
-                <View style={[markerStyles.glowOuter, { backgroundColor: cfg.glowOuter }]}>
-                    <View style={[markerStyles.glowInner, { backgroundColor: cfg.glowInner }]}>
-                        <View style={[markerStyles.singleCore, { backgroundColor: cfg.color }]}>
-                            <Ionicons name="warning" size={12} color="#fff" />
-                        </View>
-                    </View>
-                </View>
-            </TouchableOpacity>
-        );
-    }
-
-    // Cluster with single-color circular heat halo
-    const outerSize = cluster.count >= 20 ? 64 : cluster.count >= 5 ? 54 : 44;
-    const innerSize = cluster.count >= 20 ? 48 : cluster.count >= 5 ? 40 : 32;
-    const coreSize  = cluster.count >= 20 ? 34 : cluster.count >= 5 ? 28 : 22;
-
-    return (
-        <TouchableOpacity style={markerStyles.haloWrapper} onPress={onPress} activeOpacity={0.85}>
-            <View style={[
-                markerStyles.glowOuter,
-                { width: outerSize, height: outerSize, borderRadius: outerSize / 2, backgroundColor: cfg.glowOuter }
-            ]}>
-                <View style={[
-                    markerStyles.glowInner,
-                    { width: innerSize, height: innerSize, borderRadius: innerSize / 2, backgroundColor: cfg.glowInner }
-                ]}>
-                    <View style={[
-                        markerStyles.clusterCore,
-                        { width: coreSize, height: coreSize, borderRadius: coreSize / 2, backgroundColor: cfg.color }
-                    ]}>
-                        <Text style={markerStyles.clusterCount}>{cluster.count}</Text>
-                    </View>
-                </View>
-            </View>
-        </TouchableOpacity>
-    );
-}
-
-const markerStyles = StyleSheet.create({
-    haloWrapper: {
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    glowOuter: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    glowInner: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    singleCore: {
-        width: 22,
-        height: 22,
-        borderRadius: 11,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 1.5,
-        borderColor: '#ffffff',
-        ...SHADOWS.sm,
-    },
-    clusterCore: {
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 1.5,
-        borderColor: '#ffffff',
-        ...SHADOWS.sm,
-    },
-    clusterCount: {
-        fontFamily: 'Nunito-Bold',
-        fontSize: 11,
-        color: '#ffffff',
-    },
-});
-
 // ─── Popup Sheet ──────────────────────────────────────────────────────────────
 function PopupSheet({ item, onClose }) {
     if (!item) return null;
 
-    const isCluster = item.isCluster && item.count > 1;
-    const cfg = SEVERITY_CONFIG[(item.topSeverity || item.severity || 'low').toLowerCase()] ?? SEVERITY_CONFIG.low;
+    const isCluster = !!item.cluster;
+    const severityKey = (item.severity || 'low').toLowerCase();
+    const cfg = SEVERITY_CONFIG[severityKey] ?? SEVERITY_CONFIG.low;
 
     const formatDate = (ts) => {
         if (!ts) return '—';
@@ -281,8 +194,8 @@ function PopupSheet({ item, onClose }) {
 
                 {isCluster ? (
                     <>
-                        <Text style={sheetStyles.titleMain}>{item.count} Violations in Area</Text>
-                        <Text style={sheetStyles.subtitle}>Highest severity: {cfg.label}</Text>
+                        <Text style={sheetStyles.titleMain}>{item.point_count} Violations in Area</Text>
+                        <Text style={sheetStyles.subtitle}>Tap to zoom in and view individually</Text>
                     </>
                 ) : (
                     <Text style={sheetStyles.titleMain}>{item.violation_type || 'Unknown Violation'}</Text>
@@ -295,8 +208,7 @@ function PopupSheet({ item, onClose }) {
             <View style={sheetStyles.rows}>
                 {isCluster ? (
                     <>
-                        <DetailRow icon="list" label="Violation Types" value={item.types.slice(0, 3).join(', ') + (item.types.length > 3 ? ` +${item.types.length - 3} more` : '')} />
-                        <DetailRow icon="stats-chart" label="Report Count" value={`${item.count} approved reports`} />
+                        <DetailRow icon="stats-chart" label="Report Count" value={`${item.point_count} approved reports`} />
                         <DetailRow icon="location" label="Area" value="Approximate location (privacy protected)" />
                     </>
                 ) : (
@@ -304,18 +216,14 @@ function PopupSheet({ item, onClose }) {
                         <DetailRow icon="car-sport"   label="Violation"  value={item.violation_type || '—'} />
                         <DetailRow icon="flame"        label="Severity"   value={cfg.label} color={cfg.color} />
                         <DetailRow icon="calendar"    label="Date"       value={formatDate(item.reviewed_at || item.submitted_at)} />
-                        <DetailRow icon="location"    label="Location"   value="Approximate (privacy protected)" />
-                        <DetailRow 
-                            icon="person-circle" 
+                        <DetailRow icon="location"    label="Location"   value={item.location_address || 'Approximate (privacy protected)'} />
+                        <DetailRow
+                            icon="person-circle"
                             label="Approved By"
-                            value={
-                                (item.officer_name || item.officer_review?.[0]?.officer?.full_name)
-                                    ? `${item.officer_name || item.officer_review?.[0]?.officer?.full_name}${item.officer_badge || item.officer_review?.[0]?.officer?.badge_id ? ` · Badge #${item.officer_badge || item.officer_review?.[0]?.officer?.badge_id}` : ''}`
-                                    : 'Verified Officer'
-                            } 
-                            color={COLORS.primary} 
+                            value={item.officer_name || 'Verified Officer'}
+                            color={COLORS.primary}
                         />
-                        {(item.officer_jurisdiction) ? (
+                        {item.officer_jurisdiction ? (
                             <DetailRow icon="business" label="Station" value={item.officer_jurisdiction} />
                         ) : null}
                         <DetailRow icon="checkmark-done-circle" label="Status" value="Approved" color={COLORS.success} />
@@ -323,7 +231,7 @@ function PopupSheet({ item, onClose }) {
                 )}
             </View>
 
-            {/* Violation Evidence Photo */}
+            {/* Evidence photo */}
             {!isCluster && item.image_url && (
                 <View style={sheetStyles.imageSection}>
                     <View style={sheetStyles.imageSectionHeader}>
@@ -382,31 +290,110 @@ const sheetStyles = StyleSheet.create({
     rowText:   { flex: 1 },
     rowLabel:  { fontFamily: 'Nunito-SemiBold', fontSize: 11, color: COLORS.textTertiary, textTransform: 'uppercase', marginBottom: 1 },
     rowValue:  { fontFamily: 'Nunito-Medium', fontSize: FONT_SIZES.md, color: COLORS.textPrimary },
-    imageSection: {
-        marginBottom: SPACING.lg,
-    },
-    imageSectionHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        marginBottom: SPACING.xs,
-    },
-    imageSectionTitle: {
-        fontFamily: 'Nunito-Bold',
-        fontSize: 11,
-        color: COLORS.textTertiary,
-        textTransform: 'uppercase',
-    },
-    evidenceImage: {
-        width: '100%',
-        height: 170,
-        borderRadius: BORDER_RADIUS.lg,
-        borderWidth: 1,
-        borderColor: COLORS.borderLight,
-    },
+    imageSection: { marginBottom: SPACING.lg },
+    imageSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: SPACING.xs },
+    imageSectionTitle: { fontFamily: 'Nunito-Bold', fontSize: 11, color: COLORS.textTertiary, textTransform: 'uppercase' },
+    evidenceImage: { width: '100%', height: 170, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.borderLight },
     closeBtn:  { backgroundColor: COLORS.primary, paddingVertical: SPACING.md, borderRadius: BORDER_RADIUS.full, alignItems: 'center' },
     closeBtnText: { fontFamily: 'Nunito-Bold', fontSize: FONT_SIZES.md, color: '#fff' },
 });
+
+// ─── Layer style expressions ───────────────────────────────────────────────────
+//
+// Severity color interpolation for circle layer (individual points)
+const SEVERITY_COLOR_EXPR = [
+    'match', ['get', 'severity'],
+    'critical', '#2563EB',
+    'high',     '#EA580C',
+    'medium',   '#D97706',
+    'low',      '#16A34A',
+    /* default */ '#16A34A',
+];
+
+// Heatmap layer style — weight driven by 'weight' property
+const HEATMAP_LAYER_STYLE = {
+    heatmapWeight: [
+        'interpolate', ['linear'], ['get', 'weight'],
+        1, 0.25,
+        4, 1.0,
+    ],
+    heatmapIntensity: [
+        'interpolate', ['linear'], ['zoom'],
+        0, 0.4,
+        9, 1.2,
+    ],
+    heatmapRadius: [
+        'interpolate', ['linear'], ['zoom'],
+        0, 18,
+        9, 40,
+    ],
+    heatmapOpacity: [
+        'interpolate', ['linear'], ['zoom'],
+        7, 0.85,
+        12, 0.4,
+    ],
+    heatmapColor: [
+        'interpolate', ['linear'],
+        ['heatmap-density'],
+        0,    'rgba(33,102,172,0)',
+        0.2,  'rgba(103,169,207,0.6)',
+        0.4,  'rgba(209,229,240,0.75)',
+        0.6,  'rgba(253,219,199,0.85)',
+        0.8,  'rgba(239,138,98,0.9)',
+        1,    'rgba(178,24,43,1)',
+    ],
+};
+
+// Circle layer style for individual points (shown at high zoom)
+const CIRCLE_LAYER_STYLE = {
+    circleRadius: [
+        'interpolate', ['linear'], ['zoom'],
+        8,  4,
+        14, 12,
+    ],
+    circleColor: SEVERITY_COLOR_EXPR,
+    circleOpacity: [
+        'interpolate', ['linear'], ['zoom'],
+        7,  0,
+        9,  0.85,
+    ],
+    circleStrokeWidth: 1.5,
+    circleStrokeColor: '#ffffff',
+    circleStrokeOpacity: [
+        'interpolate', ['linear'], ['zoom'],
+        7,  0,
+        9,  0.9,
+    ],
+};
+
+// Cluster circle style
+const CLUSTER_CIRCLE_STYLE = {
+    circleRadius: [
+        'step', ['get', 'point_count'],
+        18,   // default radius for small clusters
+        5,  22,
+        20, 28,
+    ],
+    circleColor: [
+        'step', ['get', 'point_count'],
+        '#16A34A',  // <= 4
+        5,  '#D97706',
+        20, '#EA580C',
+    ],
+    circleOpacity: 0.85,
+    circleStrokeWidth: 2,
+    circleStrokeColor: '#ffffff',
+};
+
+// Cluster count text style
+const CLUSTER_COUNT_STYLE = {
+    textField: '{point_count}',
+    textFont: ['Open Sans Bold', 'Arial Unicode MS Bold'],
+    textSize: 12,
+    textColor: '#ffffff',
+    textIgnorePlacement: true,
+    textAllowOverlap: true,
+};
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function ViolationHeatmap({ navigation }) {
@@ -417,14 +404,13 @@ export default function ViolationHeatmap({ navigation }) {
     const [timeFilter, setTimeFilter]     = useState('all');
     const [showHeatmap, setShowHeatmap]   = useState(true);
     const [selectedItem, setSelectedItem] = useState(null);
-    const [latDelta, setLatDelta]         = useState(0.1);
 
-    const mapRef              = useRef(null);
-    const bboxRef             = useRef(null);   // current visible bounding box
-    const pulseAnim           = useRef(new Animated.Value(1)).current;
-    const isMounted           = useRef(true);
+    const cameraRef  = useRef(null);
+    const bboxRef    = useRef(null);
+    const pulseAnim  = useRef(new Animated.Value(1)).current;
+    const isMounted  = useRef(true);
 
-    // Pulse animation for the live indicator
+    // Pulse animation for live indicator
     useEffect(() => {
         if (refreshing) {
             Animated.loop(
@@ -439,7 +425,7 @@ export default function ViolationHeatmap({ navigation }) {
         }
     }, [refreshing]);
 
-    // ── Load data from Supabase ──────────────────────────────────────────────
+    // ── Load data from Supabase ────────────────────────────────────────────────
     const loadData = useCallback(async (showSpinner = true, bbox = null) => {
         if (!isMounted.current) return;
         if (showSpinner) setLoading(true);
@@ -451,65 +437,77 @@ export default function ViolationHeatmap({ navigation }) {
         if (error) {
             if (__DEV__) console.warn('[Heatmap] Load error:', error.message);
         } else if (data) {
-            let processed = [];
-            let geocodeCalls = 0; // cap at 20 to avoid blocking the event loop
-            for (let p of data) {
-                let lat = p.latitude;
-                let lng = p.longitude;
+            let validPoints = 0;
+            let omittedPoints = 0;
+            const processed = [];
 
-                // Fallback 1: Geocode location_address if lat/lng is missing (max 20 to avoid blocking)
-                if ((lat == null || lng == null || isNaN(parseFloat(lat)) || isNaN(parseFloat(lng))) && p.location_address && geocodeCalls < 20) {
+            for (const p of data) {
+                const lat = typeof p.latitude === 'number' ? p.latitude : parseFloat(p.latitude);
+                const lng = typeof p.longitude === 'number' ? p.longitude : parseFloat(p.longitude);
+
+                // Geocode fallback for location_address — max 15 calls
+                let resolvedLat = lat;
+                let resolvedLng = lng;
+
+                if ((!isFinite(lat) || !isFinite(lng) || (lat === 0 && lng === 0)) && p.location_address) {
                     try {
-                        geocodeCalls++;
                         const geo = await Location.geocodeAsync(p.location_address);
-                        if (geo && geo.length > 0) {
-                            lat = geo[0].latitude;
-                            lng = geo[0].longitude;
+                        if (geo?.length > 0) {
+                            resolvedLat = geo[0].latitude;
+                            resolvedLng = geo[0].longitude;
                         }
-                    } catch (err) {
-                        if (__DEV__) console.warn('[Heatmap] Geocode fallback failed for address:', p.location_address);
+                    } catch (_) {
+                        // Geocode failed — point will be omitted below
                     }
                 }
 
-                // Fallback 2: Default city location with small jitter if coordinates still missing
-                if (lat == null || lng == null || isNaN(parseFloat(lat)) || isNaN(parseFloat(lng))) {
-                    lat = BASE_LAT + (Math.random() - 0.5) * 0.01;
-                    lng = BASE_LNG + (Math.random() - 0.5) * 0.01;
+                // Final validity check — no fabrication allowed
+                if (!isFinite(resolvedLat) || !isFinite(resolvedLng) ||
+                    Math.abs(resolvedLat) > 90 || Math.abs(resolvedLng) > 180 ||
+                    (resolvedLat === 0 && resolvedLng === 0)) {
+                    omittedPoints++;
+                    continue;
                 }
 
+                validPoints++;
                 const sv = (p.severity || 'low').toLowerCase();
-                const weight = SEVERITY_CONFIG[sv]?.weight ?? 1;
-
                 processed.push({
                     ...p,
-                    latitude: parseFloat(lat),
-                    longitude: parseFloat(lng),
-                    weight,
+                    latitude: resolvedLat,
+                    longitude: resolvedLng,
+                    severity: sv,
+                    weight: SEVERITY_CONFIG[sv]?.weight ?? 1,
                     officer_name: p.officer_name || p.officer_review?.[0]?.officer?.full_name || 'Verified Officer',
                     officer_badge: p.officer_badge || p.officer_review?.[0]?.officer?.badge_id || '',
                 });
             }
 
-            setPoints(processed);
-            setLastUpdated(new Date());
+            if (__DEV__ && omittedPoints > 0) {
+                console.warn(`[Heatmap] Omitted ${omittedPoints} points with invalid coordinates (${validPoints} valid)`);
+            }
 
-            // Auto-fit map to loaded points on first load
-            if (showSpinner && processed.length > 0) {
-                setTimeout(() => {
-                    if (isMounted.current && mapRef.current) {
-                        const validCoords = processed
-                            .filter(p => isFinite(p.latitude) && isFinite(p.longitude) && Math.abs(p.latitude) <= 90 && Math.abs(p.longitude) <= 180)
-                            .map(p => ({ latitude: p.latitude, longitude: p.longitude }));
-                        if (validCoords.length > 0 && mapRef.current?.fitToCoordinates) {
-                            try {
-                                mapRef.current.fitToCoordinates(
-                                    validCoords,
-                                    { edgePadding: { top: 120, right: 60, bottom: 120, left: 60 }, animated: true }
-                                );
-                            } catch (_) {}
-                        }
-                    }
-                }, 600);
+            if (isMounted.current) {
+                setPoints(processed);
+                setLastUpdated(new Date());
+
+                // Auto-fit camera to valid points on first load
+                if (showSpinner && processed.length > 0 && cameraRef.current) {
+                    const lngs = processed.map(p => p.longitude);
+                    const lats = processed.map(p => p.latitude);
+                    const minLng = Math.min(...lngs);
+                    const maxLng = Math.max(...lngs);
+                    const minLat = Math.min(...lats);
+                    const maxLat = Math.max(...lats);
+
+                    try {
+                        cameraRef.current.fitBounds(
+                            [minLng, minLat],
+                            [maxLng, maxLat],
+                            [80, 80, 80, 80],
+                            600
+                        );
+                    } catch (_) {}
+                }
             }
         }
 
@@ -539,51 +537,41 @@ export default function ViolationHeatmap({ navigation }) {
         return () => supabase.removeChannel(channel);
     }, [loadData]);
 
-    // ── Bounding box handler: re-fetch on significant pan/zoom ────────────────
+    // ── Bounding box: re-fetch on pan/zoom (debounced) ────────────────────────
     const regionChangeTimeout = useRef(null);
-    const onRegionChangeComplete = useCallback((region) => {
-        if (!region || !isFinite(region.latitudeDelta)) return;
-        setLatDelta(region.latitudeDelta);
+
+    const onRegionDidChange = useCallback((event) => {
+        // v11: event.nativeEvent = { center: [lng, lat], zoom, bounds: { ne, sw }, ... }
+        const ne = event?.nativeEvent?.bounds?.ne;
+        const sw = event?.nativeEvent?.bounds?.sw;
+        if (!ne || !sw) return;
 
         const newBbox = {
-            minLat: region.latitude - region.latitudeDelta,
-            maxLat: region.latitude + region.latitudeDelta,
-            minLng: region.longitude - region.longitudeDelta,
-            maxLng: region.longitude + region.longitudeDelta,
+            minLat: sw[1],
+            maxLat: ne[1],
+            minLng: sw[0],
+            maxLng: ne[0],
         };
         bboxRef.current = newBbox;
 
-        // Debounce: only re-fetch after user stops panning for 800ms
         clearTimeout(regionChangeTimeout.current);
         regionChangeTimeout.current = setTimeout(() => {
             if (isMounted.current) loadData(false, newBbox);
         }, 800);
     }, [loadData]);
 
-    // Clear debounce timer on unmount
     useEffect(() => {
         return () => { clearTimeout(regionChangeTimeout.current); };
     }, []);
 
-    // ── Build clusters from current points ────────────────────────────────────
-    const clusters = useMemo(() => buildClusters(points, latDelta), [points, latDelta]);
-
-    // ── Heatmap points (weighted) ─────────────────────────────────────────────
-    const heatmapPoints = useMemo(() =>
-        points
-            .filter(p => isFinite(p.latitude) && isFinite(p.longitude))
-            .map(p => ({
-                latitude:  p.latitude,
-                longitude: p.longitude,
-                weight:    p.weight ?? 1,
-            })),
-    [points]);
+    // ── GeoJSON data ──────────────────────────────────────────────────────────
+    const geoJSON = useMemo(() => buildGeoJSON(points), [points]);
 
     // ── Stats ─────────────────────────────────────────────────────────────────
     const stats = useMemo(() => {
-        const criticalCount = points.filter(p => p.severity?.toLowerCase() === 'critical').length;
-        const highCount     = points.filter(p => p.severity?.toLowerCase() === 'high').length;
-        return { total: points.length, critical: criticalCount, high: highCount };
+        const critical = points.filter(p => p.severity === 'critical').length;
+        const high     = points.filter(p => p.severity === 'high').length;
+        return { total: points.length, critical, high };
     }, [points]);
 
     const formatLastUpdated = () => {
@@ -594,7 +582,28 @@ export default function ViolationHeatmap({ navigation }) {
         return `${Math.floor(diffSec / 60)}m ago`;
     };
 
-    // ── Render time filter pill ───────────────────────────────────────────────
+    // ── Handle press on GeoJSONSource (cluster or individual point) ────────────
+    const handleSourcePress = useCallback((event) => {
+        const feature = event?.nativeEvent?.payload;
+        if (!feature?.properties) return;
+
+        const props = feature.properties;
+
+        if (props.cluster) {
+            // Cluster tapped — zoom in
+            const coords = feature.geometry?.coordinates;
+            if (coords && cameraRef.current) {
+                cameraRef.current.flyTo({ center: coords, duration: 600 });
+                // Attempt to expand cluster by zooming
+                cameraRef.current.zoomTo((props.cluster_expansion_zoom ?? 10) + 1, { duration: 600 });
+            }
+            // Show cluster summary in popup
+            setSelectedItem({ ...props, cluster: true });
+        } else {
+            setSelectedItem(props);
+        }
+    }, []);
+
     const renderFilter = (label, value) => {
         const active = timeFilter === value;
         return (
@@ -613,50 +622,67 @@ export default function ViolationHeatmap({ navigation }) {
         <View style={styles.container}>
             <FocusAwareStatusBar barStyle="dark-content" statusBgColor="#F4F6F9" />
 
-            {/* ── Map ── */}
-            <MapView
-                ref={mapRef}
+            {/* ── Map (MapLibre v11) ── */}
+            <Map
                 style={styles.map}
-                provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-                initialRegion={{ latitude: BASE_LAT, longitude: BASE_LNG, latitudeDelta: 0.1, longitudeDelta: 0.1 }}
-                onRegionChangeComplete={onRegionChangeComplete}
-                mapType="standard"
-                showsUserLocation={false}
-                showsMyLocationButton={false}
+                mapStyle={MAP_STYLE}
+                logo={false}
+                attribution={true}
+                attributionPosition={{ bottom: 8, left: 8 }}
+                onRegionDidChange={onRegionDidChange}
             >
-                {/* Single-color circular heat zones when layer is toggled */}
-                {showHeatmap && clusters.map(cluster => {
-                    if (!cluster || !isFinite(cluster.latitude) || !isFinite(cluster.longitude)) return null;
-                    const severityKey = (cluster.topSeverity || cluster.severity || 'low').toLowerCase();
-                    const cfg = SEVERITY_CONFIG[severityKey] ?? SEVERITY_CONFIG.low;
-                    const radiusMeters = Math.max(120, Math.min(700, (cluster.count || 1) * 90));
-                    return (
-                        <Circle
-                            key={`heat_circle_${cluster.id}`}
-                            center={{ latitude: cluster.latitude, longitude: cluster.longitude }}
-                            radius={radiusMeters}
-                            fillColor={cfg.glowOuter}
-                            strokeColor={cfg.glowInner}
-                            strokeWidth={1.5}
-                        />
-                    );
-                })}
+                <Camera
+                    ref={cameraRef}
+                    defaultSettings={{
+                        centerCoordinate: [BASE_LNG, BASE_LAT],
+                        zoomLevel: 11,
+                    }}
+                />
 
-                {/* Clustered markers (always visible for interactivity) */}
-                {clusters.map(cluster => {
-                    if (!cluster || !isFinite(cluster.latitude) || !isFinite(cluster.longitude)) return null;
-                    return (
-                        <Marker
-                            key={cluster.id}
-                            coordinate={{ latitude: cluster.latitude, longitude: cluster.longitude }}
-                            onPress={() => setSelectedItem(cluster)}
-                            tracksViewChanges={false}
-                        >
-                            <ClusterMarker cluster={cluster} onPress={() => setSelectedItem(cluster)} />
-                        </Marker>
-                    );
-                })}
-            </MapView>
+                {/* GeoJSON source with native clustering */}
+                <GeoJSONSource
+                    id="violations"
+                    data={geoJSON}
+                    cluster={true}
+                    clusterRadius={50}
+                    clusterMaxZoom={14}
+                    onPress={handleSourcePress}
+                >
+                    {/* Heatmap layer — visible at low zoom, fades out at high zoom */}
+                    {showHeatmap && (
+                        <Layer
+                            id="violations-heatmap"
+                            type="heatmap"
+                            filter={['!', ['has', 'point_count']]}
+                            style={HEATMAP_LAYER_STYLE}
+                        />
+                    )}
+
+                    {/* Cluster circle layer */}
+                    <Layer
+                        id="violations-cluster-circle"
+                        type="circle"
+                        filter={['has', 'point_count']}
+                        style={CLUSTER_CIRCLE_STYLE}
+                    />
+
+                    {/* Cluster count text */}
+                    <Layer
+                        id="violations-cluster-count"
+                        type="symbol"
+                        filter={['has', 'point_count']}
+                        style={CLUSTER_COUNT_STYLE}
+                    />
+
+                    {/* Individual point circles (visible at high zoom) */}
+                    <Layer
+                        id="violations-circles"
+                        type="circle"
+                        filter={['!', ['has', 'point_count']]}
+                        style={CIRCLE_LAYER_STYLE}
+                    />
+                </GeoJSONSource>
+            </Map>
 
             {/* ── Top overlay ── */}
             <SafeAreaView edges={['top']} style={styles.topOverlay} pointerEvents="box-none">

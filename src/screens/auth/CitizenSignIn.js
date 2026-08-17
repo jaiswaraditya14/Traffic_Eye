@@ -72,10 +72,11 @@ export default function CitizenSignIn({ navigation }) {
         setGoogleLoading(true);
         if (__DEV__) console.log('[AUTH] GOOGLE_OAUTH_STARTED');
         try {
-            // Production builds use the registered custom scheme, not the Expo proxy.
-            // NOTE: In Expo Go (dev), this will not work for OAuth because custom schemes
-            // are not supported there. Test Google sign-in in the APK/IPA build only.
-            const redirectUri = AuthSession.makeRedirectUri({ scheme: 'trafficeye' });
+            // Canonical OAuth callback URI: trafficeye://auth/callback
+            const redirectUri = AuthSession.makeRedirectUri({
+                scheme: 'trafficeye',
+                path: 'auth/callback',
+            });
 
             const { data, error } = await signInWithGoogle(redirectUri);
             if (error) {

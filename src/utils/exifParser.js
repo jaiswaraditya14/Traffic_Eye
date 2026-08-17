@@ -816,8 +816,12 @@ export async function extractImageLocation(assetOrUri) {
     // and streams unredacted original bytes directly.
     if (Platform.OS === 'android' && MediaStoreResolver?.resolveOriginalMedia) {
         try {
+            // Pass contentUri (picker URI) as the first argument so the native module
+            // can extract the MediaStore ID directly from a content://media/... URI,
+            // bypassing filename/size queries entirely. This is the most reliable path.
             const nativeRes = await MediaStoreResolver.resolveOriginalMedia(
-                fileName,
+                cleanUri,            // contentUri — preferred for direct ID extraction
+                fileName,            // fallback: display name for query-based matching
                 fileSize,
                 dimensions?.width,
                 dimensions?.height
@@ -842,7 +846,20 @@ export async function extractImageLocation(assetOrUri) {
                 }
 
                 // 1A.1: Parse binary from the original unredacted bytes
-                if (nativeRes.bytesBase64) {
+                // IMPORTANT: Only run JPEG binary parser for JPEG files.
+                // PNG uses IHDR+tEXt/iTXt chunks, HEIC uses ISOBMFF boxes — neither
+                // has a JPEG APP1/FFE1 header. Running parseJpegBinaryExif on them will
+                // produce garbage or silently find nothing (safe), but we skip it
+                // explicitly to avoid any false-positive GPS reads.
+                const isJpegMime = !mimeType ||
+                    mimeType === 'image/jpeg' ||
+                    mimeType === 'image/jpg';
+                const isUnsupportedBinaryFormat = mimeType === 'image/png' ||
+                    mimeType === 'image/heic' ||
+                    mimeType === 'image/heif' ||
+                    mimeType === 'image/webp';
+
+                if (nativeRes.bytesBase64 && isJpegMime && !isUnsupportedBinaryFormat) {
                     exifExists = true;
                     const rawBytes = base64ToUint8Array(nativeRes.bytesBase64);
                     const binaryResult = parseJpegBinaryExif(rawBytes);
@@ -852,6 +869,11 @@ export async function extractImageLocation(assetOrUri) {
                         gpsSource = 'EXIF_ORIGINAL';
                         gpsUnavailableReason = null;
                     }
+                } else if (nativeRes.bytesBase64 && isUnsupportedBinaryFormat) {
+                    // Non-JPEG format: binary JPEG parser skipped.
+                    // GPS comes from native ExifInterface only (checked next step).
+                    exifExists = true;
+                    if (__DEV__) console.log(`[EXIF Extractor] Skipping JPEG binary parser for format: ${mimeType}`);
                 }
 
                 // 1A.2: Native ExifInterface GPS
@@ -906,9 +928,10 @@ export async function extractImageLocation(assetOrUri) {
                                 if (dimMatch) targetAssetId = dimMatch.id;
                             }
 
-                            if (!targetAssetId && recent.assets.length > 0) {
-                                targetAssetId = recent.assets[0].id;
-                            }
+                            // NOTE: Do NOT fall back to recent.assets[0].id when no filename/
+                            // dimension match is found. That would associate EXIF metadata
+                            // from a completely different photo with the selected image.
+                            // Fail closed: if identity cannot be proven, skip this stage.
                         }
                     } catch (searchErr) {
                         if (__DEV__) console.log('[EXIF Extractor] MediaStore search skipped:', searchErr.message);
@@ -957,12 +980,21 @@ export async function extractImageLocation(assetOrUri) {
                                 exifExists = true;
                                 const rawBytes = base64ToUint8Array(rawBytesBase64);
                                 bytesRead = rawBytes.byteLength;
-                                const binaryResult = parseJpegBinaryExif(rawBytes);
-                                if (binaryResult) {
-                                    coords = binaryResult;
-                                    extractionMethod = 'ORIGINAL_DCIM_BINARY_APP1';
-                                    gpsSource = 'EXIF_ORIGINAL';
-                                    gpsUnavailableReason = null;
+                                // Only run JPEG binary parser for JPEG — PNG/HEIC/HEIF/WebP
+                                // do not have JPEG APP1 headers.
+                                const isBinaryJpeg = !mimeType ||
+                                    mimeType === 'image/jpeg' ||
+                                    mimeType === 'image/jpg';
+                                if (isBinaryJpeg) {
+                                    const binaryResult = parseJpegBinaryExif(rawBytes);
+                                    if (binaryResult) {
+                                        coords = binaryResult;
+                                        extractionMethod = 'ORIGINAL_DCIM_BINARY_APP1';
+                                        gpsSource = 'EXIF_ORIGINAL';
+                                        gpsUnavailableReason = null;
+                                    }
+                                } else if (__DEV__) {
+                                    console.log(`[EXIF Extractor] Skipping JPEG binary parser for DCIM file: ${mimeType}`);
                                 }
                             }
                         } catch (dcimErr) {
@@ -1042,7 +1074,18 @@ export async function extractImageLocation(assetOrUri) {
         }
 
         // 2B: Check Photo Picker binary APP1 header
-        if (!coords && cleanUri) {
+        // Only for JPEG files — PNG/HEIC/HEIF/WebP do not have JPEG APP1 headers.
+        // Attempting JPEG binary parsing on these formats will silently return null
+        // (no crash), but we skip explicitly and record the reason.
+        const pickerMimeIsJpeg = !mimeType ||
+            mimeType === 'image/jpeg' ||
+            mimeType === 'image/jpg';
+        const pickerMimeUnsupported = mimeType === 'image/png' ||
+            mimeType === 'image/heic' ||
+            mimeType === 'image/heif' ||
+            mimeType === 'image/webp';
+
+        if (!coords && cleanUri && pickerMimeIsJpeg && !pickerMimeUnsupported) {
             try {
                 let base64Chunk = null;
                 try {
@@ -1072,6 +1115,11 @@ export async function extractImageLocation(assetOrUri) {
             } catch (readErr) {
                 if (__DEV__) console.log('[EXIF Extractor] Picker copy binary read failed:', readErr.message);
             }
+        } else if (!coords && pickerMimeUnsupported) {
+            // Non-JPEG format from picker — GPS_UNAVAILABLE; no binary parsing attempted.
+            // Native ExifInterface (Stage 1A) is the only supported path for these formats.
+            gpsUnavailableReason = `UNSUPPORTED_FORMAT_FOR_PICKER_BINARY: ${mimeType}`;
+            if (__DEV__) console.log(`[EXIF Extractor] Picker binary parse skipped for format: ${mimeType}. Use native MediaStoreResolver for GPS extraction.`);
         }
     }
 

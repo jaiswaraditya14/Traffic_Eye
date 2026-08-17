@@ -1,9 +1,9 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, Image, Alert, ScrollView,
-    ActivityIndicator, Animated, Modal, StatusBar, TextInput,
+    ActivityIndicator, Animated, Modal, StatusBar, TextInput, Platform,
 } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import MapLibreMap from '../../components/map/MapLibreMap';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -50,11 +50,9 @@ export default function NewReport({ navigation }) {
     const [trustLevel, setTrustLevel] = useState(null);
     const [isMapVisible, setIsMapVisible] = useState(false);
     const [selectedCoordinate, setSelectedCoordinate] = useState(null);
-    const [mapRegion, setMapRegion] = useState({
+    const [mapRegion] = useState({  // kept for mapRegion-dependent initialCoordinate below
         latitude: location?.latitude || 28.6139,
         longitude: location?.longitude || 77.2090,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
     });
 
     const [video, setVideo] = useState(null);
@@ -487,23 +485,37 @@ export default function NewReport({ navigation }) {
                 </ScrollView>
             </SafeAreaView>
 
-            {/* Modals are unchanged visually for brevity, standard map picker */}
-            <Modal visible={isMapVisible} animationType="slide">
-                <View style={styles.mapContainer}>
-                    <MapView style={styles.map} region={mapRegion} onRegionChangeComplete={setMapRegion} onPress={(e) => setSelectedCoordinate(e.nativeEvent.coordinate)} showsUserLocation={true}>
-                        {selectedCoordinate && <Marker coordinate={selectedCoordinate} />}
-                        {!selectedCoordinate && location && <Marker coordinate={location} pinColor="blue" />}
-                    </MapView>
-                    <View style={styles.mapHeaderLine}>
-                        <Text style={styles.mapTitle}>Pin Location</Text>
-                        <TouchableOpacity onPress={() => setIsMapVisible(false)} style={styles.closeMap}>
-                            <Ionicons name="close" size={24} color={C.textPrimary} />
-                        </TouchableOpacity>
-                    </View>
-                    <TouchableOpacity style={styles.mapConfirm} onPress={() => { setIsMapVisible(false); if (selectedCoordinate) setManualLocation(selectedCoordinate); else if (location) setManualLocation(location); }}>
-                        <Text style={styles.mapConfirmText}>Confirm Selected</Text>
-                    </TouchableOpacity>
-                </View>
+            {/* ── Map Location Picker Modal (MapLibre / OpenFreeMap) ── */}
+            <Modal visible={isMapVisible} animationType="slide" onRequestClose={() => setIsMapVisible(false)}>
+                <MapLibreMap
+                    initialCoordinate={{
+                        latitude: selectedCoordinate?.latitude || mapRegion.latitude,
+                        longitude: selectedCoordinate?.longitude || mapRegion.longitude,
+                    }}
+                    selectedCoordinate={selectedCoordinate || undefined}
+                    onLocationSelect={({ latitude, longitude }) =>
+                        setSelectedCoordinate({ latitude, longitude })
+                    }
+                    showSearch={true}
+                    showUserLocation={true}
+                    showConfirmButton={true}
+                    confirmText="Confirm Location"
+                    onConfirm={({ coordinate, address }) => {
+                        setIsMapVisible(false);
+                        if (coordinate) {
+                            setManualLocation(coordinate, address);
+                        } else if (location) {
+                            setManualLocation(location);
+                        }
+                    }}
+                />
+                {/* Close button overlay */}
+                <TouchableOpacity
+                    style={styles.closeMapBtn}
+                    onPress={() => setIsMapVisible(false)}
+                >
+                    <Ionicons name="close" size={22} color={C.textPrimary} />
+                </TouchableOpacity>
             </Modal>
 
             {/* Fullscreen Image Modal with Pinch-to-Zoom */}
@@ -881,13 +893,24 @@ const styles = StyleSheet.create({
     submitGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 18 },
     submitText: { fontSize: 17, fontFamily: 'Nunito-ExtraBold', color: C.navy, letterSpacing: 0.5 },
 
-    mapContainer: { flex: 1, backgroundColor: C.offWhite },
-    map: { flex: 1 },
-    mapHeaderLine: { position: 'absolute', top: 50, left: 20, right: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: C.surface, padding: 16, borderRadius: 16, elevation: 4 },
-    mapTitle: { fontSize: 16, fontFamily: 'Nunito-Bold', color: C.textPrimary },
-    closeMap: { padding: 4 },
-    mapConfirm: { position: 'absolute', bottom: 40, left: 20, right: 20, backgroundColor: C.navyMid, padding: 16, borderRadius: 14, alignItems: 'center', elevation: 4 },
-    mapConfirmText: { color: C.white, fontSize: 16, fontFamily: 'Nunito-Bold' },
+    // MapLibre map modal close button overlay
+    closeMapBtn: {
+        position: 'absolute',
+        top: Platform.OS === 'ios' ? 56 : 16,
+        right: 16,
+        zIndex: 20,
+        backgroundColor: C.surface,
+        borderRadius: 22,
+        width: 40,
+        height: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+        elevation: 6,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.12,
+        shadowRadius: 4,
+    },
     // Report Type Toggle Bar
     reportTypeBar: {
         backgroundColor: C.surface,

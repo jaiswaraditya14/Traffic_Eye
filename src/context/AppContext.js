@@ -6,6 +6,9 @@ const AppContext = createContext();
 export const AppProvider = ({ children }) => {
   const [showSplash, setShowSplash] = useState(true);
   const [hasSeenOnboarding, setHasSeenOnboardingState] = useState(false);
+  // True until the AsyncStorage onboarding flag read completes.
+  // AppNavigator must not select the unauthenticated route until this resolves.
+  const [onboardingLoading, setOnboardingLoading] = useState(true);
   const [userRole, setUserRole] = useState(null); // 'citizen' or 'officer'
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentReport, setCurrentReport] = useState(null);
@@ -26,6 +29,9 @@ export const AppProvider = ({ children }) => {
         }
       } catch (e) {
         // AsyncStorage read failure — default to showing onboarding (safe fallback)
+      } finally {
+        // Always resolve the loading gate so route selection is not blocked indefinitely
+        setOnboardingLoading(false);
       }
     };
     loadOnboardingState();
@@ -45,6 +51,7 @@ export const AppProvider = ({ children }) => {
     setShowSplash,
     hasSeenOnboarding,
     setHasSeenOnboarding,
+    onboardingLoading,
     userRole,
     setUserRole,
     isAuthenticated,

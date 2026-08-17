@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { AppState, Alert } from 'react-native';
 import { supabase, authService } from '../services';
 import { sendLocalNotification } from '../services/notifications';
 
@@ -11,6 +12,23 @@ export function AuthProvider({ children }) {
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
     const isMounted = useRef(true);
+    const activeUserIdRef = useRef(null);
+    const fetchSeqRef = useRef(0);
+
+    // ── AppState token auto-refresh lifecycle ────────────────────────────────
+    useEffect(() => {
+        const handleAppStateChange = (state) => {
+            if (state === 'active') {
+                supabase.auth.startAutoRefresh();
+            } else {
+                supabase.auth.stopAutoRefresh();
+            }
+        };
+        const subscription = AppState.addEventListener('change', handleAppStateChange);
+        return () => {
+            subscription.remove();
+        };
+    }, []);
 
     useEffect(() => {
         isMounted.current = true;
@@ -28,17 +46,16 @@ export function AuthProvider({ children }) {
                     if (event === 'SIGNED_OUT' || !session) {
                         // Supabase explicitly reported SIGNED_OUT — the session is gone.
                         // This is the authoritative signal to clear auth state.
+                        activeUserIdRef.current = null;
+                        fetchSeqRef.current += 1;
                         if (isMounted.current) { setUser(null); setProfile(null); }
                     } else if (session?.user) {
                         // Session and user are valid — update user state and load profile.
-                        // Profile fetch failure will NOT sign the user out (handled in fetchProfile).
+                        activeUserIdRef.current = session.user.id;
                         if (isMounted.current) setUser(session.user);
-                        await fetchProfile(session.user.id);
+                        fetchProfile(session.user.id);
                     }
                 } catch (error) {
-                    // This catch only fires if fetchProfile itself throws uncaught —
-                    // which should not happen as fetchProfile has its own error boundary.
-                    // Do NOT sign out here — the session event (not profile) triggered this.
                     if (__DEV__) console.warn('[AUTH] onAuthStateChange outer error:', error?.message);
                 } finally {
                     if (isMounted.current) setLoading(false);
@@ -55,6 +72,7 @@ export function AuthProvider({ children }) {
 
     const fetchProfile = async (userId) => {
         if (__DEV__) console.log('[AUTH] PROFILE_FETCH_START | user exists: true');
+        const currentSeq = ++fetchSeqRef.current;
 
         // Race against a 15-second timeout.
         // On timeout: user stays authenticated — profile shown as null → ProfileLoadingScreen.
@@ -67,6 +85,10 @@ export function AuthProvider({ children }) {
             await Promise.race([
                 (async () => {
                     const { data, error } = await authService.getProfile(userId);
+                    if (fetchSeqRef.current !== currentSeq || activeUserIdRef.current !== userId) {
+                        if (__DEV__) console.log('[AUTH] Discarding stale profile fetch result');
+                        return;
+                    }
 
                     if (error || !data) {
                         if (__DEV__) console.log('[AUTH] PROFILE_NOT_FOUND — attempting upsert for new OAuth user');
@@ -74,6 +96,7 @@ export function AuthProvider({ children }) {
                         // Profile row missing — this is expected for first-time Google Sign-In.
                         // Verify the Supabase session is still valid before attempting upsert.
                         const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
+                        if (fetchSeqRef.current !== currentSeq || activeUserIdRef.current !== userId) return;
 
                         if (userError || !currentUser) {
                             // supabase.auth.getUser() returned an error or null user.
@@ -96,6 +119,7 @@ export function AuthProvider({ children }) {
                         };
 
                         const { error: insertError } = await supabase.from('profiles').upsert(newProfile);
+                        if (fetchSeqRef.current !== currentSeq || activeUserIdRef.current !== userId) return;
                         if (!insertError) {
                             if (__DEV__) console.log('[AUTH] PROFILE_FETCH_SUCCESS (newly created)');
                             if (isMounted.current) setProfile(newProfile);

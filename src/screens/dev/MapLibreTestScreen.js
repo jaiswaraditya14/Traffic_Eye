@@ -1,16 +1,13 @@
 /**
  * MapLibreTestScreen.js
- * Minimal isolated test screen — proves native MLRNCameraModule loads.
- * Contains ONLY: MapView + OpenFreeMap Liberty style + Camera + one Marker.
+ * Minimal isolated test screen — proves native MapLibre v11 loads.
+ * Contains ONLY: Map + OpenFreeMap Liberty style + Camera + one Marker.
  * No heatmap, clustering, geocoding, EXIF, or app data.
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import MapLibreGL from '@maplibre/maplibre-react-native';
-
-// CRITICAL: null token required for OpenFreeMap (no Mapbox account needed)
-MapLibreGL.setAccessToken(null);
+import { Map, Camera, Marker } from '@maplibre/maplibre-react-native';
 
 const OPEN_FREE_MAP_LIBERTY = 'https://tiles.openfreemap.org/styles/liberty';
 
@@ -28,45 +25,42 @@ export default function MapLibreTestScreen() {
                 <Text style={styles.bannerText}>{status}</Text>
             </View>
 
-            {/* Native MapLibre MapView */}
-            <MapLibreGL.MapView
+            {/* Native MapLibre v11 Map */}
+            <Map
                 style={styles.map}
-                styleURL={OPEN_FREE_MAP_LIBERTY}
-                logoEnabled={false}
+                mapStyle={OPEN_FREE_MAP_LIBERTY}
+                logo={false}
+                attribution={true}
                 attributionPosition={{ bottom: 8, right: 8 }}
-                onDidFinishLoadingStyle={() => {
+                onDidFinishLoadingMap={() => {
                     setTilesLoaded(true);
-                    setStatus('✅ MLRNCameraModule LOADED — OpenFreeMap tiles OK');
+                    setStatus('✅ MapLibre v11 LOADED — OpenFreeMap tiles OK');
                 }}
                 onDidFailLoadingMap={(err) => {
                     setStatus(`❌ Map failed: ${err?.message || 'unknown error'}`);
                 }}
             >
                 {/* Camera */}
-                <MapLibreGL.Camera
+                <Camera
                     defaultSettings={{
                         centerCoordinate: MARKER_COORD,
                         zoomLevel: 13,
                     }}
-                    animationMode="flyTo"
-                    animationDuration={1000}
                 />
 
                 {/* Single test marker */}
-                <MapLibreGL.PointAnnotation
+                <Marker
                     id="test-marker"
-                    coordinate={MARKER_COORD}
-                    title="MapLibre Test Point"
+                    lngLat={MARKER_COORD}
                 >
                     <View style={styles.marker} />
-                    <MapLibreGL.Callout title="Native MapLibre Working ✅" />
-                </MapLibreGL.PointAnnotation>
-            </MapLibreGL.MapView>
+                </Marker>
+            </Map>
 
             {/* Bottom Label */}
             <View style={styles.footer}>
                 <Text style={styles.footerText}>
-                    {'@maplibre/maplibre-react-native  •  OpenFreeMap Liberty\nPan, zoom, and tap marker to verify native runtime'}
+                    {'@maplibre/maplibre-react-native v11  •  OpenFreeMap Liberty\nPan and zoom to verify native runtime'}
                 </Text>
             </View>
         </View>
