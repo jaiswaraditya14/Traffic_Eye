@@ -79,11 +79,16 @@ const TIME_FILTER_DAYS = { today: 1, '7_days': 7, '30_days': 30, all: 3650 };
 const CLUSTER_GRID_DEG = 0.008; // ~800m radius at equator
 
 function buildClusters(points, latitudeDelta) {
+    if (!Array.isArray(points) || points.length === 0) return [];
     // Scale cluster radius with zoom level
-    const gridSize = Math.max(CLUSTER_GRID_DEG, latitudeDelta * 0.15);
+    const safeDelta = (typeof latitudeDelta === 'number' && isFinite(latitudeDelta) && latitudeDelta > 0) ? latitudeDelta : 0.1;
+    const gridSize = Math.max(CLUSTER_GRID_DEG, safeDelta * 0.15);
 
     const cells = {};
     for (const pt of points) {
+        if (!pt || typeof pt.latitude !== 'number' || typeof pt.longitude !== 'number' || !isFinite(pt.latitude) || !isFinite(pt.longitude)) {
+            continue;
+        }
         const cellLat = Math.floor(pt.latitude  / gridSize);
         const cellLng = Math.floor(pt.longitude / gridSize);
         const key = `${cellLat}:${cellLng}`;
@@ -92,9 +97,12 @@ function buildClusters(points, latitudeDelta) {
     }
 
     return Object.values(cells).map(group => {
+        if (!group || group.length === 0) return null;
         // Average position of group
         const lat = group.reduce((s, p) => s + p.latitude,  0) / group.length;
         const lng = group.reduce((s, p) => s + p.longitude, 0) / group.length;
+
+        if (!isFinite(lat) || !isFinite(lng)) return null;
 
         // Highest severity in group
         const topSeverity = group.reduce((best, p) => {
@@ -118,7 +126,7 @@ function buildClusters(points, latitudeDelta) {
             // For single points, expose details
             ...(group.length === 1 ? group[0] : {}),
         };
-    });
+    }).filter(Boolean);
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -489,10 +497,17 @@ export default function ViolationHeatmap({ navigation }) {
             if (showSpinner && processed.length > 0) {
                 setTimeout(() => {
                     if (isMounted.current && mapRef.current) {
-                        mapRef.current.fitToCoordinates(
-                            processed.map(p => ({ latitude: p.latitude, longitude: p.longitude })),
-                            { edgePadding: { top: 120, right: 60, bottom: 120, left: 60 }, animated: true }
-                        );
+                        const validCoords = processed
+                            .filter(p => isFinite(p.latitude) && isFinite(p.longitude) && Math.abs(p.latitude) <= 90 && Math.abs(p.longitude) <= 180)
+                            .map(p => ({ latitude: p.latitude, longitude: p.longitude }));
+                        if (validCoords.length > 0 && mapRef.current?.fitToCoordinates) {
+                            try {
+                                mapRef.current.fitToCoordinates(
+                                    validCoords,
+                                    { edgePadding: { top: 120, right: 60, bottom: 120, left: 60 }, animated: true }
+                                );
+                            } catch (_) {}
+                        }
                     }
                 }, 600);
             }
@@ -527,6 +542,7 @@ export default function ViolationHeatmap({ navigation }) {
     // ── Bounding box handler: re-fetch on significant pan/zoom ────────────────
     const regionChangeTimeout = useRef(null);
     const onRegionChangeComplete = useCallback((region) => {
+        if (!region || !isFinite(region.latitudeDelta)) return;
         setLatDelta(region.latitudeDelta);
 
         const newBbox = {
@@ -554,11 +570,13 @@ export default function ViolationHeatmap({ navigation }) {
 
     // ── Heatmap points (weighted) ─────────────────────────────────────────────
     const heatmapPoints = useMemo(() =>
-        points.map(p => ({
-            latitude:  p.latitude,
-            longitude: p.longitude,
-            weight:    p.weight ?? 1,
-        })),
+        points
+            .filter(p => isFinite(p.latitude) && isFinite(p.longitude))
+            .map(p => ({
+                latitude:  p.latitude,
+                longitude: p.longitude,
+                weight:    p.weight ?? 1,
+            })),
     [points]);
 
     // ── Stats ─────────────────────────────────────────────────────────────────
@@ -608,9 +626,10 @@ export default function ViolationHeatmap({ navigation }) {
             >
                 {/* Single-color circular heat zones when layer is toggled */}
                 {showHeatmap && clusters.map(cluster => {
+                    if (!cluster || !isFinite(cluster.latitude) || !isFinite(cluster.longitude)) return null;
                     const severityKey = (cluster.topSeverity || cluster.severity || 'low').toLowerCase();
                     const cfg = SEVERITY_CONFIG[severityKey] ?? SEVERITY_CONFIG.low;
-                    const radiusMeters = Math.max(120, Math.min(700, cluster.count * 90));
+                    const radiusMeters = Math.max(120, Math.min(700, (cluster.count || 1) * 90));
                     return (
                         <Circle
                             key={`heat_circle_${cluster.id}`}
@@ -624,16 +643,19 @@ export default function ViolationHeatmap({ navigation }) {
                 })}
 
                 {/* Clustered markers (always visible for interactivity) */}
-                {clusters.map(cluster => (
-                    <Marker
-                        key={cluster.id}
-                        coordinate={{ latitude: cluster.latitude, longitude: cluster.longitude }}
-                        onPress={() => setSelectedItem(cluster)}
-                        tracksViewChanges={false}
-                    >
-                        <ClusterMarker cluster={cluster} onPress={() => setSelectedItem(cluster)} />
-                    </Marker>
-                ))}
+                {clusters.map(cluster => {
+                    if (!cluster || !isFinite(cluster.latitude) || !isFinite(cluster.longitude)) return null;
+                    return (
+                        <Marker
+                            key={cluster.id}
+                            coordinate={{ latitude: cluster.latitude, longitude: cluster.longitude }}
+                            onPress={() => setSelectedItem(cluster)}
+                            tracksViewChanges={false}
+                        >
+                            <ClusterMarker cluster={cluster} onPress={() => setSelectedItem(cluster)} />
+                        </Marker>
+                    );
+                })}
             </MapView>
 
             {/* ── Top overlay ── */}

@@ -324,7 +324,29 @@ export default function AIResultsVerification({ navigation, route }) {
                     </View>
 
                     <View style={styles.inputBox}>
-                        <Text style={styles.inputLabel}>Incident Location Address</Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                            <Text style={styles.inputLabel}>Incident Location Address</Text>
+                            {currentReport?.locationSource && (
+                                <View style={[
+                                    styles.locSourceBadge,
+                                    (currentReport.locationSource === 'EXIF_ORIGINAL' || currentReport.locationSource === 'EXIF_PICKER_COPY' || currentReport.locationSource === 'IMAGE_EXIF') && styles.locSourceBadgeExif,
+                                    (currentReport.locationSource === 'LIVE_DEVICE_LOCATION' || currentReport.locationSource === 'LIVE_LOCATION') && styles.locSourceBadgeLive,
+                                ]}>
+                                    <Ionicons
+                                        name={(currentReport.locationSource === 'EXIF_ORIGINAL' || currentReport.locationSource === 'EXIF_PICKER_COPY' || currentReport.locationSource === 'IMAGE_EXIF') ? 'image' : (currentReport.locationSource === 'LIVE_DEVICE_LOCATION' || currentReport.locationSource === 'LIVE_LOCATION') ? 'navigate' : 'pin'}
+                                        size={11}
+                                        color={(currentReport.locationSource === 'EXIF_ORIGINAL' || currentReport.locationSource === 'EXIF_PICKER_COPY' || currentReport.locationSource === 'IMAGE_EXIF') ? '#15803D' : (currentReport.locationSource === 'LIVE_DEVICE_LOCATION' || currentReport.locationSource === 'LIVE_LOCATION') ? '#0F2C59' : '#64748B'}
+                                    />
+                                    <Text style={[
+                                        styles.locSourceText,
+                                        (currentReport.locationSource === 'EXIF_ORIGINAL' || currentReport.locationSource === 'EXIF_PICKER_COPY' || currentReport.locationSource === 'IMAGE_EXIF') && { color: '#15803D' },
+                                        (currentReport.locationSource === 'LIVE_DEVICE_LOCATION' || currentReport.locationSource === 'LIVE_LOCATION') && { color: '#0F2C59' },
+                                    ]}>
+                                        {currentReport.locationSource === 'EXIF_ORIGINAL' ? 'Original Image GPS' : currentReport.locationSource === 'EXIF_PICKER_COPY' ? 'Image GPS' : (currentReport.locationSource === 'LIVE_DEVICE_LOCATION' || currentReport.locationSource === 'LIVE_LOCATION') ? 'Live Device GPS' : 'Manual'}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
                         <TextInput
                             style={[styles.textInput, styles.addressInput]}
                             placeholder="Location details..."
@@ -334,6 +356,11 @@ export default function AIResultsVerification({ navigation, route }) {
                             numberOfLines={4}
                             placeholderTextColor={C.textTertiary}
                         />
+                        {currentReport?.location?.latitude != null && currentReport?.location?.longitude != null && (
+                            <Text style={styles.coordMetaText}>
+                                Coordinates: {currentReport.location.latitude.toFixed(6)}, {currentReport.location.longitude.toFixed(6)}
+                            </Text>
+                        )}
                     </View>
 
                 </ScrollView>
@@ -571,6 +598,39 @@ const styles = StyleSheet.create({
     ocrWarningRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, paddingHorizontal: 6 },
     ocrWarningText: { fontSize: 12, fontFamily: 'Nunito-SemiBold', color: C.warning, flex: 1 },
     ocrMetaText: { fontSize: 11, fontFamily: 'Nunito-Medium', color: C.textSecondary, marginTop: 4, paddingHorizontal: 6 },
+
+    // Location Source metadata badge
+    locSourceBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 8,
+        backgroundColor: '#F1F5F9',
+        borderWidth: 1,
+        borderColor: '#CBD5E1',
+    },
+    locSourceBadgeExif: {
+        backgroundColor: '#DCFCE7',
+        borderColor: '#86EFAC',
+    },
+    locSourceBadgeLive: {
+        backgroundColor: '#EFF6FF',
+        borderColor: '#93C5FD',
+    },
+    locSourceText: {
+        fontSize: 11,
+        fontFamily: 'Nunito-Bold',
+        color: '#64748B',
+    },
+    coordMetaText: {
+        fontSize: 11,
+        fontFamily: 'Nunito-Medium',
+        color: C.textSecondary,
+        marginTop: 6,
+        marginLeft: 4,
+    },
 
     modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
     modalClose: { position: 'absolute', top: 60, right: 24, zIndex: 10, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },

@@ -39,5 +39,10 @@ export {
     parseCoordinateComponent,
     applyRef,
     validateCoordinates,
+    hasValidGpsValues,
+    extractImageLocation,
+    parseJpegBinaryExif,
+    logExifDiagnostics,
 } from './exifParser';
+export { computeFileSha256 } from './fileHash';
 // imageHash.js removed — duplicate detection now uses plate-OCR + Supabase DB matching

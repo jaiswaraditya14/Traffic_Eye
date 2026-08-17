@@ -21,14 +21,24 @@ export function AuthProvider({ children }) {
             async (event, session) => {
                 if (!isMounted.current) return;
                 try {
-                    setUser(session?.user ?? null);
-                    if (session?.user) {
+                    if (event === 'SIGNED_OUT' || !session) {
+                        setUser(null);
+                        setProfile(null);
+                    } else if (session?.user) {
+                        setUser(session.user);
                         await fetchProfile(session.user.id);
-                    } else {
-                        if (isMounted.current) setProfile(null);
                     }
                 } catch (error) {
                     if (__DEV__) console.warn('[Auth] State change failed:', error?.message || 'Unknown error');
+                    if (error?.message?.includes('Refresh Token') || error?.message?.includes('invalid_grant')) {
+                        try {
+                            await supabase.auth.signOut();
+                        } catch (sErr) {}
+                        if (isMounted.current) {
+                            setUser(null);
+                            setProfile(null);
+                        }
+                    }
                 } finally {
                     if (isMounted.current) setLoading(false);
                 }

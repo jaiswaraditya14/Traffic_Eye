@@ -163,31 +163,48 @@ export default function ImageReportReview({ route, navigation }) {
     };
 
     const submitDecision = async (decision) => {
+        if (submitting || alreadyReviewed) return;
         Keyboard.dismiss();
         setSubmitting(true);
-        const { data, error } = await submitOfficerDecision(
-            reportId,
-            user.id,
-            decision,
-            remarks.trim() || null,
-            internal.trim() || null,
-        );
+        try {
+            const { data, error } = await submitOfficerDecision(
+                reportId,
+                user.id,
+                decision,
+                remarks.trim() || null,
+                internal.trim() || null,
+            );
 
-        if (error) {
+            if (error) {
+                setSubmitting(false);
+                Alert.alert('Submission Failed', error.message ?? 'An error occurred. Please try again.');
+                return;
+            }
+
+            if (data?.already_reviewed) {
+                setSubmitting(false);
+                setAlreadyReviewed(true);
+                Alert.alert(
+                    'Report Already Reviewed',
+                    data.message || 'This report has already been reviewed by an officer.',
+                    [{ text: 'OK', onPress: () => navigation.goBack() }]
+                );
+                return;
+            }
+
+            setDecisionType(decision);
+
+            // Animate success
+            Animated.parallel([
+                Animated.spring(successScale,   { toValue: 1, useNativeDriver: true }),
+                Animated.timing(successOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+            ]).start(() => {
+                setTimeout(() => navigation.goBack(), 1200);
+            });
+        } catch (err) {
             setSubmitting(false);
-            Alert.alert('Submission Failed', error.message ?? 'An error occurred. Please try again.');
-            return;
+            Alert.alert('Error', err.message || 'An unexpected error occurred.');
         }
-
-        setDecisionType(decision);
-
-        // Animate success
-        Animated.parallel([
-            Animated.spring(successScale,   { toValue: 1, useNativeDriver: true }),
-            Animated.timing(successOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
-        ]).start(() => {
-            setTimeout(() => navigation.goBack(), 1200);
-        });
     };
 
     if (loading) {

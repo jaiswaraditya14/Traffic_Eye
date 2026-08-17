@@ -381,7 +381,7 @@ export default function VideoReport({ navigation }) {
     const insets = useSafeAreaInsets();
 
     const { pickVideoFromGallery, captureVideoFromCamera, loading: loadingPicker } = useImagePicker();
-    const { location, address, setAddress, loading: loadingLocation, detectLocation, setManualLocation } = useLocation();
+    const { location, address, setAddress, locationSource, loading: loadingLocation, detectLocation, setManualLocation } = useLocation();
 
     const [video, setVideo] = useState(null);
 
@@ -458,6 +458,7 @@ export default function VideoReport({ navigation }) {
 
             // Insert into image_reports
             const violationLabel = VIOLATION_TYPES.find(v => v.id === violationType)?.label || 'Other';
+            const locationSourcePayload = locationSource ? { location_source: locationSource } : {};
             const { data: report, error: reportError } = await supabase.from('image_reports').insert({
                 user_id: user.id,
                 image_url: publicUrl || '',
@@ -465,6 +466,7 @@ export default function VideoReport({ navigation }) {
                 latitude: location?.latitude ?? null,
                 longitude: location?.longitude ?? null,
                 location_address: address || null,
+                ...locationSourcePayload,
                 violation_type: violationLabel,
                 violation_description: description,
                 vehicle_number: vehiclePlate.trim().toUpperCase() || null,

@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
 import { Alert } from 'react-native';
 
 const VIDEO_SIZE_LIMIT_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -21,26 +22,45 @@ export default function useImagePicker() {
                 return null;
             }
 
+            // Request MediaLibrary permission on Android for photo/video only (avoid audio permission rejection)
+            try {
+                let mPerm = await MediaLibrary.getPermissionsAsync(false, ['photo', 'video']);
+                if (!mPerm?.granted) {
+                    await MediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
+                }
+            } catch (pErr) {
+                // Non-fatal if platform doesn't support MediaLibrary request
+            }
+
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ['images'],
-                allowsEditing: true,
+                allowsEditing: false,
                 quality: 1,
                 exif: true,
-                legacy: true,
             });
 
             if (!result.canceled && result.assets?.length > 0) {
                 const asset = result.assets[0];
-                // BUG FIX: Do NOT call setImage here. NewReport opens the crop
-                // modal after this returns. image is only committed once the user
-                // confirms crop via handleCropDone → setImage(croppedUri).
+                try {
+                    console.log('[IMAGE ASSET]', JSON.stringify(asset, null, 2));
+                } catch {
+                    console.log('[IMAGE ASSET]', asset);
+                }
                 setExifData(asset.exif || null);
-                // Return assetId so NewReport can use MediaLibrary for GPS lookup
-                return { uri: asset.uri, exif: asset.exif || null, assetId: asset.assetId || null };
+                return {
+                    uri: asset.uri,
+                    exif: asset.exif || null,
+                    assetId: asset.assetId || null,
+                    width: asset.width,
+                    height: asset.height,
+                    mimeType: asset.mimeType || asset.type || 'image/jpeg',
+                    fileName: asset.fileName || null,
+                    fileSize: asset.fileSize || null,
+                };
             }
-            return { uri: null, location: null };
+            return null;
         } catch (error) {
-            console.error('Error picking image:', error);
+            console.error('[useImagePicker] Error picking image:', error);
             Alert.alert('Error', 'Failed to pick image from gallery.');
             return null;
         } finally {
@@ -59,22 +79,33 @@ export default function useImagePicker() {
 
             const result = await ImagePicker.launchCameraAsync({
                 mediaTypes: ['images'],
-                allowsEditing: true,
+                allowsEditing: false,
                 quality: 1,
                 exif: true,
             });
 
             if (!result.canceled && result.assets?.length > 0) {
                 const asset = result.assets[0];
-                // BUG FIX: Do NOT set image here — the caller (NewReport) opens
-                // the crop modal first. image is only set after crop is confirmed
-                // via handleCropDone → setImage(croppedUri).
+                try {
+                    console.log('[IMAGE ASSET]', JSON.stringify(asset, null, 2));
+                } catch {
+                    console.log('[IMAGE ASSET]', asset);
+                }
                 setExifData(asset.exif || null);
-                return { uri: asset.uri, exif: asset.exif || null, assetId: asset.assetId || null };
+                return {
+                    uri: asset.uri,
+                    exif: asset.exif || null,
+                    assetId: asset.assetId || null,
+                    width: asset.width,
+                    height: asset.height,
+                    mimeType: asset.mimeType || asset.type || 'image/jpeg',
+                    fileName: asset.fileName || null,
+                    fileSize: asset.fileSize || null,
+                };
             }
-            return { uri: null, location: null };
+            return null;
         } catch (error) {
-            console.error('Error capturing image:', error);
+            console.error('[useImagePicker] Error capturing image:', error);
             Alert.alert('Error', 'Failed to capture photo.');
             return null;
         } finally {

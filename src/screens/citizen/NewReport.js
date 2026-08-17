@@ -10,8 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MobileContainer, FocusAwareStatusBar } from '../../components';
 import { useAppContext } from '../../context';
 import { useImagePicker, useLocation } from '../../hooks';
-import * as MediaLibrary from 'expo-media-library';
-import { parseExifGPS } from '../../utils';
+import { extractImageLocation } from '../../utils';
 
 // ── Design Tokens ──
 const C = {
@@ -44,7 +43,7 @@ export default function NewReport({ navigation }) {
     const insets = useSafeAreaInsets();
 
     const {
-        location, address, setAddress, locationSource, loading: loadingLocation,
+        location, address, setAddress, locationSource, setLocationSource, loading: loadingLocation,
         detectLocation, setManualLocation, reverseGeocodeFromCoords
     } = useLocation();
 
@@ -64,7 +63,6 @@ export default function NewReport({ navigation }) {
     const [focusedDesc, setFocusedDesc] = useState(false);
     const [fullscreenImage, setFullscreenImage] = useState(null);
 
-
     const [autoFillStatus, setAutoFillStatus] = useState(null);
     const bannerAnim = useRef(new Animated.Value(0)).current;
     const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -79,7 +77,7 @@ export default function NewReport({ navigation }) {
         Animated.spring(bannerAnim, { toValue: 1, friction: 8, tension: 40, useNativeDriver: true }).start();
     }, [bannerAnim]);
 
-    const hideBanner = useCallback((delay = 3000) => {
+    const hideBanner = useCallback((delay = 4000) => {
         bannerTimer.current = setTimeout(() => {
             Animated.timing(bannerAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => setAutoFillStatus(null));
         }, delay);
@@ -102,77 +100,46 @@ export default function NewReport({ navigation }) {
 
     useEffect(() => { return () => { if (bannerTimer.current) clearTimeout(bannerTimer.current); }; }, []);
 
-    const handleLocationExtraction = useCallback(async (exif, source, assetId) => {
-        // Show reading banner immediately for instant feedback
+    // ── Location Extraction Pipeline ──
+    const handleLocationExtraction = useCallback(async (asset) => {
         showBanner('reading');
 
-        let lat = null;
-        let lng = null;
-        let coordSource = null; // 'IMAGE_EXIF' | 'MEDIA_LIBRARY'
+        try {
+            // STEP 1: Extract GPS coordinates directly from original evidence
+            const locResult = await extractImageLocation(asset);
 
-        // ── Strategy 1: EXIF GPS Parsing (Android flat keys, iOS {GPS}, DMS, rationals) ──
-        if (exif) {
-            if (__DEV__) console.log(`[GPS Extraction] Strategy 1 — Parsing raw ${source} image EXIF data...`);
-            const exifCoords = parseExifGPS(exif);
-            if (exifCoords) {
-                lat = exifCoords.lat;
-                lng = exifCoords.lng;
-                coordSource = 'IMAGE_EXIF';
-                if (__DEV__) console.log('[GPS Extraction] ✅ EXIF GPS found');
-            } else {
-                if (__DEV__) console.log('[GPS Extraction] EXIF data present but no valid GPS coordinates');
-            }
-        }
-
-        // ── Strategy 2: MediaLibrary.getAssetInfoAsync (Android EXIF stripped fallback) ──
-        if (lat === null && assetId) {
-            try {
-                if (__DEV__) console.log('[GPS Extraction] Strategy 2 — Trying MediaLibrary lookup...');
-                const { status } = await MediaLibrary.requestPermissionsAsync();
-                if (status === 'granted') {
-                    const info = await MediaLibrary.getAssetInfoAsync(assetId, { shouldDownloadFromNetwork: false });
-                    const mlLat = info?.location?.latitude;
-                    const mlLng = info?.location?.longitude;
-                    if (
-                        mlLat != null && mlLng != null &&
-                        isFinite(mlLat) && isFinite(mlLng) &&
-                        !(mlLat === 0 && mlLng === 0) &&
-                        Math.abs(mlLat) <= 90 && Math.abs(mlLng) <= 180
-                    ) {
-                        lat = mlLat;
-                        lng = mlLng;
-                        coordSource = 'MEDIA_LIBRARY';
-                        if (__DEV__) console.log('[GPS Extraction] ✅ MediaLibrary GPS found');
-                    }
-                }
-            } catch (e) {
-                if (__DEV__) console.warn('[GPS Extraction] MediaLibrary lookup failed:', e.message);
-            }
-        }
-
-        // ── Check if valid image GPS coordinates were found ──────────────
-        if (lat !== null && lng !== null) {
-            showBanner('extracting');
-            try {
-                const result = await reverseGeocodeFromCoords(lat, lng, coordSource, false);
-                if (result && result.address) {
+            if (locResult && locResult.gpsFound && locResult.latitude != null && locResult.longitude != null) {
+                showBanner('extracting');
+                const geocodeRes = await reverseGeocodeFromCoords(
+                    locResult.latitude,
+                    locResult.longitude,
+                    locResult.gpsSource || 'EXIF_ORIGINAL',
+                    false
+                );
+                if (geocodeRes && geocodeRes.coords) {
                     setTrustLevel('Verified Location (Image Metadata)');
                     showBanner('success');
-                    hideBanner(4000);
-                } else {
-                    showBanner('no-gps');
+                    hideBanner(5000);
+                    return;
                 }
-            } catch (e) {
-                if (__DEV__) console.warn('[GPS Extraction] Reverse geocoding failed:', e.message);
-                showBanner('no-gps');
             }
-        } else {
-            // ── Fallback: No location found in image metadata ─────────────
-            // NEVER fabricate or guess location. Inform user and instruct to use Live Location.
-            if (__DEV__) console.log('[GPS Extraction] No GPS metadata in image. Prompting user to use Live Location.');
+
+            // STEP 2: Photo GPS unavailable — present explicit fallback to citizen
+            if (__DEV__) {
+                if (locResult?.reason === 'ANDROID_PHOTO_PICKER_REDACTION') {
+                    console.log('[NewReport] GPS unavailable in Photo Picker copy; original media metadata has not been accessed.');
+                } else {
+                    console.log('[NewReport] Photograph metadata does not contain valid GPS coordinates.');
+                }
+            }
+            setLocationSource(locResult?.gpsSource || 'GPS_UNAVAILABLE');
+            showBanner('no-gps');
+        } catch (err) {
+            console.warn('[NewReport] Location extraction failure:', err.message);
+            setLocationSource('GPS_UNAVAILABLE');
             showBanner('no-gps');
         }
-    }, [reverseGeocodeFromCoords, showBanner, hideBanner]);
+    }, [reverseGeocodeFromCoords, showBanner, hideBanner, setLocationSource]);
 
     const handleDetectLiveLocation = async () => {
         try {
@@ -181,7 +148,7 @@ export default function NewReport({ navigation }) {
             if (result && result.coords) {
                 setTrustLevel('Verified Live Location');
                 showBanner('live-success');
-                hideBanner(4000);
+                hideBanner(5000);
             } else {
                 showBanner('no-gps');
             }
@@ -194,25 +161,21 @@ export default function NewReport({ navigation }) {
     const handleTakePhoto = async () => {
         const result = await captureFromCamera();
         if (result?.uri) {
-            setVideo(null); setMediaType('image');
-            // Native OS crop already applied — use the URI directly
-            await handleCropDone(result.uri, result.exif || null, 'camera');
+            setVideo(null);
+            setMediaType('image');
+            setImage(result.uri);
+            await handleLocationExtraction(result);
         }
     };
 
     const handlePickImage = async () => {
         const result = await pickFromGallery();
         if (result?.uri) {
-            setVideo(null); setMediaType('image');
-            await handleCropDone(result.uri, result.exif || null, 'gallery', result.assetId || null);
+            setVideo(null);
+            setMediaType('image');
+            setImage(result.uri);
+            await handleLocationExtraction(result);
         }
-    };
-
-    const handleCropDone = async (uri, exif, source, assetId = null) => {
-        // Add cache-buster to force refresh
-        const uriWithCache = `${uri}?t=${new Date().getTime()}`;
-        setImage(uriWithCache);
-        await handleLocationExtraction(exif, source, assetId);
     };
 
     const handleSubmit = () => {
@@ -223,7 +186,7 @@ export default function NewReport({ navigation }) {
         if (!address.trim()) {
             Alert.alert(
                 'Location Required',
-                'Please provide a location address. You can tap "Use Live Location", pick on the map, or type the address manually.',
+                'Please provide a location address. You can tap "Use Live Location", pick on the map, or enter the address manually.',
                 [
                     { text: 'Use Live Location', onPress: handleDetectLiveLocation },
                     { text: 'OK', style: 'cancel' }
@@ -232,10 +195,15 @@ export default function NewReport({ navigation }) {
             return;
         }
         setCurrentReport({
-            image, video, mediaType, description, address, location,
-            locationSource: locationSource || (location ? 'DEVICE_LOCATION' : 'MANUAL'),
+            image,
+            video,
+            mediaType,
+            description,
+            address,
+            location,
+            locationSource: locationSource || (location ? 'MANUAL' : 'NOT_FOUND'),
             trustLevel: trustLevel || 'Needs Verification / Manual Location',
-            timestamp: new Date()
+            timestamp: new Date(),
         });
         navigation.navigate('AIProcessing');
     };
@@ -365,23 +333,43 @@ export default function NewReport({ navigation }) {
 
                             {/* Metadata Success State */}
                             {autoFillStatus === 'success' && (
-                                <View style={styles.bannerRow}>
-                                    <Ionicons name="checkmark-circle" size={22} color={C.success} />
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={styles.bannerSuccessTitle}>Location Found in Image</Text>
-                                        <Text style={styles.bannerSuccessSubtitle}>Address auto-filled from image metadata</Text>
+                                <View style={styles.bannerCol}>
+                                    <View style={styles.bannerRow}>
+                                        <Ionicons name="checkmark-circle" size={20} color={C.success} />
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.bannerSuccessTitle}>LOCATION FOUND</Text>
+                                            <Text style={styles.bannerSuccessSubtitle}>Source: Image GPS Metadata</Text>
+                                        </View>
                                     </View>
+                                    {location?.latitude != null && location?.longitude != null && (
+                                        <View style={styles.bannerMetaRow}>
+                                            <Ionicons name="location" size={13} color={C.success} />
+                                            <Text style={styles.bannerMetaText}>
+                                                Coordinates: {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
+                                            </Text>
+                                        </View>
+                                    )}
                                 </View>
                             )}
 
                             {/* Live Location Success State */}
                             {autoFillStatus === 'live-success' && (
-                                <View style={styles.bannerRow}>
-                                    <Ionicons name="checkmark-circle" size={22} color={C.success} />
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={styles.bannerSuccessTitle}>Live Location Detected</Text>
-                                        <Text style={styles.bannerSuccessSubtitle}>Address updated to your current live location</Text>
+                                <View style={styles.bannerCol}>
+                                    <View style={styles.bannerRow}>
+                                        <Ionicons name="navigate-circle" size={20} color={C.navyMid} />
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={[styles.bannerSuccessTitle, { color: C.navyMid }]}>LIVE LOCATION USED</Text>
+                                            <Text style={[styles.bannerSuccessSubtitle, { color: C.navy }]}>Source: Live Device Location</Text>
+                                        </View>
                                     </View>
+                                    {location?.latitude != null && location?.longitude != null && (
+                                        <View style={styles.bannerMetaRow}>
+                                            <Ionicons name="navigate" size={13} color={C.navyMid} />
+                                            <Text style={[styles.bannerMetaText, { color: C.navyMid }]}>
+                                                Coordinates: {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
+                                            </Text>
+                                        </View>
+                                    )}
                                 </View>
                             )}
 
@@ -390,12 +378,12 @@ export default function NewReport({ navigation }) {
                                 <View style={styles.bannerNoGpsCol}>
                                     <View style={styles.bannerNoGpsHeader}>
                                         <View style={styles.bannerWarnIconWrap}>
-                                            <Ionicons name="location-outline" size={18} color={C.warning} />
+                                            <Ionicons name="alert-circle-outline" size={18} color={C.warning} />
                                         </View>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={styles.bannerNoGpsTitle}>No location found from image.</Text>
+                                            <Text style={styles.bannerNoGpsTitle}>LOCATION NOT FOUND</Text>
                                             <Text style={styles.bannerNoGpsSub}>
-                                                Please use Live Location to provide your position, or enter the address manually.
+                                                No location found from image. The image does not contain usable GPS information.
                                             </Text>
                                         </View>
                                     </View>
@@ -716,6 +704,22 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 10,
+    },
+    bannerCol: {
+        flexDirection: 'column',
+        gap: 6,
+    },
+    bannerMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingTop: 4,
+        paddingLeft: 4,
+    },
+    bannerMetaText: {
+        fontSize: 12,
+        fontFamily: 'Nunito-SemiBold',
+        color: '#15803D',
     },
     bannerLoadingText: {
         fontSize: 13,

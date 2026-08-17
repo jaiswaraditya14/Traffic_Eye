@@ -1,16 +1,16 @@
 // useLocation hook
-// Encapsulates location detection, reverse-geocoding, and location_source tracking.
+// Encapsulates location detection, reverse-geocoding, and locationSource tracking.
 //
-// location_source values:
-//   'IMAGE_EXIF'      — GPS parsed from image EXIF metadata
-//   'MEDIA_LIBRARY'   — GPS retrieved from MediaLibrary asset info (Android fallback)
-//   'DEVICE_LOCATION' — Live device GPS (fallback when EXIF unavailable)
-//   'MANUAL'          — User typed or pinned on map
-//   null              — Not yet determined
+// Standard locationSource values:
+//   'IMAGE_EXIF'    — GPS extracted from image metadata / EXIF tags
+//   'LIVE_LOCATION' — High-accuracy live device GPS provided by user
+//   'MANUAL'        — User typed address or selected pin on map
+//   'NOT_FOUND'     — No location available
 
 import { useState } from 'react';
 import * as Location from 'expo-location';
 import { Alert } from 'react-native';
+import { validateCoordinates } from '../utils/exifParser';
 
 export default function useLocation() {
     const [location, setLocation] = useState(null);
@@ -20,6 +20,7 @@ export default function useLocation() {
 
     // ── Internal address-assembly helper ──────────────────────────────────────
     const buildAddress = (geocode) => {
+        if (!geocode) return '';
         const parts = [
             geocode.name,
             geocode.street,
@@ -33,76 +34,107 @@ export default function useLocation() {
     };
 
     /**
-     * Bounds coordinates to an approximate location within at most a 10-meter
-     * radius (≈ ±0.00009 degrees). Used when exact photo EXIF GPS is unavailable
-     * so that the device-location fallback cannot pinpoint the user exactly.
-     */
-    const getApproximate10mCoords = (coords) => {
-        if (!coords || typeof coords.latitude !== 'number' || typeof coords.longitude !== 'number') return coords;
-        const latOffset = (Math.random() - 0.5) * 0.00009;
-        const lngOffset = (Math.random() - 0.5) * 0.00009;
-        return {
-            ...coords,
-            latitude: coords.latitude + latOffset,
-            longitude: coords.longitude + lngOffset,
-            accuracy: Math.min(coords.accuracy ?? 10, 10),
-            isApproximate: true,
-        };
-    };
-
-    /**
-     * Request and use live device GPS.
+     * Request and acquire current live device GPS coordinates.
+     * Marks locationSource as 'LIVE_LOCATION'.
      *
-     * @param {boolean} isFallbackMode  — if true, adds ≤10m random offset
-     * @param {boolean} guardUserInput  — if true, do NOT overwrite a non-empty address
-     *                                    the user already typed (default: false)
+     * @param {boolean} guardUserInput — if true, do not overwrite non-empty user address
+     * @param {boolean} silent — if true, suppress blocking permission alerts on background/fallback calls
+     * @returns {Promise<{ coords: { latitude: number, longitude: number }, address: string, source: string } | null>}
      */
-    const detectLocation = async (isFallbackMode = false, guardUserInput = false) => {
+    const detectLocation = async (guardUserInput = false, silent = false) => {
         try {
             setLoading(true);
-            const { status } = await Location.requestForegroundPermissionsAsync();
+            let { status } = await Location.getForegroundPermissionsAsync();
             if (status !== 'granted') {
-                Alert.alert('Permission Required', 'Please grant location access to detect your location.');
+                const permRes = await Location.requestForegroundPermissionsAsync();
+                status = permRes.status;
+            }
+            if (status !== 'granted') {
+                if (!silent) {
+                    Alert.alert(
+                        'Location Permission Required',
+                        'Traffic Eye needs location access to verify incident locations. Please enable location permission in your device settings.'
+                    );
+                }
                 return null;
             }
 
-            const loc = await Location.getCurrentPositionAsync({
-                accuracy: Location.Accuracy.Highest,
-                timeout: 5000,
-            });
+            let loc = null;
 
-            const finalCoords = isFallbackMode ? getApproximate10mCoords(loc.coords) : loc.coords;
+            // Tier 1: Try high/balanced accuracy with a short timeout
+            try {
+                loc = await Location.getCurrentPositionAsync({
+                    accuracy: Location.Accuracy.Balanced,
+                    timeout: 6000,
+                });
+            } catch (pErr) {
+                // Tier 1 timeout/error - fallback to last known
+            }
+
+            // Tier 2: Fallback to last known position (instant on Android/iOS)
+            if (!loc?.coords) {
+                try {
+                    loc = await Location.getLastKnownPositionAsync();
+                } catch (lastErr) {
+                    // Ignore and try lowest accuracy
+                }
+            }
+
+            // Tier 3: Fallback to lowest accuracy
+            if (!loc?.coords) {
+                try {
+                    loc = await Location.getCurrentPositionAsync({
+                        accuracy: Location.Accuracy.Lowest,
+                        timeout: 5000,
+                    });
+                } catch (lowErr) {
+                    // Provider unavailable
+                }
+            }
+
+            if (!loc?.coords) {
+                if (!silent) {
+                    Alert.alert('Location Error', 'Failed to detect current device location. Please ensure device GPS is turned on.');
+                }
+                return null;
+            }
+
+            const valid = validateCoordinates(loc.coords.latitude, loc.coords.longitude);
+            if (!valid) {
+                if (!silent) {
+                    Alert.alert('Location Error', 'Received invalid coordinates from device GPS.');
+                }
+                return null;
+            }
+
+            const finalCoords = { latitude: valid.latitude, longitude: valid.longitude };
             setLocation(finalCoords);
+            setLocationSource('LIVE_LOCATION');
 
             // Attempt reverse geocoding
+            let resolvedAddress = `${valid.latitude.toFixed(6)}, ${valid.longitude.toFixed(6)}`;
             try {
-                const addressData = await Location.reverseGeocodeAsync({
-                    latitude: finalCoords.latitude,
-                    longitude: finalCoords.longitude,
-                });
-
+                const addressData = await Location.reverseGeocodeAsync(finalCoords);
                 if (addressData && addressData.length > 0) {
                     const addr = buildAddress(addressData[0]);
-                    // Only overwrite if the user has not already typed something
-                    if (!guardUserInput || !address.trim()) {
-                        setAddress(addr);
-                        setLocationSource('DEVICE_LOCATION');
+                    if (addr.trim()) {
+                        resolvedAddress = addr;
                     }
-                    return { coords: finalCoords, address: addr, source: 'DEVICE_LOCATION' };
                 }
             } catch (geocodeError) {
-                console.warn('[useLocation] Geocoding failed:', geocodeError.message);
+                console.warn('[useLocation] Reverse geocoding failed (using coords):', geocodeError.message);
             }
 
-            const fallback = `${finalCoords.latitude.toFixed(6)}, ${finalCoords.longitude.toFixed(6)}`;
             if (!guardUserInput || !address.trim()) {
-                setAddress(fallback);
-                setLocationSource('DEVICE_LOCATION');
+                setAddress(resolvedAddress);
             }
-            return { coords: finalCoords, address: fallback, source: 'DEVICE_LOCATION' };
+
+            return { coords: finalCoords, address: resolvedAddress, source: 'LIVE_LOCATION' };
         } catch (error) {
-            console.error('[useLocation] Error detecting location:', error.message);
-            Alert.alert('Error', 'Failed to detect your location.');
+            console.error('[useLocation] Error detecting live location:', error.message);
+            if (!silent) {
+                Alert.alert('Location Error', 'Failed to detect current device location. Please ensure GPS is turned on.');
+            }
             return null;
         } finally {
             setLoading(false);
@@ -110,48 +142,47 @@ export default function useLocation() {
     };
 
     /**
-     * Reverse-geocode a specific lat/lng pair (e.g. from image EXIF data).
-     * Sets location_source to the provided source string.
+     * Reverse-geocode specific coordinates (e.g. from image EXIF metadata).
+     * Retains the coordinates as authoritative even if geocoding fails.
      *
      * @param {number} latitude
      * @param {number} longitude
-     * @param {string} source       — 'IMAGE_EXIF' | 'MEDIA_LIBRARY'
-     * @param {boolean} guardUserInput — if true, do NOT overwrite non-empty user address
+     * @param {string} source — 'IMAGE_EXIF' | 'LIVE_LOCATION' | 'MANUAL'
+     * @param {boolean} guardUserInput — if true, do not overwrite non-empty user address
+     * @returns {Promise<{ coords: { latitude: number, longitude: number }, address: string, source: string } | null>}
      */
     const reverseGeocodeFromCoords = async (latitude, longitude, source = 'IMAGE_EXIF', guardUserInput = false) => {
+        const valid = validateCoordinates(latitude, longitude);
+        if (!valid) {
+            console.warn('[useLocation] Invalid coordinates passed to reverseGeocodeFromCoords:', { latitude, longitude });
+            return null;
+        }
+
+        const finalCoords = { latitude: valid.latitude, longitude: valid.longitude };
+        setLocation(finalCoords);
+        setLocationSource(source);
+
         try {
             setLoading(true);
+            let resolvedAddress = `${valid.latitude.toFixed(6)}, ${valid.longitude.toFixed(6)}`;
 
-            const addressData = await Location.reverseGeocodeAsync({ latitude, longitude });
-
-            if (addressData && addressData.length > 0) {
-                const addr = buildAddress(addressData[0]);
-                if (!guardUserInput || !address.trim()) {
-                    setAddress(addr);
-                    setLocationSource(source);
+            try {
+                const addressData = await Location.reverseGeocodeAsync(finalCoords);
+                if (addressData && addressData.length > 0) {
+                    const addr = buildAddress(addressData[0]);
+                    if (addr.trim()) {
+                        resolvedAddress = addr;
+                    }
                 }
-                setLocation({ latitude, longitude });
-                return { coords: { latitude, longitude }, address: addr, source };
+            } catch (geocodeError) {
+                console.warn('[useLocation] Reverse geocode network error (preserving coords):', geocodeError.message);
             }
 
-            // Fallback to raw coordinates
-            const fallback = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
             if (!guardUserInput || !address.trim()) {
-                setAddress(fallback);
-                setLocationSource(source);
+                setAddress(resolvedAddress);
             }
-            setLocation({ latitude, longitude });
-            return { coords: { latitude, longitude }, address: fallback, source };
-        } catch (error) {
-            console.error('[useLocation] Error reverse geocoding from coords:', error.message);
-            // Still set raw coordinates as fallback — don't leave the user with nothing
-            const fallback = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
-            if (!guardUserInput || !address.trim()) {
-                setAddress(fallback);
-                setLocationSource(source);
-            }
-            setLocation({ latitude, longitude });
-            return { coords: { latitude, longitude }, address: fallback, source };
+
+            return { coords: finalCoords, address: resolvedAddress, source };
         } finally {
             setLoading(false);
         }
@@ -164,29 +195,30 @@ export default function useLocation() {
     };
 
     /**
-     * Set location from the map pin picker (manual selection).
-     * Always treats this as MANUAL regardless of where the pin lands.
+     * Set location from manual pin on map.
      */
     const setManualLocation = async (coords) => {
-        setLocation(coords);
-        setLocationSource('MANUAL');
-        try {
-            const addressData = await Location.reverseGeocodeAsync({
-                latitude: coords.latitude,
-                longitude: coords.longitude,
-            });
+        const valid = validateCoordinates(coords?.latitude, coords?.longitude);
+        if (!valid) return;
 
+        const finalCoords = { latitude: valid.latitude, longitude: valid.longitude };
+        setLocation(finalCoords);
+        setLocationSource('MANUAL');
+
+        let fallbackAddr = `${valid.latitude.toFixed(6)}, ${valid.longitude.toFixed(6)}`;
+        try {
+            const addressData = await Location.reverseGeocodeAsync(finalCoords);
             if (addressData && addressData.length > 0) {
                 const addr = buildAddress(addressData[0]);
-                setAddress(addr);
-                return;
+                if (addr.trim()) {
+                    setAddress(addr);
+                    return;
+                }
             }
         } catch (geocodeError) {
-            console.warn('[useLocation] Geocoding failed:', geocodeError.message);
+            console.warn('[useLocation] Manual pin geocoding failed:', geocodeError.message);
         }
-
-        const fallback = `${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`;
-        setAddress(fallback);
+        setAddress(fallbackAddr);
     };
 
     return {
@@ -195,6 +227,7 @@ export default function useLocation() {
         address,
         setAddress,
         locationSource,
+        setLocationSource,
         loading,
         detectLocation,
         reverseGeocodeFromCoords,
