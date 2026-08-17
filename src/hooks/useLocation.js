@@ -11,27 +11,13 @@ import { useState } from 'react';
 import * as Location from 'expo-location';
 import { Alert } from 'react-native';
 import { validateCoordinates } from '../utils/exifParser';
+import { reverseGeocode } from '../services/geoService';
 
 export default function useLocation() {
     const [location, setLocation] = useState(null);
     const [address, setAddress] = useState('');
     const [locationSource, setLocationSource] = useState(null);
     const [loading, setLoading] = useState(false);
-
-    // ── Internal address-assembly helper ──────────────────────────────────────
-    const buildAddress = (geocode) => {
-        if (!geocode) return '';
-        const parts = [
-            geocode.name,
-            geocode.street,
-            geocode.district,
-            geocode.city,
-            geocode.subregion,
-            geocode.region,
-            geocode.postalCode,
-        ].filter(Boolean);
-        return [...new Set(parts)].join(', ');
-    };
 
     /**
      * Request and acquire current live device GPS coordinates.
@@ -111,15 +97,12 @@ export default function useLocation() {
             setLocation(finalCoords);
             setLocationSource('LIVE_LOCATION');
 
-            // Attempt reverse geocoding
+            // Attempt reverse geocoding via geoService (Photon -> Nominatim -> expo-location)
             let resolvedAddress = `${valid.latitude.toFixed(6)}, ${valid.longitude.toFixed(6)}`;
             try {
-                const addressData = await Location.reverseGeocodeAsync(finalCoords);
-                if (addressData && addressData.length > 0) {
-                    const addr = buildAddress(addressData[0]);
-                    if (addr.trim()) {
-                        resolvedAddress = addr;
-                    }
+                const geoResult = await reverseGeocode(valid.latitude, valid.longitude);
+                if (geoResult?.displayName && geoResult.displayName.trim()) {
+                    resolvedAddress = geoResult.displayName.trim();
                 }
             } catch (geocodeError) {
                 console.warn('[useLocation] Reverse geocoding failed (using coords):', geocodeError.message);
@@ -167,12 +150,9 @@ export default function useLocation() {
             let resolvedAddress = `${valid.latitude.toFixed(6)}, ${valid.longitude.toFixed(6)}`;
 
             try {
-                const addressData = await Location.reverseGeocodeAsync(finalCoords);
-                if (addressData && addressData.length > 0) {
-                    const addr = buildAddress(addressData[0]);
-                    if (addr.trim()) {
-                        resolvedAddress = addr;
-                    }
+                const geoResult = await reverseGeocode(valid.latitude, valid.longitude);
+                if (geoResult?.displayName && geoResult.displayName.trim()) {
+                    resolvedAddress = geoResult.displayName.trim();
                 }
             } catch (geocodeError) {
                 console.warn('[useLocation] Reverse geocode network error (preserving coords):', geocodeError.message);
@@ -196,8 +176,11 @@ export default function useLocation() {
 
     /**
      * Set location from manual pin on map.
+     *
+     * @param {{ latitude: number, longitude: number }} coords
+     * @param {string} [presetAddress]
      */
-    const setManualLocation = async (coords) => {
+    const setManualLocation = async (coords, presetAddress = null) => {
         const valid = validateCoordinates(coords?.latitude, coords?.longitude);
         if (!valid) return;
 
@@ -205,15 +188,17 @@ export default function useLocation() {
         setLocation(finalCoords);
         setLocationSource('MANUAL');
 
+        if (presetAddress && typeof presetAddress === 'string' && presetAddress.trim()) {
+            setAddress(presetAddress.trim());
+            return;
+        }
+
         let fallbackAddr = `${valid.latitude.toFixed(6)}, ${valid.longitude.toFixed(6)}`;
         try {
-            const addressData = await Location.reverseGeocodeAsync(finalCoords);
-            if (addressData && addressData.length > 0) {
-                const addr = buildAddress(addressData[0]);
-                if (addr.trim()) {
-                    setAddress(addr);
-                    return;
-                }
+            const geoResult = await reverseGeocode(valid.latitude, valid.longitude);
+            if (geoResult?.displayName && geoResult.displayName.trim()) {
+                setAddress(geoResult.displayName.trim());
+                return;
             }
         } catch (geocodeError) {
             console.warn('[useLocation] Manual pin geocoding failed:', geocodeError.message);

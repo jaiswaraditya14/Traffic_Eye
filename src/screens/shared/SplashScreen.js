@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import * as ExpoSplashScreen from 'expo-splash-screen';
 import { useAppContext, useAuth } from '../../context';
 import { FocusAwareStatusBar } from '../../components';
 
@@ -35,6 +36,10 @@ export default function SplashScreen({ navigation }) {
         if (hasExited.current) return;
         if (minTimeElapsed.current && !authLoading) {
             hasExited.current = true;
+            // Hide the native splash screen (if still visible) before revealing
+            // the authenticated/unauthenticated navigator beneath.
+            // hideAsync() is a no-op if the splash was already hidden.
+            ExpoSplashScreen.hideAsync().catch(() => {});
             setShowSplash(false);
         }
     };

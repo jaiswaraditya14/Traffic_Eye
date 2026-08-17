@@ -55,6 +55,7 @@
       "favicon": "./assets/images/icon.png"
     },
     "plugins": [
+      "@maplibre/maplibre-react-native",
       "expo-web-browser",
       "expo-font",
       "@react-native-community/datetimepicker",

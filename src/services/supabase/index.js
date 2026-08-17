@@ -39,6 +39,11 @@ export const supabase = createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKe
         storage: customStorage,
         autoRefreshToken: true,
         persistSession: true,
-        detectSessionInUrl: true,
+        // detectSessionInUrl is a web-only mechanism that reads tokens from the
+        // browser's URL bar after OAuth redirects. On React Native/Android the
+        // OAuth callback is handled explicitly via WebBrowser + exchangeCodeForSession,
+        // so this must be false — otherwise Supabase may fire a spurious SIGNED_OUT
+        // event when it tries to parse the deep-link URL and finds no session tokens.
+        detectSessionInUrl: Platform.OS === 'web',
     },
 });

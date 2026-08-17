@@ -16,29 +16,30 @@ export function AuthProvider({ children }) {
         isMounted.current = true;
 
         // Supabase v2 fires INITIAL_SESSION on startup (with persisted session or null).
-        // This is the single source of truth — no need for a separate getSession() call.
+        // This is the ONLY auth state listener — single source of truth.
+        // Events handled: INITIAL_SESSION, SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED, USER_UPDATED
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
                 if (!isMounted.current) return;
+
+                if (__DEV__) console.log(`[AUTH] AUTH_EVENT: ${event} | session exists: ${!!session}`);
+
                 try {
                     if (event === 'SIGNED_OUT' || !session) {
-                        setUser(null);
-                        setProfile(null);
+                        // Supabase explicitly reported SIGNED_OUT — the session is gone.
+                        // This is the authoritative signal to clear auth state.
+                        if (isMounted.current) { setUser(null); setProfile(null); }
                     } else if (session?.user) {
-                        setUser(session.user);
+                        // Session and user are valid — update user state and load profile.
+                        // Profile fetch failure will NOT sign the user out (handled in fetchProfile).
+                        if (isMounted.current) setUser(session.user);
                         await fetchProfile(session.user.id);
                     }
                 } catch (error) {
-                    if (__DEV__) console.warn('[Auth] State change failed:', error?.message || 'Unknown error');
-                    if (error?.message?.includes('Refresh Token') || error?.message?.includes('invalid_grant')) {
-                        try {
-                            await supabase.auth.signOut();
-                        } catch (sErr) {}
-                        if (isMounted.current) {
-                            setUser(null);
-                            setProfile(null);
-                        }
-                    }
+                    // This catch only fires if fetchProfile itself throws uncaught —
+                    // which should not happen as fetchProfile has its own error boundary.
+                    // Do NOT sign out here — the session event (not profile) triggered this.
+                    if (__DEV__) console.warn('[AUTH] onAuthStateChange outer error:', error?.message);
                 } finally {
                     if (isMounted.current) setLoading(false);
                 }
@@ -53,25 +54,37 @@ export function AuthProvider({ children }) {
 
 
     const fetchProfile = async (userId) => {
-        // Race against a 10-second timeout so Google Sign-In never leaves the user
-        // stuck on a blank loading screen if the network or RLS fails.
+        if (__DEV__) console.log('[AUTH] PROFILE_FETCH_START | user exists: true');
+
+        // Race against a 15-second timeout.
+        // On timeout: user stays authenticated — profile shown as null → ProfileLoadingScreen.
+        // We do NOT sign out on timeout because the auth session is still valid.
         const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Profile fetch timed out')), 10000)
+            setTimeout(() => reject(new Error('PROFILE_TIMEOUT')), 15000)
         );
 
         try {
             await Promise.race([
                 (async () => {
                     const { data, error } = await authService.getProfile(userId);
+
                     if (error || !data) {
-                        // Profile missing — attempt to create a default one for OAuth / edge cases.
+                        if (__DEV__) console.log('[AUTH] PROFILE_NOT_FOUND — attempting upsert for new OAuth user');
+
+                        // Profile row missing — this is expected for first-time Google Sign-In.
+                        // Verify the Supabase session is still valid before attempting upsert.
                         const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
+
                         if (userError || !currentUser) {
+                            // supabase.auth.getUser() returned an error or null user.
+                            // This means Supabase itself reports no valid auth — safe to clear state.
+                            if (__DEV__) console.log('[AUTH] getUser() returned no user — clearing state');
                             if (isMounted.current) { setUser(null); setProfile(null); }
-                            await supabase.auth.signOut();
+                            // Do not call signOut() — Supabase already has no session.
                             return;
                         }
 
+                        // Session confirmed valid — create profile row for new OAuth user.
                         const newProfile = {
                             id: currentUser.id,
                             full_name: currentUser.user_metadata?.full_name ||
@@ -84,29 +97,69 @@ export function AuthProvider({ children }) {
 
                         const { error: insertError } = await supabase.from('profiles').upsert(newProfile);
                         if (!insertError) {
+                            if (__DEV__) console.log('[AUTH] PROFILE_FETCH_SUCCESS (newly created)');
                             if (isMounted.current) setProfile(newProfile);
                         } else {
-                            if (isMounted.current) { setUser(null); setProfile(null); }
-                            await supabase.auth.signOut();
+                            // Profile upsert failed (DB/RLS error) — but the auth session IS valid.
+                            // Keep user authenticated with profile=null → ProfileLoadingScreen.
+                            // Do NOT sign out — this is a database failure, not an auth failure.
+                            if (__DEV__) console.warn('[AUTH] PROFILE_UPSERT_FAILED | status:', insertError?.code, '| session remains valid');
+                            if (isMounted.current) setProfile(null);
                         }
                     } else {
+                        if (__DEV__) console.log('[AUTH] PROFILE_FETCH_SUCCESS | role:', data?.role);
                         if (isMounted.current) setProfile(data);
                     }
                 })(),
                 timeoutPromise,
             ]);
         } catch (err) {
-            if (__DEV__) console.warn('[Auth] Profile fetch failed:', err?.message || 'Unknown error');
-            if (isMounted.current) { setUser(null); setProfile(null); }
-            await supabase.auth.signOut();
-            // Only alert on timeout (not on normal sign-out during unmount)
-            if (err?.message === 'Profile fetch timed out') {
+            // Catches: network errors, DB errors, RLS violations, and PROFILE_TIMEOUT.
+            // CRITICAL: Profile fetch failure MUST NOT sign the user out.
+            // Verify session state via Supabase before deciding any action.
+            if (__DEV__) console.warn('[AUTH] PROFILE_FETCH_FAILED | reason:', err?.message?.substring(0, 80));
+
+            if (err?.message === 'PROFILE_TIMEOUT') {
+                // Timeout: session is likely still valid. Keep user authenticated.
+                // ProfileLoadingScreen will be shown (isAuthenticated=true, profile=null).
+                if (__DEV__) console.warn('[AUTH] PROFILE_FETCH_FAILED — timeout, keeping session alive');
+                if (isMounted.current) setProfile(null); // stay authenticated
+
                 const { Alert } = require('react-native');
                 Alert.alert(
                     'Connection Issue',
-                    'Could not complete sign-in. Please check your connection and try again.',
-                    [{ text: 'OK' }]
+                    'Profile data could not be loaded. Please check your connection.',
+                    [{ text: 'Retry', onPress: () => { if (user?.id) fetchProfile(user.id); } },
+                     { text: 'OK' }]
                 );
+                return;
+            }
+
+            // For all other errors (network, DB, RLS): check whether the Supabase
+            // session is actually still valid before considering any state change.
+            // This is the authoritative check — not string matching on error messages.
+            try {
+                const { data: { session: currentSession } } = await supabase.auth.getSession();
+
+                if (currentSession) {
+                    // Session is valid. Profile fetch failed for non-auth reasons (network/DB/RLS).
+                    // Keep the user authenticated. Profile=null → ProfileLoadingScreen.
+                    // DO NOT call signOut().
+                    if (__DEV__) console.log('[AUTH] PROFILE_FETCH_FAILED | session still valid — keeping user authenticated');
+                    if (isMounted.current) setProfile(null);
+                } else {
+                    // Supabase confirms there is no active session.
+                    // Clear auth state — this is a genuine unauthenticated state.
+                    if (__DEV__) console.log('[AUTH] PROFILE_FETCH_FAILED | no session confirmed — clearing auth state');
+                    if (isMounted.current) { setUser(null); setProfile(null); }
+                    // onAuthStateChange(SIGNED_OUT) will fire naturally from Supabase.
+                }
+            } catch (sessionCheckErr) {
+                // getSession() itself failed (severe network issue).
+                // Do not sign out — we cannot confirm session is invalid.
+                // Keep current auth state unchanged. User remains on ProfileLoadingScreen.
+                if (__DEV__) console.warn('[AUTH] getSession() check failed — preserving current state');
+                if (isMounted.current) setProfile(null);
             }
         }
     };

@@ -33,6 +33,8 @@ import {
     VideoReportStatus,
     ImageReportStatus,
 } from '../screens';
+// Dev-only: MapLibre native runtime test screen
+import MapLibreTestScreen from '../screens/dev/MapLibreTestScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -109,6 +111,12 @@ export default function CitizenNavigator() {
             <Stack.Screen name="ImageReportStatus" component={ImageReportStatus} />
             <Stack.Screen name="ImageReportDetail" component={ReportDetail} />
             <Stack.Screen name="MyReports" component={MyReports} />
+            {/* Dev-only MapLibre native runtime test */}
+            <Stack.Screen
+                name="MapLibreTest"
+                component={MapLibreTestScreen}
+                options={{ headerShown: true, title: 'MapLibre Native Test' }}
+            />
         </Stack.Navigator>
     );
 }

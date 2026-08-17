@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context';
 import { FocusAwareStatusBar } from '../../components';
 import * as Location from 'expo-location';
+import { reverseGeocode } from '../../services/geoService';
 import { formatNumber } from '../../utils';
 import { fetchCitizenReports, subscribeToReportUpdates, fetchNotifications } from '../../services/reports';
 import { useFocusEffect } from '@react-navigation/native';
@@ -54,18 +55,13 @@ export default function CitizenHome({ navigation }) {
                 if (status === 'granted') {
                     const pos = await Location.getLastKnownPositionAsync();
                     if (pos?.coords) {
-                        const rev = await Location.reverseGeocodeAsync({
-                            latitude: pos.coords.latitude,
-                            longitude: pos.coords.longitude,
-                        });
-                        if (rev?.[0]) {
-                            const city = rev[0].city || rev[0].district || rev[0].subregion;
-                            const region = rev[0].region || rev[0].country;
-                            if (city && region) {
-                                setUserCity(`${city}, ${region}`);
-                            } else if (city) {
-                                setUserCity(city);
-                            }
+                        const geo = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+                        if (geo?.city && geo?.state) {
+                            setUserCity(`${geo.city}, ${geo.state}`);
+                        } else if (geo?.city) {
+                            setUserCity(geo.city);
+                        } else if (geo?.displayName) {
+                            setUserCity(geo.displayName);
                         }
                     }
                 }
@@ -438,12 +434,41 @@ export default function CitizenHome({ navigation }) {
                                 );
                             })}
                         </Animated.View>
+                        {/* ── DEV ONLY: MapLibre Native Test ── */}
+                        {__DEV__ && (
+                            <TouchableOpacity
+                                style={devBtnStyle}
+                                onPress={() => navigation.navigate('MapLibreTest')}
+                                activeOpacity={0.8}
+                            >
+                                <Ionicons name="map" size={16} color="#0A1E3F" />
+                                <Text style={devBtnTextStyle}>🗺 MapLibre Native Runtime Test</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 </ScrollView>
             </SafeAreaView>
         </View>
     );
 }
+
+// Dev-only inline styles (no StyleSheet entry needed)
+const devBtnStyle = {
+    margin: 16,
+    backgroundColor: '#F59E0B',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    justifyContent: 'center',
+};
+const devBtnTextStyle = {
+    fontSize: 14,
+    fontFamily: 'Nunito-Bold',
+    color: '#0A1E3F',
+};
 
 const styles = StyleSheet.create({
     container: {

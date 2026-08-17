@@ -43,7 +43,7 @@ export { default as VerifiedReportDetail } from './officer/VerifiedReportDetail'
 export { default as ViolationHeatmap } from './officer/ViolationHeatmap';
 export { default as OfficerReportExport } from './officer/OfficerReportExport';
 
-// Shared Screens
+// Shared & Dev Screens
 export { default as SplashScreen } from './shared/SplashScreen';
 export { default as OnboardingCarousel } from './shared/OnboardingCarousel';
 export { default as PermissionsRequest } from './shared/PermissionsRequest';
