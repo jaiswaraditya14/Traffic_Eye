@@ -13,7 +13,7 @@ import {
     TextInput, Modal, Alert, ScrollView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FocusAwareStatusBar } from '../../components';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -155,6 +155,7 @@ const rc = StyleSheet.create({
 
 // ── Main screen ───────────────────────────────────────────────────────────
 export default function PendingQueue({ navigation }) {
+    const insets = useSafeAreaInsets();
     const { profile } = useAuth();
     
     // Core List States
@@ -569,7 +570,7 @@ export default function PendingQueue({ navigation }) {
             
             {/* Bulk Action Bottom Bar */}
             {isSelectionMode && (
-                <View style={[s.bulkActionBar, { paddingBottom: 30 }]}>
+                <View style={[s.bulkActionBar, { paddingBottom: Math.max(insets.bottom + 16, 20) }]}>
                     <Text style={s.bulkSelectedText}>
                         <Text style={{ fontFamily: 'Nunito-ExtraBold' }}>{selectedIds.length}</Text> reports selected
                     </Text>
@@ -715,9 +716,11 @@ export default function PendingQueue({ navigation }) {
                             )}
                         </ScrollView>
 
-                        <TouchableOpacity style={m.applyBtn} onPress={applyFilters}>
-                            <Text style={m.applyBtnText}>Show Results</Text>
-                        </TouchableOpacity>
+                        <View style={[m.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+                            <TouchableOpacity style={m.applyBtn} onPress={applyFilters}>
+                                <Text style={m.applyBtnText}>Show Results</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </Modal>
@@ -772,7 +775,7 @@ const s = StyleSheet.create({
     emptySub:   { fontSize: 13, fontFamily: 'Nunito-Medium', color: C.textTertiary, textAlign: 'center' },
     
     // Bulk Triage Bottom Bar
-    bulkActionBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.border, padding: 20, shadowColor: C.navy, shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 20 },
+    bulkActionBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: C.surface, borderTopWidth: 1, borderTopColor: C.border, paddingHorizontal: 20, paddingTop: 16, shadowColor: C.navy, shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.08, shadowRadius: 20, elevation: 20 },
     bulkRow: { flexDirection: 'row', gap: 12 },
     bulkSelectedText: { fontSize: 14, fontFamily: 'Nunito-Medium', color: C.navyMid, marginBottom: 12, textAlign: 'center' },
     bulkActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 14 },
@@ -783,7 +786,7 @@ const s = StyleSheet.create({
 
 const m = StyleSheet.create({
     overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-    sheet: { backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '85%' },
+    sheet: { backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 24, paddingHorizontal: 24, paddingBottom: 0, maxHeight: '85%' },
     handle: { width: 40, height: 4, backgroundColor: C.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
     headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 },
     title: { fontSize: 18, fontFamily: 'Nunito-Bold', color: C.textPrimary },
@@ -808,6 +811,7 @@ const m = StyleSheet.create({
     pillText: { fontSize: 12, fontFamily: 'Nunito-Medium', color: C.textSecondary },
     pillTextActive: { color: C.white },
 
-    applyBtn: { backgroundColor: C.amber, padding: 16, borderRadius: 14, alignItems: 'center', marginTop: 10 },
+    footer: { paddingTop: 12 },
+    applyBtn: { backgroundColor: C.amber, padding: 16, borderRadius: 14, alignItems: 'center' },
     applyBtnText: { fontSize: 16, fontFamily: 'Nunito-Bold', color: C.navy },
 });

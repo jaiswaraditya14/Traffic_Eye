@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, ActivityIndicator, Text, TouchableOpacity, Animated, StyleSheet } from 'react-native';
 import * as Linking from 'expo-linking';
+import * as SplashScreen from 'expo-splash-screen';
 import { useAppContext, useAuth } from '../context';
 
 // Navigators
@@ -11,7 +12,6 @@ import OfficerNavigator from './OfficerNavigator';
 
 // Screens
 import {
-    SplashScreen,
     OnboardingCarousel,
     RoleSelection,
     CitizenSignIn,
@@ -117,25 +117,43 @@ const profileLoadingStyles = StyleSheet.create({
 });
 
 export default function AppNavigator({ navigationRef }) {
-    const { hasSeenOnboarding, showSplash, onboardingLoading } = useAppContext();
+    const { hasSeenOnboarding, onboardingLoading } = useAppContext();
     const { isAuthenticated, loading, profile } = useAuth();
+    const hasHiddenSplashRef = useRef(false);
 
     // App is initializing while:
-    //  - splash animation is active (showSplash), OR
-    //  - auth session is being restored from AsyncStorage (loading), OR
+    //  - auth session is being restored from AsyncStorage / Supabase (loading), OR
     //  - onboarding flag is being read from AsyncStorage (onboardingLoading).
-    // All three must resolve before any route selection can occur.
-    // This prevents sign-in flash AND onboarding flash for returning users.
-    const isAppInitializing = showSplash || loading || onboardingLoading;
+    // Both must resolve before the initial route is committed.
+    // This prevents sign-in flash AND onboarding flash on cold start.
+    const isAppInitializing = loading || onboardingLoading;
+
+    const handleNavigationReady = useCallback(() => {
+        if (!hasHiddenSplashRef.current) {
+            hasHiddenSplashRef.current = true;
+            SplashScreen.hideAsync().catch(() => {});
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!isAppInitializing) {
+            handleNavigationReady();
+        }
+    }, [isAppInitializing, handleNavigationReady]);
+
+    // While auth and onboarding states are resolving, render plain background view
+    // while native splash remains visible via preventAutoHideAsync.
+    if (isAppInitializing) {
+        return <View style={{ flex: 1, backgroundColor: '#0A1E3F' }} />;
+    }
 
     // Navigation funnel:
-    //  1. SplashScreen  — shown once on cold start until ready (no double load)
-    //  2. If authenticated + profile exists → go directly to role dashboard
-    //  3. If authenticated + profile still fetching → ProfileLoading screen with retry
-    //  4. First launch → Onboarding
-    //  5. Auth stack → RoleSelection → Citizen/Officer Sign In
+    //  1. If authenticated + profile exists → go directly to role dashboard
+    //  2. If authenticated + profile still fetching → ProfileLoading screen with retry
+    //  3. First launch → Onboarding
+    //  4. Auth stack → RoleSelection → Citizen/Officer Sign In
     return (
-        <NavigationContainer linking={linking} ref={navigationRef}>
+        <NavigationContainer linking={linking} ref={navigationRef} onReady={handleNavigationReady}>
             <Stack.Navigator
                 screenOptions={{
                     headerShown: false,
@@ -143,15 +161,8 @@ export default function AppNavigator({ navigationRef }) {
                     animationDuration: 250,
                 }}
             >
-                {/* 1. Single unified Splash Screen during initialization */}
-                {isAppInitializing ? (
-                    <Stack.Screen
-                        name="Splash"
-                        component={SplashScreen}
-                        options={{ animation: 'fade' }}
-                    />
-                ) : isAuthenticated && profile ? (
-                    /* 2. Authenticated — go directly to role dashboard */
+                {isAuthenticated && profile ? (
+                    /* 1. Authenticated — go directly to role dashboard */
                     profile.role === 'citizen' ? (
                         <Stack.Screen
                             name="Citizen"
@@ -166,17 +177,17 @@ export default function AppNavigator({ navigationRef }) {
                         />
                     )
                 ) : isAuthenticated && !profile ? (
-                    /* 3. Authenticated but profile still loading */
+                    /* 2. Authenticated but profile still loading */
                     <Stack.Screen name="ProfileLoading" component={ProfileLoadingScreen} />
                 ) : !hasSeenOnboarding ? (
-                    /* 4. First launch — show onboarding */
+                    /* 3. First launch — show onboarding */
                     <Stack.Screen
                         name="Onboarding"
                         component={OnboardingCarousel}
                         options={{ animation: 'fade' }}
                     />
                 ) : (
-                    /* 5. Unauthenticated — Auth stack */
+                    /* 4. Unauthenticated — Auth stack */
                     <>
                         <Stack.Screen name="RoleSelection" component={RoleSelection} />
                         <Stack.Screen name="CitizenSignIn" component={CitizenSignIn} />

@@ -39,6 +39,23 @@ const MAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 const { width } = Dimensions.get('window');
 
 // ─── Constants ────────────────────────────────────────────────────────────────
+// Target initial viewport: Mumbai Metropolitan Region
+// (Mumbai, Thane, Navi Mumbai, Mira-Bhayandar, Panvel)
+const MMR_BOUNDS = {
+    southWest: [72.75, 18.99],
+    northEast: [73.08, 19.32],
+};
+
+const INITIAL_CAMERA_VIEW = {
+    bounds: [
+        MMR_BOUNDS.southWest[0],
+        MMR_BOUNDS.southWest[1],
+        MMR_BOUNDS.northEast[0],
+        MMR_BOUNDS.northEast[1],
+    ],
+    padding: { top: 210, bottom: 80, left: 20, right: 20 },
+};
+
 const BASE_LNG = 72.8777;
 const BASE_LAT = 19.0760;
 
@@ -489,25 +506,6 @@ export default function ViolationHeatmap({ navigation }) {
             if (isMounted.current) {
                 setPoints(processed);
                 setLastUpdated(new Date());
-
-                // Auto-fit camera to valid points on first load
-                if (showSpinner && processed.length > 0 && cameraRef.current) {
-                    const lngs = processed.map(p => p.longitude);
-                    const lats = processed.map(p => p.latitude);
-                    const minLng = Math.min(...lngs);
-                    const maxLng = Math.max(...lngs);
-                    const minLat = Math.min(...lats);
-                    const maxLat = Math.max(...lats);
-
-                    try {
-                        cameraRef.current.fitBounds(
-                            [minLng, minLat],
-                            [maxLng, maxLat],
-                            [80, 80, 80, 80],
-                            600
-                        );
-                    } catch (_) {}
-                }
             }
         }
 
@@ -604,6 +602,53 @@ export default function ViolationHeatmap({ navigation }) {
         }
     }, []);
 
+    const handleResetToMMR = useCallback(() => {
+        if (!cameraRef.current) return;
+        try {
+            cameraRef.current.fitBounds(
+                [
+                    MMR_BOUNDS.southWest[0],
+                    MMR_BOUNDS.southWest[1],
+                    MMR_BOUNDS.northEast[0],
+                    MMR_BOUNDS.northEast[1],
+                ],
+                {
+                    padding: { top: 210, bottom: 80, left: 20, right: 20 },
+                    duration: 600,
+                }
+            );
+        } catch (err) {
+            if (__DEV__) console.warn('[Heatmap] fitBounds MMR failed:', err?.message);
+        }
+    }, []);
+
+    const handleFitReports = useCallback(() => {
+        if (!cameraRef.current || points.length === 0) return;
+        const lngs = points.map(p => p.longitude);
+        const lats = points.map(p => p.latitude);
+        const minLng = Math.min(...lngs);
+        const maxLng = Math.max(...lngs);
+        const minLat = Math.min(...lats);
+        const maxLat = Math.max(...lats);
+
+        const delta = 0.015;
+        const bounds = (minLng === maxLng && minLat === maxLat)
+            ? [minLng - delta, minLat - delta, maxLng + delta, maxLat + delta]
+            : [minLng, minLat, maxLng, maxLat];
+
+        try {
+            cameraRef.current.fitBounds(
+                bounds,
+                {
+                    padding: { top: 220, bottom: 90, left: 30, right: 30 },
+                    duration: 600,
+                }
+            );
+        } catch (err) {
+            if (__DEV__) console.warn('[Heatmap] fitBounds reports failed:', err?.message);
+        }
+    }, [points]);
+
     const renderFilter = (label, value) => {
         const active = timeFilter === value;
         return (
@@ -633,10 +678,7 @@ export default function ViolationHeatmap({ navigation }) {
             >
                 <Camera
                     ref={cameraRef}
-                    defaultSettings={{
-                        centerCoordinate: [BASE_LNG, BASE_LAT],
-                        zoomLevel: 11,
-                    }}
+                    initialViewState={INITIAL_CAMERA_VIEW}
                 />
 
                 {/* GeoJSON source with native clustering */}
@@ -736,14 +778,24 @@ export default function ViolationHeatmap({ navigation }) {
             </SafeAreaView>
 
             {/* ── Floating action buttons ── */}
-            {/* Layer toggle */}
+            {/* Fit Reports button (explicit user action, never automatic) */}
+            {points.length > 0 && (
+                <TouchableOpacity
+                    style={[styles.fab, styles.fabFitReports]}
+                    onPress={handleFitReports}
+                    activeOpacity={0.85}
+                >
+                    <Ionicons name="expand" size={20} color={COLORS.primary} />
+                </TouchableOpacity>
+            )}
+
+            {/* Reset to MMR Region */}
             <TouchableOpacity
-                style={[styles.fab, styles.fabLayers]}
-                onPress={() => setShowHeatmap(h => !h)}
+                style={[styles.fab, styles.fabResetMMR]}
+                onPress={handleResetToMMR}
                 activeOpacity={0.85}
             >
-                <Ionicons name="layers" size={22} color={showHeatmap ? COLORS.primary : COLORS.textTertiary} />
-                {showHeatmap && <View style={styles.fabActiveDot} />}
+                <Ionicons name="locate" size={20} color={COLORS.primary} />
             </TouchableOpacity>
 
             {/* Refresh button */}
@@ -757,6 +809,16 @@ export default function ViolationHeatmap({ navigation }) {
                     ? <ActivityIndicator size="small" color={COLORS.primary} />
                     : <Ionicons name="refresh" size={20} color={COLORS.primary} />
                 }
+            </TouchableOpacity>
+
+            {/* Layer toggle */}
+            <TouchableOpacity
+                style={[styles.fab, styles.fabLayers]}
+                onPress={() => setShowHeatmap(h => !h)}
+                activeOpacity={0.85}
+            >
+                <Ionicons name="layers" size={22} color={showHeatmap ? COLORS.primary : COLORS.textTertiary} />
+                {showHeatmap && <View style={styles.fabActiveDot} />}
             </TouchableOpacity>
 
             {/* ── Loading overlay ── */}
@@ -864,8 +926,10 @@ const styles = StyleSheet.create({
         justifyContent: 'center', alignItems: 'center',
         ...SHADOWS.md,
     },
-    fabLayers:    { bottom: 110 },
-    fabRefresh:   { bottom: 166 },
+    fabLayers:     { bottom: 110 },
+    fabRefresh:    { bottom: 166 },
+    fabResetMMR:   { bottom: 222 },
+    fabFitReports: { bottom: 278 },
     fabActiveDot: {
         position: 'absolute', top: 10, right: 10,
         width: 8, height: 8, borderRadius: 4,

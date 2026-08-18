@@ -4,7 +4,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
-  const [showSplash, setShowSplash] = useState(true);
   const [hasSeenOnboarding, setHasSeenOnboardingState] = useState(false);
   // True until the AsyncStorage onboarding flag read completes.
   // AppNavigator must not select the unauthenticated route until this resolves.
@@ -47,8 +46,6 @@ export const AppProvider = ({ children }) => {
   };
 
   const value = {
-    showSplash,
-    setShowSplash,
     hasSeenOnboarding,
     setHasSeenOnboarding,
     onboardingLoading,

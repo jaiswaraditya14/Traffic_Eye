@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, StatusBar, TouchableOpacity, ActivityIndicator, Modal, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFocusEffect } from '@react-navigation/native';
@@ -42,6 +42,7 @@ export default function VerifiedReports({ route, navigation }) {
     const emptyTitle = statusFilter === 'rejected' ? 'No Rejected Reports' : 'No Verified Reports';
     const emptySub = statusFilter === 'rejected' ? 'There are no rejected reports yet.' : 'There are no verified reports yet.';
 
+    const insets = useSafeAreaInsets();
     const { profile } = useAuth();
     const [verifiedReports, setVerifiedReports] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -429,9 +430,11 @@ export default function VerifiedReports({ route, navigation }) {
                             )}
                         </ScrollView>
 
-                        <TouchableOpacity style={styles.modalApplyBtn} onPress={applyFilters}>
-                            <Text style={styles.modalApplyBtnText}>Show Results</Text>
-                        </TouchableOpacity>
+                        <View style={[styles.modalFooter, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+                            <TouchableOpacity style={styles.modalApplyBtn} onPress={applyFilters}>
+                                <Text style={styles.modalApplyBtnText}>Show Results</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
             </Modal>
@@ -521,7 +524,7 @@ const styles = StyleSheet.create({
 
     // Modal Styles
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-    modalSheet: { backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '85%' },
+    modalSheet: { backgroundColor: C.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 24, paddingHorizontal: 24, paddingBottom: 0, maxHeight: '85%' },
     modalHandle: { width: 40, height: 4, backgroundColor: C.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
     modalHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 },
     modalTitle: { fontSize: 18, fontFamily: 'Nunito-Bold', color: C.textPrimary },
@@ -538,6 +541,7 @@ const styles = StyleSheet.create({
     modalPillText: { fontSize: 12, fontFamily: 'Nunito-Medium', color: C.textSecondary },
     modalPillTextActive: { color: C.white },
 
-    modalApplyBtn: { backgroundColor: C.amber, padding: 16, borderRadius: 14, alignItems: 'center', marginTop: 10 },
+    modalFooter: { paddingTop: 12 },
+    modalApplyBtn: { backgroundColor: C.amber, padding: 16, borderRadius: 14, alignItems: 'center' },
     modalApplyBtnText: { fontSize: 16, fontFamily: 'Nunito-Bold', color: C.navy },
 });

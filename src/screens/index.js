@@ -44,7 +44,6 @@ export { default as ViolationHeatmap } from './officer/ViolationHeatmap';
 export { default as OfficerReportExport } from './officer/OfficerReportExport';
 
 // Shared & Dev Screens
-export { default as SplashScreen } from './shared/SplashScreen';
 export { default as OnboardingCarousel } from './shared/OnboardingCarousel';
 export { default as PermissionsRequest } from './shared/PermissionsRequest';
 export { default as AIProcessing } from './shared/AIProcessing';
