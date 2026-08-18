@@ -7,8 +7,18 @@
  * Exports:
  *   stripThinkTags()    — strips <think>…</think> from reasoning model output
  *   buildAttemptQueue() — builds model × key rotation queue
- *   runWithRotation()   — executes queue with smart fallback
- *   callAI()            — universal Groq + Gemini HTTP caller
+ *   runWithRotation()   — executes queue with smart fallback (5xx/timeout only)
+ *   callAI()            — universal NVIDIA + Gemini HTTP caller
+ *
+ * Fallback policy:
+ *   Advance to the next model/key ONLY on:
+ *     • 5xx server errors (provider unavailable, overloaded)
+ *     • Timeout / AbortError / network failure
+ *   Do NOT advance on:
+ *     • 4xx client errors (bad key, billing, rate limit 429, bad request 400)
+ *       — these will be the same for any key from the same account
+ *     • JSON parse failures — if the model produced garbage, other models
+ *       are unlikely to be asked the same question with a better result.
  */
 
 import { AI_CONFIG, GROQ_MODELS, NVIDIA_MODELS } from '../../config';
@@ -43,21 +53,21 @@ export const stripThinkTags = (text) => {
 // Strategy: exhaust ALL keys for Model A before moving to Model B.
 // Uses the explicit GROQ_MODELS Set — no fragile string-sniffing.
 export const buildAttemptQueue = (modelsArray) => {
+    const entries = modelsArray.map((model) => {
+        if (GROQ_MODELS.has(model)) return { model, provider: 'groq', keys: AI_CONFIG.groqApiKeys || [] };
+        if (NVIDIA_MODELS.has(model)) return { model, provider: 'nvidia', keys: AI_CONFIG.nvidiaApiKeys || [] };
+        return { model, provider: 'gemini', keys: AI_CONFIG.geminiApiKeys || [] };
+    });
+
     const queue = [];
-    for (const model of modelsArray) {
-        if (GROQ_MODELS.has(model)) {
-            for (const apiKey of (AI_CONFIG.groqApiKeys || [])) {
-                queue.push({ model, apiKey, provider: 'groq' });
-            }
-        } else if (NVIDIA_MODELS.has(model)) {
-            for (const apiKey of (AI_CONFIG.nvidiaApiKeys || [])) {
-                queue.push({ model, apiKey, provider: 'nvidia' });
-            }
-        } else {
-            // Gemini — one entry per key so Gemini #1 is tried before Gemini #2
-            for (const apiKey of (AI_CONFIG.geminiApiKeys || [])) {
-                queue.push({ model, apiKey, provider: 'gemini' });
-            }
+    // Try the primary key of each provider/model before rotating keys. This
+    // gives NVIDIA priority while keeping Gemini a genuine fast fallback.
+    for (const entry of entries) {
+        if (entry.keys[0]) queue.push({ model: entry.model, apiKey: entry.keys[0], provider: entry.provider });
+    }
+    for (const entry of entries) {
+        for (const apiKey of entry.keys.slice(1)) {
+            queue.push({ model: entry.model, apiKey, provider: entry.provider });
         }
     }
     return queue;
@@ -75,6 +85,7 @@ export const callAI = async ({
     maxTokens = 512,
     timeoutMs = 45000,
     jsonMode = false,
+    responseSchema,
 }) => {
     if (!apiKey) throw new Error(`${provider} API key undefined — check .env`);
 
@@ -126,6 +137,7 @@ export const callAI = async ({
                 maxOutputTokens:  maxTokens,   // ← was missing — Gemini was generating unbounded responses
                 candidateCount:   1,
                 responseMimeType: jsonMode ? 'application/json' : 'text/plain',
+                ...(jsonMode && responseSchema ? { responseSchema } : {}),
             },
         });
 
@@ -162,9 +174,15 @@ export const callAI = async ({
 // ─── Run one stage with model+key rotation ────────────────────────────────────
 // Returns { text, parsed, winningAttempt } on first success.
 // Per-stage token limits and timeouts are forwarded to callAI via callOptions.
+//
+// Fallback policy (fail-fast on client errors):
+//   • 5xx / timeout / AbortError → try next attempt (server-side transient fault)
+//   • 4xx (400, 401, 403, 429)  → stop immediately (client-side, will not improve)
+//   • JSON parse failure         → stop immediately (model output issue, not availability)
 export const runWithRotation = async (prompt, base64Image, attempts, label, callOptions = {}) => {
     let lastError = null;
-    for (const attempt of attempts) {
+    const maxAttempts = Math.max(1, callOptions.maxAttempts || attempts.length);
+    for (const attempt of attempts.slice(0, maxAttempts)) {
         const { model, apiKey, provider } = attempt;
         const tag = `[${label}] provider=${provider} model=${model}`;
         console.log(`${tag} → trying`);
@@ -180,10 +198,36 @@ export const runWithRotation = async (prompt, base64Image, attempts, label, call
             return { text, parsed, winningAttempt: attempt };
         } catch (err) {
             lastError = err;
-            const isQuota   = err.message.includes('429') || err.message.toLowerCase().includes('quota');
-            const isNetwork = err.name === 'AbortError' || err.message.toLowerCase().includes('network');
-            const isParse   = err.message.includes('JSON') || err.message.includes('parse') || err.message.includes('confidence');
-            console.warn(`${tag} → ✗ ${isQuota ? 'QUOTA' : isNetwork ? 'TIMEOUT' : isParse ? 'PARSE FAIL' : 'ERROR'}: ${err.message}`);
+            const msg = err.message || '';
+
+            // Categorise error type
+            const isTimeout  = err.name === 'AbortError' || msg.toLowerCase().includes('network') || msg.includes('TIMEOUT');
+            const is5xx      = /HTTP 5\d\d/.test(msg);
+            const is4xx      = /HTTP [4]\d\d/.test(msg);
+            const is429      = msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('rate limit');
+            const isParse    = msg.includes('JSON') || msg.includes('parse') || msg.includes('confidence');
+
+            const canRetry = isTimeout || is5xx;   // only transient server-side faults warrant a retry
+            const mustStop = isParse || (is4xx && !is429);  // bad request, auth failure, billing — won't fix by rotating
+
+            const category = isTimeout  ? 'TIMEOUT'
+                           : is5xx      ? '5XX'
+                           : is429      ? 'QUOTA/429'
+                           : is4xx      ? '4XX-STOP'
+                           : isParse    ? 'PARSE FAIL'
+                           : 'ERROR';
+
+            console.warn(`${tag} → ✗ ${category}: ${msg.slice(0, 200)}`);
+
+            if (mustStop) {
+                // Non-transient error — stop the entire rotation immediately.
+                break;
+            }
+            if (!canRetry) {
+                // Quota/rate-limit: try the next key in the rotation (different account).
+                // For other unknown errors: also try the next attempt.
+                // (Fall through to next loop iteration)
+            }
         }
     }
     throw lastError ?? new Error(`${label}: all attempts failed`);
