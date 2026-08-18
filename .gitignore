@@ -42,3 +42,6 @@ yarn-error.*
 
 # Supabase CLI cache (auto-generated, no source code)
 supabase/.temp
+
+# Benchmark / test scratch files (binary assets, not source code)
+scripts/*.b64
