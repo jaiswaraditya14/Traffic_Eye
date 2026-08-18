@@ -404,10 +404,11 @@ export default function CitizenHome({ navigation }) {
                                         key={activity.id}
                                         style={styles.activityCard}
                                         activeOpacity={0.8}
-                                        onPress={() =>
-                                            navigation.getParent()?.navigate('ReportDetail', { reportId: activity.id }) ??
-                                            navigation.navigate('ReportDetail', { reportId: activity.id })
-                                        }
+                                        onPress={() => {
+                                            const fullReport = reports.find(r => r.id === activity.id);
+                                            navigation.getParent()?.navigate('ReportDetail', { reportId: activity.id, report: fullReport }) ??
+                                            navigation.navigate('ReportDetail', { reportId: activity.id, report: fullReport });
+                                        }}
                                     >
                                         {/* Left colored bar */}
                                         <View style={[styles.cardBar, { backgroundColor: config.barColor }]} />

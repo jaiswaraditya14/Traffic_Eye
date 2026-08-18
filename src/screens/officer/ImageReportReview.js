@@ -22,7 +22,7 @@ import { FocusAwareStatusBar } from '../../components';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context';
 import { fetchReportById, submitOfficerDecision } from '../../services/reports';
-import { rewardService } from '../../services';
+import { rewardService, supabase } from '../../services';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -91,16 +91,17 @@ const ir = StyleSheet.create({
 
 // ── Main screen ───────────────────────────────────────────────────────────
 export default function ImageReportReview({ route, navigation }) {
-    const { reportId } = route.params ?? {};
+    const { reportId: rawReportId, report: reportParam } = route.params ?? {};
+    const reportId     = rawReportId || reportParam?.id;
     const { user }     = useAuth();
     const insets       = useSafeAreaInsets();
 
-    const [report,   setReport]   = useState(null);
-    const [loading,  setLoading]  = useState(true);
+    const [report,   setReport]   = useState(reportParam || null);
+    const [loading,  setLoading]  = useState(!reportParam && !!reportId);
     const [remarks,  setRemarks]  = useState('');
     const [internal, setInternal] = useState('');
     const [submitting, setSubmitting] = useState(false);
-    const [alreadyReviewed, setAlreadyReviewed] = useState(false);
+    const [alreadyReviewed, setAlreadyReviewed] = useState(reportParam?.status ? reportParam.status !== 'pending' : false);
     const [fullscreenImage, setFullscreenImage] = useState(null);
     const [decisionType, setDecisionType] = useState('approved');
 
@@ -115,24 +116,37 @@ export default function ImageReportReview({ route, navigation }) {
     const loadReport = async () => {
         if (!reportId) {
             setLoading(false);
-            Alert.alert('Error', 'Invalid or missing report ID.');
+            Alert.alert('Notice', 'Invalid or missing report ID.');
             navigation.goBack();
             return;
         }
-        setLoading(true);
+        if (!report) setLoading(true);
         try {
             const { data, error } = await fetchReportById(reportId);
             if (!error && data) {
                 setReport(data);
                 if (data.status !== 'pending') setAlreadyReviewed(true);
-            } else {
-                Alert.alert('Error', 'Could not load report details.');
-                navigation.goBack();
+            } else if (!report) {
+                // Direct query fallback
+                const { data: directData } = await supabase
+                    .from('image_reports')
+                    .select('*')
+                    .eq('id', reportId)
+                    .maybeSingle();
+                if (directData) {
+                    setReport(directData);
+                    if (directData.status !== 'pending') setAlreadyReviewed(true);
+                } else {
+                    Alert.alert('Notice', 'Could not load report details.');
+                    navigation.goBack();
+                }
             }
         } catch (err) {
             if (__DEV__) console.warn('[ImageReportReview] Load failed:', err?.message);
-            Alert.alert('Error', 'Could not load report details.');
-            navigation.goBack();
+            if (!report) {
+                Alert.alert('Notice', 'Could not load report details.');
+                navigation.goBack();
+            }
         } finally {
             setLoading(false);
         }

@@ -234,8 +234,8 @@ export default function MyReports({ navigation }) {
                                             key={report.id}
                                             style={styles.reportCard}
                                             onPress={() =>
-                                                navigation.getParent()?.navigate('ReportDetail', { reportId: report.id }) ??
-                                                navigation.navigate('ReportDetail', { reportId: report.id })
+                                                navigation.getParent()?.navigate('ReportDetail', { reportId: report.id, report }) ??
+                                                navigation.navigate('ReportDetail', { reportId: report.id, report })
                                             }
                                             activeOpacity={0.8}
                                         >

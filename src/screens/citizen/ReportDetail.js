@@ -15,7 +15,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient';
 import { FocusAwareStatusBar } from '../../components';
 import { fetchReportById } from '../../services/reports';
-import { rewardService } from '../../services';
+import { rewardService, supabase } from '../../services';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -50,11 +50,12 @@ const SEVERITY_MAP = {
 };
 
 export default function ReportDetail({ navigation, route }) {
-    const reportId = route.params?.reportId;
+    const reportId = route.params?.reportId || route.params?.report?.id || route.params?.report_id || route.params?.id;
+    const initialReport = route.params?.report || null;
     const insets = useSafeAreaInsets();
 
-    const [report, setReport] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [report, setReport] = useState(initialReport);
+    const [loading, setLoading] = useState(!initialReport && !!reportId);
     const [fullscreenImage, setFullscreenImage] = useState(null);
 
     useEffect(() => {
@@ -66,10 +67,20 @@ export default function ReportDetail({ navigation, route }) {
             setLoading(false);
             return;
         }
-        setLoading(true);
+        if (!report) setLoading(true);
         try {
             const { data, error } = await fetchReportById(reportId);
-            if (!error && data) setReport(data);
+            if (!error && data) {
+                setReport(data);
+            } else if (!report) {
+                // Fallback to direct table query if joined relationship fails
+                const { data: directData } = await supabase
+                    .from('image_reports')
+                    .select('*')
+                    .eq('id', reportId)
+                    .maybeSingle();
+                if (directData) setReport(directData);
+            }
         } catch (err) {
             if (__DEV__) console.warn('[ReportDetail] Failed to load report:', err?.message);
         } finally {

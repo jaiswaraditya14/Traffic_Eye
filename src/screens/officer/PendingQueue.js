@@ -342,8 +342,8 @@ export default function PendingQueue({ navigation }) {
     };
 
     const navigateToReview = (report) => {
-        navigation.getParent()?.navigate('ImageReportReview', { reportId: report.id })
-            ?? navigation.navigate('ImageReportReview', { reportId: report.id });
+        navigation.getParent()?.navigate('ImageReportReview', { reportId: report.id, report })
+            ?? navigation.navigate('ImageReportReview', { reportId: report.id, report });
     };
 
     // Processing the Actions

@@ -15,13 +15,14 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FocusAwareStatusBar } from '../../components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import { useVideoPlayer, VideoView } from 'expo-video';
 import * as FileSystem from 'expo-file-system/legacy';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { FocusAwareStatusBar } from '../../components';
 import { fetchReportById } from '../../services/reports';
+import { supabase } from '../../services';
 
 // ── Tokens ────────────────────────────────────────────────────────────────
 const C = {
@@ -69,36 +70,59 @@ const ir = StyleSheet.create({
 
 // ── Main screen ───────────────────────────────────────────────────────────
 export default function VerifiedReportDetail({ route, navigation }) {
-    const { reportId, mockData } = route.params ?? {};
+    const { reportId: rawReportId, mockData, report: paramReport, id: altId } = route.params ?? {};
+    const reportId = rawReportId || paramReport?.id || mockData?.id || altId;
+    const initialData = mockData || paramReport || null;
 
-    const [report,         setReport]         = useState(null);
-    const [loading,        setLoading]        = useState(true);
+    const [report,         setReport]         = useState(initialData);
+    const [loading,        setLoading]        = useState(!initialData && !!reportId);
     const [pdfGenerating,  setPdfGenerating]  = useState(false);
     const [fullscreenImg,  setFullscreenImg]  = useState(null);
-    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const fadeAnim = useRef(new Animated.Value(initialData ? 1 : 0)).current;
 
     useEffect(() => {
         loadReport();
-    }, [reportId, mockData]);
+    }, [reportId, mockData, paramReport]);
 
     const loadReport = async () => {
-        setLoading(true);
-        if (mockData) {
-            setReport(mockData);
-            Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+        if (initialData) {
+            setReport(initialData);
+            Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+        }
+        if (!reportId) {
             setLoading(false);
             return;
         }
+        if (!initialData) setLoading(true);
 
-        const { data, error } = await fetchReportById(reportId);
-        if (!error && data) {
-            setReport(data);
-            Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
-        } else {
-            Alert.alert('Error', 'Could not load report details.');
-            navigation.goBack();
+        try {
+            const { data, error } = await fetchReportById(reportId);
+            if (!error && data) {
+                setReport(data);
+                Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+            } else if (!initialData) {
+                // Direct fallback
+                const { data: directData } = await supabase
+                    .from('image_reports')
+                    .select('*')
+                    .eq('id', reportId)
+                    .maybeSingle();
+                if (directData) {
+                    setReport(directData);
+                    Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+                } else {
+                    Alert.alert('Notice', 'Report details could not be loaded.');
+                    navigation.goBack();
+                }
+            }
+        } catch (err) {
+            if (!initialData) {
+                Alert.alert('Notice', 'Report details could not be loaded.');
+                navigation.goBack();
+            }
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     // ── PDF Generation ────────────────────────────────────────────────────

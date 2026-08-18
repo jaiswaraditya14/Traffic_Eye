@@ -527,7 +527,7 @@ export default function VerificationReports({ navigation }) {
                                     report={report}
                                     expanded={expandedId === report.id}
                                     onToggle={() => setExpandedId(expandedId === report.id ? null : report.id)}
-                                    onViewFull={() => navigation.navigate('ReportDetail', { report: report })}
+                                    onViewFull={() => navigation.navigate('ReportDetail', { reportId: report.id, report: report })}
                                 />
                             ))
                         )}

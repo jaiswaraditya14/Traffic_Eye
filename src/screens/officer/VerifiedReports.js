@@ -278,7 +278,7 @@ export default function VerifiedReports({ route, navigation }) {
                                 <TouchableOpacity
                                     key={report.id}
                                     style={styles.reportCard}
-                                    onPress={() => navigation.navigate('VerifiedReportDetail', { reportId: report.id })}
+                                    onPress={() => navigation.navigate('VerifiedReportDetail', { reportId: report.id, report, mockData: report })}
                                     activeOpacity={0.82}
                                 >
                                     {/* Success/Severity Left Bar */}

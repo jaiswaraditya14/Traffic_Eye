@@ -252,7 +252,7 @@ function ReportCard({ report, navigation }) {
                         {/* View full report */}
                         <TouchableOpacity
                             style={rcs.fullBtn}
-                            onPress={() => navigation.navigate('ImageReportDetail', { reportId: report.id })}
+                            onPress={() => navigation.navigate('ImageReportDetail', { reportId: report.id, report })}
                             activeOpacity={0.8}
                         >
                             <Text style={rcs.fullBtnText}>View Full Report</Text>
