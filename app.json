@@ -8,6 +8,8 @@
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
       "backgroundColor": "#0A1E3F"
     },
     "ios": {
@@ -25,6 +27,8 @@
         "backgroundColor": "#0A1E3F"
       },
       "splash": {
+        "image": "./assets/images/icon.png",
+        "resizeMode": "contain",
         "backgroundColor": "#0A1E3F"
       },
       "permissions": [

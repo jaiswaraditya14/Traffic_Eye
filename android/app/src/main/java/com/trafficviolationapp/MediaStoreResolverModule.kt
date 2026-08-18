@@ -1,4 +1,4 @@
-package com.anonymous.TrafficEye
+package com.trafficviolationapp
 
 import android.content.ContentUris
 import android.media.ExifInterface
@@ -15,7 +15,6 @@ import com.facebook.react.bridge.WritableMap
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.security.MessageDigest
-import com.trafficviolationapp.BuildConfig
 
 /**
  * MediaStoreResolverModule
@@ -26,21 +25,6 @@ import com.trafficviolationapp.BuildConfig
  * Reads the actual original unredacted file bytes directly from the ContentResolver
  * stream, computes the authoritative SHA-256 of the original file, and extracts
  * authentic GPS coordinates.
- *
- * Identity rules (fail-closed):
- *   1. If `contentUri` is provided and is a MediaStore `content://media/...` URI,
- *      extract the MediaStore ID directly from it — no name/size query.
- *   2. If `fileName` is provided, query MediaStore with exact filename match AND
- *      disambiguate with fileSize and/or dimensions. Only one unambiguous match
- *      is accepted.
- *   3. If neither provides a conclusive match, return MEDIASTORE_ASSET_NOT_FOUND.
- *
- * REMOVED: the unsafe "recent 100 items" fallback that could associate metadata
- * from a completely different photo when identity cannot be proven.
- *
- * NOTE: Android Photo Picker URIs can use authorities other than `content://media/`.
- * For non-MediaStore authorities, JS should read the file via the picker copy path
- * and label the result as EXIF_PICKER_COPY.
  */
 class MediaStoreResolverModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
 
@@ -58,51 +42,54 @@ class MediaStoreResolverModule(reactContext: ReactApplicationContext) : ReactCon
         promise: Promise
     ) {
         try {
-            val resolver = reactApplicationContext.contentResolver
-            val collectionUri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            val context = reactApplicationContext
+            val resolver = context.contentResolver
 
-            // ── Strategy 1: Direct ID extraction from a content://media/... URI ──
+            val collectionUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+            } else {
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            }
+
             var matchedId: Long? = null
             var matchedDisplayName: String? = null
-            var matchedSize: Long = 0L
+            var matchedSize: Long = 0
 
+            // ── STRATEGY 1: Direct ID extraction if input is already a MediaStore URI ──
             if (!contentUri.isNullOrEmpty()) {
-                try {
-                    val parsedUri = Uri.parse(contentUri)
-                    val authority = parsedUri.authority ?: ""
+                val parsed = Uri.parse(contentUri)
+                val isMediaStore = (parsed.scheme == "content") &&
+                    (parsed.authority?.startsWith("media") == true ||
+                     parsed.authority == "com.android.providers.media.documents")
 
-                    if (authority == "media" || authority.startsWith("com.android.providers.media")) {
-                        // MediaStore URI — extract ID from last path segment
-                        val idFromUri = ContentUris.parseId(parsedUri)
-                        if (idFromUri > 0) {
-                            // Verify the ID exists in MediaStore
-                            val verifyProjection = arrayOf(
-                                MediaStore.Images.Media._ID,
-                                MediaStore.Images.Media.DISPLAY_NAME,
-                                MediaStore.Images.Media.SIZE,
+                if (isMediaStore) {
+                    try {
+                        val lastSegment = parsed.lastPathSegment
+                        val idCandidate = lastSegment?.toLongOrNull()
+                            ?: lastSegment?.substringAfterLast(":")?.toLongOrNull()
+
+                        if (idCandidate != null && idCandidate > 0) {
+                            val probeUri = ContentUris.withAppendedId(collectionUri, idCandidate)
+                            val probeCursor = resolver.query(
+                                probeUri,
+                                arrayOf(MediaStore.Images.Media._ID, MediaStore.Images.Media.DISPLAY_NAME, MediaStore.Images.Media.SIZE),
+                                null, null, null
                             )
-                            val verifyCursor = resolver.query(
-                                ContentUris.withAppendedId(collectionUri, idFromUri),
-                                verifyProjection, null, null, null
-                            )
-                            verifyCursor?.use { c ->
-                                if (c.moveToFirst()) {
-                                    matchedId = c.getLong(c.getColumnIndexOrThrow(MediaStore.Images.Media._ID))
-                                    matchedDisplayName = c.getString(c.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME))
-                                    matchedSize = c.getLong(c.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE))
+                            probeCursor?.use { pc ->
+                                if (pc.moveToFirst()) {
+                                    matchedId = pc.getLong(pc.getColumnIndexOrThrow(MediaStore.Images.Media._ID))
+                                    matchedDisplayName = pc.getString(pc.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME))
+                                    matchedSize = pc.getLong(pc.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE))
                                 }
                             }
                         }
+                    } catch (probeErr: Exception) {
+                        // Strategy 1 failed, fall through to Strategy 2
                     }
-                    // else: non-MediaStore authority (e.g. com.google.android.apps.photos.contentprovider)
-                    // We cannot safely extract a MediaStore ID — fall through to fileName strategy.
-                } catch (uriEx: Exception) {
-                    // Malformed URI or unsupported authority — fall through to fileName strategy
-                    if (BuildConfig.DEBUG) android.util.Log.w("MediaStoreResolver", "URI parse/query failed: ${uriEx.message}")
                 }
             }
 
-            // ── Strategy 2: Exact filename match + disambiguation ──
+            // ── STRATEGY 2: Disambiguated filename query ──
             if (matchedId == null && !fileName.isNullOrEmpty()) {
                 val projection = arrayOf(
                     MediaStore.Images.Media._ID,
@@ -159,8 +146,6 @@ class MediaStoreResolverModule(reactContext: ReactApplicationContext) : ReactCon
                                 matchedDisplayName = name
                                 matchedSize = size
                             } else {
-                                // Ambiguous: multiple rows match the same filename + hints.
-                                // Fail closed — we cannot safely identify which is the correct asset.
                                 matchedId = null
                                 matchedDisplayName = null
                                 matchedSize = 0
@@ -170,16 +155,10 @@ class MediaStoreResolverModule(reactContext: ReactApplicationContext) : ReactCon
                     }
 
                     if (candidates > 1) {
-                        // Already nulled out above; confirm here
                         matchedId = null
                     }
                 }
             }
-
-            // ── REMOVED: unsafe "recent 100 items" fallback ──
-            // The old code queried all recent images when filename matched nothing.
-            // This could associate EXIF from a completely different photo.
-            // If identity cannot be proven, we fail closed here.
 
             if (matchedId == null) {
                 val result = Arguments.createMap()
@@ -249,7 +228,7 @@ class MediaStoreResolverModule(reactContext: ReactApplicationContext) : ReactCon
                     }
                 }
             } catch (exifErr: Exception) {
-                // Non-fatal — JS binary parser can also parse headerBase64 (JPEG only)
+                // Non-fatal
             }
 
             val result: WritableMap = Arguments.createMap()

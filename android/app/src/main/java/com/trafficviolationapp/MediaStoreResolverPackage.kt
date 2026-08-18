@@ -1,4 +1,4 @@
-package com.anonymous.TrafficEye
+package com.trafficviolationapp
 
 import android.view.View
 import com.facebook.react.ReactPackage
