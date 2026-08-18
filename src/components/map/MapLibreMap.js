@@ -129,7 +129,6 @@ export default function MapLibreMap({
         if (currentCoord?.latitude && currentCoord?.longitude) {
             fetchAddressForCoord(currentCoord.latitude, currentCoord.longitude);
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Move camera to coordinate (called after tap/drag/search/GPS)
@@ -225,7 +224,6 @@ export default function MapLibreMap({
             }
         }, 400),
         // Only recreate when the coordinate bias changes significantly
-        // eslint-disable-next-line react-hooks/exhaustive-deps
         [currentCoord?.latitude, currentCoord?.longitude]
     );
 
