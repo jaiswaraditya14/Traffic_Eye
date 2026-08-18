@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     View, Text, StyleSheet, Animated, Easing, Alert,
 } from 'react-native';
@@ -34,6 +34,7 @@ export default function AIProcessing({ navigation }) {
 
     const pulseAnim    = useRef(new Animated.Value(1)).current;
     const progressAnim = useRef(new Animated.Value(0)).current;
+    const [stageLabel, setStageLabel] = useState('Preparing image...');
 
     useEffect(() => {
         Animated.loop(
@@ -100,8 +101,13 @@ export default function AIProcessing({ navigation }) {
                 // ═══════════════════════════════════════════════════════════════════
                 console.log('[AIProcessing] Launching vision detection...');
 
-                // Vision Violation Detection (Stage 1, optional Stage 1.5 + Stage 2)
-                const results = await aiService.analyzeViolationImage(currentReport.image);
+                // Vision Violation Detection — with live stage callbacks for UI
+                const results = await aiService.analyzeViolationImage(currentReport.image, {
+                    onStageChange: (label) => {
+                        console.log('[AIProcessing] Stage:', label);
+                        setStageLabel(label);
+                    },
+                });
 
                 // ── Plate-OCR Duplicate Check (uses plate from Task B — 0 extra API calls) ──
                 // POSSIBLE_DUPLICATE ≠ automatic rejection. Officer still reviews.
@@ -131,6 +137,22 @@ export default function AIProcessing({ navigation }) {
 
                 if (didNavigate) return;
                 didNavigate = true;
+
+                if (results.requiresManualReview && !results.violationDetected) {
+                    Alert.alert(
+                        'Manual Review Required',
+                        'The image does not contain enough clear evidence for an automatic decision.\n\nPlease enter the violation details manually for officer review.',
+                        [
+                            { text: 'Try Again',      style: 'cancel', onPress: () => navigation.goBack() },
+                            { text: 'Enter Manually', style: 'default', onPress: () => navigation.replace('AIResultsVerification', {
+                                aiResults: results,
+                                possibleDuplicate,
+                                duplicateExistingId,
+                            }) },
+                        ]
+                    );
+                    return;
+                }
 
                 if (!results.violationDetected) {
                     Alert.alert(
@@ -200,7 +222,7 @@ export default function AIProcessing({ navigation }) {
 
             {/* Title & Status */}
             <Text style={styles.title}>Analyzing Evidence</Text>
-            <Text style={styles.subtitle}>Verifying license plate, location, and offense details</Text>
+            <Text style={styles.subtitle}>{stageLabel}</Text>
 
             {/* Progress Bar */}
             <View style={styles.progressBarBg}>

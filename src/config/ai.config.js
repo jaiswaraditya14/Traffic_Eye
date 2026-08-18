@@ -1,49 +1,50 @@
 /**
- * ai.config.js — Central AI model registry for Traffic Eye.
+ * AI model registry — Traffic Eye Production Configuration
  *
- * PRIORITY ORDER (vision, authenticity, OCR):
- *   1. NVIDIA NIM  → integrate.api.nvidia.com/v1  (highest — generous quota)
- *   2. Gemini #1   → gemini-3.5-flash via key slot 1
- *   3. Gemini #2   → gemini-3.5-flash via key slot 2
- *   4. Gemini #3   → gemini-3.7-flash via key slot 1  (stronger, slower fallback)
+ * Architecture: AI SEES → CODE DECIDES → GROQ AUDITS → UNCERTAINTY → MANUAL REVIEW
  *
- * REASONING (text-only, Stage 1.5):
- *   Groq-first (6 keys, text models have no TPM conflict with vision tasks).
- *   NVIDIA + Gemini as fallbacks.
+ * Provider roles:
+ *   NVIDIA NIM   — Primary visual perception (SEES)
+ *   Gemini Flash — Fallback visual perception (SEES, only on NVIDIA failure)
+ *   Groq         — Text-only consistency auditor (AUDITS, never sees images)
  *
- * PROVIDER SETS (used by buildAttemptQueue in utils.js):
- *   GROQ_MODELS   → provider: 'groq'
- *   NVIDIA_MODELS → provider: 'nvidia'
- *   (all others)  → provider: 'gemini'
- *
- * Last verified: August 2026 against live API key
- *   ✅ gemini-3.5-flash         — works (vision + text)
- *   ✅ gemini-3.7-flash         — works (vision + text, stronger)
- *   ✅ gemini-flash-latest      — works (auto-alias to latest flash)
- *   ❌ gemini-2.0-flash         — deprecated / no longer available
- *   ❌ gemini-2.5-flash         — 404: no longer available to new users
- *   ❌ gemini-2.5-flash-lite    — 404: no longer available to new users
- *
- *   ✅ NVIDIA meta/llama-3.2-11b-vision-instruct — confirmed working
- *   ❌ NVIDIA nvidia/nemotron-* — requires paid tier
+ * ⚠️  SECURITY NOTE: These keys are bundled into the React Native APK/IPA.
+ * Any motivated user can extract them from the binary. For production:
+ *   - Restrict each key's scope to only the Traffic Eye app (per-provider API settings).
+ *   - Rate-limit keys at the provider level.
+ *   - Rotate keys regularly.
+ *   - Consider a backend API proxy so keys never ship in the client bundle.
  */
 
-// ─── Provider Sets ────────────────────────────────────────────────────────────
 export const GROQ_MODELS = new Set([
-    'qwen/qwen3.6-27b',
     'openai/gpt-oss-20b',
     'openai/gpt-oss-120b',
+    'qwen/qwen3.6-27b',
     'llama-3.3-70b-versatile',
 ]);
 
 export const NVIDIA_MODELS = new Set([
-    'meta/llama-3.2-11b-vision-instruct',   // ✅ Vision — confirmed working
-    'meta/llama-3.1-70b-instruct',          // ✅ Text  — confirmed working
-    'meta/llama-3.3-70b-instruct',          // Text — latest Llama 3.3
+    'meta/llama-3.2-11b-vision-instruct',
+    'meta/llama-3.1-70b-instruct',
+    'meta/llama-3.3-70b-instruct',
 ]);
 
 export const AI_CONFIG = {
-    // ── API Keys ──────────────────────────────────────────────────────────────
+    // ── API keys (read at runtime; never hard-coded) ──────────────────────────
+    nvidiaApiKeys: [
+        process.env.EXPO_PUBLIC_NVIDIA_API_KEY_1,
+        process.env.EXPO_PUBLIC_NVIDIA_API_KEY,
+    ].filter(Boolean),
+
+    geminiApiKeys: [
+        process.env.EXPO_PUBLIC_GEMINI_API_KEY_1,
+        process.env.EXPO_PUBLIC_GEMINI_API_KEY_2,
+        process.env.EXPO_PUBLIC_GEMINI_API_KEY_3,
+        process.env.EXPO_PUBLIC_GEMINI_API_KEY,
+    ].filter(Boolean),
+
+    // Groq is TEXT-ONLY in this account — 6 keys for auditor rotation.
+    // Groq must NEVER receive an image payload.
     groqApiKeys: [
         process.env.EXPO_PUBLIC_GROQ_API_KEY_1,
         process.env.EXPO_PUBLIC_GROQ_API_KEY_2,
@@ -54,51 +55,29 @@ export const AI_CONFIG = {
         process.env.EXPO_PUBLIC_GROQ_API_KEY,
     ].filter(Boolean),
 
-    geminiApiKeys: [
-        process.env.EXPO_PUBLIC_GEMINI_API_KEY_1,   // Gemini slot #1
-        process.env.EXPO_PUBLIC_GEMINI_API_KEY_2,   // Gemini slot #2
-        process.env.EXPO_PUBLIC_GEMINI_API_KEY_3,
-        process.env.EXPO_PUBLIC_GEMINI_API_KEY,     // Default Gemini Key
-    ].filter(Boolean),
-
-    nvidiaApiKeys: [
-        process.env.EXPO_PUBLIC_NVIDIA_API_KEY_1,
-        process.env.EXPO_PUBLIC_NVIDIA_API_KEY,     // Default NVIDIA Key
-    ].filter(Boolean),
-
-    nvidiaModels: NVIDIA_MODELS,
-
-    // ── Vision: Violation Detection (Stage 1) ─────────────────────────────────
-    // Queue expands to: [NVIDIA×1] → [gemini-3.5-flash×keys] → [gemini-3.7-flash×keys]
+    // ── Pipeline stage model lists (ordered: primary → fallback) ─────────────
+    // NVIDIA Llama 11B = primary visual perception
+    // Gemini 3.5 Flash = fallback visual perception (called only on NVIDIA failure)
     visionModels: [
-        'meta/llama-3.2-11b-vision-instruct',   // 1. NVIDIA NIM ⭐
-        'gemini-3.5-flash',                      // 2. Gemini (all keys) — fast, capable
-        'gemini-3.7-flash',                      // 3. Gemini (all keys) — stronger fallback
+        'meta/llama-3.2-11b-vision-instruct',
+        'gemini-3.5-flash',
     ],
-
-    // ── Authenticity: Image Forensics (Stage 0B) ──────────────────────────────
-    // Same priority. Never uses Groq (qwen fails JSON mode for auth prompt).
-    authenticityModels: [
-        'meta/llama-3.2-11b-vision-instruct',   // 1. NVIDIA NIM ⭐
-        'gemini-3.5-flash',                      // 2. Gemini (all keys)
-        'gemini-3.7-flash',                      // 3. Gemini (all keys) — stronger fallback
-    ],
-
-    // ── OCR: Plate Reading (Stage 2, high-res 1600px) ─────────────────────────
     ocrModels: [
-        'meta/llama-3.2-11b-vision-instruct',   // 1. NVIDIA NIM ⭐
-        'gemini-3.5-flash',                      // 2. Gemini (all keys)
-        'gemini-3.7-flash',                      // 3. Gemini (all keys)
+        'meta/llama-3.2-11b-vision-instruct',
+        'gemini-3.5-flash',
+    ],
+    // Groq GPT-OSS-20B = text-only consistency auditor
+    reasoningModels: [
+        'openai/gpt-oss-20b',
     ],
 
-    // ── Reasoning: Validation (Stage 1.5, text-only) ──────────────────────────
-    // Groq-first: 6 keys, 12K TPM, separate pool — no collision with vision.
-    reasoningModels: [
-        'llama-3.3-70b-versatile',               // 1. Groq — Primary (12K TPM × 6 keys) ⭐
-        'openai/gpt-oss-20b',                    // 2. Groq — Secondary
-        'openai/gpt-oss-120b',                   // 3. Groq — Heavy
-        'meta/llama-3.3-70b-instruct',           // 4. NVIDIA NIM — text fallback
-        'gemini-3.5-flash',                      // 5. Gemini — fast text fallback
-        'gemini-3.7-flash',                      // 6. Gemini — strong text fallback
-    ],
+    // ── Per-stage hard timeouts (ms) ─────────────────────────────────────────
+    // Each stage gets exactly one primary attempt within its budget.
+    // Fallback to Gemini is counted as a second attempt within visionMs budget.
+    timeoutVisionMs:   12000,  // 12s per provider attempt (primary + fallback separate)
+    timeoutOcrMs:      10000,  // 10s — conditional, only when plate unresolved
+    timeoutAuditorMs:   8000,  // 8s — Groq text-only audit; fast model (~490ms typical)
+
+    // Max attempts before a stage is considered failed
+    maxAttemptsPerStage: 2,
 };
