@@ -21,6 +21,7 @@
 // Applied to evidence from the vision model.
 const CONF_HIGH   = 0.75;  // Required for most violation assertions
 const CONF_MEDIUM = 0.65;  // Used only for supplementary evidence
+const INDIAN_PLATE_PATTERN = /^(?:[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{4}|\d{2}BH\d{4}[A-Z]{2})$/;
 
 // ─── Visibility states from vision model ─────────────────────────────────────
 const VS = {
@@ -95,6 +96,10 @@ const isNotUsable = (field) =>
     field === VS.NOT_VISIBLE ||
     field === VS.UNCERTAIN ||
     field === VS.NOT_APPLICABLE;
+
+const normalizePlate = (value) => typeof value === 'string'
+    ? value.replace(/\s+/g, '').toUpperCase()
+    : '';
 
 // ─── Individual rule evaluators ───────────────────────────────────────────────
 
@@ -574,14 +579,17 @@ export function applyRules(evidence, verbose = false) {
     const plateText = evidence.plate_text ?? evidence.plateText ??
                       evidence.vehicle_number ?? evidence.vehicleNumber ?? 'PLATE_NOT_READABLE';
     const plateConf = conf(evidence.plate_confidence ?? evidence.plateConfidence ?? 0);
-    const plateReadable = plateText &&
-        plateText !== 'Not detected' &&
-        plateText !== 'Not applicable' &&
-        plateText !== 'PLATE_NOT_READABLE' &&
-        (plateText.replace(/\s+/g, '').length >= 4);
+    const normalizedPlate = normalizePlate(plateText);
+    const plateReadable =
+        normalizedPlate !== 'NOTDETECTED' &&
+        normalizedPlate !== 'NOTAPPLICABLE' &&
+        normalizedPlate !== 'PLATE_NOT_READABLE' &&
+        plateConf >= CONF_HIGH &&
+        !normalizedPlate.includes('?') &&
+        INDIAN_PLATE_PATTERN.test(normalizedPlate);
 
     const plateInfo = {
-        text:       plateReadable ? plateText.replace(/\s+/g, '').toUpperCase() : 'PLATE_NOT_READABLE',
+        text:       plateReadable ? normalizedPlate : 'PLATE_NOT_READABLE',
         confidence: plateConf,
         readable:   plateReadable,
         needsOcr:   !plateReadable && evidence.plate_visible !== false,

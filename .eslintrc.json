@@ -19,6 +19,11 @@
     "react",
     "react-native"
   ],
+  "settings": {
+    "react": {
+      "version": "detect"
+    }
+  },
   "rules": {
     "react/prop-types": 0,
     "react/react-in-jsx-scope": 0,
@@ -51,6 +56,7 @@
     "global": true,
     "globalThis": true,
     "URL": true,
-    "AbortController": true
+    "AbortController": true,
+    "Buffer": true
   }
 }

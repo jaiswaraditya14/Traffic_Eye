@@ -237,10 +237,25 @@ const buildEvidenceSummary = (evidence, ruleResult) => {
 };
 
 // ─── Final result formatter ───────────────────────────────────────────────────
+const normalizePlateText = (value) => typeof value === 'string'
+    ? value.replace(/\s+/g, '').toUpperCase()
+    : '';
+
+const INDIAN_PLATE_PATTERN = /^(?:[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{4}|\d{2}BH\d{4}[A-Z]{2})$/;
+
+const isVerifiedOcrPlate = (ocr) => {
+    const plate = normalizePlateText(ocr?.plate_text);
+    const confidence = Number(ocr?.confidence_percent);
+    return plate && plate !== 'PLATE_NOT_READABLE' &&
+        !plate.includes('?') &&
+        Number.isFinite(confidence) && confidence >= 75 &&
+        INDIAN_PLATE_PATTERN.test(plate);
+};
+
 const buildFinalResult = ({ evidence, ruleResult, auditResult, ocrResult, telemetry, integrity, providerUsed, fallbackUsed, ocrUsed }) => {
-    const violations = auditResult?.accepted_violations?.length
-        ? auditResult.accepted_violations
-        : ruleResult.confirmedViolations;
+    // Only local deterministic rules can produce confirmed violations. An
+    // auditor may flag uncertainty but must never add, remove, or rename one.
+    const violations = ruleResult.confirmedViolations;
 
     const requiresManualReview =
         auditResult?.requires_manual_review ||
@@ -248,10 +263,9 @@ const buildFinalResult = ({ evidence, ruleResult, auditResult, ocrResult, teleme
         (ruleResult.uncertainViolations.length > 0 && violations.length === 0);
 
     // Final plate text — never accept unsupported plate from AI
-    let plateText = auditResult?.final_plate_text || ruleResult.plateInfo?.text || 'PLATE_NOT_READABLE';
-    if (ocrResult?.plate_text && ocrResult.plate_text !== 'PLATE_NOT_READABLE' &&
-        (ocrResult.confidence_percent ?? 0) >= 50) {
-        plateText = ocrResult.plate_text.replace(/\s+/g, '').toUpperCase();
+    let plateText = ruleResult.plateInfo?.text || 'PLATE_NOT_READABLE';
+    if (isVerifiedOcrPlate(ocrResult)) {
+        plateText = normalizePlateText(ocrResult.plate_text);
     }
 
     // Severity from confirmed violations
@@ -420,7 +434,7 @@ export const aiService = {
 
             // ── Stage 1F Fallback (Gemini) ────────────────────────────────────
             if (!visionRaw) {
-                const fallbackAttempts = visionAttempts.slice(1);
+                const fallbackAttempts = visionAttempts.slice(1, 2);
                 if (fallbackAttempts.length > 0) {
                     const t1f = makeTimer();
                     try {
@@ -429,7 +443,7 @@ export const aiService = {
                             VISION_PROMPT, visionB64,
                             fallbackAttempts,
                             'S1-VISION-FALLBACK',
-                            { maxTokens: 512, timeoutMs: timeoutVision }
+                            { maxTokens: 512, timeoutMs: timeoutVision, maxAttempts: 1 }
                         );
                         visionRaw = text;
                         providerUsed  = fallbackAttempts[0].provider;
@@ -527,11 +541,14 @@ export const aiService = {
                         PLATE_OCR_PROMPT, ocrB64,
                         ocrAttempts,
                         'S2-OCR',
-                        { maxTokens: 256, timeoutMs: AI_CONFIG.timeoutOcrMs || 10000 }
+                        {
+                            maxTokens: 256,
+                            timeoutMs: AI_CONFIG.timeoutOcrMs || 10000,
+                            maxAttempts: AI_CONFIG.maxAttemptsPerStage || 2,
+                        }
                     );
                     const parsedOCR = extractJSON(rawOCR);
-                    if (parsedOCR?.plate_text && parsedOCR.plate_text !== 'PLATE_NOT_READABLE' &&
-                        (parsedOCR.confidence_percent ?? 0) >= 50) {
+                    if (isVerifiedOcrPlate(parsedOCR)) {
                         ocrResult = parsedOCR;
                         console.log(`[AI] Stage 2 OCR: "${parsedOCR.plate_text}" @ ${parsedOCR.confidence_percent}%`);
                     } else {

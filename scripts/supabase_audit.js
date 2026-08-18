@@ -1,7 +1,11 @@
 const { createClient } = require('@supabase/supabase-js');
 
-const SUPABASE_URL = 'https://dstincwwyddrimcfgzfs.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzdGluY3d3eWRkcmltY2ZnemZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMDg0MDUsImV4cCI6MjA4NTY4NDQwNX0.ulc_7KAzccIFsRyS5RxEY9MA1xR6ISRA4QI16ZIW8ps';
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    throw new Error('Missing Supabase configuration. Run with Node --env-file=.env; never hard-code credentials.');
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -22,8 +26,7 @@ async function run() {
 
     // === 1. PROJECT INFO ===
     console.log('=== 1. PROJECT INFO ===');
-    console.log('Project ref: dstincwwyddrimcfgzfs');
-    console.log('URL: https://dstincwwyddrimcfgzfs.supabase.co');
+    console.log('Configured Supabase project: present');
 
     // Test connection
     const { data: testData, error: testErr } = await safeQuery('profiles', 'id', { count: 'exact', head: true });
@@ -110,3 +113,4 @@ async function run() {
 }
 
 run().catch(e => console.error('Fatal:', e));
+

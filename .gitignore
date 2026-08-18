@@ -45,3 +45,7 @@ supabase/.temp
 
 # Benchmark / test scratch files (binary assets, not source code)
 scripts/*.b64
+
+# Editor
+.vscode/
+

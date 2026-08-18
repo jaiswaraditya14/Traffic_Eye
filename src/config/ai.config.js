@@ -1,12 +1,12 @@
 /**
  * AI model registry — Traffic Eye Production Configuration
  *
- * Architecture: AI SEES → CODE DECIDES → GROQ AUDITS → UNCERTAINTY → MANUAL REVIEW
+ * Architecture: AI SEES → CODE DECIDES → UNCERTAINTY → MANUAL REVIEW
  *
  * Provider roles:
  *   NVIDIA NIM   — Primary visual perception (SEES)
  *   Gemini Flash — Fallback visual perception (SEES, only on NVIDIA failure)
- *   Groq         — Text-only consistency auditor (AUDITS, never sees images)
+ *   Groq         — Reserved for separate non-evidence features only.
  *
  * ⚠️  SECURITY NOTE: These keys are bundled into the React Native APK/IPA.
  * Any motivated user can extract them from the binary. For production:
@@ -43,8 +43,7 @@ export const AI_CONFIG = {
         process.env.EXPO_PUBLIC_GEMINI_API_KEY,
     ].filter(Boolean),
 
-    // Groq is TEXT-ONLY in this account — 6 keys for auditor rotation.
-    // Groq must NEVER receive an image payload.
+    // Reserved for separate non-evidence features. Groq never receives images.
     groqApiKeys: [
         process.env.EXPO_PUBLIC_GROQ_API_KEY_1,
         process.env.EXPO_PUBLIC_GROQ_API_KEY_2,
@@ -66,10 +65,8 @@ export const AI_CONFIG = {
         'meta/llama-3.2-11b-vision-instruct',
         'gemini-3.5-flash',
     ],
-    // Groq GPT-OSS-20B = text-only consistency auditor
-    reasoningModels: [
-        'openai/gpt-oss-20b',
-    ],
+    // A second LLM must not participate in an enforcement decision.
+    reasoningModels: [],
 
     // ── Per-stage hard timeouts (ms) ─────────────────────────────────────────
     // Each stage gets exactly one primary attempt within its budget.
