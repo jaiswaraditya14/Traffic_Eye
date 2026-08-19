@@ -24,6 +24,7 @@ export const GROQ_MODELS = new Set([
 ]);
 
 export const NVIDIA_MODELS = new Set([
+    'nvidia/llama-3.1-nemotron-nano-vl-8b-v1',
     'meta/llama-3.2-11b-vision-instruct',
     'meta/llama-3.1-70b-instruct',
     'meta/llama-3.3-70b-instruct',
@@ -55,13 +56,15 @@ export const AI_CONFIG = {
     ].filter(Boolean),
 
     // ── Pipeline stage model lists (ordered: primary → fallback) ─────────────
-    // NVIDIA Llama 11B = primary visual perception
-    // Gemini 3.5 Flash = fallback visual perception (called only on NVIDIA failure)
+    // NVIDIA Nemotron Nano VL = primary visual perception (fast, accurate, low 429)
+    // Llama 11B / Gemini 3.5 Flash = fallbacks
     visionModels: [
+        'nvidia/llama-3.1-nemotron-nano-vl-8b-v1',
         'meta/llama-3.2-11b-vision-instruct',
         'gemini-3.5-flash',
     ],
     ocrModels: [
+        'nvidia/llama-3.1-nemotron-nano-vl-8b-v1',
         'meta/llama-3.2-11b-vision-instruct',
         'gemini-3.5-flash',
     ],

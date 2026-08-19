@@ -6,8 +6,13 @@ node_modules/
 dist/
 web-build/
 
-# Native folders (let EAS run prebuild cleanly)
-android/
+# Native folders
+# NOTE: android/ is intentionally NOT excluded here.
+# This project uses bare-workflow native modules (MediaStoreResolverModule.kt,
+# MediaStoreResolverPackage.kt) that are registered in MainApplication.kt.
+# These files cannot survive an EAS prebuild step, so the full android/
+# directory must be uploaded to EAS and used as-is (bare-workflow EAS build).
+# DO NOT add android/ back to this file.
 ios/
 
 # Git

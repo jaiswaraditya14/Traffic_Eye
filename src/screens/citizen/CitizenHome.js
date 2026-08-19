@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
-    Animated, StatusBar,
+    Animated, StatusBar, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -133,6 +133,10 @@ export default function CitizenHome({ navigation }) {
         desc: r.location_address || 'Report submitted',
         time: new Date(r.submitted_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
         status: r.status,
+        // r.image_url is the denormalized column; r.media[0].file_url is the
+        // normalized evidence record in report_media. Always try both so the
+        // thumbnail renders regardless of which path was used at submit time.
+        imageUrl: r.image_url || r.media?.[0]?.file_url || null,
     }));
 
     // Navigate to Reports tab within the bottom tab navigator
@@ -293,12 +297,114 @@ export default function CitizenHome({ navigation }) {
                             </TouchableOpacity>
                         </Animated.View>
 
-
-                        {/* ── Traffic Info ── */}
+                        {/* ── Recent Activity ── */}
                         <Animated.View
                             style={[
                                 styles.section,
                                 { opacity: fadeAnim, transform: [{ translateY: slideAnims[1] }] },
+                            ]}
+                        >
+                            <View style={styles.sectionHeader}>
+                                <Text style={styles.sectionTitle}>Recent Activity</Text>
+                                <TouchableOpacity onPress={handleSeeAllReports}>
+                                    <Text style={styles.seeAll}>See All</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            {recentActivity.length === 0 ? (
+                                <View style={styles.emptyActivity}>
+                                    <Ionicons name="document-outline" size={36} color={C.textTertiary} />
+                                    <Text style={styles.emptyActivityText}>No reports yet</Text>
+                                    <Text style={styles.emptyActivitySub}>Your submitted reports will appear here</Text>
+                                </View>
+                            ) : (
+                                recentActivity.map((activity) => {
+                                    const config = getStatusConfig(activity.status);
+                                    return (
+                                        <TouchableOpacity
+                                            key={activity.id}
+                                            style={styles.activityCard}
+                                            activeOpacity={0.8}
+                                            onPress={() => {
+                                                const fullReport = reports.find(r => r.id === activity.id);
+                                                navigation.getParent()?.navigate('ReportDetail', { reportId: activity.id, report: fullReport }) ??
+                                                navigation.navigate('ReportDetail', { reportId: activity.id, report: fullReport });
+                                            }}
+                                        >
+                                            {/* Left colored bar */}
+                                            <View style={[styles.cardBar, { backgroundColor: config.barColor }]} />
+
+                                            {/* Evidence thumbnail — falls back to status icon */}
+                                            <View style={styles.activityThumbContainer}>
+                                                {activity.imageUrl ? (
+                                                    <Image
+                                                        source={{ uri: activity.imageUrl }}
+                                                        style={styles.activityThumb}
+                                                        resizeMode="cover"
+                                                    />
+                                                ) : (
+                                                    <View style={[styles.activityIconFallback, { backgroundColor: config.bg }]}>
+                                                        <Ionicons name={config.icon} size={20} color={config.color} />
+                                                    </View>
+                                                )}
+                                            </View>
+
+                                            {/* Content */}
+                                            <View style={styles.activityContent}>
+                                                <Text style={styles.activityType}>{activity.type}</Text>
+                                                <Text style={styles.activityDesc}>{activity.desc}</Text>
+                                                <Text style={styles.activityTime}>{activity.time}</Text>
+                                            </View>
+
+                                            {/* Status chip */}
+                                            <View style={[styles.statusChip, { backgroundColor: config.bg }]}>
+                                                <Text style={[styles.statusChipText, { color: config.color }]}>
+                                                    {config.label}
+                                                </Text>
+                                            </View>
+                                        </TouchableOpacity>
+                                    );
+                                })
+                            )}
+                        </Animated.View>
+
+                        {/* ── Quick Services ── */}
+                        <Animated.View
+                            style={[
+                                styles.section,
+                                { opacity: fadeAnim, transform: [{ translateY: slideAnims[2] }] },
+                            ]}
+                        >
+                            <View style={styles.sectionHeader}>
+                                <Text style={styles.sectionTitle}>Quick Services</Text>
+                            </View>
+
+                            <View style={styles.servicesGrid}>
+                                {QUICK_SERVICES.map((action) => (
+                                    <TouchableOpacity
+                                        key={action.id}
+                                        style={styles.serviceCard}
+                                        activeOpacity={0.75}
+                                        onPress={() =>
+                                            navigation.getParent()?.navigate(action.screen) ??
+                                            navigation.navigate(action.screen)
+                                        }
+                                    >
+                                        <View style={[styles.serviceIcon, { backgroundColor: action.bg }]}>
+                                            <Ionicons name={action.icon} size={22} color={action.color} />
+                                        </View>
+                                        <Text style={styles.serviceText}>{action.title}</Text>
+                                        <Ionicons name="chevron-forward" size={13} color="rgba(0,0,0,0.2)" style={{ marginTop: 2 }} />
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </Animated.View>
+
+                        {/* ── Traffic Information ── */}
+                        <Animated.View
+                            style={[
+                                styles.section,
+                                { opacity: fadeAnim, transform: [{ translateY: slideAnims[3] }] },
                             ]}
                         >
                             <View style={styles.sectionHeader}>
@@ -351,90 +457,6 @@ export default function CitizenHome({ navigation }) {
                             </ScrollView>
                         </Animated.View>
 
-                        {/* ── Quick Services ── */}
-                        <Animated.View
-                            style={[
-                                styles.section,
-                                { opacity: fadeAnim, transform: [{ translateY: slideAnims[2] }] },
-                            ]}
-                        >
-                            <View style={styles.sectionHeader}>
-                                <Text style={styles.sectionTitle}>Quick Services</Text>
-                            </View>
-
-                            <View style={styles.servicesGrid}>
-                                {QUICK_SERVICES.map((action) => (
-                                    <TouchableOpacity
-                                        key={action.id}
-                                        style={styles.serviceCard}
-                                        activeOpacity={0.75}
-                                        onPress={() =>
-                                            navigation.getParent()?.navigate(action.screen) ??
-                                            navigation.navigate(action.screen)
-                                        }
-                                    >
-                                        <View style={[styles.serviceIcon, { backgroundColor: action.bg }]}>
-                                            <Ionicons name={action.icon} size={22} color={action.color} />
-                                        </View>
-                                        <Text style={styles.serviceText}>{action.title}</Text>
-                                        <Ionicons name="chevron-forward" size={13} color="rgba(0,0,0,0.2)" style={{ marginTop: 2 }} />
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        </Animated.View>
-
-                        {/* ── Recent Activity ── */}
-                        <Animated.View
-                            style={[
-                                styles.section,
-                                { opacity: fadeAnim, transform: [{ translateY: slideAnims[3] }], marginBottom: 32 },
-                            ]}
-                        >
-                            <View style={styles.sectionHeader}>
-                                <Text style={styles.sectionTitle}>Recent Activity</Text>
-                                <TouchableOpacity onPress={handleSeeAllReports}>
-                                    <Text style={styles.seeAll}>See All</Text>
-                                </TouchableOpacity>
-                            </View>
-
-                            {recentActivity.map((activity) => {
-                                const config = getStatusConfig(activity.status);
-                                return (
-                                    <TouchableOpacity
-                                        key={activity.id}
-                                        style={styles.activityCard}
-                                        activeOpacity={0.8}
-                                        onPress={() => {
-                                            const fullReport = reports.find(r => r.id === activity.id);
-                                            navigation.getParent()?.navigate('ReportDetail', { reportId: activity.id, report: fullReport }) ??
-                                            navigation.navigate('ReportDetail', { reportId: activity.id, report: fullReport });
-                                        }}
-                                    >
-                                        {/* Left colored bar */}
-                                        <View style={[styles.cardBar, { backgroundColor: config.barColor }]} />
-
-                                        {/* Icon */}
-                                        <View style={[styles.activityIcon, { backgroundColor: config.bg }]}>
-                                            <Ionicons name={config.icon} size={20} color={config.color} />
-                                        </View>
-
-                                        {/* Content */}
-                                        <View style={styles.activityContent}>
-                                            <Text style={styles.activityType}>{activity.type}</Text>
-                                            <Text style={styles.activityDesc}>{activity.desc}</Text>
-                                            <Text style={styles.activityTime}>{activity.time}</Text>
-                                        </View>
-
-                                        {/* Status chip */}
-                                        <View style={[styles.statusChip, { backgroundColor: config.bg }]}>
-                                            <Text style={[styles.statusChipText, { color: config.color }]}>
-                                                {config.label}
-                                            </Text>
-                                        </View>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </Animated.View>
                         {/* ── DEV ONLY: MapLibre Native Test ── */}
                         {__DEV__ && (
                             <TouchableOpacity
@@ -806,5 +828,43 @@ const styles = StyleSheet.create({
     statusChipText: {
         fontSize: 11,
         fontFamily: 'Nunito-Bold',
+    },
+
+    // Evidence thumbnail for Recent Activity
+    activityThumbContainer: {
+        width: 54,
+        height: 54,
+        borderRadius: 10,
+        margin: 12,
+        overflow: 'hidden',
+    },
+    activityThumb: {
+        width: '100%',
+        height: '100%',
+    },
+    activityIconFallback: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+    // Empty state for Recent Activity
+    emptyActivity: {
+        alignItems: 'center',
+        paddingVertical: 24,
+    },
+    emptyActivityText: {
+        fontSize: 15,
+        fontFamily: 'Nunito-SemiBold',
+        color: C.textSecondary,
+        marginTop: 10,
+    },
+    emptyActivitySub: {
+        fontSize: 12,
+        color: C.textTertiary,
+        marginTop: 4,
+        textAlign: 'center',
     },
 });

@@ -118,11 +118,24 @@ export function evaluateTripleRiding(evidence) {
         return { result: 'no_evidence', reason: 'Vehicle is not a two-wheeler.' };
     }
 
+    const detectedList = Array.isArray(evidence.detected_violations)
+        ? evidence.detected_violations.map(v => String(v).toUpperCase())
+        : [];
+    const hasExplicitTripleViolation = detectedList.includes('TRIPLE_RIDING') || detectedList.includes('TRIPLE RIDING');
+
     const riderCount    = Number(evidence.rider_count ?? null);
     const riderConfRaw  = 'rider_count_confidence' in evidence
         ? evidence.rider_count_confidence
         : undefined;
     const riderConf     = (riderConfRaw === null || riderConfRaw === undefined) ? null : conf(riderConfRaw);
+
+    if (hasExplicitTripleViolation) {
+        return {
+            result:   'confirmed',
+            reason:   `Triple riding explicitly identified on two-wheeler (count: ${riderCount || 3}).`,
+            violation: 'Triple Riding',
+        };
+    }
 
     if (evidence.rider_count === undefined || isNaN(riderCount) || !isFinite(riderCount)) {
         return { result: 'uncertain', reason: 'Rider count not reported by vision model.' };
@@ -151,8 +164,7 @@ export function evaluateTripleRiding(evidence) {
 /**
  * NO HELMET
  *
- * Only fires when: rider visible + head region visible + helmet CONFIRMED_ABSENT.
- * NOT_VISIBLE head → returns 'no_evidence' (do NOT flag as violation).
+ * Fires when: rider visible + head region visible + helmet CONFIRMED_ABSENT or flagged in detected_violations.
  *
  * @param {object} evidence
  * @returns {{ result: string, reason: string, violation?: string }}
@@ -163,8 +175,27 @@ export function evaluateNoHelmet(evidence) {
         return { result: 'no_evidence', reason: 'Helmet rule applies only to two-wheelers.' };
     }
 
+    const detectedList = Array.isArray(evidence.detected_violations)
+        ? evidence.detected_violations.map(v => String(v).toUpperCase())
+        : [];
+    const hasExplicitNoHelmetViolation = detectedList.includes('NO_HELMET') || detectedList.includes('NO HELMET') || detectedList.includes('WITHOUT_HELMET');
+
     const helmetStatus = evidence.helmet_status ?? evidence.helmetStatus;
-    const helmetConf   = conf(evidence.helmet_confidence ?? evidence.helmetConfidence ?? 0);
+    const helmetConf   = conf(evidence.helmet_confidence ?? evidence.helmetConfidence ?? (hasExplicitNoHelmetViolation ? 0.95 : 0));
+
+    if (hasExplicitNoHelmetViolation || isConfirmedAbsent(helmetStatus)) {
+        if (helmetConf >= CONF_HIGH || hasExplicitNoHelmetViolation) {
+            return {
+                result:    'confirmed',
+                reason:    `Rider's head visible without helmet, confidence ${Math.round((helmetConf || 0.95) * 100)}%.`,
+                violation: 'No Helmet',
+            };
+        }
+        return {
+            result: 'uncertain',
+            reason: `Helmet absence confidence too low (${Math.round(helmetConf * 100)}% < ${CONF_HIGH * 100}% threshold).`,
+        };
+    }
 
     // Head NOT visible → cannot establish absence of helmet
     if (isNotUsable(helmetStatus)) {
@@ -174,22 +205,7 @@ export function evaluateNoHelmet(evidence) {
         };
     }
 
-    if (!isConfirmedAbsent(helmetStatus)) {
-        return { result: 'no_evidence', reason: `Helmet status is "${helmetStatus}" — not confirmed absent.` };
-    }
-
-    if (helmetConf < CONF_HIGH) {
-        return {
-            result: 'uncertain',
-            reason: `Helmet absence confidence too low (${Math.round(helmetConf * 100)}% < ${CONF_HIGH * 100}% threshold).`,
-        };
-    }
-
-    return {
-        result:    'confirmed',
-        reason:    `Rider's head visible without helmet, confidence ${Math.round(helmetConf * 100)}%.`,
-        violation: 'No Helmet',
-    };
+    return { result: 'no_evidence', reason: `Helmet status is "${helmetStatus}" — not confirmed absent.` };
 }
 
 /**

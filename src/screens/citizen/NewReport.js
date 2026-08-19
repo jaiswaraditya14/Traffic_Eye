@@ -50,10 +50,6 @@ export default function NewReport({ navigation }) {
     const [trustLevel, setTrustLevel] = useState(null);
     const [isMapVisible, setIsMapVisible] = useState(false);
     const [selectedCoordinate, setSelectedCoordinate] = useState(null);
-    const [mapRegion] = useState({  // kept for mapRegion-dependent initialCoordinate below
-        latitude: location?.latitude || 28.6139,
-        longitude: location?.longitude || 77.2090,
-    });
 
     const [video, setVideo] = useState(null);
     const [mediaType, setMediaType] = useState(null);
@@ -488,10 +484,9 @@ export default function NewReport({ navigation }) {
             {/* ── Map Location Picker Modal (MapLibre / OpenFreeMap) ── */}
             <Modal visible={isMapVisible} animationType="slide" onRequestClose={() => setIsMapVisible(false)}>
                 <MapLibreMap
-                    initialCoordinate={{
-                        latitude: selectedCoordinate?.latitude || mapRegion.latitude,
-                        longitude: selectedCoordinate?.longitude || mapRegion.longitude,
-                    }}
+                    initialCoordinate={
+                        selectedCoordinate ?? (location ? { latitude: location.latitude, longitude: location.longitude } : null)
+                    }
                     selectedCoordinate={selectedCoordinate || undefined}
                     onLocationSelect={({ latitude, longitude }) =>
                         setSelectedCoordinate({ latitude, longitude })
@@ -500,6 +495,7 @@ export default function NewReport({ navigation }) {
                     showUserLocation={true}
                     showConfirmButton={true}
                     confirmText="Confirm Location"
+                    autoLocateOnMount={true}
                     onConfirm={({ coordinate, address }) => {
                         setIsMapVisible(false);
                         if (coordinate) {

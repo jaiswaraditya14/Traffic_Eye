@@ -57,63 +57,53 @@ const makeTimer = () => {
 // Output is structured observable evidence using explicit visibility states:
 //   CONFIRMED_VISIBLE | CONFIRMED_ABSENT | NOT_VISIBLE | UNCERTAIN | NOT_APPLICABLE
 //
-const VISION_PROMPT = `You are a visual-perception system for a traffic evidence platform.
-Your only job is to describe WHAT YOU CAN ACTUALLY SEE in this image.
-You are NOT a traffic law expert. Do NOT decide violations. Only observe.
+const VISION_PROMPT = `You are an expert forensic traffic violation AI.
+Inspect this photo objectively and evaluate all traffic rules with precision:
 
-VISIBILITY STATES — use these exact strings:
-  CONFIRMED_VISIBLE  — clearly and confidently observed
-  CONFIRMED_ABSENT   — clearly and confidently absent (you can see the area)
-  NOT_VISIBLE        — area is blocked, cropped, blurry, or out of frame
-  UNCERTAIN          — you can see the area but cannot clearly determine state
-  NOT_APPLICABLE     — this observation type does not apply to the subject
+1. VEHICLE & OCCUPANTS:
+   - Identify vehicle type (motorcycle, scooter, car, auto, bus, truck, etc.).
+   - TWO-WHEELERS: Count all riders by inspecting heads along the seat line (driver, middle, pillion) and legs along the sides. Check helmets (caps/hats/bare heads = helmet_status "CONFIRMED_ABSENT").
+   - FOUR-WHEELERS: Set helmet_status "NOT_APPLICABLE". Check driver/passenger seatbelts (bare torso without belt = seatbelt_status "CONFIRMED_ABSENT").
+   - Read exact license plate characters if legible.
 
-MANDATORY RULES:
-1. If you cannot see something clearly, use NOT_VISIBLE or UNCERTAIN. Never guess.
-2. Do NOT set vehicle_number to anything except "PLATE_NOT_READABLE" unless a plate is clearly legible.
-3. Do NOT determine legal violations — only report observable facts.
-4. Confidence values must be 0.0–1.0 decimal. Use 0.0 when uncertain.
-5. If image quality is too poor, set image_quality.usable = false and stop.
+2. VIOLATIONS (0, 1, or Multiple):
+   - If NO violations observed -> detected_violations = [].
+   - If 1 violation observed (e.g. only NO_HELMET, or only NO_SEATBELT, or only RED_LIGHT) -> return that single violation.
+   - If 2 or more simultaneous violations observed (e.g. NO_HELMET and TRIPLE_RIDING) -> return ALL observed violations.
 
-Return ONLY valid JSON — no markdown, no explanation, no code fences:
+Return ONLY valid JSON matching this schema:
 {
   "image_quality": {
     "usable": true,
-    "lighting": "GOOD|POOR|NIGHT|OVEREXPOSED",
-    "blur": "NONE|SLIGHT|HEAVY",
-    "confidence": 0.0
+    "confidence": 0.95
   },
-  "vehicle_type": "motorcycle|scooter|car|auto|bus|truck|tempo|other|unknown",
-  "vehicle_number": "PLATE_NOT_READABLE",
-  "plate_visible": false,
-  "plate_status": "NOT_VISIBLE",
-  "plate_confidence": 0.0,
-  "rider_count": null,
-  "rider_count_confidence": 0.0,
-  "helmet_status": "NOT_VISIBLE",
-  "helmet_confidence": 0.0,
-  "seatbelt_status": "NOT_APPLICABLE",
-  "seatbelt_confidence": 0.0,
-  "phone_status": "NOT_VISIBLE",
-  "phone_confidence": 0.0,
-  "phone_evidence": "",
-  "traffic_light_state": "NOT_VISIBLE",
-  "vehicle_position": "UNKNOWN",
-  "red_light_confidence": 0.0,
-  "road_direction_established": false,
-  "vehicle_travel_opposing": false,
-  "wrong_way_confidence": 0.0,
-  "footpath_status": "NOT_APPLICABLE",
-  "footpath_confidence": 0.0,
-  "overload_status": "NOT_APPLICABLE",
-  "overload_confidence": 0.0,
-  "cargo_evidence": "",
-  "cargo_protrudes": false,
-  "overcrowding_status": "NOT_APPLICABLE",
-  "overcrowding_confidence": 0.0,
-  "observations": [],
-  "overall_confidence": 0.0,
-  "description": ""
+  "vehicle": {
+    "type": "motorcycle|scooter|car|auto|bus|truck|tempo|other",
+    "make_model_color": "visual description",
+    "plate_number": "EXACT_PLATE_OR_PLATE_NOT_READABLE",
+    "plate_confidence": 0.95
+  },
+  "occupants_breakdown": {
+    "heads_observed_count": 1,
+    "heads_description": "description of heads/caps visible",
+    "legs_and_bodies_observed": "description of bodies and legs visible",
+    "total_rider_count": 1,
+    "helmet_status": "CONFIRMED_ABSENT|CONFIRMED_VISIBLE|NOT_APPLICABLE",
+    "helmet_confidence": 0.95,
+    "seatbelt_status": "CONFIRMED_ABSENT|CONFIRMED_VISIBLE|NOT_APPLICABLE",
+    "seatbelt_confidence": 0.95,
+    "phone_in_hand": false
+  },
+  "detected_violations": [
+    {
+      "violation_type": "NO_HELMET|TRIPLE_RIDING|PHONE_USAGE|WRONG_SIDE|RED_LIGHT|NO_SEATBELT|OTHER",
+      "severity": "HIGH|MEDIUM|LOW",
+      "confidence": 0.95,
+      "violator": "Rider|Pillion|Both|Driver|All",
+      "visual_proof": "Brief description of visual proof from image"
+    }
+  ],
+  "forensic_summary": "Concise summary of vehicle, occupants, and any infractions observed."
 }`;
 
 // ─── Stage 2: Plate OCR Prompt ────────────────────────────────────────────────
@@ -203,11 +193,35 @@ const extractJSON = (text) => {
 // ─── Vision evidence extraction from AI response ──────────────────────────────
 const parseVisionEvidence = (raw) => {
     const parsed = extractJSON(raw);
-    // Validate minimum required fields
-    if (typeof parsed.image_quality?.usable !== 'boolean') {
-        throw new Error('Vision response missing required image_quality.usable field');
+    if (parsed.image_quality && typeof parsed.image_quality.usable === 'boolean' && !parsed.image_quality.usable) {
+        return { image_quality: { usable: false } };
     }
-    return parsed;
+
+    const vehicle = parsed.vehicle || {};
+    const occupants = parsed.occupants_breakdown || parsed.occupants || {};
+    const violations = Array.isArray(parsed.detected_violations)
+        ? parsed.detected_violations.map(v => typeof v === 'object' ? v.violation_type : String(v))
+        : [];
+
+    const riderCount = occupants.total_rider_count ?? occupants.heads_observed_count ?? occupants.rider_or_passenger_count ?? parsed.rider_count ?? null;
+    const helmetStatus = occupants.helmet_status || parsed.helmet_status || (violations.some(v => v.includes('NO_HELMET')) ? 'CONFIRMED_ABSENT' : 'NOT_VISIBLE');
+
+    return {
+        ...parsed,
+        image_quality: parsed.image_quality || { usable: true },
+        vehicle_type: parsed.vehicle_type || vehicle.type || 'motorcycle',
+        vehicle_number: parsed.vehicle_number || vehicle.plate_number || 'PLATE_NOT_READABLE',
+        plate_confidence: parsed.plate_confidence ?? vehicle.plate_confidence ?? 0.95,
+        plate_status: (vehicle.plate_number && vehicle.plate_number !== 'PLATE_NOT_READABLE') ? 'CONFIRMED_VISIBLE' : 'NOT_VISIBLE',
+        rider_count: riderCount,
+        rider_count_confidence: 0.95,
+        helmet_status: helmetStatus,
+        helmet_confidence: occupants.helmet_confidence ?? 0.95,
+        seatbelt_status: occupants.seatbelt_status || 'NOT_APPLICABLE',
+        phone_status: occupants.phone_in_hand ? 'CONFIRMED_IN_USE' : 'NOT_VISIBLE',
+        detected_violations: violations,
+        description: parsed.description || parsed.forensic_summary || ''
+    };
 };
 
 // ─── Build a safe text summary for Groq (NO image data, NO API keys) ─────────

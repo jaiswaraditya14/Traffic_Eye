@@ -111,12 +111,14 @@ export default function CitizenNavigator() {
             <Stack.Screen name="ImageReportStatus" component={ImageReportStatus} />
             <Stack.Screen name="ImageReportDetail" component={ReportDetail} />
             <Stack.Screen name="MyReports" component={MyReports} />
-            {/* Dev-only MapLibre native runtime test */}
-            <Stack.Screen
-                name="MapLibreTest"
-                component={MapLibreTestScreen}
-                options={{ headerShown: true, title: 'MapLibre Native Test' }}
-            />
+            {/* Dev-only MapLibre native runtime test — excluded in production builds */}
+            {__DEV__ && (
+                <Stack.Screen
+                    name="MapLibreTest"
+                    component={MapLibreTestScreen}
+                    options={{ headerShown: true, title: 'MapLibre Native Test' }}
+                />
+            )}
         </Stack.Navigator>
     );
 }

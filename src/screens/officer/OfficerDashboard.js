@@ -183,10 +183,18 @@ export default function OfficerDashboard({ navigation }) {
                                     </View>
                                 </View>
                                 <View style={styles.headerRight}>
-                                    <TouchableOpacity style={styles.headerIconBtn}>
+                                    <TouchableOpacity
+                                        style={styles.headerIconBtn}
+                                        onPress={() => navigation.navigate('OfficerSettings')}
+                                        activeOpacity={0.8}
+                                    >
                                         <Ionicons name="settings-outline" size={20} color={C.white} />
                                     </TouchableOpacity>
-                                    <TouchableOpacity style={styles.headerIconBtn}>
+                                    <TouchableOpacity
+                                        style={styles.headerIconBtn}
+                                        onPress={() => navigation.navigate('OfficerNotifications')}
+                                        activeOpacity={0.8}
+                                    >
                                         <Ionicons name="notifications-outline" size={20} color={C.white} />
                                         <View style={styles.notifDot} />
                                     </TouchableOpacity>

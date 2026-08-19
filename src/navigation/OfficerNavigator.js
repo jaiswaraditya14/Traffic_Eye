@@ -19,6 +19,7 @@ import {
     VerifiedReportDetail,
     ViolationHeatmap,
     OfficerReportExport,
+    Notifications,
 } from '../screens';
 
 const Tab = createBottomTabNavigator();
@@ -82,6 +83,7 @@ export default function OfficerNavigator() {
             <Stack.Screen name="VerifiedReportDetail" component={VerifiedReportDetail} />
             <Stack.Screen name="OfficerSettings" component={OfficerSettings} />
             <Stack.Screen name="OfficerReportExport" component={OfficerReportExport} />
+            <Stack.Screen name="OfficerNotifications" component={Notifications} />
         </Stack.Navigator>
     );
 }
