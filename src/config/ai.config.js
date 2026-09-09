@@ -1,83 +1,30 @@
 /**
- * AI model registry — Traffic Eye Production Configuration
+ * AI model registry — Traffic Eye
  *
  * Architecture: AI SEES → CODE DECIDES → UNCERTAINTY → MANUAL REVIEW
  *
- * Provider roles:
- *   NVIDIA NIM   — Primary visual perception (SEES)
- *   Gemini Flash — Fallback visual perception (SEES, only on NVIDIA failure)
- *   Groq         — Reserved for separate non-evidence features only.
+ * ── Security boundary ───────────────────────────────────────────────────────
+ * This file deliberately contains NO API keys and NO provider endpoints.
  *
- * ⚠️  SECURITY NOTE: These keys are bundled into the React Native APK/IPA.
- * Any motivated user can extract them from the binary. For production:
- *   - Restrict each key's scope to only the Traffic Eye app (per-provider API settings).
- *   - Rate-limit keys at the provider level.
- *   - Rotate keys regularly.
- *   - Consider a backend API proxy so keys never ship in the client bundle.
+ * Provider credentials live only in Supabase Edge Function secrets and are
+ * used exclusively by `supabase/functions/ai-analyze`. Anything placed in an
+ * `EXPO_PUBLIC_*` variable is inlined into the JS bundle and is extractable
+ * from any installed APK/IPA, so it is not a secret.
+ *
+ * Model selection, prompt text, timeouts, rotation, and per-user quota are
+ * all owned by the Edge Function. The client may only name a pipeline stage.
  */
 
-export const GROQ_MODELS = new Set([
-    'openai/gpt-oss-20b',
-    'openai/gpt-oss-120b',
-    'qwen/qwen3.6-27b',
-    'llama-3.3-70b-versatile',
-]);
-
-export const NVIDIA_MODELS = new Set([
-    'nvidia/llama-3.1-nemotron-nano-vl-8b-v1',
-    'meta/llama-3.2-11b-vision-instruct',
-    'meta/llama-3.1-70b-instruct',
-    'meta/llama-3.3-70b-instruct',
-]);
-
 export const AI_CONFIG = {
-    // ── API keys (read at runtime; never hard-coded) ──────────────────────────
-    nvidiaApiKeys: [
-        process.env.EXPO_PUBLIC_NVIDIA_API_KEY_1,
-        process.env.EXPO_PUBLIC_NVIDIA_API_KEY,
-    ].filter(Boolean),
+    // Pipeline stages the client is permitted to request from the server.
+    // The server maps each stage to its own prompt and model allow-list.
+    stages: ['vision', 'ocr', 'audit'],
 
-    geminiApiKeys: [
-        process.env.EXPO_PUBLIC_GEMINI_API_KEY_1,
-        process.env.EXPO_PUBLIC_GEMINI_API_KEY_2,
-        process.env.EXPO_PUBLIC_GEMINI_API_KEY_3,
-        process.env.EXPO_PUBLIC_GEMINI_API_KEY,
-    ].filter(Boolean),
+    // Client-side deadline for the Edge Function round trip. The authoritative
+    // per-provider timeout is enforced server-side; this is only so the UI
+    // cannot hang if the network stalls.
+    edgeFunctionTimeoutMs: 25000,
 
-    // Reserved for separate non-evidence features. Groq never receives images.
-    groqApiKeys: [
-        process.env.EXPO_PUBLIC_GROQ_API_KEY_1,
-        process.env.EXPO_PUBLIC_GROQ_API_KEY_2,
-        process.env.EXPO_PUBLIC_GROQ_API_KEY_3,
-        process.env.EXPO_PUBLIC_GROQ_API_KEY_4,
-        process.env.EXPO_PUBLIC_GROQ_API_KEY_5,
-        process.env.EXPO_PUBLIC_GROQ_API_KEY_6,
-        process.env.EXPO_PUBLIC_GROQ_API_KEY,
-    ].filter(Boolean),
-
-    // ── Pipeline stage model lists (ordered: primary → fallback) ─────────────
-    // NVIDIA Nemotron Nano VL = primary visual perception (fast, accurate, low 429)
-    // Llama 11B / Gemini 3.5 Flash = fallbacks
-    visionModels: [
-        'nvidia/llama-3.1-nemotron-nano-vl-8b-v1',
-        'meta/llama-3.2-11b-vision-instruct',
-        'gemini-3.5-flash',
-    ],
-    ocrModels: [
-        'nvidia/llama-3.1-nemotron-nano-vl-8b-v1',
-        'meta/llama-3.2-11b-vision-instruct',
-        'gemini-3.5-flash',
-    ],
-    // A second LLM must not participate in an enforcement decision.
-    reasoningModels: [],
-
-    // ── Per-stage hard timeouts (ms) ─────────────────────────────────────────
-    // Each stage gets exactly one primary attempt within its budget.
-    // Fallback to Gemini is counted as a second attempt within visionMs budget.
-    timeoutVisionMs:   12000,  // 12s per provider attempt (primary + fallback separate)
-    timeoutOcrMs:      10000,  // 10s — conditional, only when plate unresolved
-    timeoutAuditorMs:   8000,  // 8s — Groq text-only audit; fast model (~490ms typical)
-
-    // Max attempts before a stage is considered failed
-    maxAttemptsPerStage: 2,
+    // Name of the Edge Function that owns all provider access.
+    analyzeFunctionName: 'ai-analyze',
 };

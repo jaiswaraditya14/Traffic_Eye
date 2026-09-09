@@ -19,29 +19,21 @@
  *   No LLM may invent vehicle registration numbers
  *   Groq never receives image payloads
  *
- * ⚠️  Security note: API keys are in EXPO_PUBLIC_* env vars and are therefore
- * bundled in the APK/IPA. They are NOT server secrets. See ai.config.js.
+ * ── Security boundary ───────────────────────────────────────────────────────
+ * This module holds no provider credentials and contacts no provider endpoint.
+ * Stages 1, 2 and 3 are executed by the authenticated Supabase Edge Function
+ * `ai-analyze`, which owns the prompts, the model allow-list, the timeouts and
+ * the per-user quota. Stage 0 (preprocessing) and Stage RE (the rule engine)
+ * remain on-device because they touch the raw local file and must not send it
+ * anywhere.
  */
 
-import { AI_CONFIG }  from '../../config';
-import { stripThinkTags, buildAttemptQueue, runWithRotation, callAI } from './utils';
+import { stripThinkTags, invokeAiStage, AiStageError } from './utils';
 import { checkLocalIntegrity, prepareVisionImage, prepareOcrImage } from './preprocessing';
 import { applyRules, VIOLATION_SEVERITY } from './ruleEngine';
 
 // Re-export shared utilities for callers that import from this module
-export { stripThinkTags, buildAttemptQueue, runWithRotation, callAI } from './utils';
-
-// ─── Diagnostics ──────────────────────────────────────────────────────────────
-const logDiagnostics = () => {
-    const g = AI_CONFIG.geminiApiKeys?.length || 0;
-    const q = AI_CONFIG.groqApiKeys?.length   || 0;
-    const n = AI_CONFIG.nvidiaApiKeys?.length  || 0;
-    console.log(`[AI] Keys — NVIDIA(${n}) Gemini(${g}) Groq(${q})`);
-    console.log(`[AI] Vision Models:    ${(AI_CONFIG.visionModels    || []).join(' → ')}`);
-    console.log(`[AI] OCR Models:       ${(AI_CONFIG.ocrModels       || []).join(' → ')}`);
-    console.log(`[AI] Reasoning Models: ${(AI_CONFIG.reasoningModels || []).join(' → ')}`);
-    if (!g && !q && !n) console.error('[AI] ⚠️  No API keys — check .env and restart.');
-};
+export { stripThinkTags, invokeAiStage, AiStageError } from './utils';
 
 // ─── Telemetry helper ─────────────────────────────────────────────────────────
 const makeTimer = () => {
@@ -49,132 +41,10 @@ const makeTimer = () => {
     return { elapsed: () => Date.now() - start };
 };
 
-// ─── Stage 1: Structured Evidence Vision Prompt ───────────────────────────────
-//
-// The model's role: PERCEIVE and DESCRIBE observable facts.
-// The model's role is NOT: decide violations, apply legal rules, or invent data.
-//
-// Output is structured observable evidence using explicit visibility states:
-//   CONFIRMED_VISIBLE | CONFIRMED_ABSENT | NOT_VISIBLE | UNCERTAIN | NOT_APPLICABLE
-//
-const VISION_PROMPT = `You are an expert forensic traffic violation AI.
-Inspect this photo objectively and evaluate all traffic rules with precision:
-
-1. VEHICLE & OCCUPANTS:
-   - Identify vehicle type (motorcycle, scooter, car, auto, bus, truck, etc.).
-   - TWO-WHEELERS: Count all riders by inspecting heads along the seat line (driver, middle, pillion) and legs along the sides. Check helmets (caps/hats/bare heads = helmet_status "CONFIRMED_ABSENT").
-   - FOUR-WHEELERS: Set helmet_status "NOT_APPLICABLE". Check driver/passenger seatbelts (bare torso without belt = seatbelt_status "CONFIRMED_ABSENT").
-   - Read exact license plate characters if legible.
-
-2. VIOLATIONS (0, 1, or Multiple):
-   - If NO violations observed -> detected_violations = [].
-   - If 1 violation observed (e.g. only NO_HELMET, or only NO_SEATBELT, or only RED_LIGHT) -> return that single violation.
-   - If 2 or more simultaneous violations observed (e.g. NO_HELMET and TRIPLE_RIDING) -> return ALL observed violations.
-
-Return ONLY valid JSON matching this schema:
-{
-  "image_quality": {
-    "usable": true,
-    "confidence": 0.95
-  },
-  "vehicle": {
-    "type": "motorcycle|scooter|car|auto|bus|truck|tempo|other",
-    "make_model_color": "visual description",
-    "plate_number": "EXACT_PLATE_OR_PLATE_NOT_READABLE",
-    "plate_confidence": 0.95
-  },
-  "occupants_breakdown": {
-    "heads_observed_count": 1,
-    "heads_description": "description of heads/caps visible",
-    "legs_and_bodies_observed": "description of bodies and legs visible",
-    "total_rider_count": 1,
-    "helmet_status": "CONFIRMED_ABSENT|CONFIRMED_VISIBLE|NOT_APPLICABLE",
-    "helmet_confidence": 0.95,
-    "seatbelt_status": "CONFIRMED_ABSENT|CONFIRMED_VISIBLE|NOT_APPLICABLE",
-    "seatbelt_confidence": 0.95,
-    "phone_in_hand": false
-  },
-  "detected_violations": [
-    {
-      "violation_type": "NO_HELMET|TRIPLE_RIDING|PHONE_USAGE|WRONG_SIDE|RED_LIGHT|NO_SEATBELT|OTHER",
-      "severity": "HIGH|MEDIUM|LOW",
-      "confidence": 0.95,
-      "violator": "Rider|Pillion|Both|Driver|All",
-      "visual_proof": "Brief description of visual proof from image"
-    }
-  ],
-  "forensic_summary": "Concise summary of vehicle, occupants, and any infractions observed."
-}`;
-
-// ─── Stage 2: Plate OCR Prompt ────────────────────────────────────────────────
-const PLATE_OCR_PROMPT = `You are a specialist license plate OCR system for Indian vehicles.
-Your ONLY job is to read the number plate text as accurately as possible.
-
-MANDATORY RULES:
-1. Read EVERY character individually — never guess or infer missing characters.
-2. Common lookalike pairs: 0/O, 1/I/l, 8/B, 5/S, 6/G, 2/Z, 4/A, 7/T
-3. Use "?" for any genuinely unreadable character position.
-4. Focus ONLY on the PRIMARY vehicle's plate — ignore background plates.
-5. If no plate is visible at all, return plate_text = "PLATE_NOT_READABLE".
-
-INDIAN PLATE FORMAT REFERENCE:
-  Standard:  [STATE 2-LTR][DISTRICT 2-NUM][SERIES 1-2-LTR][NUM 4-DIGIT]
-  Examples:  MH12AB1234  KA04MF0099  DL8CAK0001  UP32ET5678
-  BH series: 23BH1234AA
-
-Return ONLY this JSON, nothing else:
-{
-  "plate_text": "PLATE_NOT_READABLE",
-  "confidence_percent": 0,
-  "uncertain_characters": [],
-  "notes": ""
-}`;
-
-// ─── Stage 3: Groq Auditor Prompt ────────────────────────────────────────────
-// Groq receives ONLY text (structured evidence + candidate violations).
-// It NEVER receives image data.
-//
-// Groq's responsibilities:
-//   1. Validate JSON structure and logical consistency.
-//   2. Detect contradictions (e.g. triple riding evidence + person_count=2).
-//   3. Reject violations not supported by evidence.
-//   4. Verify confidence/evidence relationships.
-//   5. Ensure no unsupported plate text is being claimed.
-//   6. Normalize and return the final audited response.
-//
-const GROQ_AUDIT_PROMPT = (evidenceSummary, candidates) => `You are a senior traffic enforcement officer and evidence auditor.
-You have received structured evidence from a visual perception system and a list of candidate violations proposed by a rule engine.
-
-YOUR ROLE: Audit the logical consistency. Accept well-supported violations. Reject unsupported ones. Flag contradictions.
-
-MANDATORY RULES — FAIL-CLOSED:
-1. If evidence says "UNCERTAIN" or "NOT_VISIBLE", you MUST NOT assert that violation.
-2. If rider_count is uncertain, you MUST NOT accept "Triple Riding".
-3. If helmet_status is NOT_VISIBLE or UNCERTAIN, you MUST reject "No Helmet".
-4. If seatbelt is NOT_VISIBLE or UNCERTAIN, you MUST reject "No Seatbelt".
-5. If road_direction_established is false, you MUST reject "Wrong Side Driving".
-6. If vehicle_position does not confirm crossing stop line, you MUST reject "Red Light Violation".
-7. Never invent a plate number. If plate_text is "PLATE_NOT_READABLE", keep it that way.
-8. Never change UNCERTAIN to CONFIRMED_ABSENT.
-9. If evidence is contradictory, set requires_manual_review = true.
-
-EVIDENCE SUMMARY:
-${evidenceSummary}
-
-CANDIDATE VIOLATIONS PROPOSED BY RULE ENGINE:
-${candidates.length > 0 ? candidates.join(', ') : 'NONE'}
-
-Return ONLY this JSON:
-{
-  "accepted_violations": [],
-  "rejected_violations": [],
-  "rejection_reasons": {},
-  "contradictions": [],
-  "requires_manual_review": false,
-  "final_plate_text": "PLATE_NOT_READABLE",
-  "audit_confidence": 0.0,
-  "audit_notes": ""
-}`;
+// ─── Prompts ─────────────────────────────────────────────────────────────────
+// The vision, OCR and audit prompts live in supabase/functions/ai-analyze/prompts.ts.
+// Keeping them server-side means an extracted anon key cannot be used to run
+// arbitrary prompts against the project's paid provider credit.
 
 // ─── JSON extraction ──────────────────────────────────────────────────────────
 const extractJSON = (text) => {
@@ -373,8 +243,6 @@ export const aiService = {
         let ocrResult     = null;
         let integrity     = null;
 
-        logDiagnostics();
-
         try {
             // ═══════════════════════════════════════════════════════════════════
             // STAGE 0 — Local Preprocessing & Integrity Check
@@ -415,59 +283,23 @@ export const aiService = {
             // ═══════════════════════════════════════════════════════════════════
             if (onStageChange) onStageChange('Analyzing traffic scene...');
 
-            const visionModels  = AI_CONFIG.visionModels || [];
-            const timeoutVision = AI_CONFIG.timeoutVisionMs || 12000;
-
-            // Build attempt queue: primary model first, fallback second
-            const visionAttempts = buildAttemptQueue(visionModels);
-
-            // ── Stage 1 Primary (NVIDIA) ─────────────────────────────────────
-            const primaryAttempt = visionAttempts[0];
+            // Provider selection, model fallback (NVIDIA → Gemini) and key
+            // rotation all happen server-side inside the ai-analyze Edge
+            // Function. The client only asks for the 'vision' stage.
             let visionRaw = null;
-
-            if (primaryAttempt) {
+            {
                 const t1 = makeTimer();
                 try {
-                    console.log(`[AI] Stage 1 — Primary: ${primaryAttempt.provider}/${primaryAttempt.model}`);
-                    const { text } = await runWithRotation(
-                        VISION_PROMPT, visionB64,
-                        [primaryAttempt],
-                        'S1-VISION-PRIMARY',
-                        { maxTokens: 512, timeoutMs: timeoutVision }
-                    );
-                    visionRaw = text;
-                    providerUsed = primaryAttempt.provider;
+                    const res = await invokeAiStage({ stage: 'vision', imageBase64: visionB64 });
+                    visionRaw     = res.text;
+                    providerUsed  = res.provider;
+                    fallbackUsed  = res.provider === 'gemini';
                     telemetry.vision_primary_ms = t1.elapsed();
-                    console.log(`[AI] Stage 1 Primary: ✅ ${telemetry.vision_primary_ms}ms`);
-                } catch (primaryErr) {
+                    console.log(`[AI] Stage 1 Vision: ✅ ${telemetry.vision_primary_ms}ms (server provider=${res.provider})`);
+                } catch (visionErr) {
                     telemetry.vision_primary_ms = t1.elapsed();
-                    console.warn(`[AI] Stage 1 Primary: ✗ ${primaryErr.message} — trying fallback`);
-                    if (onStageChange) onStageChange('Performing additional verification...');
-                }
-            }
-
-            // ── Stage 1F Fallback (Gemini) ────────────────────────────────────
-            if (!visionRaw) {
-                const fallbackAttempts = visionAttempts.slice(1, 2);
-                if (fallbackAttempts.length > 0) {
-                    const t1f = makeTimer();
-                    try {
-                        console.log(`[AI] Stage 1F — Fallback: ${fallbackAttempts[0].provider}/${fallbackAttempts[0].model}`);
-                        const { text } = await runWithRotation(
-                            VISION_PROMPT, visionB64,
-                            fallbackAttempts,
-                            'S1-VISION-FALLBACK',
-                            { maxTokens: 512, timeoutMs: timeoutVision, maxAttempts: 1 }
-                        );
-                        visionRaw = text;
-                        providerUsed  = fallbackAttempts[0].provider;
-                        fallbackUsed  = true;
-                        telemetry.vision_fallback_ms = t1f.elapsed();
-                        console.log(`[AI] Stage 1F Fallback: ✅ ${telemetry.vision_fallback_ms}ms`);
-                    } catch (fallbackErr) {
-                        telemetry.vision_fallback_ms = t1f.elapsed();
-                        console.error(`[AI] Stage 1F Fallback: ✗ ${fallbackErr.message}`);
-                    }
+                    const code = visionErr instanceof AiStageError ? visionErr.code : 'UNKNOWN';
+                    console.warn(`[AI] Stage 1 Vision: ✗ ${code}`);
                 }
             }
 
@@ -550,17 +382,7 @@ export const aiService = {
                 try {
                     console.log('[AI] Stage 2 — OCR: plate present but unreadable, attempting OCR');
                     const ocrB64 = await prepareOcrImage(cleanUri);
-                    const ocrAttempts = buildAttemptQueue(AI_CONFIG.ocrModels || AI_CONFIG.visionModels || []);
-                    const { text: rawOCR } = await runWithRotation(
-                        PLATE_OCR_PROMPT, ocrB64,
-                        ocrAttempts,
-                        'S2-OCR',
-                        {
-                            maxTokens: 256,
-                            timeoutMs: AI_CONFIG.timeoutOcrMs || 10000,
-                            maxAttempts: AI_CONFIG.maxAttemptsPerStage || 2,
-                        }
-                    );
+                    const { text: rawOCR } = await invokeAiStage({ stage: 'ocr', imageBase64: ocrB64 });
                     const parsedOCR = extractJSON(rawOCR);
                     if (isVerifiedOcrPlate(parsedOCR)) {
                         ocrResult = parsedOCR;
@@ -590,23 +412,20 @@ export const aiService = {
             //
             if (onStageChange) onStageChange('Validating evidence...');
             const candidateViolations = ruleResult.confirmedViolations;
-            const groqAttempts = buildAttemptQueue(AI_CONFIG.reasoningModels || []);
 
-            if (groqAttempts.length > 0 && candidateViolations.length > 0) {
+            if (candidateViolations.length > 0) {
                 const t3 = makeTimer();
                 try {
                     const evidenceSummary = buildEvidenceSummary(evidence, ruleResult);
-                    const auditPrompt     = GROQ_AUDIT_PROMPT(evidenceSummary, candidateViolations);
 
-                    console.log(`[AI] Stage 3 — Groq audit: candidates=[${candidateViolations.join(', ')}]`);
+                    console.log(`[AI] Stage 3 — audit: candidates=[${candidateViolations.join(', ')}]`);
 
-                    const { text: auditRaw } = await runWithRotation(
-                        auditPrompt,
-                        null,             // ← NO IMAGE — Groq is text-only
-                        groqAttempts,
-                        'S3-AUDIT',
-                        { maxTokens: 384, timeoutMs: AI_CONFIG.timeoutAuditorMs || 8000, jsonMode: true }
-                    );
+                    // Text-only. The Edge Function sends no image to the auditor.
+                    const { text: auditRaw } = await invokeAiStage({
+                        stage: 'audit',
+                        evidenceSummary,
+                        candidates: candidateViolations,
+                    });
 
                     const parsedAudit = extractJSON(auditRaw);
 
@@ -623,10 +442,8 @@ export const aiService = {
                     // This is safe because the rule engine is already fail-closed
                 }
                 telemetry.reasoning_ms = t3.elapsed();
-            } else if (candidateViolations.length === 0) {
-                console.log('[AI] Stage 3 Groq audit: skipped — no candidate violations');
             } else {
-                console.log('[AI] Stage 3 Groq audit: skipped — no reasoning models configured');
+                console.log('[AI] Stage 3 audit: skipped — no candidate violations');
             }
 
             // ═══════════════════════════════════════════════════════════════════
