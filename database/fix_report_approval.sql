@@ -1,24 +1,8 @@
 -- =============================================================================
--- Migration: 20260817000001_fix_officer_review_and_guard_trigger.sql
--- Description:
---   1. Fix guard_protected_profile_columns() to allow server-side RPCs using
---      the transaction session flag 'traffic_eye.allow_profile_update', while
---      continuing to strictly block direct client REST modifications.
---   2. Harden submit_officer_review() with:
---      - Authenticated caller check (auth.uid())
---      - Officer role verification (role IN ('officer', 'admin'))
---      - Atomic row locking (SELECT ... FOR UPDATE)
---      - Idempotency guard (returns early if not 'pending', preventing double-points)
---      - Atomic points award and auditable point_transactions record
---      - Citizen notification on both approved and rejected outcomes
---   3. Update award_submission_points, award_points, and redeem_reward_item
---      with the transaction session flag for seamless execution.
+-- TRAFFIC EYE: FIX OFFICER REPORT APPROVAL & SECURE POINTS ARCHITECTURE
 -- =============================================================================
 
--- ── 1. GUARD TRIGGER FUNCTION ON public.profiles ─────────────────────────────
--- Blocks direct client REST modification of points_balance, role, and badge_id,
--- while permitting trusted server-side RPCs that set traffic_eye.allow_profile_update = 'on'.
-
+-- ── 1. FIX TRIGGER: Allow server-side RPCs to modify points_balance ───────────
 CREATE OR REPLACE FUNCTION public.guard_protected_profile_columns()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -56,7 +40,7 @@ BEGIN
 END;
 $$;
 
--- Drop and recreate the trigger
+-- Drop and re-attach trigger to public.profiles
 DROP TRIGGER IF EXISTS guard_profile_columns_update ON public.profiles;
 CREATE TRIGGER guard_profile_columns_update
     BEFORE UPDATE ON public.profiles
@@ -66,10 +50,7 @@ CREATE TRIGGER guard_profile_columns_update
 REVOKE ALL ON FUNCTION public.guard_protected_profile_columns() FROM PUBLIC;
 
 
--- ── 2. SUBMIT OFFICER REVIEW RPC ─────────────────────────────────────────────
--- Atomically processes officer decision (approve/reject), validates officer role,
--- awards severity-based points, logs transaction, and notifies citizen.
-
+-- ── 2. HARDEN submit_officer_review() RPC ────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.submit_officer_review(
     p_report_id    UUID,
     p_officer_id   UUID,
@@ -91,7 +72,7 @@ DECLARE
     v_notif_title  TEXT;
     v_notif_body   TEXT;
 BEGIN
-    -- 1. Validate decision value
+    -- 1. Validate decision parameter
     IF p_decision NOT IN ('approved', 'rejected') THEN
         RAISE EXCEPTION 'Invalid decision: %. Must be approved or rejected.', p_decision
             USING ERRCODE = 'invalid_parameter_value';
@@ -100,7 +81,6 @@ BEGIN
     -- 2. Verify authenticated caller
     v_caller_id := auth.uid();
     IF v_caller_id IS NULL THEN
-        -- Fallback to p_officer_id if auth.uid() is not set in local simulation context
         v_caller_id := p_officer_id;
     END IF;
 
@@ -109,14 +89,14 @@ BEGIN
             USING ERRCODE = 'insufficient_privilege';
     END IF;
 
-    -- 3. Verify officer / admin role
+    -- 3. Verify caller is an authorized officer or admin
     SELECT role INTO v_caller_role FROM public.profiles WHERE id = v_caller_id;
     IF v_caller_role IS NULL OR v_caller_role NOT IN ('officer', 'admin') THEN
         RAISE EXCEPTION 'Unauthorized: Only verified traffic officers can review reports.'
             USING ERRCODE = 'insufficient_privilege';
     END IF;
 
-    -- 4. Lock report row atomically to prevent race conditions
+    -- 4. Lock report row to prevent race conditions
     SELECT * INTO v_report
     FROM public.image_reports
     WHERE id = p_report_id
@@ -127,7 +107,7 @@ BEGIN
             USING ERRCODE = 'no_data_found';
     END IF;
 
-    -- 5. Idempotency guard: if already reviewed, return early without double-crediting
+    -- 5. Idempotency guard: prevent double approval/points if tapped rapidly
     IF v_report.status <> 'pending' THEN
         RETURN jsonb_build_object(
             'success',          false,
@@ -137,10 +117,10 @@ BEGIN
         );
     END IF;
 
-    -- 6. Set transaction session flag to allow server-side profile points update
+    -- 6. Set internal session flag for points update
     PERFORM set_config('traffic_eye.allow_profile_update', 'on', true);
 
-    -- 7. Insert or update officer_reviews record
+    -- 7. Insert or update review record
     INSERT INTO public.officer_reviews (report_id, officer_id, decision, remarks, internal_notes)
     VALUES (p_report_id, v_caller_id, p_decision, p_remarks, p_internal)
     ON CONFLICT (report_id) DO UPDATE
@@ -189,7 +169,7 @@ BEGIN
         );
     END IF;
 
-    -- 11. Send notification to citizen
+    -- 11. Send push notification to citizen
     IF p_decision = 'approved' THEN
         v_notif_title := 'Report Approved! 🎉';
         v_notif_body  := COALESCE(p_remarks,
@@ -223,9 +203,9 @@ REVOKE ALL ON FUNCTION public.submit_officer_review(UUID, UUID, TEXT, TEXT, TEXT
 GRANT EXECUTE ON FUNCTION public.submit_officer_review(UUID, UUID, TEXT, TEXT, TEXT) TO authenticated;
 
 
--- ── 3. HARDEN OTHER POINTS RPCs WITH SESSION FLAG ───────────────────────────
+-- ── 3. UPDATE OTHER REWARD RPCs ──────────────────────────────────────────────
 
--- 3A. award_submission_points (called on report submission)
+-- 3A. award_submission_points (called when filing report)
 CREATE OR REPLACE FUNCTION public.award_submission_points(
     p_user_id   UUID,
     p_report_id UUID
@@ -271,56 +251,7 @@ REVOKE ALL ON FUNCTION public.award_submission_points(UUID, UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.award_submission_points(UUID, UUID) TO authenticated;
 
 
--- 3B. award_points (generic admin/system award)
-CREATE OR REPLACE FUNCTION public.award_points(
-    p_user_id     UUID,
-    p_points      INTEGER,
-    p_action      TEXT    DEFAULT 'report_approved',
-    p_description TEXT    DEFAULT 'Points awarded',
-    p_ref_id      UUID    DEFAULT NULL
-)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-    v_new_balance INTEGER;
-BEGIN
-    IF p_points <= 0 THEN
-        RAISE EXCEPTION 'Points must be positive' USING ERRCODE = 'invalid_parameter_value';
-    END IF;
-
-    -- Allow server-side profile update
-    PERFORM set_config('traffic_eye.allow_profile_update', 'on', true);
-
-    UPDATE public.profiles
-    SET points_balance = points_balance + p_points
-    WHERE id = p_user_id
-    RETURNING points_balance INTO v_new_balance;
-
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'User % not found', p_user_id USING ERRCODE = 'no_data_found';
-    END IF;
-
-    INSERT INTO public.point_transactions
-        (user_id, amount, type, action, reference_id, description)
-    VALUES
-        (p_user_id, p_points, 'earned', p_action, p_ref_id, p_description);
-
-    RETURN jsonb_build_object(
-        'success',     true,
-        'pointsAdded', p_points,
-        'newBalance',  v_new_balance
-    );
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.award_points(UUID, INTEGER, TEXT, TEXT, UUID) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.award_points(UUID, INTEGER, TEXT, TEXT, UUID) TO authenticated;
-
-
--- 3C. redeem_reward_item (points redemption)
+-- 3B. redeem_reward_item (called during gift redemption)
 CREATE OR REPLACE FUNCTION public.redeem_reward_item(
     p_user_id    UUID,
     p_item_id    TEXT,

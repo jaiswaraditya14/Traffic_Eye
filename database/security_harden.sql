@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------------
--- TRAFFIC EYE — SECURITY HARDENING PATCH 2
+-- TRAFFIC EYE ï¿½ SECURITY HARDENING PATCH 2
 -- File: 20260816000002_security_hardening_patch.sql
 -- ---------------------------------------------------------------------------
 --
@@ -34,17 +34,17 @@ CREATE INDEX IF NOT EXISTS idx_badge_rate_limit_source_time
     ON public.badge_lookup_rate_limit (source_key, attempt_at DESC);
 
 ALTER TABLE public.badge_lookup_rate_limit ENABLE ROW LEVEL SECURITY;
--- No client policies needed — only accessible from SECURITY DEFINER functions
+-- No client policies needed ï¿½ only accessible from SECURITY DEFINER functions
 
 
--- -- 2. FIX guard_protected_profile_columns() — remove wrong WHEN clause ---
+-- -- 2. FIX guard_protected_profile_columns() ï¿½ remove wrong WHEN clause ---
 --
 -- BUG IN PREVIOUS VERSION:
 --   WHEN (current_user IN ('authenticator', 'anon', 'authenticated'))
 -- In Supabase/PostgREST all client queries run as the 'authenticator' role.
 -- 'authenticated' and 'anon' are PostgREST JWT claim identifiers, not
 -- PostgreSQL session roles. The WHEN clause was fragile and its intent
--- ambiguous. FIX: remove WHEN clause entirely — trigger fires unconditionally.
+-- ambiguous. FIX: remove WHEN clause entirely ï¿½ trigger fires unconditionally.
 -- SECURITY DEFINER RPCs bypass triggers (they run as owner), which is correct.
 
 CREATE OR REPLACE FUNCTION public.guard_protected_profile_columns()
@@ -97,10 +97,10 @@ CREATE POLICY "Users can update own profile safe cols"
     WITH CHECK ((SELECT auth.uid()) = id);
 
 
--- -- 4. safe_update_own_profile() — DB-enforced field allow-list -----------
+-- -- 4. safe_update_own_profile() ï¿½ DB-enforced field allow-list -----------
 --
 -- authService.updateProfile() accepts an arbitrary updates object.
--- This RPC is the hardened replacement — only full_name and avatar_url
+-- This RPC is the hardened replacement ï¿½ only full_name and avatar_url
 -- can be changed. Any attempt to modify role/badge_id/points is ignored
 -- at the application layer AND blocked by the trigger above.
 
@@ -141,12 +141,12 @@ REVOKE ALL ON FUNCTION public.safe_update_own_profile(TEXT, TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.safe_update_own_profile(TEXT, TEXT) TO authenticated;
 
 
--- -- 5. get_officer_email_by_badge() — rate-limited rewrite ----------------
+-- -- 5. get_officer_email_by_badge() ï¿½ rate-limited rewrite ----------------
 --
 -- PROBLEM: Previous version callable by anon with no rate limiting.
 -- FIX: Track call count per pg_backend_pid + hour bucket.
 -- Limit: 10 attempts per 5-minute window. Returns NULL silently on limit.
--- Anon grant kept — badge login must work before authentication.
+-- Anon grant kept ï¿½ badge login must work before authentication.
 
 DROP FUNCTION IF EXISTS public.get_officer_email_by_badge(TEXT);
 
@@ -179,7 +179,7 @@ BEGIN
 
     -- Hard limit: 10 attempts per 5-minute window
     IF v_attempt_count >= 10 THEN
-        -- Fail silently — do not reveal rate-limiting is active
+        -- Fail silently ï¿½ do not reveal rate-limiting is active
         RETURN NULL;
     END IF;
 
@@ -198,7 +198,7 @@ BEGIN
     WHERE badge_id = trim(upper(p_badge_id))
       AND role     = 'officer';
 
-    RETURN v_email;  -- NULL for non-match — indistinguishable from invalid badge
+    RETURN v_email;  -- NULL for non-match ï¿½ indistinguishable from invalid badge
 END;
 $$;
 

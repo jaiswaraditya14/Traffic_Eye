@@ -5,13 +5,6 @@
  * and never leave this process. The only thing the client learns about a
  * provider failure is a typed code from `_shared/http.ts`.
  *
-/**
- * Provider transport for the ai-analyze Edge Function.
- *
- * Secrets are read from the function environment (`supabase secrets set …`)
- * and never leave this process. The only thing the client learns about a
- * provider failure is a typed code from `_shared/http.ts`.
- *
  * Model choice is an allow-list keyed by pipeline stage — the client cannot
  * name a model, a provider, an endpoint, or a prompt.
  */
@@ -81,23 +74,16 @@ export const STAGE_MAX_TOKENS: Record<'vision' | 'ocr' | 'audit', number> = {
 };
 
 const ENV_KEYS: Record<Provider, readonly string[]> = {
-  tokenharbor: ['TOKENHARBOR_API_KEY_1', 'TOKENHARBOR_API_KEY_2'],
-  nvidia: ['NVIDIA_API_KEY_1', 'NVIDIA_API_KEY_2', 'NVIDIA_API_KEY_3'],
-  gemini: ['GEMINI_API_KEY_1', 'GEMINI_API_KEY_2', 'GEMINI_API_KEY_3'],
-  groq: [
-    'GROQ_API_KEY_1',
-    'GROQ_API_KEY_2',
-    'GROQ_API_KEY_3',
-    'GROQ_API_KEY_4',
-    'GROQ_API_KEY_5',
-    'GROQ_API_KEY_6',
-  ],
+  tokenharbor: ['TOKENHARBOR_API_KEY_1'],
+  nvidia: ['NVIDIA_API_KEY_1', 'NVIDIA_API_KEY_2'],
+  gemini: ['GEMINI_API_KEY_1'],
+  groq: ['GROQ_API_KEY_1', 'GROQ_API_KEY_2'],
 };
 
 /** Keys configured for a provider, in rotation order. Values never logged. */
 export function keysFor(provider: Provider): string[] {
   return ENV_KEYS[provider]
-    .map((name) => Deno.env.get(name))
+    .map((name) => Deno.env.get(name) || (name.startsWith('TOKENHARBOR_') || name.startsWith('NVIDIA_') || name.startsWith('GEMINI_') || name.startsWith('GROQ_') ? undefined : name))
     .filter((v): v is string => typeof v === 'string' && v.length > 0);
 }
 

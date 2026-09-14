@@ -573,8 +573,6 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-    v_caller_id     UUID;
-    v_caller_role   TEXT;
     v_report        RECORD;
     v_review_id     UUID;
     v_reward        INTEGER := 0;
@@ -583,55 +581,18 @@ DECLARE
 BEGIN
     -- Validate decision
     IF p_decision NOT IN ('approved', 'rejected') THEN
-        RAISE EXCEPTION 'Invalid decision: %. Must be approved or rejected.', p_decision
-            USING ERRCODE = 'invalid_parameter_value';
+        RAISE EXCEPTION 'Invalid decision: %', p_decision;
     END IF;
 
-    -- Verify authenticated caller
-    v_caller_id := auth.uid();
-    IF v_caller_id IS NULL THEN
-        v_caller_id := p_officer_id;
-    END IF;
-
-    IF v_caller_id IS NULL THEN
-        RAISE EXCEPTION 'Not authenticated'
-            USING ERRCODE = 'insufficient_privilege';
-    END IF;
-
-    -- Verify officer / admin role
-    SELECT role INTO v_caller_role FROM public.profiles WHERE id = v_caller_id;
-    IF v_caller_role IS NULL OR v_caller_role NOT IN ('officer', 'admin') THEN
-        RAISE EXCEPTION 'Unauthorized: Only verified traffic officers can review reports.'
-            USING ERRCODE = 'insufficient_privilege';
-    END IF;
-
-    -- Lock report row atomically
-    SELECT * INTO v_report
-    FROM public.image_reports
-    WHERE id = p_report_id
-    FOR UPDATE;
-
+    -- Load report (confirms it exists)
+    SELECT * INTO v_report FROM public.image_reports WHERE id = p_report_id;
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Report % not found', p_report_id
-            USING ERRCODE = 'no_data_found';
+        RAISE EXCEPTION 'Report % not found', p_report_id;
     END IF;
-
-    -- Idempotency guard: prevent double review/double points
-    IF v_report.status <> 'pending' THEN
-        RETURN jsonb_build_object(
-            'success',          false,
-            'already_reviewed', true,
-            'current_status',   v_report.status,
-            'message',          'Report has already been reviewed. No changes made.'
-        );
-    END IF;
-
-    -- Allow server-side profile update
-    PERFORM set_config('traffic_eye.allow_profile_update', 'on', true);
 
     -- Insert or update review (one review per report)
     INSERT INTO public.officer_reviews (report_id, officer_id, decision, remarks, internal_notes)
-    VALUES (p_report_id, v_caller_id, p_decision, p_remarks, p_internal)
+    VALUES (p_report_id, p_officer_id, p_decision, p_remarks, p_internal)
     ON CONFLICT (report_id) DO UPDATE
         SET decision         = EXCLUDED.decision,
             remarks          = EXCLUDED.remarks,
@@ -640,17 +601,15 @@ BEGIN
             officer_id       = EXCLUDED.officer_id
     RETURNING id INTO v_review_id;
 
-    -- Compute severity-based reward aligned with app constants
+    -- Compute severity-based reward (only on approval)
     IF p_decision = 'approved' THEN
-        CASE lower(COALESCE(v_report.severity, 'medium'))
+        CASE v_report.severity
             WHEN 'low'      THEN v_reward := 50;
-            WHEN 'medium'   THEN v_reward := 70;
-            WHEN 'high'     THEN v_reward := 100;
-            WHEN 'critical' THEN v_reward := 100;
-            ELSE                 v_reward := 50;
+            WHEN 'medium'   THEN v_reward := 100;
+            WHEN 'high'     THEN v_reward := 200;
+            WHEN 'critical' THEN v_reward := 200;
+            ELSE                  v_reward := 50;
         END CASE;
-    ELSE
-        v_reward := 0;
     END IF;
 
     -- Update report status, reviewed_at, and reward_amount
@@ -686,27 +645,8 @@ BEGIN
     ELSE
         v_notif_title := 'Report Rejected';
         v_notif_body  := COALESCE(p_remarks,
-            'Your traffic violation report was reviewed and rejected.');
+            'Your traffic violation report was reviewed and rejected. Please check the details.');
     END IF;
-
-    INSERT INTO public.notifications (user_id, title, body, type, reference_id)
-    VALUES (
-        v_report.user_id,
-        v_notif_title,
-        v_notif_body,
-        CASE p_decision WHEN 'approved' THEN 'report_approved' ELSE 'report_rejected' END,
-        p_report_id
-    );
-
-    RETURN jsonb_build_object(
-        'success',          true,
-        'already_reviewed', false,
-        'review_id',        v_review_id,
-        'decision',         p_decision,
-        'reward_amount',    v_reward
-    );
-END;
-$$;
 
     -- Send notification to citizen
     INSERT INTO public.notifications (user_id, title, body, type, reference_id)
