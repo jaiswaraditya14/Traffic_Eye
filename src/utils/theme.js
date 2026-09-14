@@ -9,6 +9,9 @@ const { width, height } = Dimensions.get('window');
 // ─────────────────────────────────────────────────────────
 
 export const COLORS = {
+    glassLight: 'rgba(255,255,255,0.85)',
+    glassBorder: 'rgba(255,255,255,0.35)',
+    onNavyMuted: 'rgba(255,255,255,0.72)',
     // ── Primary: Deep Government Navy Blue (Authority, Security & Trust) ──
     primary: '#0F2C59',
     primaryDark: '#0A1E3F',
@@ -77,6 +80,20 @@ export const COLORS = {
     // ── Overlay ──
     overlay: 'rgba(15, 23, 42, 0.6)',
     overlayLight: 'rgba(15, 23, 42, 0.08)',
+    overlayStrong: 'rgba(10, 30, 63, 0.72)', // navy scrim for modals
+
+    // ── Semantic aliases (design-system source of truth) ─────────────────────
+    // Explicit names the design language references. These alias the palette
+    // above so both `COLORS.secondary` and `COLORS.accent` resolve identically.
+    accent: '#D97706',
+    accentDark: '#B45309',
+    accentLight: '#F59E0B',
+    accentSurface: '#FEF3C7',
+    card: '#FFFFFF',            // elevated card surface
+    cardBorder: '#E2E8F0',      // hairline card outline
+    text: '#0F172A',            // alias of textPrimary
+    textMuted: '#64748B',       // alias of textTertiary
+    mutedText: '#64748B',       // alias (naming parity)
 };
 
 // Legacy dark colors (kept for backward compat with any remaining usage)
@@ -133,6 +150,13 @@ export const DARK_COLORS = {
     borderFocus: '#6366F1',
     overlay: 'rgba(0, 0, 0, 0.6)',
     overlayLight: 'rgba(255, 255, 255, 0.06)',
+    overlayStrong: 'rgba(0, 0, 0, 0.72)',
+    // Semantic aliases (parity with light theme)
+    card: '#1E293B',
+    cardBorder: '#334155',
+    text: '#F8FAFC',
+    textMuted: '#94A3B8',
+    mutedText: '#94A3B8',
 };
 
 export const getColors = (isDarkMode = false) => {
@@ -153,6 +177,11 @@ export const SPACING = {
     xxl: 32,
     xxxl: 48,
     '4xl': 64,
+    // Raw 4-point steps that complete the design-system scale
+    // (4, 8, 12, 16, 20, 24, 32, 40, 48). The T-shirt names above skip 20/40,
+    // so these fill the gaps without renumbering existing usage.
+    '20': 20,
+    '40': 40,
 };
 
 // ─────────────────────────────────────
@@ -198,6 +227,45 @@ export const FONT_WEIGHTS = {
     semibold: '600',
     bold: '700',
     extrabold: '800',
+};
+
+// ─────────────────────────────────────
+// DM Sans families (loaded alongside Nunito in src/utils/fonts.js).
+// These back the TYPOGRAPHY presets below — the display/heading voice of the
+// design system. Existing screens keep Nunito via FONT_FAMILIES; new/shared
+// components adopt TYPOGRAPHY.
+// ─────────────────────────────────────
+
+export const DISPLAY_FONT_FAMILIES = {
+    regular: 'DMSans-Regular',
+    medium: 'DMSans-Medium',
+    semibold: 'DMSans-SemiBold',
+    bold: 'DMSans-Bold',
+    extrabold: 'DMSans-ExtraBold',
+};
+
+// ─────────────────────────────────────
+// TYPOGRAPHY — seven practical DM Sans combinations
+// Each preset is a ready-to-spread text style: { fontFamily, fontSize,
+// lineHeight, letterSpacing }. Spread directly onto a <Text> style.
+//   <Text style={[TYPOGRAPHY.h2, { color: COLORS.text }]}>…</Text>
+// ─────────────────────────────────────
+
+export const TYPOGRAPHY = {
+    // 1. Hero/display numbers & splash headers
+    display: { fontFamily: 'DMSans-ExtraBold', fontSize: 34, lineHeight: 40, letterSpacing: -0.6 },
+    // 2. Screen titles
+    h1: { fontFamily: 'DMSans-Bold', fontSize: 26, lineHeight: 32, letterSpacing: -0.4 },
+    // 3. Section titles / card headers
+    h2: { fontFamily: 'DMSans-Bold', fontSize: 20, lineHeight: 26, letterSpacing: -0.2 },
+    // 4. Emphasised body / list titles
+    subtitle: { fontFamily: 'DMSans-SemiBold', fontSize: 16, lineHeight: 22, letterSpacing: 0 },
+    // 5. Default reading text
+    body: { fontFamily: 'DMSans-Regular', fontSize: 15, lineHeight: 22, letterSpacing: 0 },
+    // 6. Buttons & compact labels (uppercase-friendly)
+    label: { fontFamily: 'DMSans-SemiBold', fontSize: 13, lineHeight: 18, letterSpacing: 0.3 },
+    // 7. Captions / metadata / helper text
+    caption: { fontFamily: 'DMSans-Medium', fontSize: 12, lineHeight: 16, letterSpacing: 0.2 },
 };
 
 // ─────────────────────────────────────
@@ -328,6 +396,21 @@ export const GRADIENTS = {
     heroDark: ['#001535', '#002452', '#1B3A6B'],
     // Card shine
     cardShine: ['rgba(255,255,255,0)', 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0)'],
+};
+
+// ─────────────────────────────────────
+// Springs — Animated.spring configs (useNativeDriver-friendly)
+// Shared motion vocabulary so interactions feel consistent app-wide.
+//   Animated.spring(scale, { toValue: 0.96, useNativeDriver: true, ...SPRINGS.snappy })
+// ─────────────────────────────────────
+
+export const SPRINGS = {
+    // Quick, tight response for taps/toggles
+    snappy: { tension: 300, friction: 20 },
+    // Balanced ease for entrances and layout shifts
+    smooth: { tension: 120, friction: 18 },
+    // Playful overshoot for celebratory moments (rewards, success)
+    bouncy: { tension: 180, friction: 8 },
 };
 
 // ─────────────────────────────────────

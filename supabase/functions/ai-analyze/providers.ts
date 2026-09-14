@@ -5,13 +5,20 @@
  * and never leave this process. The only thing the client learns about a
  * provider failure is a typed code from `_shared/http.ts`.
  *
+/**
+ * Provider transport for the ai-analyze Edge Function.
+ *
+ * Secrets are read from the function environment (`supabase secrets set …`)
+ * and never leave this process. The only thing the client learns about a
+ * provider failure is a typed code from `_shared/http.ts`.
+ *
  * Model choice is an allow-list keyed by pipeline stage — the client cannot
  * name a model, a provider, an endpoint, or a prompt.
  */
 
 import { ERR, type ErrCode } from '../_shared/http.ts';
 
-export type Provider = 'nvidia' | 'gemini' | 'groq';
+export type Provider = 'tokenharbor' | 'nvidia' | 'gemini' | 'groq';
 
 export interface Attempt {
   provider: Provider;
@@ -20,6 +27,15 @@ export interface Attempt {
 
 /** Server-owned allow-list. Anything not listed here can never be called. */
 export const ALLOWED_MODELS: Record<Provider, ReadonlySet<string>> = {
+  tokenharbor: new Set([
+    'claude-sonnet-4.6',
+    'gemini-3.8-flash',
+    'gemini-3.7-flash',
+    'qwen3.7-max',
+    'mimo-v2.5',
+    'mimo-v2.5:free',
+    'deepseek-v4.1-flash',
+  ]),
   nvidia: new Set([
     'nvidia/llama-3.1-nemotron-nano-vl-8b-v1',
     'meta/llama-3.2-11b-vision-instruct',
@@ -31,17 +47,25 @@ export const ALLOWED_MODELS: Record<Provider, ReadonlySet<string>> = {
 /** Ordered attempt chain per stage: primary first, fallback second. */
 export const STAGE_ATTEMPTS: Record<'vision' | 'ocr' | 'audit', readonly Attempt[]> = {
   vision: [
+    { provider: 'tokenharbor', model: 'claude-sonnet-4.6' },
+    { provider: 'tokenharbor', model: 'gemini-3.8-flash' },
     { provider: 'nvidia', model: 'nvidia/llama-3.1-nemotron-nano-vl-8b-v1' },
     { provider: 'nvidia', model: 'meta/llama-3.2-11b-vision-instruct' },
     { provider: 'gemini', model: 'gemini-3.5-flash' },
   ],
   ocr: [
+    { provider: 'tokenharbor', model: 'claude-sonnet-4.6' },
+    { provider: 'tokenharbor', model: 'gemini-3.8-flash' },
     { provider: 'nvidia', model: 'nvidia/llama-3.1-nemotron-nano-vl-8b-v1' },
     { provider: 'nvidia', model: 'meta/llama-3.2-11b-vision-instruct' },
     { provider: 'gemini', model: 'gemini-3.5-flash' },
   ],
-  // Text-only audit. Groq never receives image bytes.
-  audit: [{ provider: 'groq', model: 'openai/gpt-oss-20b' }],
+  // Text audit: Token Harbor mimo-v2.5:free primary, Groq fallback.
+  audit: [
+    { provider: 'tokenharbor', model: 'mimo-v2.5:free' },
+    { provider: 'tokenharbor', model: 'claude-sonnet-4.6' },
+    { provider: 'groq', model: 'openai/gpt-oss-20b' },
+  ],
 };
 
 export const STAGE_TIMEOUT_MS: Record<'vision' | 'ocr' | 'audit', number> = {
@@ -57,6 +81,7 @@ export const STAGE_MAX_TOKENS: Record<'vision' | 'ocr' | 'audit', number> = {
 };
 
 const ENV_KEYS: Record<Provider, readonly string[]> = {
+  tokenharbor: ['TOKENHARBOR_API_KEY_1', 'TOKENHARBOR_API_KEY_2'],
   nvidia: ['NVIDIA_API_KEY_1', 'NVIDIA_API_KEY_2', 'NVIDIA_API_KEY_3'],
   gemini: ['GEMINI_API_KEY_1', 'GEMINI_API_KEY_2', 'GEMINI_API_KEY_3'],
   groq: [
@@ -77,10 +102,16 @@ export function keysFor(provider: Provider): string[] {
 }
 
 export function anyProviderConfigured(): boolean {
-  return (['nvidia', 'gemini', 'groq'] as Provider[]).some((p) => keysFor(p).length > 0);
+  return (['tokenharbor', 'nvidia', 'gemini', 'groq'] as Provider[]).some((p) => keysFor(p).length > 0);
+}
+
+export function providerConfiguredFor(stage: 'vision' | 'ocr' | 'audit'): boolean {
+  return STAGE_ATTEMPTS[stage].some(({ provider }) => keysFor(provider).length > 0);
 }
 
 export class ProviderError extends Error {
+  attempts = 0;
+  latencyMs = 0;
   constructor(
     readonly code: ErrCode,
     /** Upstream HTTP status, if any. Used for retry policy and metrics only. */
@@ -112,15 +143,17 @@ async function callProvider(a: CallArgs): Promise<string> {
     throw new ProviderError(ERR.INTERNAL, null, 'model not in allow-list');
   }
 
-  const oaiCompatible = a.provider === 'groq' || a.provider === 'nvidia';
+  const oaiCompatible = a.provider === 'groq' || a.provider === 'nvidia' || a.provider === 'tokenharbor';
   const isGpt120b = a.model === 'openai/gpt-oss-120b';
 
   const url =
-    a.provider === 'groq'
-      ? 'https://api.groq.com/openai/v1/chat/completions'
-      : a.provider === 'nvidia'
-        ? 'https://integrate.api.nvidia.com/v1/chat/completions'
-        : `https://generativelanguage.googleapis.com/v1beta/models/${a.model}:generateContent`;
+    a.provider === 'tokenharbor'
+      ? 'https://tokenharbor.ai/v1/chat/completions'
+      : a.provider === 'groq'
+        ? 'https://api.groq.com/openai/v1/chat/completions'
+        : a.provider === 'nvidia'
+          ? 'https://integrate.api.nvidia.com/v1/chat/completions'
+          : `https://generativelanguage.googleapis.com/v1beta/models/${a.model}:generateContent`;
 
   const body = oaiCompatible
     ? JSON.stringify({
@@ -180,7 +213,10 @@ async function callProvider(a: CallArgs): Promise<string> {
     if (!res.ok) {
       // Drain and discard: the body may echo the prompt or key material.
       await res.body?.cancel();
-      const code: ErrCode = res.status >= 500 ? ERR.PROVIDER_UNAVAILABLE : ERR.PROVIDER_BAD_OUTPUT;
+      const code: ErrCode =
+        res.status >= 500 || res.status === 402 || res.status === 429
+          ? ERR.PROVIDER_UNAVAILABLE
+          : ERR.PROVIDER_BAD_OUTPUT;
       throw new ProviderError(code, res.status, `upstream status ${res.status}`);
     }
 
@@ -189,7 +225,7 @@ async function callProvider(a: CallArgs): Promise<string> {
       ? json?.choices?.[0]?.message?.content
       : json?.candidates?.[0]?.content?.parts?.[0]?.text;
 
-    if (typeof text !== 'string' || text.length === 0) {
+    if (typeof text !== 'string' || text.length === 0 || text.length > 16_000) {
       throw new ProviderError(ERR.PROVIDER_BAD_OUTPUT, null, 'empty completion');
     }
     return text;
@@ -218,6 +254,7 @@ export interface RotationResult {
  * Retry policy mirrors the previous client behaviour:
  *   5xx / timeout / network  → advance
  *   429 / quota              → advance (next key is a different account)
+ *   402 / balance zero       → advance to next attempt in chain
  *   other 4xx                → stop (auth, billing, malformed request)
  */
 export async function runStage(
@@ -258,11 +295,15 @@ export async function runStage(
         const transient =
           last.code === ERR.PROVIDER_TIMEOUT ||
           last.code === ERR.PROVIDER_UNAVAILABLE ||
-          status === 429;
+          status === 429 ||
+          status === 402;
         if (!transient) break; // hard 4xx — rotating keys will not help
       }
     }
   }
 
-  throw last ?? new ProviderError(ERR.PROVIDER_UNAVAILABLE, null, 'no attempt executed');
+  const failure = last ?? new ProviderError(ERR.NOT_CONFIGURED, null, 'no attempt executed');
+  failure.attempts = attempts;
+  failure.latencyMs = Date.now() - started;
+  throw failure;
 }

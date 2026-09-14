@@ -8,6 +8,7 @@ import { COLORS, BORDER_RADIUS, SHADOWS, FONT_SIZES, FONT_WEIGHTS, SPACING } fro
 
 // Import Screens from barrel
 import {
+    About,
     CitizenHome,
     MyReports,
     Rewards,
@@ -89,6 +90,7 @@ export default function CitizenNavigator() {
             }}
         >
             <Stack.Screen name="CitizenMain" component={CitizenTabNavigator} />
+            <Stack.Screen name="About" component={About} />
             <Stack.Screen name="PermissionsRequest" component={PermissionsRequest} />
             <Stack.Screen name="NewReport" component={NewReport} />
             <Stack.Screen name="AIProcessing" component={AIProcessing} />

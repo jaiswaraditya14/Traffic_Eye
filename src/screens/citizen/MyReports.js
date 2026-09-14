@@ -73,7 +73,7 @@ export default function MyReports({ navigation }) {
                 hasLoadedRef.current = true;
             }
         } catch (err) {
-            console.error('Error fetching reports:', err);
+            if (__DEV__) console.warn('[MyReports] Reports unavailable.');
         } finally {
             setLoading(false);
             setRefreshing(false);

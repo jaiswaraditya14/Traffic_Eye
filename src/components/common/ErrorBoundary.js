@@ -1,16 +1,26 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { COLORS, SPACING, BORDER_RADIUS, SHADOWS, TYPOGRAPHY } from '../../utils/theme';
+import PressableScale from './PressableScale';
 
 /**
- * ErrorBoundary — catches unhandled React errors anywhere in the tree.
- * Displays a friendly recovery UI instead of a white screen.
+ * ErrorBoundary — catches unhandled React render errors anywhere below it and
+ * shows a branded recovery screen instead of a white/blank screen.
+ *
+ * Recovery: "Try Again" clears the error AND remounts the child subtree (via an
+ * incrementing key), so a transient render failure gets a genuinely fresh mount
+ * rather than re-rendering the same broken state.
+ *
+ * Privacy: only an allowlisted error kind and frame count render in __DEV__.
+ * Production shows a generic, reassuring message and never surfaces stack
+ * traces, tokens, evidence URLs, provider responses, or any identifying detail.
  */
 export default class ErrorBoundary extends React.Component {
     constructor(props) {
         super(props);
-        this.state = { hasError: false, error: null };
-        this.handleReset = this.handleReset.bind(this);
+        this.state = { hasError: false, error: null, info: null, resetKey: 0 };
+        this.handleRetry = this.handleRetry.bind(this);
     }
 
     static getDerivedStateFromError(error) {
@@ -18,42 +28,69 @@ export default class ErrorBoundary extends React.Component {
     }
 
     componentDidCatch(error, info) {
-        // Log error in __DEV__ mode only — never log PII in production
+        // Dev-only diagnostics. Never log in production — an error message or
+        // component stack could incidentally contain sensitive strings.
         if (__DEV__) {
-            console.error('[ErrorBoundary] Unhandled error:', error, info);
+            console.warn('[ErrorBoundary] Render failure captured.');
         }
+        this.setState({ info });
     }
 
-    handleReset() {
-        this.setState({ hasError: false, error: null });
+    handleRetry() {
+        // Clear the error and bump the reset key so children remount fresh.
+        this.setState((prev) => ({
+            hasError: false,
+            error: null,
+            info: null,
+            resetKey: prev.resetKey + 1,
+        }));
     }
 
     render() {
         if (!this.state.hasError) {
-            return this.props.children;
+            // Keying the subtree lets "Try Again" force a clean remount.
+            return (
+                <React.Fragment key={this.state.resetKey}>
+                    {this.props.children}
+                </React.Fragment>
+            );
         }
+
+        const safeKind = ['Error', 'TypeError', 'RangeError', 'ReferenceError'].includes(this.state.error?.name)
+            ? this.state.error.name : 'Error';
+        const devMessage = __DEV__ ? `Render failure type: ${safeKind}` : null;
+        const devStack = __DEV__ && this.state.info?.componentStack
+            ? `Component frames captured: ${this.state.info.componentStack.split('\n').filter(Boolean).length}` : null;
 
         return (
             <View style={styles.container}>
                 <View style={styles.card}>
                     <View style={styles.iconContainer}>
-                        <Ionicons name="warning" size={48} color="#F59E0B" />
+                        <Ionicons name="warning" size={44} color={COLORS.secondary} />
                     </View>
+
                     <Text style={styles.title}>Something went wrong</Text>
                     <Text style={styles.subtitle}>
-                        The app encountered an unexpected error. Please try again.
+                        The app hit an unexpected error. Tap Try Again to reload, then
+                        check your report status before submitting again.
                     </Text>
-                    {__DEV__ && this.state.error && (
-                        <ScrollView style={styles.errorBox}>
-                            <Text style={styles.errorText}>
-                                {this.state.error.toString()}
-                            </Text>
+
+                    {(devMessage || devStack) && (
+                        <ScrollView style={styles.errorBox} contentContainerStyle={styles.errorBoxContent}>
+                            {!!devMessage && <Text style={styles.errorText}>{devMessage}</Text>}
+                            {!!devStack && <Text style={styles.stackText}>{devStack}</Text>}
                         </ScrollView>
                     )}
-                    <TouchableOpacity style={styles.button} onPress={this.handleReset} activeOpacity={0.85}>
-                        <Ionicons name="refresh" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+
+                    <PressableScale
+                        onPress={this.handleRetry}
+                        style={styles.button}
+                        accessibilityLabel="Try again"
+                        accessibilityHint="Reloads the screen that failed"
+                    >
+                        <Ionicons name="refresh" size={18} color={COLORS.white} style={styles.buttonIcon} />
                         <Text style={styles.buttonText}>Try Again</Text>
-                    </TouchableOpacity>
+                    </PressableScale>
                 </View>
             </View>
         );
@@ -63,73 +100,77 @@ export default class ErrorBoundary extends React.Component {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#0A1E3F',
+        backgroundColor: COLORS.primaryDark,
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 24,
+        padding: SPACING.xl,
     },
     card: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 24,
-        padding: 32,
+        backgroundColor: COLORS.card,
+        borderRadius: BORDER_RADIUS.xxxl,
+        padding: SPACING.xxl,
         width: '100%',
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.15,
-        shadowRadius: 24,
-        elevation: 10,
+        ...SHADOWS.xl,
     },
     iconContainer: {
         width: 88,
         height: 88,
-        borderRadius: 22,
-        backgroundColor: '#FEF3C7',
+        borderRadius: BORDER_RADIUS.xxl,
+        backgroundColor: COLORS.secondarySurface,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: SPACING['20'],
     },
     title: {
-        fontSize: 22,
-        fontFamily: 'Nunito-Bold',
-        color: '#0F172A',
-        marginBottom: 8,
+        ...TYPOGRAPHY.h2,
+        color: COLORS.text,
+        marginBottom: SPACING.sm,
         textAlign: 'center',
     },
     subtitle: {
-        fontSize: 14,
-        color: '#64748B',
-        fontFamily: 'Nunito-Medium',
+        ...TYPOGRAPHY.body,
+        color: COLORS.textMuted,
         textAlign: 'center',
-        lineHeight: 20,
-        marginBottom: 24,
+        marginBottom: SPACING.xl,
     },
     errorBox: {
-        backgroundColor: '#FEE2E2',
-        borderRadius: 10,
-        padding: 12,
-        marginBottom: 20,
-        maxHeight: 120,
+        backgroundColor: COLORS.errorSurface,
+        borderRadius: BORDER_RADIUS.md,
+        padding: SPACING.md,
+        marginBottom: SPACING.xl,
+        maxHeight: 140,
         width: '100%',
     },
+    errorBoxContent: {
+        paddingBottom: SPACING.xs,
+    },
     errorText: {
-        fontSize: 11,
-        color: '#B91C1C',
-        fontFamily: 'Nunito-Medium',
+        ...TYPOGRAPHY.caption,
+        color: COLORS.error,
+        marginBottom: SPACING.xs,
+    },
+    stackText: {
+        ...TYPOGRAPHY.caption,
+        fontSize: 10,
+        lineHeight: 14,
+        color: COLORS.textSecondary,
     },
     button: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#0F2C59',
-        borderRadius: 14,
-        paddingHorizontal: 28,
-        paddingVertical: 14,
-        width: '100%',
         justifyContent: 'center',
+        backgroundColor: COLORS.primary,
+        borderRadius: BORDER_RADIUS.lg,
+        paddingHorizontal: SPACING.xl,
+        paddingVertical: SPACING.lg,
+        width: '100%',
+    },
+    buttonIcon: {
+        marginRight: SPACING.sm,
     },
     buttonText: {
-        fontSize: 16,
-        fontFamily: 'Nunito-Bold',
-        color: '#FFFFFF',
+        ...TYPOGRAPHY.subtitle,
+        color: COLORS.white,
     },
 });

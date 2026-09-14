@@ -1,38 +1,43 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, Image, Alert, ScrollView,
-    ActivityIndicator, Animated, Modal, StatusBar, TextInput, Platform,
+    ActivityIndicator, Animated, Modal, StatusBar, TextInput, Platform, Linking, Keyboard,
 } from 'react-native';
 import MapLibreMap from '../../components/map/MapLibreMap';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MobileContainer, FocusAwareStatusBar } from '../../components';
+import { MobileContainer, FocusAwareStatusBar, StepIndicator, StatusPill } from '../../components';
 import { useAppContext } from '../../context';
 import { useImagePicker, useLocation } from '../../hooks';
+import { buildDemoReport } from '../../services/demoMode';
+import { validateNewReport, sourceLabel } from '../../utils/productExperience';
+import { COLORS } from '../../utils/theme';
+import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { extractImageLocation } from '../../utils';
 
 // ── Design Tokens ──
 const C = {
-    navy: '#0A1E3F',
-    navyMid: '#0F2C59',
-    amber: '#D97706',
-    amberDark: '#B45309',
-    white: '#FFFFFF',
-    offWhite: '#F4F6F9',
-    surface: '#FFFFFF',
-    surfaceInput: '#F1F5F9',
-    textPrimary: '#0F172A',
-    textSecondary: '#475569',
-    textTertiary: '#64748B',
-    border: '#CBD5E1',
-    success: '#15803D',
-    successSurface: '#DCFCE7',
-    warning: '#B45309',
-    warningSurface: '#FEF3C7',
-    error: '#B91C1C',
-    primarySurface: '#EFF6FF',
-    info: '#0F2C59',
+    navy: COLORS.primaryDark,
+    navyMid: COLORS.primary,
+    amber: COLORS.secondary,
+    amberDark: COLORS.secondaryDark,
+    white: COLORS.surface,
+    offWhite: COLORS.background,
+    surface: COLORS.surface,
+    surfaceInput: COLORS.surfaceContainer,
+    textPrimary: COLORS.textPrimary,
+    textSecondary: COLORS.textSecondary,
+    textTertiary: COLORS.textTertiary,
+    border: COLORS.surfaceContainerHighest,
+    success: COLORS.success,
+    successSurface: COLORS.successSurface,
+    warning: COLORS.secondaryDark,
+    warningSurface: COLORS.secondarySurface,
+    error: COLORS.error,
+    primarySurface: COLORS.primarySurface,
+    info: COLORS.primary,
 };
 
 export default function NewReport({ navigation }) {
@@ -62,7 +67,14 @@ export default function NewReport({ navigation }) {
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const bannerTimer = useRef(null);
 
-    const { setCurrentReport } = useAppContext();
+    const { setCurrentReport, demoMode, demoLoading } = useAppContext();
+    const [permissionDenied, setPermissionDenied] = useState(null);
+    const [imageMetadata, setImageMetadata] = useState({});
+    const demoReport = demoMode ? buildDemoReport() : null;
+    const evidenceImage = demoReport?.image || image;
+    const errors = validateNewReport(demoReport || { image: image || video, location, address });
+    const canContinue = !demoLoading && !loadingLocation && Object.keys(errors).length === 0;
+    const openSettings = () => Linking.openSettings().catch(() => Alert.alert('Settings unavailable', 'Open your device settings and select Traffic Eye permissions.'));
 
     const showBanner = useCallback((status) => {
         if (bannerTimer.current) clearTimeout(bannerTimer.current);
@@ -121,15 +133,15 @@ export default function NewReport({ navigation }) {
             // STEP 2: Photo GPS unavailable — present explicit fallback to citizen
             if (__DEV__) {
                 if (locResult?.reason === 'ANDROID_PHOTO_PICKER_REDACTION') {
-                    console.log('[NewReport] GPS unavailable in Photo Picker copy; original media metadata has not been accessed.');
+                    if (__DEV__) console.log('[NewReport] Picker copy did not provide usable GPS metadata.');
                 } else {
-                    console.log('[NewReport] Photograph metadata does not contain valid GPS coordinates.');
+                    if (__DEV__) console.log('[NewReport] Photograph does not contain usable GPS metadata.');
                 }
             }
             setLocationSource(locResult?.gpsSource || 'GPS_UNAVAILABLE');
             showBanner('no-gps');
         } catch (err) {
-            console.warn('[NewReport] Location extraction failure:', err.message);
+            if (__DEV__) console.warn('[NewReport] Location extraction failed.');
             setLocationSource('GPS_UNAVAILABLE');
             showBanner('no-gps');
         }
@@ -138,7 +150,10 @@ export default function NewReport({ navigation }) {
     const handleDetectLiveLocation = async () => {
         try {
             showBanner('detecting-live');
-            const result = await detectLocation(false, false);
+            const permission = await Location.requestForegroundPermissionsAsync();
+            if (!permission.granted) { setPermissionDenied('Location'); return; }
+            setPermissionDenied(null);
+            const result = await detectLocation(false, true);
             if (result && result.coords) {
                 setTrustLevel('Verified Live Location');
                 showBanner('live-success');
@@ -147,17 +162,21 @@ export default function NewReport({ navigation }) {
                 showBanner('no-gps');
             }
         } catch (error) {
-            if (__DEV__) console.warn('[Live Location] Detection failed:', error?.message);
+            if (__DEV__) console.warn('[Live Location] Detection failed.');
             showBanner('no-gps');
         }
     };
 
     const handleTakePhoto = async () => {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) { setPermissionDenied('Camera'); return; }
+        setPermissionDenied(null);
         const result = await captureFromCamera();
         if (result?.uri) {
             setVideo(null);
             setMediaType('image');
             setImage(result.uri);
+            setImageMetadata({ mimeType: result.mimeType, fileName: result.fileName });
             await handleLocationExtraction(result);
         }
     };
@@ -168,11 +187,19 @@ export default function NewReport({ navigation }) {
             setVideo(null);
             setMediaType('image');
             setImage(result.uri);
+            setImageMetadata({ mimeType: result.mimeType, fileName: result.fileName });
             await handleLocationExtraction(result);
         }
     };
 
     const handleSubmit = () => {
+        Keyboard.dismiss();
+        if (!canContinue) return;
+        if (demoMode) {
+            setCurrentReport(buildDemoReport());
+            navigation.navigate('AIProcessing');
+            return;
+        }
         if (!image && !video) {
             Alert.alert('Evidence Required', 'Please capture or select an image or video before continuing.');
             return;
@@ -189,6 +216,7 @@ export default function NewReport({ navigation }) {
             return;
         }
         setCurrentReport({
+            ...imageMetadata,
             image,
             video,
             mediaType,
@@ -238,21 +266,15 @@ export default function NewReport({ navigation }) {
                     contentContainerStyle={styles.scrollInner}
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode="on-drag"
                 >
                     {/* ── Steps ── */}
-                    <View style={styles.stepIndicator}>
-                        <View style={styles.stepDotActive}>
-                            <Text style={styles.stepDotTextActive}>1</Text>
-                        </View>
-                        <View style={styles.stepLineActive} />
-                        <View style={image || video ? styles.stepDotActive : styles.stepDot}>
-                            <Text style={image || video ? styles.stepDotTextActive : styles.stepDotText}>2</Text>
-                        </View>
-                        <View style={styles.stepLine} />
-                        <View style={styles.stepDot}>
-                            <Text style={styles.stepDotText}>3</Text>
-                        </View>
-                    </View>
+                    <StepIndicator labels={['Capture', 'Location', 'Submit']} active={!evidenceImage ? 0 : canContinue ? 2 : 1} />
+                    {demoMode && <StatusPill label="Demo — synthetic evidence, not saved" status="pending" />}
+                    {!!permissionDenied && <View accessibilityRole="alert" style={{ padding: 16, backgroundColor: COLORS.warningSurface }}>
+                        <Text>{permissionDenied} permission is denied. You can enable it in settings.</Text>
+                        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open Settings" onPress={openSettings} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: COLORS.primary }}>Open Settings</Text></TouchableOpacity>
+                    </View>}
                     <Text style={styles.stepHeader}>Step 1: Capture Evidence</Text>
 
                     {/* ── Media Preview ── */}
@@ -261,11 +283,11 @@ export default function NewReport({ navigation }) {
                         onPress={() => image ? setFullscreenImage(image) : undefined}
                         activeOpacity={image ? 0.9 : 1}
                     >
-                        {image ? (
+                        {evidenceImage ? (
                             <>
                                 <Image
-                                    key={image}
-                                    source={{ uri: image }}
+                                    key={String(evidenceImage)}
+                                    source={typeof evidenceImage === 'number' ? evidenceImage : { uri: evidenceImage }}
                                     style={styles.mediaImage}
                                 />
                                 {/* Tap-to-preview hint badge */}
@@ -287,7 +309,7 @@ export default function NewReport({ navigation }) {
                     </TouchableOpacity>
 
                     {/* ── Action Buttons ── */}
-                    <View style={styles.mediaBtnRow}>
+                    <View style={styles.mediaBtnRow} pointerEvents={demoMode ? 'none' : 'auto'} accessibilityElementsHidden={demoMode}>
                         {!image && (
                             <TouchableOpacity style={styles.mediaBtn} onPress={handleTakePhoto} activeOpacity={0.8}>
                                 <LinearGradient colors={[C.navy, C.navyMid]} style={styles.mediaBtnGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
@@ -406,6 +428,13 @@ export default function NewReport({ navigation }) {
                         </Animated.View>
                     )}
 
+                    {!!(demoReport?.location || location) && <View>
+                        <View pointerEvents="none" style={{ height: 160, borderRadius: 16, overflow: 'hidden' }} accessibilityLabel="Selected incident location map">
+                            <MapLibreMap key={JSON.stringify(demoReport?.location || location)} initialCoordinate={demoReport?.location || location} selectedCoordinate={demoReport?.location || location} showSearch={false} showUserLocation={false} showConfirmButton={false} autoLocateOnMount={false} />
+                        </View>
+                        <StatusPill status="pending" label={demoMode ? 'Demo — synthetic location' : sourceLabel(locationSource)} />
+                    </View>}
+                    {Object.values(errors).map(message => <Text key={message} style={{ color: COLORS.error, marginVertical: 4 }}>{message}</Text>)}
                     {/* ── Details ── */}
                     <Text style={styles.stepHeader}>Step 2: Add Details</Text>
 
@@ -424,7 +453,9 @@ export default function NewReport({ navigation }) {
                             style={styles.addressInput}
                             placeholder="Enter address or use Live Location..."
                             placeholderTextColor={C.textTertiary}
-                            value={address}
+                            value={demoReport?.address || address}
+                            editable={!demoMode}
+                            accessibilityLabel="Incident location address"
                             onChangeText={setAddress}
                             multiline
                             numberOfLines={4}
@@ -467,14 +498,17 @@ export default function NewReport({ navigation }) {
 
                     {/* ── Submit ── */}
                     <TouchableOpacity
-                        style={[styles.submitBtn, (!image && !video) && { opacity: 0.5 }]}
+                        style={[styles.submitBtn, !canContinue && { opacity: 0.5 }]}
                         onPress={handleSubmit}
                         activeOpacity={0.88}
-                        disabled={!image && !video}
+                        disabled={!canContinue}
+                        accessibilityRole="button"
+                        accessibilityLabel={demoMode ? 'Preview demo report' : 'Analyze with AI'}
+                        accessibilityState={{ disabled: !canContinue }}
                     >
                         <LinearGradient colors={[C.amberDark, C.amber]} style={styles.submitGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
                             <Ionicons name="sparkles" size={18} color={C.navy} />
-                            <Text style={styles.submitText}>Analyze with AI</Text>
+                            <Text style={styles.submitText}>{demoMode ? 'Preview Demo Report' : 'Analyze with AI'}</Text>
                         </LinearGradient>
                     </TouchableOpacity>
 
@@ -565,27 +599,6 @@ const styles = StyleSheet.create({
     scrollContent: { flex: 1 },
     scrollInner: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
 
-    stepIndicator: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 20,
-        gap: 8,
-    },
-    stepDot: {
-        width: 26, height: 26, borderRadius: 13,
-        backgroundColor: '#E5E7EB',
-        justifyContent: 'center', alignItems: 'center'
-    },
-    stepDotActive: {
-        width: 26, height: 26, borderRadius: 13,
-        backgroundColor: C.amber,
-        justifyContent: 'center', alignItems: 'center'
-    },
-    stepDotText: { fontSize: 12, fontFamily: 'Nunito-Bold', color: C.textTertiary },
-    stepDotTextActive: { fontSize: 12, fontFamily: 'Nunito-Bold', color: C.navy },
-    stepLine: { width: 30, height: 2, backgroundColor: '#E5E7EB' },
-    stepLineActive: { width: 30, height: 2, backgroundColor: C.amber },
 
     stepHeader: {
         fontSize: 15,
@@ -679,7 +692,7 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         borderRadius: 16,
         borderWidth: 1.5,
-        borderColor: '#CBD5E1',
+        borderColor: COLORS.surfaceContainerHighest,
         backgroundColor: C.surface
     },
     mediaBtnOutlineText: { fontSize: 15, fontFamily: 'Nunito-Bold', color: C.navyMid },
@@ -692,8 +705,8 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     bannerLoading: {
-        backgroundColor: '#EFF6FF',
-        borderColor: '#BFDBFE',
+        backgroundColor: COLORS.primarySurface,
+        borderColor: COLORS.primaryBorder,
     },
     bannerSuccess: {
         backgroundColor: C.successSurface,
@@ -701,8 +714,8 @@ const styles = StyleSheet.create({
     },
     bannerNoGps: {
         backgroundColor: '#FFFBEB',
-        borderColor: '#FDE68A',
-        shadowColor: '#D97706',
+        borderColor: COLORS.secondaryBorder,
+        shadowColor: COLORS.secondary,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.08,
         shadowRadius: 6,
@@ -727,7 +740,7 @@ const styles = StyleSheet.create({
     bannerMetaText: {
         fontSize: 12,
         fontFamily: 'Nunito-SemiBold',
-        color: '#15803D',
+        color: COLORS.success,
     },
     bannerLoadingText: {
         fontSize: 13,
@@ -758,7 +771,7 @@ const styles = StyleSheet.create({
         width: 32,
         height: 32,
         borderRadius: 16,
-        backgroundColor: '#FEF3C7',
+        backgroundColor: COLORS.secondarySurface,
         justifyContent: 'center',
         alignItems: 'center',
         marginTop: 1,
@@ -771,7 +784,7 @@ const styles = StyleSheet.create({
     bannerNoGpsSub: {
         fontSize: 12,
         fontFamily: 'Nunito-Medium',
-        color: '#B45309',
+        color: COLORS.secondaryDark,
         marginTop: 2,
         lineHeight: 17,
     },
@@ -801,7 +814,7 @@ const styles = StyleSheet.create({
     fieldLabel: { fontSize: 13, fontFamily: 'Nunito-Bold', color: C.navy, marginBottom: 10, marginTop: 12 },
     addressBox: {
         flexDirection: 'column',
-        backgroundColor: '#F1F5F9',
+        backgroundColor: COLORS.surfaceContainer,
         borderRadius: 20,
         paddingLeft: 18,
         paddingRight: 18,
@@ -809,8 +822,8 @@ const styles = StyleSheet.create({
         paddingBottom: 14,
         minHeight: 150,
         borderWidth: 1.5,
-        borderColor: '#E2E8F0',
-        shadowColor: '#0F2C59',
+        borderColor: COLORS.surfaceContainerHigh,
+        shadowColor: COLORS.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.08,
         shadowRadius: 10,
@@ -869,7 +882,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(0,0,0,0.08)',
         marginBottom: 32,
-        shadowColor: '#0F2C59',
+        shadowColor: COLORS.primary,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.04,
         shadowRadius: 6,
@@ -902,7 +915,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         elevation: 6,
-        shadowColor: '#000',
+        shadowColor: COLORS.black,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.12,
         shadowRadius: 4,

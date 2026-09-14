@@ -59,7 +59,7 @@ export default function ForgotPassword({ navigation }) {
             navigation.navigate('OtpVerification', { email: email.trim() });
         } catch (err) {
             setError('Something went wrong. Please try again.');
-            if (__DEV__) console.warn('Forgot password error:', err?.message || 'Unknown error');
+            if (__DEV__) console.warn('[AUTH] Password reset request failed.');
         } finally {
             setLoading(false);
         }

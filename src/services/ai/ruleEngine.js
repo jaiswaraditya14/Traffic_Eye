@@ -576,17 +576,12 @@ export function applyRules(evidence, verbose = false) {
             const evalResult = evaluatorFn(evidence);
             ruleReasons[ruleKey] = evalResult;
 
-            if (verbose) {
-                console.log(`[RuleEngine] ${ruleKey}: ${evalResult.result} — ${evalResult.reason}`);
-            }
-
             if (evalResult.result === 'confirmed' && evalResult.violation) {
                 confirmedViolations.push(evalResult.violation);
             } else if (evalResult.result === 'uncertain') {
                 uncertainViolations.push(ruleKey);
             }
         } catch (err) {
-            console.warn(`[RuleEngine] Rule "${ruleKey}" threw unexpectedly:`, err.message);
             // A rule crash never becomes a violation — fail-closed
         }
     }
@@ -631,12 +626,6 @@ export function applyRules(evidence, verbose = false) {
     const requiresManualReview =
         !imageUsable ||
         (uncertainViolations.length > 0 && confirmedViolations.length === 0);
-
-    if (verbose) {
-        console.log(`[RuleEngine] Confirmed: [${confirmedViolations.join(', ')}]`);
-        console.log(`[RuleEngine] Uncertain: [${uncertainViolations.join(', ')}]`);
-        console.log(`[RuleEngine] ManualReview: ${requiresManualReview}`);
-    }
 
     return {
         confirmedViolations,

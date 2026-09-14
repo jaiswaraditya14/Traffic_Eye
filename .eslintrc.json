@@ -8,6 +8,9 @@
     "plugin:react/recommended",
     "plugin:react-native/all"
   ],
+  "overrides": [
+    { "files": ["**/*.test.js", "**/__tests__/**/*.js"], "env": { "jest": true } }
+  ],
   "parserOptions": {
     "ecmaFeatures": {
       "jsx": true
@@ -57,6 +60,7 @@
     "globalThis": true,
     "URL": true,
     "AbortController": true,
+    "AbortSignal": true,
     "Buffer": true
   }
 }

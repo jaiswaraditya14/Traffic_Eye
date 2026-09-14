@@ -5,15 +5,17 @@
  * Tests NVIDIA NIM, Google Gemini, and Groq for Traffic Eye.
  * SECURITY: API keys are never printed. Only redacted summaries appear.
  * Test image: a pre-generated 32x32 gray JPEG ? no real user evidence.
+ * Developer-only live benchmark: supply server-only environment variables
+ * explicitly. Never load provider keys from the mobile app's .env.
+ * See docs/AI_PHASE1_SETUP.md. This script is excluded from EAS uploads.
  */
 "use strict";
 
-require("dotenv").config();
 const fs   = require("fs");
 const path = require("path");
 
 // ??? Redact helper ????????????????????????????????????????????????????????????
-const REDACT = k => !k ? "[MISSING]" : "[SET:" + k.length + "chars]";
+const REDACT = k => !k ? "[MISSING]" : "[SET]";
 
 // ??? Read test image ??????????????????????????????????????????????????????????
 const IMG_B64_PATH = path.join(__dirname, "_test_image.b64");
@@ -23,25 +25,24 @@ console.log("Test image loaded: " + Math.round(TEST_IMG_B64.length * 3 / 4) + " 
 
 // ??? API keys ?????????????????????????????????????????????????????????????????
 const NVIDIA_KEYS = [
-    process.env.EXPO_PUBLIC_NVIDIA_API_KEY_1,
-    process.env.EXPO_PUBLIC_NVIDIA_API_KEY,
+    process.env.NVIDIA_API_KEY_1,
+    process.env.NVIDIA_API_KEY_2,
+    process.env.NVIDIA_API_KEY_3,
 ].filter(Boolean);
 
 const GEMINI_KEYS = [
-    process.env.EXPO_PUBLIC_GEMINI_API_KEY_1,
-    process.env.EXPO_PUBLIC_GEMINI_API_KEY_2,
-    process.env.EXPO_PUBLIC_GEMINI_API_KEY_3,
-    process.env.EXPO_PUBLIC_GEMINI_API_KEY,
+    process.env.GEMINI_API_KEY_1,
+    process.env.GEMINI_API_KEY_2,
+    process.env.GEMINI_API_KEY_3,
 ].filter(Boolean);
 
 const GROQ_KEYS = [
-    process.env.EXPO_PUBLIC_GROQ_API_KEY_1,
-    process.env.EXPO_PUBLIC_GROQ_API_KEY_2,
-    process.env.EXPO_PUBLIC_GROQ_API_KEY_3,
-    process.env.EXPO_PUBLIC_GROQ_API_KEY_4,
-    process.env.EXPO_PUBLIC_GROQ_API_KEY_5,
-    process.env.EXPO_PUBLIC_GROQ_API_KEY_6,
-    process.env.EXPO_PUBLIC_GROQ_API_KEY,
+    process.env.GROQ_API_KEY_1,
+    process.env.GROQ_API_KEY_2,
+    process.env.GROQ_API_KEY_3,
+    process.env.GROQ_API_KEY_4,
+    process.env.GROQ_API_KEY_5,
+    process.env.GROQ_API_KEY_6,
 ].filter(Boolean);
 
 console.log("\nKey inventory:");
@@ -158,7 +159,7 @@ async function callNV(key, model, prompt, b64, ms) {
         headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
         body: JSON.stringify({model, messages:[{role:"user",content}], temperature:0, max_tokens:512})
     }, ms);
-    if (!res.ok) { const t=await res.text().catch(()=>""); throw Object.assign(new Error("HTTP "+res.status),{status:res.status,_body:t.slice(0,200)}); }
+    if (!res.ok) { await res.body?.cancel(); throw Object.assign(new Error("HTTP "+res.status),{status:res.status}); }
     const j = await res.json();
     if (!j.choices || !j.choices.length) throw new Error("No choices");
     return { text:j.choices[0].message.content, itok:j.usage&&j.usage.prompt_tokens, otok:j.usage&&j.usage.completion_tokens };
@@ -171,17 +172,17 @@ async function callGM(key, model, prompt, b64, schema, ms) {
     const gc = {temperature:0, maxOutputTokens:512, candidateCount:1, responseMimeType:"application/json"};
     if (schema) gc.responseSchema = schema;
     const res = await tFetch(
-        "https://generativelanguage.googleapis.com/v1beta/models/"+model+":generateContent?key="+key,
-        { method:"POST", headers:{"Content-Type":"application/json"},
+        "https://generativelanguage.googleapis.com/v1beta/models/"+model+":generateContent",
+        { method:"POST", headers:{"Content-Type":"application/json","x-goog-api-key":key},
           body: JSON.stringify({contents:[{parts}], generationConfig:gc}) },
         ms
     );
-    if (!res.ok) { const t=await res.text().catch(()=>""); throw Object.assign(new Error("HTTP "+res.status),{status:res.status,_body:t.slice(0,200)}); }
+    if (!res.ok) { await res.body?.cancel(); throw Object.assign(new Error("HTTP "+res.status),{status:res.status}); }
     const j = await res.json();
     if (!j.candidates || !j.candidates.length) throw new Error("No candidates");
     const text = j.candidates[0].content && j.candidates[0].content.parts && j.candidates[0].content.parts[0] ? j.candidates[0].content.parts[0].text : null;
     if (!text && j.candidates[0].finishReason === "MAX_TOKENS") throw new Error("MAX_TOKENS: response truncated");
-    if (!text) throw new Error("Empty text (finishReason="+j.candidates[0].finishReason+")");
+    if (!text) throw new Error("Empty provider text");
     return { text, itok:j.usageMetadata&&j.usageMetadata.promptTokenCount, otok:j.usageMetadata&&j.usageMetadata.candidatesTokenCount };
 }
 
@@ -194,7 +195,7 @@ async function callGQ(key, model, prompt, ms, supportsJSON) {
         headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
         body: JSON.stringify(body)
     }, ms);
-    if (!res.ok) { const t=await res.text().catch(()=>""); throw Object.assign(new Error("HTTP "+res.status),{status:res.status,_body:t.slice(0,200)}); }
+    if (!res.ok) { await res.body?.cancel(); throw Object.assign(new Error("HTTP "+res.status),{status:res.status}); }
     const j = await res.json();
     if (!j.choices || !j.choices.length) throw new Error("No choices");
     return { text:j.choices[0].message.content, itok:j.usage&&j.usage.prompt_tokens, otok:j.usage&&j.usage.completion_tokens };
@@ -215,11 +216,11 @@ async function runT(name, callFn, validator) {
         } else if (parsed) {
             r.schemaOK = true; r.ok = true;
         } else {
-            r.msg = "Could not extract JSON from: " + (text||"").slice(0,60);
+            r.msg = "INVALID_PROVIDER_JSON";
         }
     } catch(e) {
         r.ms = Date.now()-t0; r.httpSt = e.status||null;
-        r.err = e.name==="AbortError" ? "TIMEOUT" : e.status ? "HTTP "+e.status : e.message.slice(0,80);
+        r.err = e.name==="AbortError" ? "TIMEOUT" : Number.isInteger(e.status) ? "HTTP "+e.status : "PROVIDER_FAILURE";
     }
     return r;
 }
@@ -428,13 +429,14 @@ const allResults = [];
 "# AI Provider Benchmark Report\n"+
 "*Traffic Eye ? Three-Provider Audit (NVIDIA ? Gemini ? Groq) ? "+ts+"*\n\n"+
 "> ?? **Security**: No API key values are stored in this report.\n\n"+
+"> Developer benchmark only. Configure AI secrets in Supabase, never in the app. See [Phase 1 setup](docs/AI_PHASE1_SETUP.md).\n\n"+
 "---\n\n"+
 "## Key Inventory\n\n"+
 "| Provider | Keys Available | Slots |\n"+
 "|----------|---------------|-------|\n"+
-"| NVIDIA NIM | "+NVIDIA_KEYS.length+" | EXPO_PUBLIC_NVIDIA_API_KEY_1 |\n"+
-"| Gemini | "+GEMINI_KEYS.length+" | EXPO_PUBLIC_GEMINI_API_KEY_1, _2 |\n"+
-"| Groq | "+GROQ_KEYS.length+" | EXPO_PUBLIC_GROQ_API_KEY_1 ? _6 |\n\n"+
+"| NVIDIA NIM | "+NVIDIA_KEYS.length+" | NVIDIA_API_KEY_1 through _3 (server-only) |\n"+
+"| Gemini | "+GEMINI_KEYS.length+" | GEMINI_API_KEY_1 through _3 (server-only) |\n"+
+"| Groq | "+GROQ_KEYS.length+" | GROQ_API_KEY_1 through _6 (server-only) |\n\n"+
 "---\n\n"+
 "## Groq Provider Situation\n\n"+
 groqNote+"\n\n"+
@@ -448,7 +450,7 @@ sumRows+"\n\n"+
 "## Detailed Test Results\n\n"+
 detRows+"\n"+
 "---\n\n"+
-"## Final Production Pipeline\n\n"+
+"## Benchmark Pipeline Candidates (not a deployment verification)\n\n"+
 "| Stage | Primary | Fallback | Notes |\n"+
 "|-------|---------|----------|-------|\n"+
 "| Vision Analysis | `"+(primVision?primVision.model:"NONE")+"` | `"+(fallVision?fallVision.model:"NONE")+"` | Image required |\n"+
@@ -469,7 +471,8 @@ detRows+"\n"+
 "|-------|--------|\n"+
 removedRows+"\n\n"+
 "---\n\n"+
-"## Recommended ai.config.js Update\n\n"+
+"## Server Model Candidates (review against the Edge Function allowlist)\n\n"+
+"Do not copy this configuration into the mobile app.\n\n"+
 "```json\n"+cfgNote+"\n```\n\n"+
 "---\n\n"+
 "## Test Methodology\n\n"+
@@ -488,7 +491,7 @@ removedRows+"\n\n"+
 
     fs.writeFileSync(path.join(__dirname,"..","AI_PROVIDER_BENCHMARK_REPORT.md"), report, "utf8");
     console.log("\n\n?? Report saved: AI_PROVIDER_BENCHMARK_REPORT.md");
-    console.log("\nRecommended ai.config.js update:");
+    console.log("\nServer model candidates for Edge Function allowlist review (not mobile configuration):");
     console.log(cfgNote);
 
     process.exit(0);

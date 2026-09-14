@@ -48,3 +48,4 @@ export { default as OnboardingCarousel } from './shared/OnboardingCarousel';
 export { default as PermissionsRequest } from './shared/PermissionsRequest';
 export { default as AIProcessing } from './shared/AIProcessing';
 export { default as AIResultsVerification } from './shared/AIResultsVerification';
+export { default as About } from './citizen/About';

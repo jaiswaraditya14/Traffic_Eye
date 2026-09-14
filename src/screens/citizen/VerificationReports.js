@@ -346,7 +346,7 @@ export default function VerificationReports({ navigation }) {
                 setReports(reportsData);
             }
         } catch (err) {
-            if (__DEV__) console.error('Failed to fetch reports:', err);
+            if (__DEV__) console.warn('[VerificationReports] Reports unavailable.');
         } finally {
             setLoading(false);
             setRefreshing(false);

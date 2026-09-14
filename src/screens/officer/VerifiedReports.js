@@ -106,7 +106,7 @@ export default function VerifiedReports({ route, navigation }) {
                 hasLoadedRef.current = true;
             }
         } catch (e) {
-            console.error('Error fetching verified reports:', e);
+            if (__DEV__) console.warn('[VerifiedReports] Reports unavailable.');
         } finally {
             setLoading(false);
         }

@@ -13,6 +13,7 @@
       "backgroundColor": "#0A1E3F"
     },
     "ios": {
+      "bundleIdentifier": "com.trafficviolationapp",
       "supportsTablet": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app needs access to your location to auto-detect the address of traffic violations.",
@@ -55,7 +56,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/icon.png",
+          "icon": "./assets/images/notification-icon.png",
           "color": "#F59E0B",
           "defaultChannel": "traffic-eye-default",
           "sounds": []

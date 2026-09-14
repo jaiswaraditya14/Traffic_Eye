@@ -276,7 +276,7 @@ export default function VerifiedReportDetail({ route, navigation }) {
                 Alert.alert('Saved', `PDF saved to: ${destPath}`);
             }
         } catch (err) {
-            console.error('PDF generation error:', err);
+            if (__DEV__) console.warn('[VerifiedReportDetail] PDF generation failed.');
             Alert.alert('Failed', 'Could not generate PDF. Please try again.');
         } finally {
             setPdfGenerating(false);

@@ -1,3 +1,4 @@
+import { COLORS } from '../../utils/theme';
 /**
  * Notifications.js (Citizen) — Industry-standard notification screen
  *
@@ -18,33 +19,33 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context';
-import { FocusAwareStatusBar } from '../../components';
+import { FocusAwareStatusBar, FeedbackToast, CardSkeleton } from '../../components';
 import {
     fetchNotifications,
     markNotificationRead,
     markAllNotificationsRead,
-    subscribeToNotifications,
 } from '../../services/reports';
-import { clearAllNotifications } from '../../services/notifications';
+import { useNotifications } from '../../context/NotificationContext';
+import useReducedMotion from '../../hooks/useReducedMotion';
 
 const C = {
-    navy: '#0A1E3F',
-    navyMid: '#0F2C59',
-    amber: '#F59E0B',
-    amberSurface: '#FEF3C7',
-    white: '#FFFFFF',
-    offWhite: '#F4F6F9',
-    surface: '#FFFFFF',
-    textPrimary: '#0F172A',
-    textSecondary: '#475569',
-    textTertiary: '#64748B',
+    navy: COLORS.primaryDark,
+    navyMid: COLORS.primary,
+    amber: COLORS.secondaryLight,
+    amberSurface: COLORS.secondarySurface,
+    white: COLORS.surface,
+    offWhite: COLORS.background,
+    surface: COLORS.surface,
+    textPrimary: COLORS.textPrimary,
+    textSecondary: COLORS.textSecondary,
+    textTertiary: COLORS.textTertiary,
     success: '#059669',
     successSurface: '#D1FAE5',
-    error: '#DC2626',
-    errorSurface: '#FEE2E2',
-    warning: '#D97706',
-    warningSurface: '#FEF3C7',
-    border: '#E2E8F0',
+    error: COLORS.errorLight,
+    errorSurface: COLORS.errorSurface,
+    warning: COLORS.secondary,
+    warningSurface: COLORS.secondarySurface,
+    border: COLORS.surfaceContainerHigh,
     borderLight: '#F0F2F5',
 };
 
@@ -112,7 +113,12 @@ function isToday(iso) {
 }
 
 export default function Notifications({ navigation }) {
-    const { user } = useAuth();
+    const { user, profile } = useAuth();
+    const reduced = useReducedMotion();
+    const { unreadCount, latestNotification, notificationRevision, refreshUnread } = useNotifications();
+    const [toast, setToast] = useState(null);
+    const requestSequence = useRef(0);
+    const busy = useRef(false);
     const [notifs, setNotifs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -120,6 +126,7 @@ export default function Notifications({ navigation }) {
     const fadeAnim = useRef(new Animated.Value(0)).current;
 
     const load = useCallback(async (isRefresh = false) => {
+        const request = ++requestSequence.current;
         if (!user?.id) {
             setLoading(false);
             setRefreshing(false);
@@ -127,50 +134,55 @@ export default function Notifications({ navigation }) {
         }
         if (!isRefresh) setLoading(true);
         try {
-            const { data } = await fetchNotifications(user.id);
+            const { data, error } = await fetchNotifications(user.id);
+            if (request !== requestSequence.current) return;
+            if (error) throw error;
             if (data) setNotifs(data);
         } catch (err) {
-            if (__DEV__) console.warn('[Notifications] Load failed:', err?.message);
+            if (request === requestSequence.current) setToast('Could not load notifications. Pull down to retry.');
         } finally {
+            if (request === requestSequence.current) {
             setLoading(false);
             setRefreshing(false);
-            Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
+            Animated.timing(fadeAnim, { toValue: 1, duration: reduced ? 0 : 350, useNativeDriver: true }).start();
+            }
         }
-    }, [user?.id]);
+    }, [user?.id, reduced, fadeAnim]);
 
-    useEffect(() => { load(); }, [load]);
-
-    // Clear OS notification banners + badge when user opens this screen
     useEffect(() => {
-        clearAllNotifications();
-    }, []);
-
-    // Realtime: new notifications arrive instantly
+        load(true);
+        return () => { requestSequence.current++; fadeAnim.stopAnimation(); };
+    }, [load, notificationRevision, fadeAnim]);
     useEffect(() => {
-        if (!user?.id) return;
-        const ch = subscribeToNotifications(user.id, (payload) => {
-            setNotifs(prev => [payload.new, ...prev]);
-        });
-        return () => { if (ch) ch.unsubscribe(); };
-    }, [user?.id]);
+        if (latestNotification?.user_id === user?.id) setNotifs(prev => [latestNotification, ...prev.filter(row => row.id !== latestNotification.id)]);
+    }, [latestNotification, user?.id]);
 
     const handleMarkRead = async (notif) => {
-        // Mark read first
-        if (!notif.is_read) {
-            setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
-            await markNotificationRead(notif.id);
-        }
-
-        // Deep link: if it's a report notification with a report_id, navigate to detail
-        if (REPORT_TYPES.has(notif.type) && notif.report_id) {
-            navigation.navigate('ReportDetail', { reportId: notif.report_id });
-        }
+        if (busy.current) return;
+        busy.current = true;
+        const request = requestSequence.current;
+        try {
+            if (!notif.is_read) {
+                const { error } = await markNotificationRead(notif.id);
+                if (error) throw error;
+                if (request === requestSequence.current) setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+                refreshUnread();
+            }
+            if (REPORT_TYPES.has(notif.type) && notif.reference_id) navigation.navigate(profile?.role === 'officer' ? 'ImageReportReview' : 'ImageReportStatus', { reportId: notif.reference_id });
+        } catch { if (request === requestSequence.current) setToast('Could not mark notification read. Tap again to retry.'); }
+        finally { busy.current = false; }
     };
-
     const handleMarkAllRead = async () => {
-        if (!user?.id) return;
-        setNotifs(prev => prev.map(n => ({ ...n, is_read: true })));
-        await markAllNotificationsRead(user.id);
+        if (!user?.id || busy.current) return;
+        busy.current = true;
+        const request = requestSequence.current;
+        try {
+            const { error } = await markAllNotificationsRead(user.id);
+            if (error) throw error;
+            if (request === requestSequence.current) setNotifs(prev => prev.map(n => ({ ...n, is_read: true })));
+            refreshUnread();
+        } catch { if (request === requestSequence.current) setToast('Could not mark all read. Please retry.'); }
+        finally { busy.current = false; }
     };
 
     // Filter by active tab
@@ -178,7 +190,6 @@ export default function Notifications({ navigation }) {
         ? notifs
         : notifs.filter(n => getConfig(n.type).category === activeTab);
 
-    const unreadCount = notifs.filter(n => !n.is_read).length;
     const filteredUnread = filtered.filter(n => !n.is_read).length;
 
     // Group filtered by today / earlier
@@ -187,7 +198,7 @@ export default function Notifications({ navigation }) {
 
     const renderNotif = (n) => {
         const cfg = getConfig(n.type);
-        const isReport = REPORT_TYPES.has(n.type) && n.report_id;
+        const isReport = REPORT_TYPES.has(n.type) && n.reference_id;
         return (
             <TouchableOpacity
                 key={n.id}
@@ -319,7 +330,7 @@ export default function Notifications({ navigation }) {
 
                 {loading ? (
                     <View style={s.centered}>
-                        <ActivityIndicator size="large" color={C.navyMid} />
+                        <CardSkeleton />
                         <Text style={s.loadingText}>Loading notifications…</Text>
                     </View>
                 ) : (
@@ -355,6 +366,7 @@ export default function Notifications({ navigation }) {
                     </Animated.ScrollView>
                 )}
             </SafeAreaView>
+            <FeedbackToast visible={!!toast} message={toast || ''} variant="error" onDismiss={() => setToast(null)} />
         </View>
     );
 }

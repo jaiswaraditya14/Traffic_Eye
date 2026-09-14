@@ -29,11 +29,13 @@
  */
 
 import { stripThinkTags, invokeAiStage, AiStageError } from './utils';
+import { invokeAiStageWithRetry } from './retry';
 import { checkLocalIntegrity, prepareVisionImage, prepareOcrImage } from './preprocessing';
 import { applyRules, VIOLATION_SEVERITY } from './ruleEngine';
 
 // Re-export shared utilities for callers that import from this module
 export { stripThinkTags, invokeAiStage, AiStageError } from './utils';
+export { invokeAiStageWithRetry } from './retry';
 
 // ─── Telemetry helper ─────────────────────────────────────────────────────────
 const makeTimer = () => {
@@ -198,8 +200,7 @@ const buildFinalResult = ({ evidence, ruleResult, auditResult, ocrResult, teleme
         },
     };
 
-    console.log(`[AI] ✅ Final: violation=${violationDetected}, violations=[${violations.join(', ')}], plate="${plateText}", manualReview=${requiresManualReview}`);
-    console.log(`[AI] ⏱️  Telemetry: preprocessing=${telemetry.preprocessing_ms}ms vision=${telemetry.vision_primary_ms || telemetry.vision_fallback_ms}ms rules=${telemetry.rule_engine_ms}ms ocr=${telemetry.ocr_ms || 0}ms audit=${telemetry.reasoning_ms || 0}ms total=${telemetry.total_ms}ms`);
+    if (__DEV__) console.warn('[AI] Analysis stage completed or unavailable; evidence detail omitted.');
 
     return result;
 };
@@ -220,9 +221,16 @@ export const aiService = {
      * @param {string}   imageUri    - Local file URI from camera/gallery
      * @param {object}   [options]
      * @param {Function} [options.onStageChange] - Called with (stageName: string) for UI
+     * @param {AbortSignal} [options.signal] - Abort to cancel pending vision retries
+     *        (e.g. the screen unmounted or the user cancelled). Cancellation surfaces
+     *        as a thrown AiStageError('CANCELLED') so the caller can ignore the result.
      * @returns {Promise<object>} Final violation result
      */
-    analyzeViolationImage: async (imageUri, { onStageChange } = {}) => {
+    analyzeViolationImage: async (imageUri, { onStageChange, signal } = {}) => {
+        const assertActive = () => {
+            if (signal?.aborted) throw new AiStageError('CANCELLED', null, 'AI request cancelled.');
+        };
+        assertActive();
         const totalTimer = makeTimer();
         const telemetry  = {
             preprocessing_ms:    0,
@@ -250,11 +258,12 @@ export const aiService = {
             if (onStageChange) onStageChange('Preparing image...');
             const t0 = makeTimer();
 
-            const cleanUri = (imageUri || '').split('?')[0];
+            const cleanUri = imageUri || '';
             integrity = await checkLocalIntegrity(cleanUri);
+            assertActive();
 
             if (integrity.status === 'INSUFFICIENT_EVIDENCE') {
-                console.warn('[AI] Stage 0: Image unusable —', integrity.integrityDetails?.join('; '));
+                if (__DEV__) console.warn('[AI] Image unusable.');
                 return {
                     violationDetected:   false,
                     vehicleNumber:       'Not applicable',
@@ -269,14 +278,14 @@ export const aiService = {
             }
 
             if (integrity.status === 'POSSIBLE_INTEGRITY_ISSUE') {
-                console.warn('[AI] Stage 0: Integrity concern —', integrity.integrityDetails?.join('; '));
+                if (__DEV__) console.warn('[AI] Integrity check requires officer review.');
                 // Continue analysis — officer will review the integrity flag
             }
 
             // Prepare base64 image for vision
             const visionB64 = await prepareVisionImage(cleanUri);
+            assertActive();
             telemetry.preprocessing_ms = t0.elapsed();
-            console.log(`[AI] Stage 0 complete: ${telemetry.preprocessing_ms}ms, integrity=${integrity.status}`);
 
             // ═══════════════════════════════════════════════════════════════════
             // STAGE 1 — Primary Vision Perception (NVIDIA → Gemini fallback)
@@ -290,21 +299,34 @@ export const aiService = {
             {
                 const t1 = makeTimer();
                 try {
-                    const res = await invokeAiStage({ stage: 'vision', imageBase64: visionB64 });
+                    // Retry only transient transport failures (PROVIDER_UNAVAILABLE /
+                    // PROVIDER_TIMEOUT / NETWORK) with a short 1s→3s back-off. Auth,
+                    // quota and bad-output errors are not retried. An aborted signal
+                    // cancels pending retries and surfaces as AiStageError('CANCELLED').
+                    const res = await invokeAiStageWithRetry(
+                        { stage: 'vision', imageBase64: visionB64 },
+                        {
+                            signal,
+                            onRetry: ({ attempt }) => {
+                                if (onStageChange) onStageChange(`Reconnecting to analysis service (attempt ${attempt + 1})...`);
+                            },
+                        },
+                    );
                     visionRaw     = res.text;
                     providerUsed  = res.provider;
                     fallbackUsed  = res.provider === 'gemini';
                     telemetry.vision_primary_ms = t1.elapsed();
-                    console.log(`[AI] Stage 1 Vision: ✅ ${telemetry.vision_primary_ms}ms (server provider=${res.provider})`);
                 } catch (visionErr) {
                     telemetry.vision_primary_ms = t1.elapsed();
-                    const code = visionErr instanceof AiStageError ? visionErr.code : 'UNKNOWN';
-                    console.warn(`[AI] Stage 1 Vision: ✗ ${code}`);
+                    // Cancellation is not a failure — propagate so the caller can
+                    // discard the result instead of showing an analysis error.
+                    if (visionErr instanceof AiStageError && visionErr.code === 'CANCELLED') {
+                        throw visionErr;
+                    }
                 }
             }
 
             if (!visionRaw) {
-                console.error('[AI] All vision providers failed — ANALYSIS_FAILED');
                 return {
                     violationDetected:    false,
                     vehicleNumber:        'Not applicable',
@@ -323,7 +345,7 @@ export const aiService = {
             try {
                 evidence = parseVisionEvidence(visionRaw);
             } catch (parseErr) {
-                console.error('[AI] Vision response parse failed:', parseErr.message);
+                if (__DEV__) console.warn('[AI] Analysis stage completed or unavailable; evidence detail omitted.');
                 return {
                     violationDetected:    false,
                     vehicleNumber:        'Not applicable',
@@ -339,7 +361,6 @@ export const aiService = {
 
             // Image not usable according to vision model
             if (!evidence.image_quality?.usable) {
-                console.warn('[AI] Vision model reports image unusable');
                 return {
                     violationDetected:    false,
                     vehicleNumber:        'Not applicable',
@@ -357,13 +378,11 @@ export const aiService = {
             // STAGE RE — Local Deterministic Rule Engine
             // ═══════════════════════════════════════════════════════════════════
             const tRE = makeTimer();
-            ruleResult = applyRules(evidence, __DEV__);
+            ruleResult = applyRules(evidence, false);
             telemetry.rule_engine_ms = tRE.elapsed();
-            console.log(`[AI] Stage RE: ${ruleResult.confirmedViolations.length} confirmed, ${ruleResult.uncertainViolations.length} uncertain in ${telemetry.rule_engine_ms}ms`);
 
             // ── Fast path: no confirmed violations and no uncertainty ──────────
             if (ruleResult.confirmedViolations.length === 0 && ruleResult.uncertainViolations.length === 0) {
-                console.log('[AI] ⚡ Fast path: Rule engine found no violations');
                 telemetry.total_ms = totalTimer.elapsed();
                 return buildFinalResult({ evidence, ruleResult, auditResult: null, ocrResult: null, telemetry, integrity, providerUsed, fallbackUsed, ocrUsed: false });
             }
@@ -380,27 +399,26 @@ export const aiService = {
                 if (onStageChange) onStageChange('Reading vehicle information...');
                 const t2 = makeTimer();
                 try {
-                    console.log('[AI] Stage 2 — OCR: plate present but unreadable, attempting OCR');
                     const ocrB64 = await prepareOcrImage(cleanUri);
-                    const { text: rawOCR } = await invokeAiStage({ stage: 'ocr', imageBase64: ocrB64 });
+                    assertActive();
+                    const { text: rawOCR } = await invokeAiStageWithRetry({ stage: 'ocr', imageBase64: ocrB64 }, { signal });
                     const parsedOCR = extractJSON(rawOCR);
                     if (isVerifiedOcrPlate(parsedOCR)) {
                         ocrResult = parsedOCR;
-                        console.log(`[AI] Stage 2 OCR: "${parsedOCR.plate_text}" @ ${parsedOCR.confidence_percent}%`);
+                        if (__DEV__) console.warn('[AI] Analysis stage completed or unavailable; evidence detail omitted.');
                     } else {
-                        console.log(`[AI] Stage 2 OCR: plate still unreadable (${parsedOCR?.plate_text || 'null'} @ ${parsedOCR?.confidence_percent || 0}%)`);
+                        if (__DEV__) console.warn('[AI] Analysis stage completed or unavailable; evidence detail omitted.');
                     }
                     ocrUsed = true;
                 } catch (ocrErr) {
-                    console.warn('[AI] Stage 2 OCR failed (non-fatal):', ocrErr.message);
+                    assertActive();
+                    if (ocrErr?.code === 'CANCELLED') throw ocrErr;
+                    if (__DEV__) console.warn('[AI] Analysis stage completed or unavailable; evidence detail omitted.');
                     ocrUsed = true; // record that we attempted it
                 }
                 telemetry.ocr_ms = t2.elapsed();
-                console.log(`[AI] Stage 2 complete: ${telemetry.ocr_ms}ms`);
             } else if (ruleResult.confirmedViolations.length > 0 && ruleResult.plateInfo.readable) {
-                console.log(`[AI] Stage 2 OCR: skipped — plate already readable ("${ruleResult.plateInfo.text}")`);
-            } else {
-                console.log('[AI] Stage 2 OCR: skipped — no confirmed violations or plate not present');
+                if (__DEV__) console.warn('[AI] Analysis stage completed or unavailable; evidence detail omitted.');
             }
 
             // ═══════════════════════════════════════════════════════════════════
@@ -418,14 +436,12 @@ export const aiService = {
                 try {
                     const evidenceSummary = buildEvidenceSummary(evidence, ruleResult);
 
-                    console.log(`[AI] Stage 3 — audit: candidates=[${candidateViolations.join(', ')}]`);
-
                     // Text-only. The Edge Function sends no image to the auditor.
-                    const { text: auditRaw } = await invokeAiStage({
+                    const { text: auditRaw } = await invokeAiStageWithRetry({
                         stage: 'audit',
                         evidenceSummary,
                         candidates: candidateViolations,
-                    });
+                    }, { signal });
 
                     const parsedAudit = extractJSON(auditRaw);
 
@@ -435,20 +451,21 @@ export const aiService = {
                     }
 
                     auditResult = parsedAudit;
-                    console.log(`[AI] Stage 3 Audit: accepted=[${auditResult.accepted_violations.join(', ')}] rejected=[${(auditResult.rejected_violations || []).join(', ')}]`);
+                    if (__DEV__) console.log('[AI] Audit completed.');
                 } catch (auditErr) {
-                    console.warn('[AI] Stage 3 Groq audit failed (non-fatal — using rule engine result):', auditErr.message);
+                    assertActive();
+                    if (auditErr?.code === 'CANCELLED') throw auditErr;
+                    if (__DEV__) console.warn('[AI] Analysis stage completed or unavailable; evidence detail omitted.');
                     // Audit failure is non-fatal: we use the rule engine result directly
                     // This is safe because the rule engine is already fail-closed
                 }
                 telemetry.reasoning_ms = t3.elapsed();
-            } else {
-                console.log('[AI] Stage 3 audit: skipped — no candidate violations');
             }
 
             // ═══════════════════════════════════════════════════════════════════
             // RESULT
             // ═══════════════════════════════════════════════════════════════════
+            assertActive();
             if (onStageChange) onStageChange('Preparing report...');
             telemetry.total_ms = totalTimer.elapsed();
 
@@ -458,7 +475,14 @@ export const aiService = {
             });
 
         } catch (fatalError) {
-            console.error('[AI] Fatal pipeline error:', fatalError?.message || fatalError);
+            assertActive();
+            // Cancellation (unmount / user abort) is not an analysis failure —
+            // let it propagate so the caller can silently discard the result.
+            if (fatalError instanceof AiStageError && fatalError.code === 'CANCELLED') {
+                throw fatalError;
+            }
+
+            if (__DEV__) console.warn('[AI] Analysis stage completed or unavailable; evidence detail omitted.');
             telemetry.total_ms = totalTimer.elapsed();
 
             // In dev: return a safe mock so the UI is not permanently stuck

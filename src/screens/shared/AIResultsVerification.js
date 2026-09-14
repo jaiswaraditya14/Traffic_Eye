@@ -1,39 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Modal, Alert, TextInput, StatusBar, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAppContext } from '../../context/AppContext';
-import { supabase } from '../../services';
-import * as FileSystem from 'expo-file-system/legacy';
-const { EncodingType } = FileSystem;
-import { decode } from 'base64-arraybuffer';
-import { FocusAwareStatusBar } from '../../components';
+import { useAppContext, useAuth } from '../../context';
+import { reportService } from '../../services';
+import { COLORS } from '../../utils/theme';
+import { confidencePercent } from '../../utils/productExperience';
+import { isDemoEvidence } from '../../services/demoMode';
+import { FocusAwareStatusBar, ProgressRing, PressableScale, FeedbackToast } from '../../components';
 
 
-const C = {
-    navy: '#0A1E3F',
-    navyMid: '#0F2C59',
-    amber: '#D97706',
-    white: '#FFFFFF',
-    offWhite: '#F4F6F9',
-    surface: '#FFFFFF',
-    textPrimary: '#0F172A',
-    textSecondary: '#475569',
-    border: '#CBD5E1',
-    error: '#B91C1C',
-    success: '#15803D',
-    successSurface: '#DCFCE7',
-    warning: '#B45309',
-};
 
 export default function AIResultsVerification({ navigation, route }) {
     const { currentReport } = useAppContext();
+    const { user } = useAuth();
     const { aiResults, authenticityResult: routeAuthResult, possibleDuplicate, duplicateExistingId } = route.params || {};
 
     const [vehicleNumber, setVehicleNumber] = useState(() => {
         const raw = aiResults?.vehicleNumber || currentReport?.vehiclePlate || '';
         // Don't pre-fill placeholder strings into the editable field
-        return (raw === 'Not detected' || raw === 'Not applicable' || raw === 'N/A') ? '' : raw;
+        return ['Not detected', 'Not applicable', 'N/A', 'PLATE_NOT_READABLE'].includes(raw) ? '' : raw;
     });
 
     // Multi-select: start with all AI-detected violations pre-selected
@@ -51,9 +37,19 @@ export default function AIResultsVerification({ navigation, route }) {
         );
     };
     const [address, setAddress] = useState(currentReport?.address || '');
-    const [confidence] = useState(aiResults?.confidence?.toString() || '0');
+    const confidence = confidencePercent(aiResults?.confidence, aiResults?.confidenceUnit);
+    const [toast, setToast] = useState(null);
     const [imageModalVisible, setImageModalVisible] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    // Double-tap guard — synchronous, so a second tap in the same frame is ignored
+    // before React re-renders with the disabled state.
+    const submittingRef = useRef(false);
+    const submissionRef = useRef(null);
+    const mountedRef = useRef(true);
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => { mountedRef.current = false; };
+    }, []);
 
     const severity = aiResults?.severity || 'Unknown';
     const violationDetected = aiResults?.violationDetected !== false;
@@ -71,43 +67,17 @@ export default function AIResultsVerification({ navigation, route }) {
             return;
         }
 
+        // Ignore repeat taps while a submission is already in flight. The ref
+        // flips synchronously so a double-tap can't launch two uploads/inserts.
+        if (submittingRef.current) return;
+        submittingRef.current = true;
         setSubmitting(true);
+
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) throw new Error('User not authenticated');
-
-            // 1. Upload image to Storage
-            let publicUrl = null;
-            let storagePath = null;
-
-            if (currentReport?.image) {
-                const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
-                storagePath = `${user.id}/${fileName}`;
-
-                // Convert URI to Base64 and then to ArrayBuffer
-                const base64 = await FileSystem.readAsStringAsync(currentReport.image, {
-                    encoding: EncodingType?.Base64 || 'base64',
-                });
-
-                const { error: uploadError } = await supabase.storage
-                    .from('report-media')
-                    .upload(storagePath, decode(base64), {
-                        contentType: 'image/jpeg',
-                        upsert: true
-                    });
-
-                if (uploadError) throw uploadError;
-
-                const { data: { publicUrl: url } } = supabase.storage
-                    .from('report-media')
-                    .getPublicUrl(storagePath);
-                
-                publicUrl = url;
+            if (isDemoEvidence(currentReport, aiResults)) {
+                navigation.replace('ReportSuccess', { demo: true, verifiedData: { ...currentReport, demo: true, vehicleNumber, violationType, address } });
+                return;
             }
-
-            let imgReportId = null;
-
-            // Save to new image_reports table (officer queue + transparency layer)
             const severityLower = (aiResults?.severity || 'medium').toLowerCase();
             const normSeverity = ['low', 'medium', 'high', 'critical'].includes(severityLower) ? severityLower : 'medium';
             // location_source is persisted only when the optional DB column exists.
@@ -116,10 +86,10 @@ export default function AIResultsVerification({ navigation, route }) {
                 ? { location_source: currentReport.locationSource }
                 : {};
 
-            const { data: imgReport, error: imgReportError } = await supabase.from('image_reports').insert({
-                user_id:               user.id,
-                image_url:             publicUrl || '',
-                image_storage_path:    storagePath,
+            // Report payload WITHOUT user_id/image_url/image_storage_path — the
+            // service fills those in from the authenticated user and the uploaded
+            // object, so there is exactly one place that knows the storage layout.
+            const report = {
                 latitude:              currentReport?.location?.latitude ?? null,
                 longitude:             currentReport?.location?.longitude ?? null,
                 location_address:      address || currentReport?.address || null,
@@ -129,82 +99,82 @@ export default function AIResultsVerification({ navigation, route }) {
                 severity:              normSeverity,
                 ai_confidence:         parseFloat(confidence) / 100,
                 ai_raw_result:         aiResults,
-                vehicle_number:        vehicleNumber,
+                vehicle_number:        vehicleNumber.trim().toUpperCase(),
                 status:                'pending',
                 authenticity_check:    routeAuthResult || currentReport?.authenticityResult || null,
                 possible_duplicate:    possibleDuplicate || false,
                 duplicate_report_id:   duplicateExistingId || null,
-            }).select().single();
+            };
 
+            const cleanImageUri = currentReport?.image || '';
+            const media = cleanImageUri
+                ? { uri: cleanImageUri, fileType: 'image', mimeType: currentReport?.mimeType, fileName: currentReport?.fileName }
+                : null;
 
-            if (imgReportError) throw imgReportError;
-            imgReportId = imgReport.id;
+            const { data: created, error } = await reportService.submitReportWithMedia({
+                userId: user?.id,
+                submission: submissionRef.current || (submissionRef.current = reportService.createReportSubmission()),
+                report,
+                media,
+            });
 
-            // Link evidence to report_media table (for gallery display)
-            if (imgReportId && publicUrl) {
-                await supabase.from('report_media').insert({
-                    report_id:    imgReportId,
-                    file_url:     publicUrl,
-                    file_type:    'image',
-                    storage_path: storagePath,
-                    file_name:    storagePath?.split('/').pop(),
-                    mime_type:    'image/jpeg',
-                });
-            }
+            if (error || !created) throw error || new Error('Could not save the report.');
 
-            // No points awarded at submission time.
-            // Points are awarded by the officer via submit_officer_review DB function upon approval.
-
-            navigation.navigate('ReportSuccess', {
+            if (!mountedRef.current) return;
+            navigation.replace('ReportSuccess', {
+                reward_amount: created.reward_amount,
                 verifiedData: {
-                    vehicleNumber,
+                    vehicleNumber: report.vehicle_number,
                     violationType,
                     severity,
                     confidence: `${confidence}%`,
                     ...currentReport,
                     address, // Use edited address
-                    reportId: imgReportId
-                }
+                    reportId: created.id,
+                },
             });
         } catch (error) {
-            console.error('Error saving report:', error);
-            Alert.alert('Submission Failed', error.message || 'Could not save report. Please try again.');
+            // Dev-only diagnostics; the user sees a generic, safe message with no
+            // storage paths, URLs, or backend error detail.
+            if (__DEV__) console.warn('[reports] Submission did not complete.');
+            if (mountedRef.current) setToast(error?.userMessage || 'Could not save your report. Please check your connection and try again.');
         } finally {
-            setSubmitting(false);
+            submittingRef.current = false;
+            if (mountedRef.current) setSubmitting(false);
         }
     };
 
     return (
         <View style={styles.container}>
-            <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
+            <FocusAwareStatusBar barStyle="light-content" statusBgColor={COLORS.primaryDark} />
             <SafeAreaView style={styles.safeArea} edges={['top']}>
                 {/* ── Header ── */}
                 <View style={styles.header}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                        <Ionicons name="arrow-back" size={20} color={C.white} />
+                        <Ionicons name="arrow-back" size={20} color={COLORS.white} />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>Review AI Results</Text>
                     <View style={{ width: 36 }} />
                 </View>
 
-                <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                    
+                <ScrollView keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" style={styles.content} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+
                     {/* Media Preview */}
                     <View style={styles.mediaContainer}>
                         {currentReport?.image ? (
                             <TouchableOpacity onPress={() => setImageModalVisible(true)} activeOpacity={0.9}>
-                                <Image source={{ uri: currentReport.image }} style={styles.mediaPreview} resizeMode="cover" />
-                                <View style={styles.zoomBtn}><Ionicons name="expand" size={16} color={C.navyMid} /></View>
+                                <Image source={typeof currentReport.image === 'number' ? currentReport.image : { uri: currentReport.image }} style={styles.mediaPreview} resizeMode="cover" />
+                                <View style={styles.zoomBtn}><Ionicons name="expand" size={16} color={COLORS.primary} /></View>
                             </TouchableOpacity>
                         ) : (
-                            <View style={styles.placeholder}><Ionicons name="image" size={48} color={C.border} /></View>
+                            <View style={styles.placeholder}><Ionicons name="image" size={48} color={COLORS.border} /></View>
                         )}
                     </View>
 
                     {/* Possible Duplicate Warning Banner */}
                     {possibleDuplicate && (
                         <View style={styles.duplicateBanner}>
-                            <Ionicons name="warning" size={18} color="#B45309" />
+                            <Ionicons name="warning" size={18} color={COLORS.secondaryDark} />
                             <View style={{ flex: 1 }}>
                                 <Text style={styles.duplicateBannerTitle}>⚠️ Possible Duplicate</Text>
                                 <Text style={styles.duplicateBannerText}>
@@ -217,13 +187,14 @@ export default function AIResultsVerification({ navigation, route }) {
                     {/* AI Insights Card */}
                     <View style={styles.aiCard}>
                         <View style={styles.aiHeader}>
-                            <Ionicons name="sparkles" size={18} color={violationDetected ? C.success : C.warning} />
-                            <Text style={[styles.aiTitle, { color: violationDetected ? C.success : C.warning }]}>AI Detection</Text>
-                            <View style={[styles.confidenceBadge, !violationDetected && { backgroundColor: '#FEF3C7', borderColor: 'rgba(217,119,6,0.2)' }]}>
-                                <Text style={[styles.confidenceText, !violationDetected && { color: C.warning }]}>{confidence}% Match</Text>
+                            <Ionicons name="sparkles" size={18} color={violationDetected ? COLORS.success : COLORS.warning} />
+                            <Text style={[styles.aiTitle, { color: violationDetected ? COLORS.success : COLORS.warning }]}>AI Detection</Text>
+                            <View style={[styles.confidenceBadge, !violationDetected && { backgroundColor: COLORS.secondarySurface, borderColor: 'rgba(217,119,6,0.2)' }]}>
+                                <Text style={[styles.confidenceText, !violationDetected && { color: COLORS.warning }]}>{confidence}% Match</Text>
                             </View>
                         </View>
 
+                        <ProgressRing value={confidence / 100} color={confidence < 40 ? COLORS.error : confidence <= 70 ? COLORS.secondary : COLORS.success} label="AI confidence" />
                         {/* Primary message */}
                         <View style={styles.aiAlertBox}>
                             {violationDetected ? (
@@ -240,7 +211,7 @@ export default function AIResultsVerification({ navigation, route }) {
                         {/* AI reasoning */}
                         {!!aiDescription && aiDescription !== 'No traffic violation detected.' && (
                             <View style={styles.aiReasonBox}>
-                                <Ionicons name="information-circle-outline" size={14} color={C.textSecondary} style={{ marginTop: 1 }} />
+                                <Ionicons name="information-circle-outline" size={14} color={COLORS.textSecondary} style={{ marginTop: 1 }} />
                                 <Text style={styles.aiReasonText}>{aiDescription}</Text>
                             </View>
                         )}
@@ -274,21 +245,22 @@ export default function AIResultsVerification({ navigation, route }) {
 
                     {/* Input Forms */}
                     <Text style={styles.sectionHeader}>Detected Details</Text>
-                    
+
                     <View style={styles.inputBox}>
                         <Text style={styles.inputLabel}>Vehicle Registration Plate</Text>
                         <TextInput
-                            style={styles.textInput}
+                            style={[styles.textInput, { borderWidth: 2, borderColor: COLORS.black, backgroundColor: COLORS.white, color: COLORS.black, letterSpacing: 2 }]}
+                            accessibilityLabel="Vehicle registration plate"
                             placeholder="e.g. MH12AB1234"
                             value={vehicleNumber}
                             onChangeText={setVehicleNumber}
                             autoCapitalize="characters"
-                            placeholderTextColor={C.textTertiary}
+                            placeholderTextColor={COLORS.textTertiary}
                         />
                         {/* OCR uncertainty warning */}
                         {plateOCR?.uncertainCharacters?.length > 0 && (
                             <View style={styles.ocrWarningRow}>
-                                <Ionicons name="alert-circle" size={14} color={C.warning} />
+                                <Ionicons name="alert-circle" size={14} color={COLORS.warning} />
                                 <Text style={styles.ocrWarningText}>
                                     Uncertain: {plateOCR.uncertainCharacters.join(' · ')}
                                 </Text>
@@ -296,7 +268,7 @@ export default function AIResultsVerification({ navigation, route }) {
                         )}
                         {plateOCR?.confidence != null && (
                             <Text style={styles.ocrMetaText}>
-                                OCR confidence: {plateOCR.confidence}%{plateOCR.notes ? ` — ${plateOCR.notes}` : ''}
+                                OCR confidence: {confidencePercent(plateOCR.confidence, plateOCR.confidenceUnit)}%{plateOCR.notes ? ` — ${plateOCR.notes}` : ''}
                             </Text>
                         )}
                     </View>
@@ -307,14 +279,16 @@ export default function AIResultsVerification({ navigation, route }) {
                             {['Triple Riding', 'No Helmet', 'Wrong Parking', 'Speeding', 'No Seat Belt', 'Rash Driving', 'Footpath Driving', 'Red Light', 'Wrong Way', 'Phone Use', 'Overloading', 'Lane Cutting'].map(type => {
                                 const active = selectedViolations.includes(type);
                                 return (
-                                    <TouchableOpacity
+                                    <PressableScale
                                         key={type}
                                         style={[styles.chip, active && styles.chipActive]}
+                                        accessibilityLabel={type}
+                                        accessibilityState={{ selected: active }}
                                         onPress={() => toggleViolation(type)}
                                     >
-                                        {active && <Ionicons name="checkmark" size={13} color={C.white} style={{ marginRight: 4 }} />}
+                                        {active && <Ionicons name="checkmark" size={13} color={COLORS.white} style={{ marginRight: 4 }} />}
                                         <Text style={[styles.chipText, active && styles.chipTextActive]}>{type}</Text>
-                                    </TouchableOpacity>
+                                    </PressableScale>
                                 );
                             })}
                         </View>
@@ -335,12 +309,12 @@ export default function AIResultsVerification({ navigation, route }) {
                                     <Ionicons
                                         name={(currentReport.locationSource === 'EXIF_ORIGINAL' || currentReport.locationSource === 'EXIF_PICKER_COPY' || currentReport.locationSource === 'IMAGE_EXIF') ? 'image' : (currentReport.locationSource === 'LIVE_DEVICE_LOCATION' || currentReport.locationSource === 'LIVE_LOCATION') ? 'navigate' : 'pin'}
                                         size={11}
-                                        color={(currentReport.locationSource === 'EXIF_ORIGINAL' || currentReport.locationSource === 'EXIF_PICKER_COPY' || currentReport.locationSource === 'IMAGE_EXIF') ? '#15803D' : (currentReport.locationSource === 'LIVE_DEVICE_LOCATION' || currentReport.locationSource === 'LIVE_LOCATION') ? '#0F2C59' : '#64748B'}
+                                        color={(currentReport.locationSource === 'EXIF_ORIGINAL' || currentReport.locationSource === 'EXIF_PICKER_COPY' || currentReport.locationSource === 'IMAGE_EXIF') ? COLORS.success : (currentReport.locationSource === 'LIVE_DEVICE_LOCATION' || currentReport.locationSource === 'LIVE_LOCATION') ? COLORS.primary : COLORS.textTertiary}
                                     />
                                     <Text style={[
                                         styles.locSourceText,
-                                        (currentReport.locationSource === 'EXIF_ORIGINAL' || currentReport.locationSource === 'EXIF_PICKER_COPY' || currentReport.locationSource === 'IMAGE_EXIF') && { color: '#15803D' },
-                                        (currentReport.locationSource === 'LIVE_DEVICE_LOCATION' || currentReport.locationSource === 'LIVE_LOCATION') && { color: '#0F2C59' },
+                                        (currentReport.locationSource === 'EXIF_ORIGINAL' || currentReport.locationSource === 'EXIF_PICKER_COPY' || currentReport.locationSource === 'IMAGE_EXIF') && { color: COLORS.success },
+                                        (currentReport.locationSource === 'LIVE_DEVICE_LOCATION' || currentReport.locationSource === 'LIVE_LOCATION') && { color: COLORS.primary },
                                     ]}>
                                         {currentReport.locationSource === 'EXIF_ORIGINAL' ? 'Original Image GPS' : currentReport.locationSource === 'EXIF_PICKER_COPY' ? 'Image GPS' : (currentReport.locationSource === 'LIVE_DEVICE_LOCATION' || currentReport.locationSource === 'LIVE_LOCATION') ? 'Live Device GPS' : 'Manual'}
                                     </Text>
@@ -354,7 +328,7 @@ export default function AIResultsVerification({ navigation, route }) {
                             onChangeText={setAddress}
                             multiline
                             numberOfLines={4}
-                            placeholderTextColor={C.textTertiary}
+                            placeholderTextColor={COLORS.textTertiary}
                         />
                         {currentReport?.location?.latitude != null && currentReport?.location?.longitude != null && (
                             <Text style={styles.coordMetaText}>
@@ -367,19 +341,19 @@ export default function AIResultsVerification({ navigation, route }) {
 
                 {/* Footer Action */}
                 <View style={styles.footer}>
-                    <TouchableOpacity 
-                        style={[styles.primaryBtn, submitting && { opacity: 0.7 }]} 
-                        onPress={handleSubmit} 
+                    <TouchableOpacity
+                        style={[styles.primaryBtn, submitting && { opacity: 0.7 }]}
+                        onPress={handleSubmit}
                         disabled={submitting}
                         activeOpacity={0.88}
                     >
                         <View style={styles.primaryBtnInner}>
                             {submitting ? (
-                                <ActivityIndicator color={C.white} size="small" />
+                                <ActivityIndicator color={COLORS.white} size="small" />
                             ) : (
                                 <>
                                     <Text style={styles.primaryBtnText}>Confirm & Submit</Text>
-                                    <Ionicons name="checkmark-circle" size={18} color={C.white} />
+                                    <Ionicons name="checkmark-circle" size={18} color={COLORS.white} />
                                 </>
                             )}
                         </View>
@@ -387,12 +361,13 @@ export default function AIResultsVerification({ navigation, route }) {
                 </View>
 
             </SafeAreaView>
+            <FeedbackToast visible={!!toast} message={toast || ''} variant="error" onDismiss={() => setToast(null)} />
 
             {/* Modal */}
             <Modal visible={imageModalVisible} transparent={true} animationType="fade" onRequestClose={() => setImageModalVisible(false)}>
                 <View style={styles.modalBg}>
                     <TouchableOpacity style={styles.modalClose} onPress={() => setImageModalVisible(false)}>
-                        <Ionicons name="close" size={28} color={C.white} />
+                        <Ionicons name="close" size={28} color={COLORS.white} />
                     </TouchableOpacity>
                     <ScrollView
                         maximumZoomScale={5}
@@ -411,57 +386,57 @@ export default function AIResultsVerification({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: C.offWhite },
+    container: { flex: 1, backgroundColor: COLORS.background },
     safeArea: { flex: 1 },
 
     // Header
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: C.navy },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: COLORS.primaryDark },
     backButton: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)', justifyContent: 'center', alignItems: 'center' },
-    headerTitle: { fontSize: 20, fontFamily: 'Nunito-Bold', color: C.white },
+    headerTitle: { fontSize: 20, fontFamily: 'Nunito-Bold', color: COLORS.white },
 
     content: { flex: 1 },
     scrollContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
 
     // Media
-    mediaContainer: { 
-        width: '100%', 
-        height: 240, 
-        borderRadius: 24, 
-        overflow: 'hidden', 
-        backgroundColor: C.surface, 
-        marginBottom: 24, 
-        shadowColor: '#0F2C59', 
-        shadowOffset: { width: 0, height: 12 }, 
-        shadowOpacity: 0.12, 
-        shadowRadius: 20, 
+    mediaContainer: {
+        width: '100%',
+        height: 240,
+        borderRadius: 24,
+        overflow: 'hidden',
+        backgroundColor: COLORS.surface,
+        marginBottom: 24,
+        shadowColor: COLORS.primary,
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.12,
+        shadowRadius: 20,
         elevation: 8,
         borderWidth: 1,
         borderColor: 'rgba(0,0,0,0.05)',
     },
     mediaPreview: { width: '100%', height: '100%' },
     placeholder: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    zoomBtn: { 
-        position: 'absolute', 
-        bottom: 16, 
-        right: 16, 
-        backgroundColor: 'rgba(255,255,255,0.92)', 
-        padding: 10, 
+    zoomBtn: {
+        position: 'absolute',
+        bottom: 16,
+        right: 16,
+        backgroundColor: 'rgba(255,255,255,0.92)',
+        padding: 10,
         borderRadius: 14,
-        shadowColor: '#000',
+        shadowColor: COLORS.black,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
     },
 
     // AI Card
-    aiCard: { 
-        backgroundColor: '#FFFFFF', 
-        borderRadius: 24, 
-        padding: 20, 
-        marginBottom: 28, 
-        borderWidth: 1, 
+    aiCard: {
+        backgroundColor: COLORS.surface,
+        borderRadius: 24,
+        padding: 20,
+        marginBottom: 28,
+        borderWidth: 1,
         borderColor: 'rgba(5,150,105,0.1)',
-        shadowColor: C.success,
+        shadowColor: COLORS.success,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.05,
         shadowRadius: 12,
@@ -469,20 +444,20 @@ const styles = StyleSheet.create({
     },
     aiHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
     aiTitle: { fontSize: 16, fontFamily: 'Nunito-Bold', marginLeft: 8, flex: 1 },
-    confidenceBadge: { 
-        backgroundColor: C.successSurface, 
-        paddingHorizontal: 12, 
-        paddingVertical: 6, 
+    confidenceBadge: {
+        backgroundColor: COLORS.successSurface,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
         borderRadius: 100,
         borderWidth: 1,
         borderColor: 'rgba(5,150,105,0.2)',
     },
-    confidenceText: { fontSize: 12, fontFamily: 'Nunito-ExtraBold', color: C.success, letterSpacing: 0.2 },
-    aiAlertBox: { 
+    confidenceText: { fontSize: 12, fontFamily: 'Nunito-ExtraBold', color: COLORS.success, letterSpacing: 0.2 },
+    aiAlertBox: {
         marginTop: 4,
         paddingLeft: 4,
     },
-    aiAlertText: { fontSize: 14, color: C.textSecondary, lineHeight: 22, fontFamily: 'Nunito-Medium' },
+    aiAlertText: { fontSize: 14, color: COLORS.textSecondary, lineHeight: 22, fontFamily: 'Nunito-Medium' },
 
     // AI reasoning note
     aiReasonBox: {
@@ -493,7 +468,7 @@ const styles = StyleSheet.create({
     },
     aiReasonText: {
         flex: 1, fontSize: 12, fontFamily: 'Nunito-Medium',
-        color: C.textSecondary, lineHeight: 18,
+        color: COLORS.textSecondary, lineHeight: 18,
     },
 
     // All violations chips (multi-select)
@@ -504,7 +479,7 @@ const styles = StyleSheet.create({
     },
     violationTagLabel: {
         width: '100%', fontSize: 11, fontFamily: 'Nunito-SemiBold',
-        color: C.textSecondary, marginBottom: 2,
+        color: COLORS.textSecondary, marginBottom: 2,
     },
     violationTag: {
         flexDirection: 'row', alignItems: 'center',
@@ -518,38 +493,38 @@ const styles = StyleSheet.create({
         borderColor: '#4F46E5',
     },
     violationTagText: {
-        fontSize: 12, fontFamily: 'Nunito-Bold', color: C.textSecondary,
+        fontSize: 12, fontFamily: 'Nunito-Bold', color: COLORS.textSecondary,
     },
     violationTagTextActive: {
         color: '#4F46E5',
     },
 
 
-    sectionHeader: { 
-        fontSize: 17, 
-        fontFamily: 'Nunito-Bold', 
-        color: C.navy, 
-        marginBottom: 20, 
+    sectionHeader: {
+        fontSize: 17,
+        fontFamily: 'Nunito-Bold',
+        color: COLORS.primaryDark,
+        marginBottom: 20,
         letterSpacing: -0.2,
         marginLeft: 4,
     },
 
     inputBox: { marginBottom: 24 },
-    inputLabel: { fontSize: 13, fontFamily: 'Nunito-Bold', color: C.navyMid, marginBottom: 10, marginLeft: 6 },
-    textInput: { 
-        backgroundColor: C.surface, 
-        borderWidth: 1.5, 
-        borderColor: '#E5E7EB', 
-        borderRadius: 16, 
-        paddingHorizontal: 18, 
-        paddingVertical: 14, 
-        fontSize: 16, 
-        color: C.textPrimary, 
+    inputLabel: { fontSize: 13, fontFamily: 'Nunito-Bold', color: COLORS.primary, marginBottom: 10, marginLeft: 6 },
+    textInput: {
+        backgroundColor: COLORS.surface,
+        borderWidth: 1.5,
+        borderColor: '#E5E7EB',
+        borderRadius: 16,
+        paddingHorizontal: 18,
+        paddingVertical: 14,
+        fontSize: 16,
+        color: COLORS.textPrimary,
         fontFamily: 'Nunito-SemiBold',
-        shadowColor: C.navyMid, 
-        shadowOffset: { width: 0, height: 2 }, 
-        shadowOpacity: 0.02, 
-        shadowRadius: 6, 
+        shadowColor: COLORS.primary,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.02,
+        shadowRadius: 6,
     },
     addressInput: {
         minHeight: 120,
@@ -557,47 +532,47 @@ const styles = StyleSheet.create({
         paddingTop: 14,
     },
     chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 14 },
-    chip: { 
+    chip: {
         flexDirection: 'row', alignItems: 'center',
-        backgroundColor: '#F3F4F6', 
-        borderWidth: 1, 
-        borderColor: 'rgba(0,0,0,0.05)', 
-        paddingHorizontal: 16, 
-        paddingVertical: 10, 
-        borderRadius: 14 
+        backgroundColor: '#F3F4F6',
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.05)',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 14
     },
     chipActive: {
-        backgroundColor: C.navy,
-        borderColor: C.navy,
+        backgroundColor: COLORS.primaryDark,
+        borderColor: COLORS.primaryDark,
     },
-    chipText: { fontSize: 13, fontFamily: 'Nunito-Bold', color: C.navyMid },
-    chipTextActive: { color: C.white },
-    selectedViolationsText: { fontSize: 12, fontFamily: 'Nunito-SemiBold', color: C.success, marginTop: 10, marginLeft: 4 },
+    chipText: { fontSize: 13, fontFamily: 'Nunito-Bold', color: COLORS.primary },
+    chipTextActive: { color: COLORS.white },
+    selectedViolationsText: { fontSize: 12, fontFamily: 'Nunito-SemiBold', color: COLORS.success, marginTop: 10, marginLeft: 4 },
 
-    footer: { 
-        paddingHorizontal: 24, 
+    footer: {
+        paddingHorizontal: 24,
         paddingTop: 20,
-        paddingBottom: 40, 
-        backgroundColor: C.surface, 
-        borderTopWidth: 1, 
+        paddingBottom: 40,
+        backgroundColor: COLORS.surface,
+        borderTopWidth: 1,
         borderTopColor: 'rgba(0,0,0,0.05)',
     },
-    primaryBtn: { 
-        borderRadius: 18, 
-        overflow: 'hidden', 
-        shadowColor: C.navy, 
-        shadowOffset: { width: 0, height: 8 }, 
-        shadowOpacity: 0.25, 
-        shadowRadius: 16, 
-        elevation: 8 
+    primaryBtn: {
+        borderRadius: 18,
+        overflow: 'hidden',
+        shadowColor: COLORS.primaryDark,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.25,
+        shadowRadius: 16,
+        elevation: 8
     },
-    primaryBtnInner: { flexDirection: 'row', paddingVertical: 18, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: C.navy },
-    primaryBtnText: { fontSize: 17, fontFamily: 'Nunito-ExtraBold', color: C.white, letterSpacing: 0.5 },
+    primaryBtnInner: { flexDirection: 'row', paddingVertical: 18, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: COLORS.primaryDark },
+    primaryBtnText: { fontSize: 17, fontFamily: 'Nunito-ExtraBold', color: COLORS.white, letterSpacing: 0.5 },
 
     // OCR metadata
     ocrWarningRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, paddingHorizontal: 6 },
-    ocrWarningText: { fontSize: 12, fontFamily: 'Nunito-SemiBold', color: C.warning, flex: 1 },
-    ocrMetaText: { fontSize: 11, fontFamily: 'Nunito-Medium', color: C.textSecondary, marginTop: 4, paddingHorizontal: 6 },
+    ocrWarningText: { fontSize: 12, fontFamily: 'Nunito-SemiBold', color: COLORS.warning, flex: 1 },
+    ocrMetaText: { fontSize: 11, fontFamily: 'Nunito-Medium', color: COLORS.textSecondary, marginTop: 4, paddingHorizontal: 6 },
 
     // Location Source metadata badge
     locSourceBadge: {
@@ -607,27 +582,27 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         paddingVertical: 3,
         borderRadius: 8,
-        backgroundColor: '#F1F5F9',
+        backgroundColor: COLORS.surfaceContainer,
         borderWidth: 1,
-        borderColor: '#CBD5E1',
+        borderColor: COLORS.surfaceContainerHighest,
     },
     locSourceBadgeExif: {
-        backgroundColor: '#DCFCE7',
+        backgroundColor: COLORS.successSurface,
         borderColor: '#86EFAC',
     },
     locSourceBadgeLive: {
-        backgroundColor: '#EFF6FF',
+        backgroundColor: COLORS.primarySurface,
         borderColor: '#93C5FD',
     },
     locSourceText: {
         fontSize: 11,
         fontFamily: 'Nunito-Bold',
-        color: '#64748B',
+        color: COLORS.textTertiary,
     },
     coordMetaText: {
         fontSize: 11,
         fontFamily: 'Nunito-Medium',
-        color: C.textSecondary,
+        color: COLORS.textSecondary,
         marginTop: 6,
         marginLeft: 4,
     },
@@ -641,9 +616,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'flex-start',
         gap: 12,
-        backgroundColor: '#FEF3C7',
+        backgroundColor: COLORS.secondarySurface,
         borderWidth: 1.5,
-        borderColor: '#D97706',
+        borderColor: COLORS.secondary,
         borderRadius: 18,
         padding: 16,
         marginBottom: 20,

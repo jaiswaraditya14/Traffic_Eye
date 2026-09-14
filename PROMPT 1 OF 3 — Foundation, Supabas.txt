@@ -1,0 +1,993 @@
+PROMPT 1 OF 3 — Foundation, Supabase, Security, and Core Reliability
+Role
+You are the lead React Native, Expo, Supabase, and mobile security engineer for Traffic Eye, an AI-powered traffic-violation reporting application.
+Repository: D:\Traffic_Eye
+Required branch: Pre_Main
+Stack: React Native 0.81, Expo SDK 54, Supabase JS v2, MapLibre
+Frontend: JavaScript only
+Supabase Edge Functions: TypeScript
+This is the first stage of a three-stage production-readiness sprint. Your job is to secure the backend contract, centralize critical client behavior, establish the design foundation, and leave a precise handoff for the next stage.
+Do not merely create a plan. Inspect, implement, test, and document the work.
+Start Here
+Before editing:
+1. Run git branch --show-current.
+2. If the branch is not Pre_Main, stop and report the mismatch. Do not switch branches or touch main.
+3. Inspect git status and preserve all user changes.
+4. Read AGENTS.md or other repository instructions if present.
+5. Inspect:
+   - package.json and lockfile
+   - App configuration
+   - Navigation
+   - src/utils/theme.js
+   - services/reports/index.js
+   - AIResultsVerification.js
+   - VideoReport.js
+   - AIProcessing.js
+   - Existing error boundary
+   - database/PHASE1_SQL_EDITOR.sql
+   - database/Traffic_eye_database.sql
+   - Supabase functions and migrations
+   - Existing tests
+Non-Negotiable Constraints
+- Work only on Pre_Main.
+- Preserve authentication, rewards, notifications, officer reviews, and AI analysis.
+- Do not modify ai-analyze or providers.ts.
+- Preserve Token Harbor as primary and NVIDIA, Gemini, and Groq as configured fallbacks.
+- Never expose provider keys or service_role credentials in the mobile client.
+- Do not put provider secrets in EXPO_PUBLIC_*.
+- Do not introduce TypeScript into the React Native app.
+- Do not rewrite the app from scratch.
+- Preserve unrelated comments and user changes.
+- Add only lightweight Expo-compatible dependencies through npx expo install.
+- Do not run SQL against the live Supabase project.
+- Do not deploy functions, set secrets, publish builds, or perform external writes.
+- Use forward-only, reviewable database changes.
+- Never weaken RLS, authorization, validation, rate limiting, duplicate prevention, or evidence integrity.
+- Never claim a check passed unless it actually ran and passed.
+Deliverable 1 — Create SUPABASE_CHANGES.md
+Create D:\Traffic_Eye\SUPABASE_CHANGES.md before editing application code.
+Inspect the real schema first. All SQL must match actual function signatures, types, columns, constraints, grants, security-definer conventions, and search paths.
+The document must contain these ten sections.
+1. Apply AI Analysis Events Table
+Include the complete contents of database/PHASE1_SQL_EDITOR.sql, including:
+- ai_analysis_events
+- reserve_ai_analysis_event()
+- Indexes
+- RLS
+- Grants
+- Supporting statements
+Explain how to run it through:
+Supabase Dashboard → SQL Editor → New Query → Run
+If the source has a correctness or security problem, clearly separate the original SQL from the corrected recommendation.
+2. Set Edge Function Secrets
+Include placeholder commands:
+npx supabase secrets set TOKENHARBOR_API_KEY_1="<replace-me>"
+npx supabase secrets set TOKENHARBOR_API_KEY_2="<replace-me>"
+npx supabase secrets set NVIDIA_API_KEY_1="<replace-me>"
+npx supabase secrets set GEMINI_API_KEY_1="<replace-me>"
+npx supabase secrets set GROQ_API_KEY_1="<replace-me>"
+Mark TOKENHARBOR_API_KEY_1 as required and TOKENHARBOR_API_KEY_2 as optional. Explain that real values must never be committed.
+3. Deploy the Edge Function
+Include:
+npx supabase functions deploy ai-analyze --no-verify-jwt
+Explain the security implications of --no-verify-jwt and identify application-level authentication enforced by the inspected function.
+4. Fix Duplicate Review Notifications
+Inspect public.submit_officer_review(...) in database/Traffic_eye_database.sql.
+Provide a complete, schema-accurate replacement preserving:
+- Function signature and return type
+- Officer authorization
+- Jurisdiction enforcement
+- Row locking
+- Idempotency
+- State validation
+- Officer-review creation
+- Severity-based rewards
+- Point crediting
+- Audit behavior
+- Existing security conventions
+- Exactly one notification insert
+Remove only the duplicate-notification behavior.
+5. Harden New-User Creation
+Provide a complete replacement for public.handle_new_user() that:
+- Forces all public signups to citizen
+- Ignores metadata-supplied roles
+- Does not copy badge_id, department, or jurisdiction
+- Preserves legitimate signup fields
+- Follows existing security conventions
+Include:
+UPDATE public.profiles
+SET
+  role = 'officer',
+  badge_id = 'EYE-055',
+  jurisdiction = 'Vakola',
+  department = 'Mumbai Traffic Police'
+WHERE email = 'officer@example.com';
+Explain that officer promotion must occur through a trusted administrative path.
+6. Demo Seed Data
+Provide an idempotent DO $$ ... $$ block that:
+- Safely finds the first citizen and officer
+- Reports clearly if either is unavailable
+- Inserts 12–15 realistic Mumbai reports
+- Creates exactly 5 pending reports
+- Creates exactly 5 approved reports with reviews and point transactions
+- Creates 2–5 rejected reports with reviews
+- Inserts representative notifications
+- Uses realistic but synthetic coordinates, addresses, timestamps, severities, and violations
+- Uses placeholder image URLs
+- Recalculates the citizen’s point balance
+- Uses deterministic IDs or a seed marker
+- Can be rerun without duplication
+- Satisfies all real constraints
+7. Verify Storage Buckets
+Include a read-only query checking:
+- report-media
+- verification-images
+Explain how to reapply the relevant database section without creating conflicting policies.
+8. Verify Realtime
+Include a query checking whether the Realtime publication contains:
+- image_reports
+- notifications
+- officer_reviews
+- verification_reports
+- report_media
+Provide guarded commands for adding missing tables.
+9. Authentication Settings
+Document:
+- Email provider enabled
+- Site URL: trafficeye://
+- trafficeye://auth/callback
+- trafficeye://signup-success
+- trafficeye://reset-password
+- Expo Go development redirect pattern derived from project configuration
+Do not invent a fixed development URL.
+10. Summary Checklist
+Finish with a Markdown checkbox table covering all ten sections and verification status.
+Deliverable 2 — Shared Design Foundation
+Extend src/utils/theme.js into the visual source of truth.
+Include:
+- Semantic colors for primary, secondary, accent, background, surface, card, text, muted text, border, success, warning, danger, and overlays
+- Existing navy-and-amber civic palette
+- Seven practical DM Sans typography combinations
+- Spacing: 4, 8, 12, 16, 20, 24, 32, 40, 48
+- Border radii: 8, 12, 16, 24, 9999
+- Shadows: sm, md, lg, xl
+- Springs: snappy, smooth, bouncy
+Create reusable components only where they eliminate genuine duplication, such as:
+- Status pill
+- Skeleton block
+- Empty state
+- Glass card
+- Animated counter
+- Pressable-scale wrapper
+- Toast
+- Confirmation modal
+Do not perform a risky blind global style replacement. Migrate shared infrastructure and any files touched by this prompt.
+Deliverable 3 — Centralize Report Submission
+Refactor AIResultsVerification.js and VideoReport.js so storage upload and database creation use uploadReportMedia() and the canonical APIs in services/reports/index.js.
+Ensure:
+- One authoritative submission path
+- Consistent payload validation
+- Correct storage paths and MIME types
+- No duplicate upload or insert
+- Retry-safe behavior
+- Double-tap submission protection
+- Safe orphan cleanup where possible
+- No sensitive URLs or secrets in logs
+Change checkUserRateLimit and checkPlateDuplicate to fail closed:
+- If either check throws or returns an indeterminate result, block submission.
+- Show a safe, user-friendly retry message.
+- Preserve diagnostic context without exposing sensitive data.
+- Add focused tests for success, rejection, thrown errors, malformed responses, and retry behavior.
+Deliverable 4 — AI Client Resilience
+Without modifying ai-analyze or providers.ts:
+- Add retry handling around invokeAiStage.
+- Retry only transient failures such as 502 and 503.
+- Use approximately 1-second and 3-second delays.
+- Allow two retries after the initial attempt.
+- Do not retry authentication, validation, rate-limit, or deterministic errors.
+- Cancel retries after unmount or user cancellation.
+- Prevent overlapping retry loops.
+- Add a Try Again state.
+- Support: “AI unavailable. Submit for manual review?”
+- Ensure manual-review submissions are represented correctly for officers.
+- Add focused tests for retry classification, backoff order, cancellation, exhaustion, and manual fallback.
+Deliverable 5 — Error Boundary
+Upgrade the existing error boundary with:
+- Branded “Something went wrong” screen
+- Restart/retry action
+- Development-only diagnostics
+- Production-safe messaging
+- No white-screen failure
+- No access-token, identity, evidence URL, provider response, or secret exposure
+Validation
+Run the most relevant available checks, including where configured:
+npm run lint
+npm test
+npx expo-doctor
+npx expo install --check
+npx expo export --platform android
+npx expo export --platform ios
+Use the repository’s actual package manager. Do not install or upgrade unrelated dependencies.
+If a full check is unavailable, run the closest targeted check and document the limitation.
+Review the final diff for:
+- Accidental secret exposure
+- Unrelated edits
+- Broken imports
+- Duplicate code paths
+- Unhandled promises
+- Subscription/timer leaks
+- JavaScript syntax errors
+- Expo-incompatible dependencies
+Handoff
+Create D:\Traffic_Eye\SPRINT_HANDOFF_1.md containing:
+- Completed work
+- Files changed
+- Architectural decisions
+- Report-submission flow after refactoring
+- Database changes documented
+- Tests added
+- Commands executed and actual results
+- Known issues
+- Items required by Prompt 2
+- Items that must not be regressed
+Final Response
+Report:
+- Outcome
+- Files changed
+- Tests and actual results
+- Remaining blockers
+- Supabase actions requiring the user
+- Confirmation that SPRINT_HANDOFF_1.md is ready
+Do not claim the entire app is production-ready at this stage.
+PROMPT 2 OF 3 — Product Experience, Feature Completion, and Demo Polish
+Role
+You are the lead React Native product engineer and mobile UI/UX specialist for Traffic Eye.
+Repository: D:\Traffic_Eye
+Required branch: Pre_Main
+Stack: React Native 0.81, Expo SDK 54, Supabase JS v2, MapLibre
+Frontend: JavaScript only
+This is the second stage of a three-stage sprint. Prompt 1 established the backend contract, shared theme, centralized submission flow, and security foundation. Your responsibility is to complete and polish the citizen and officer product experience without regressing that foundation.
+Do not merely describe or mock up the work. Implement, inspect, render, test, and document it.
+Start Here
+Before editing:
+1. Confirm the current branch is Pre_Main. Stop if it is not.
+2. Inspect git status and preserve existing work.
+3. Read repository instructions.
+4. Read:
+   - SUPABASE_CHANGES.md
+   - SPRINT_HANDOFF_1.md
+   - src/utils/theme.js
+   - Shared components created by Prompt 1
+   - Current navigation
+   - Citizen, officer, and shared screens
+   - Report and notification services
+   - App configuration and assets
+5. Run the quickest reliable baseline check before editing.
+6. Do not redo completed Prompt 1 work unless a verified defect requires a targeted fix.
+Constraints
+- Do not touch main.
+- Do not modify ai-analyze or providers.ts.
+- Preserve authentication, centralized report submission, fail-closed validation, rewards, and officer-review integrity.
+- Do not expose secrets or privileged keys.
+- Use JavaScript in the app and TypeScript only in Edge Functions.
+- Reuse the shared theme and components.
+- Avoid heavy UI, animation, charting, and state-management packages.
+- Add Expo-compatible packages only through npx expo install.
+- Use real data except in explicit demo mode.
+- Handle loading, empty, error, offline, permission, retry, and success states.
+- Respect safe areas, font scaling, accessibility, reduced motion, and small devices.
+- Clean up subscriptions, timers, listeners, and animations.
+- Do not deploy, publish, or mutate live external services.
+Citizen Experience
+Citizen Home
+Upgrade src/screens/citizen/CitizenHome.js with:
+- Personalized navy/deep-blue hero
+- User name and permission-safe GPS city
+- Animated amber points badge
+- Frosted photo and video quick actions
+- Live counts for reports, points, and verified reports
+- Count-up animation when focused
+- Last three reports in a recent activity feed
+- Accessible pending, approved, and rejected status pills
+- Quick-access cards for Traffic Signs, Speed Limits, Emergency, Fine Calculator, and Safety Tips
+- Realtime notification bell and unread count
+- Skeleton, refresh, offline, empty, and error states
+All values must come from real application data.
+New Report
+Upgrade src/screens/citizen/NewReport.js with:
+- Capture → Location → Submit step indicator
+- Animated progress
+- Clear camera/gallery hierarchy
+- Smart location card
+- MapLibre location preview
+- Pulsing pin
+- EXIF/device/manual source badge
+- Zoomable evidence preview where supported
+- Permission-denied recovery
+- Validation that prevents incomplete submission
+AI Processing
+Upgrade src/screens/shared/AIProcessing.js with:
+1. Scanning image
+2. Detecting vehicles
+3. Reading plate
+4. Cross-checking evidence
+5. Report ready
+Requirements:
+- Map stages to onStageChange.
+- Use deterministic, interruptible animations.
+- Clean up animations on unmount.
+- Prefer actual backend stage events when available.
+- Preserve retry and manual-review fallback from Prompt 1.
+AI Results Verification
+Upgrade src/screens/shared/AIResultsVerification.js with:
+- Animated confidence meter
+- Accessible numeric score
+- Red/yellow/green confidence treatment
+- Realistic Indian license-plate presentation
+- Tappable violation chips
+- Animated selected states
+- Submission feedback
+- Centralized report submission only
+Report Success
+Upgrade src/screens/citizen/ReportSuccess.js with:
+- Lightweight confetti
+- Self-drawing checkmark
+- Animated points earned
+- Report Another
+- View My Reports
+- Navigation behavior that prevents accidental resubmission
+Status Timeline
+Upgrade ImageReportStatus.js with:
+- Submitted
+- Under Review
+- Approved or Rejected
+- Actual timestamps
+- Officer remarks
+- Points-earned badge
+- Pending and incomplete states
+Never fabricate missing timestamps.
+Rewards
+Upgrade src/screens/citizen/Rewards.js with:
+- Animated points hero
+- Subtle sparkles
+- Tier progress
+- Reward-card press tilt
+- Coupon reveal
+- Correct insufficient-points, redeemed, unavailable, loading, and failure states
+Never weaken redemption idempotency.
+Officer Experience
+Officer Dashboard
+Upgrade src/screens/officer/OfficerDashboard.js with:
+- Dark-navy command-center aesthetic
+- Animated pending, approved, and rejected rings
+- Top-five pending queue sorted by severity and age
+- Urgency indicators
+- Realtime Live badge
+- Jurisdiction-filtered queries
+- Skeleton, refresh, empty, offline, and error states
+Officer Review
+Upgrade ImageReportReview.js with:
+- Evidence image
+- AI analysis
+- Confidence score
+- Relevant telemetry
+- Violation add/remove override
+- Approve and reject confirmations
+- Locked loading state during submission
+- Idempotent retry behavior
+- Clear failure recovery
+- Authorization and jurisdiction preservation
+Violation Heatmap
+Upgrade src/screens/officer/ViolationHeatmap.js with:
+- Low, Medium, High, and Critical filters
+- Today, Week, Month, and All time ranges
+- Correctly recomputed MapLibre source data
+- Animated filter selection
+- Cluster/report detail bottom sheet
+- Evidence, violation, severity, and status
+- My Location action
+- Permission-safe centering
+- Empty-map state
+Do not add a second map implementation.
+Officer PDF Export
+Upgrade OfficerReportExport.js with:
+- expo-print
+- Date-range filtering
+- Summary statistics
+- Useful report metadata
+- Preview/share workflow
+- Empty and error states
+- Escaped user-provided content in generated HTML
+Realtime Notifications
+Implement the complete notification loop in the existing auth/session architecture:
+- Subscribe only to rows belonging to the authenticated user.
+- Trigger a local Expo notification for a new row.
+- Update the unread badge immediately.
+- Navigate to the related report when tapped.
+- Prevent duplicate local notifications.
+- Prevent duplicate subscriptions across auth refreshes.
+- Clean up on logout, account change, and unmount.
+- Handle foreground, background, denied-permission, and unavailable-device behavior.
+Video Reports
+Complete VideoReport.js with:
+- 15-second recording timer
+- Recording-limit enforcement
+- Playback
+- Retake
+- Centralized upload
+- Correct MIME type and storage path
+- Expo SDK 54-compatible keyframe extraction
+- AI analysis
+- Upload progress
+- Cancellation-safe cleanup
+- Retry and manual-review fallback
+If reliable keyframe extraction is not possible with the compatible stack, implement the safest fallback and document the limitation instead of adding an incompatible native dependency.
+Onboarding
+Upgrade src/screens/shared/OnboardingCarousel.js with four pages:
+1. “See a violation? Snap it!”
+2. “AI analyzes in seconds”
+3. “Officers verify and act”
+4. “Earn rewards, save lives”
+Generate four consistent navy/amber illustrations without embedded text. Store optimized files in the established asset directory.
+Add:
+- Parallax scrolling
+- Accessible page indicators
+- Get Started action
+- Persistent onboarding completion
+- Reduced-motion fallback
+- Correct small-screen behavior
+Demo and Release Polish
+App Icon and Splash
+Generate a professional Traffic Eye icon with:
+- Stylized eye
+- Traffic-signal motif
+- Navy and amber palette
+- Strong small-size silhouette
+- No text
+- No unofficial government seal
+Create the variants required by the Expo configuration. Validate Android adaptive-icon safe zones and splash alignment.
+About Screen
+Add to Profile navigation:
+- App name
+- Config-derived version
+- Technology badges
+- “Made for [University/Event]”
+Use a centralized placeholder if the event name cannot be found.
+Hidden Demo Mode
+Five taps on the Profile version number should toggle demo mode.
+When enabled:
+- Persist locally
+- Show subtle confirmation
+- Load a bundled synthetic test image
+- Use a deterministic Mumbai location
+- Skip external AI
+- Return a schema-compatible cached result
+- Prevent accidental production-data creation
+When disabled:
+- Clear demo state
+- Restore the real pipeline
+Global Quality Requirements
+Apply across relevant screens:
+- Shared theme tokens
+- Skeleton loading
+- Pull-to-refresh
+- Empty states
+- Toasts for non-critical feedback
+- Confirmation modals for consequential actions
+- Haptics
+- Memoized expensive list items
+- Stable callbacks and list keys
+- Accessible names, roles, values, and states
+- Status communication beyond color alone
+- Safe-area and keyboard handling
+- Reduced-motion behavior
+- Animation, timer, and subscription cleanup
+Visual Verification
+Render or run every substantially modified screen and inspect:
+- Layout
+- Clipping
+- Safe areas
+- Font scaling
+- Empty states
+- Loading states
+- Error states
+- Keyboard overlap
+- Modal behavior
+- Navigation
+- Color consistency
+- Touch targets
+- Animation cleanup
+Revise visible defects before finishing.
+Validation
+Run targeted checks throughout, followed by applicable project-wide checks:
+npm run lint
+npm test
+npx expo-doctor
+npx expo install --check
+npx expo export --platform android
+npx expo export --platform ios
+Use the actual repository package manager. Record failures accurately.
+Add or update focused tests for:
+- New Report validation
+- AI stage transitions
+- AI retry/manual fallback UI
+- Notification deduplication
+- Notification navigation
+- Officer priority sorting
+- Heatmap filtering
+- Status timeline
+- Rewards guards
+- Demo-mode state
+- Video-flow state transitions
+Handoff
+Create D:\Traffic_Eye\SPRINT_HANDOFF_2.md containing:
+- Completed screens and features
+- Files changed
+- Dependencies added
+- Visual assets generated
+- Data flows affected
+- Tests added
+- Commands and actual results
+- Known defects
+- Platform limitations
+- Items Prompt 3 must verify
+- Critical flows that must not regress
+Final Response
+Report:
+- Product outcome
+- Screens and features completed
+- Files changed
+- Tests and actual results
+- Remaining defects or limitations
+- Confirmation that SPRINT_HANDOFF_2.md is ready
+Do not claim production readiness. That decision belongs to Prompt 3.
+PROMPT 3 OF 3 — Production Testing, Defect Resolution, and Release Readiness
+Role
+You are the senior mobile QA, React Native reliability, application security, accessibility, performance, and release engineer for Traffic Eye.
+Repository: D:\Traffic_Eye
+Required branch: Pre_Main
+Stack: React Native 0.81, Expo SDK 54, Supabase JS v2, MapLibre
+This is the final stage of the sprint. Prompts 1 and 2 implemented the application foundation and product experience. Your responsibility is to test the complete application, fix discovered defects, validate release builds, and make an evidence-based production-readiness decision.
+You are authorized to make in-scope local code and test changes required to fix defects. Do not stop after producing a test plan.
+Start Here
+1. Confirm the branch is Pre_Main. Stop if it is not.
+2. Inspect git status and preserve all existing work.
+3. Read repository instructions.
+4. Read:
+   - SUPABASE_CHANGES.md
+   - SPRINT_HANDOFF_1.md
+   - SPRINT_HANDOFF_2.md
+   - App configuration
+   - Package scripts
+   - Test configuration
+   - EAS configuration
+   - Database and RLS definitions
+5. Review the complete diff against the branch base.
+6. Build a requirement-to-test matrix covering the two earlier prompts.
+7. Run baseline checks before changing code.
+Constraints
+- Do not touch main.
+- Do not modify ai-analyze or providers.ts.
+- Do not expose secrets.
+- Do not weaken tests, RLS, authorization, validation, or idempotency to obtain a pass.
+- Do not run destructive SQL or use production user data.
+- Use local Supabase or a dedicated test project when available.
+- Do not deploy, publish, submit to app stores, initiate paid builds, or modify signing credentials without permission.
+- Do not claim a test passed unless it ran.
+- Do not treat Expo Go as release-build validation.
+- Do not claim iOS device testing without an iOS-capable environment.
+- Fix all discovered critical and high-severity in-scope defects, then rerun affected tests.
+Create PRODUCTION_READINESS.md
+Create D:\Traffic_Eye\PRODUCTION_READINESS.md and maintain it throughout testing.
+Include:
+1. Executive summary
+2. Branch and commit tested
+3. Test environment
+4. Platforms, OS versions, devices, and build types
+5. Commands executed
+6. Automated results
+7. Manual results
+8. Database and authorization results
+9. Security findings
+10. Accessibility findings
+11. Performance findings
+12. Known defects
+13. Untested areas
+14. External prerequisites
+15. Store configuration status
+16. Final readiness decision
+17. Safest next actions
+Test Infrastructure
+Inspect the current setup and prefer:
+1. Existing test tools
+2. Existing Jest/Expo configuration
+3. Lightweight Expo-compatible additions
+4. Precise manual test scripts where automation is impractical
+Do not add a large E2E framework unless already established or clearly justified.
+Use synthetic accounts, plates, reports, media, coordinates, and notifications.
+Static and Dependency Validation
+Run applicable checks:
+npm run lint
+npm test
+npx expo-doctor
+npx expo install --check
+Use the established package manager.
+Inspect for:
+- Invalid or case-sensitive imports
+- Circular dependencies
+- Missing assets
+- Unused or duplicate dependencies
+- Expo incompatibilities
+- Deprecated APIs
+- Invalid app configuration
+- Missing environment variables
+- Client-side secrets
+- service_role usage
+- Debug code and sensitive logs
+- Unhandled promises
+- Timer, listener, and subscription leaks
+Do not upgrade unrelated packages.
+Unit Tests
+Ensure focused coverage for:
+- Report payload validation
+- Location-source selection
+- Severity and reward calculations
+- Rate-limit fail-closed behavior
+- Duplicate-plate fail-closed behavior
+- AI retry classification and backoff
+- AI cancellation
+- Notification deduplication
+- Timeline derivation
+- Officer priority sorting
+- Heatmap filters
+- Export date ranges
+- Demo mode
+- Points and redemption guards
+Cover success, failure, boundary, malformed-data, cancellation, and retry cases.
+Component and Integration Tests
+Test critical behavior with external boundaries mocked:
+- Authentication loading and failure
+- Citizen Home statistics
+- New Report validation
+- AI stage changes
+- AI retry and manual fallback
+- AI result editing
+- Submission double-tap protection
+- Report success navigation
+- Notification updates and navigation
+- Officer queue sorting
+- Officer approval and rejection
+- Reward redemption
+- Video-flow transitions
+- Empty, loading, offline, permission, and error states
+Avoid large snapshots that do not verify behavior.
+Database, RLS, and Authorization Tests
+Using local Supabase or a dedicated test project when available, verify:
+- Public signup cannot create an officer.
+- Citizens cannot read unrelated private reports.
+- Citizens cannot review reports.
+- Officers see only permitted jurisdictions.
+- Unauthenticated users cannot access protected records or media.
+- Review submission is idempotent.
+- Concurrent reviews cannot double-credit points.
+- Exactly one notification is created per review.
+- Rate-limit reservation is atomic.
+- Duplicate detection works.
+- Storage policies prevent unauthorized access.
+- Realtime does not leak rows between users.
+- Demo seed SQL is rerunnable.
+Do not use service_role when testing ordinary user permissions.
+Critical End-to-End Journeys
+Automate with the existing E2E setup where available. Otherwise document and execute exact manual test scripts.
+Citizen Journey
+Test:
+1. First launch
+2. Onboarding
+3. Signup
+4. Login and logout
+5. Session restoration
+6. Password-reset deep link
+7. Camera permission allow/deny
+8. Media permission allow/deny
+9. Location permission allow/deny
+10. Camera capture
+11. Gallery selection
+12. EXIF location
+13. Device location
+14. Manual location
+15. AI success
+16. Transient AI retry
+17. Permanent AI failure
+18. Manual-review fallback
+19. Report submission
+20. Duplicate submission prevention
+21. Status timeline update
+22. Realtime notification
+23. Notification-to-report navigation
+24. Points update
+25. Reward redemption
+26. Video capture, playback, retake, upload, and submission
+27. Demo-mode enable, use, disable, and cleanup
+Officer Journey
+Test:
+1. Officer login
+2. Jurisdiction-filtered dashboard
+3. Realtime pending queue
+4. Evidence inspection
+5. AI details
+6. Violation override
+7. Approval
+8. Rejection
+9. Concurrent/idempotent review protection
+10. Heatmap filters
+11. Cluster/report details
+12. My Location
+13. PDF export
+14. Logout and subscription cleanup
+Permission Testing
+For camera, media, location, and notifications, test:
+- Not requested
+- First-time allow
+- First-time deny
+- Permanent denial
+- Limited access where supported
+- Permission revoked in settings
+- Return from settings
+- Device capability unavailable
+The app must not crash or become permanently stuck.
+Network and Failure Testing
+Test:
+- Airplane mode at launch
+- Network loss during upload
+- Network loss during AI processing
+- Network loss during review
+- Slow network
+- Intermittent network
+- Timeout
+- Supabase 401, 403, 409, 429, and 5xx
+- AI 502/503
+- Expired session
+- Backgrounding during upload
+- Termination during an active flow
+- Repeated taps during slow requests
+Verify retries never create duplicate:
+- Reports
+- Reviews
+- Notifications
+- Point transactions
+- Storage objects
+Device and Layout Matrix
+Test high-risk flows on available representatives of:
+- Small Android phone
+- Typical Android phone
+- Large Android phone
+- Minimum supported Android OS
+- Current Android target
+- Small iPhone
+- Large iPhone
+- Current supported iOS version
+Also test:
+- Portrait
+- Landscape where supported
+- Display scaling
+- Large accessibility font
+- Light and dark system settings
+- Display cutouts
+- Keyboard-visible screens
+- Background restoration
+- Low-memory behavior where reproducible
+Mark unavailable platforms as blocked, not passed.
+Accessibility Testing
+Verify:
+- Screen-reader navigation
+- Logical focus order
+- Accessible names, roles, values, and states
+- Status not communicated by color alone
+- Dynamic font scaling
+- No important text clipping
+- Suitable contrast
+- Practical touch targets
+- Reduced-motion support
+- Modal focus behavior
+- Keyboard dismissal and recovery
+- Meaningful labels for illustrations and evidence
+Fix critical and high-impact accessibility issues.
+Performance Testing
+Test in a release or release-like build:
+- Cold and warm startup
+- Citizen Home rendering
+- Officer Dashboard rendering
+- Large list scrolling
+- Heatmap interaction
+- Image preview memory
+- Video recording and playback
+- Upload behavior
+- Animation smoothness
+- JS-thread stalls
+- Repeated-navigation memory growth
+- Subscription and timer cleanup
+Acceptance expectations:
+- No recurring frozen primary interaction
+- Smooth representative-device scrolling
+- No unbounded image loading
+- No obvious repeated-flow memory leak
+- No duplicate realtime subscription
+- No uncontrolled rerender loop
+- No avoidable blocking work on interaction paths
+- Appropriate image compression consistent with evidence requirements
+Document measurement limitations honestly.
+Security and Privacy Testing
+Verify:
+- No provider or service_role secret in source or generated bundles
+- No secrets in logs, fixtures, snapshots, or source maps
+- Sensitive actions rely on RLS or trusted server logic
+- Client-supplied roles, ownership, officer identity, points, and rewards are not trusted
+- Deep links validate routes and identifiers
+- Evidence URLs use the intended privacy model
+- Error messages do not reveal provider internals
+- Logs avoid tokens, identities, plates, and signed URLs
+- PDFs contain only authorized data
+- Logout clears private cached state
+- Account switching cannot reveal previous-user data
+- Demo mode cannot bypass production authorization
+Search for secret patterns without printing suspected secret values.
+Mobile Lifecycle Testing
+Test:
+- Fresh installation
+- Upgrade over an existing installation where practical
+- Foreground/background restoration
+- Termination and relaunch
+- Session restoration
+- Expired-token recovery
+- Deep link from terminated state
+- Notification tap from foreground, background, and terminated states
+- Interrupted upload
+- Interrupted camera/video flow
+- Logout during active subscriptions
+- Account switching
+Release Configuration and Builds
+Inspect:
+- App configuration
+- Android package name
+- iOS bundle identifier
+- Version and build numbers
+- Production app name
+- Icon and splash
+- Adaptive icon
+- Deep-link schemes
+- Android permissions
+- iOS permission descriptions
+- Notifications
+- MapLibre
+- Production environment selection
+- Debug flags
+- Development menus
+- Cleartext network settings
+- Export compliance fields
+- Privacy-policy/support links if present
+- EAS profiles
+Run the strongest available non-destructive build checks:
+npx expo export --platform android
+npx expo export --platform ios
+If EAS access and credentials already exist, validate the configured preview or production profile without publishing or initiating an unauthorized paid build.
+Installable Build Smoke Test
+Where tooling permits:
+- Build an Android release candidate.
+- Install it on an emulator or physical device.
+- Launch without Metro.
+- Complete the primary citizen flow.
+- Complete the primary officer flow.
+- Test deep links, notifications, camera, media, location, map, PDF, and video.
+- Verify production endpoints and configuration.
+- Confirm development-only features are disabled.
+Perform equivalent iOS testing only when the required environment and signing access are available.
+Stability Testing
+Using test infrastructure:
+- Submit at least 10 synthetic photo reports.
+- Run at least 5 synthetic video flows.
+- Approve and reject multiple reports.
+- Reopen dashboards repeatedly.
+- Background and restore the app during active work.
+- Log in and out repeatedly.
+- Switch citizen/officer test accounts.
+- Trigger multiple realtime events.
+Verify:
+- No duplicate records
+- No double point credit
+- No duplicate notification
+- No growing subscription count
+- No persistent loading overlay
+- No stale account data
+- No unrecoverable navigation state
+- No repeated crash
+Defect Handling
+Classify defects as:
+- Critical: Security breach, authorization bypass, data corruption, app cannot launch, or core flow impossible
+- High: Core feature failure, repeated crash, duplicate reward/review, or major privacy risk
+- Medium: Recoverable functional, performance, or accessibility defect
+- Low: Cosmetic or minor usability issue
+For each defect:
+1. Record reproduction steps.
+2. Identify the root cause.
+3. Implement the smallest safe fix.
+4. Add a regression test where practical.
+5. Rerun affected and adjacent tests.
+6. Record the result.
+Resolve all critical and high defects before considering the app ready.
+Regression Matrix
+Add a table to PRODUCTION_READINESS.md containing:
+- Test ID
+- Platform/device
+- Build type
+- Feature
+- Preconditions
+- Steps
+- Expected result
+- Actual result
+- Pass/fail/blocked
+- Evidence
+- Defect reference
+Include every critical citizen and officer journey.
+Final Readiness Decision
+Use exactly one status:
+- READY — required gates passed with no unresolved critical/high defects
+- READY WITH CONDITIONS — no critical defects, but specific validation or operational conditions remain
+- NOT READY — critical/high defects, missing core flows, or essential platform validation remains
+Never choose READY when validation is limited to Expo Go, mocks, or one development environment.
+Final Quality Gate
+Before finishing, verify:
+- All changes are intentional.
+- main was untouched.
+- No credentials were introduced.
+- No required asset is missing.
+- No dead control or broken route remains.
+- No duplicate submission path remains.
+- Critical states are handled.
+- Automated tests pass.
+- Android export/build validation passes.
+- iOS export/build validation passes or is documented as blocked.
+- Critical installable-build journeys pass where tooling permits.
+- SUPABASE_CHANGES.md is complete.
+- Both handoff files are accounted for.
+- PRODUCTION_READINESS.md is complete.
+- No unresolved critical/high defect remains for a READY decision.
+Final Response
+Lead with the readiness decision, then report:
+- Tests executed and actual results
+- Builds validated by platform
+- Defects found and fixed
+- Remaining defects and severity
+- Security, accessibility, and performance findings
+- Untested or blocked areas
+- Supabase actions the user must perform
+- Exact safest next action
+
+
+1:33 PM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Approve for me
+
+Select effortGPT-5.6 SolHigh

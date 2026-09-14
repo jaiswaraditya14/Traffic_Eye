@@ -23,7 +23,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { fetchHeatmapPoints, subscribeToApprovedMapReports } from '../../services/reports';
-import { FocusAwareStatusBar } from '../../components';
+import { FocusAwareStatusBar, PressableScale, FeedbackToast } from '../../components';
+import useReducedMotion from '../../hooks/useReducedMotion';
+import { filterHeatmapReports } from '../../utils/productExperience';
 import { supabase } from '../../services/supabase';
 import {
     COLORS,
@@ -78,7 +80,7 @@ const SEVERITY_CONFIG = {
         order: 3,
     },
     medium: {
-        color: '#D97706',
+        color: COLORS.secondary,
         glowOuter: 'rgba(217, 119, 6, 0.25)',
         glowInner: 'rgba(217, 119, 6, 0.50)',
         label: 'Medium',
@@ -86,7 +88,7 @@ const SEVERITY_CONFIG = {
         order: 2,
     },
     low: {
-        color: '#16A34A',
+        color: COLORS.successLight,
         glowOuter: 'rgba(22, 163, 74, 0.22)',
         glowInner: 'rgba(22, 163, 74, 0.45)',
         label: 'Low',
@@ -110,7 +112,7 @@ function buildGeoJSON(points) {
         if (!isFinite(lat) || !isFinite(lng) ||
             Math.abs(lat) > 90 || Math.abs(lng) > 180 ||
             (lat === 0 && lng === 0)) {
-            if (__DEV__) console.log('[Heatmap] Omitting point with invalid coords:', p.id, lat, lng);
+            if (__DEV__) console.log('[Heatmap] Omitting a point with invalid coordinates.');
             continue;
         }
 
@@ -296,7 +298,7 @@ const sheetStyles = StyleSheet.create({
     header: { marginBottom: SPACING.md },
     titleRow: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.sm, alignItems: 'center' },
     severityPill: { paddingHorizontal: SPACING.sm, paddingVertical: 3, borderRadius: BORDER_RADIUS.full },
-    severityText: { fontFamily: 'Nunito-Bold', fontSize: 11, color: '#fff' },
+    severityText: { fontFamily: 'Nunito-Bold', fontSize: 11, color: COLORS.surface },
     statusPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.successSurface, paddingHorizontal: SPACING.sm, paddingVertical: 3, borderRadius: BORDER_RADIUS.full },
     statusText: { fontFamily: 'Nunito-SemiBold', fontSize: 11, color: COLORS.success },
     titleMain: { fontFamily: 'Nunito-Bold', fontSize: FONT_SIZES.xl, color: COLORS.textPrimary, marginBottom: 2 },
@@ -312,7 +314,7 @@ const sheetStyles = StyleSheet.create({
     imageSectionTitle: { fontFamily: 'Nunito-Bold', fontSize: 11, color: COLORS.textTertiary, textTransform: 'uppercase' },
     evidenceImage: { width: '100%', height: 170, borderRadius: BORDER_RADIUS.lg, borderWidth: 1, borderColor: COLORS.borderLight },
     closeBtn:  { backgroundColor: COLORS.primary, paddingVertical: SPACING.md, borderRadius: BORDER_RADIUS.full, alignItems: 'center' },
-    closeBtnText: { fontFamily: 'Nunito-Bold', fontSize: FONT_SIZES.md, color: '#fff' },
+    closeBtnText: { fontFamily: 'Nunito-Bold', fontSize: FONT_SIZES.md, color: COLORS.surface },
 });
 
 // ─── Layer style expressions ───────────────────────────────────────────────────
@@ -322,9 +324,9 @@ const SEVERITY_COLOR_EXPR = [
     'match', ['get', 'severity'],
     'critical', '#2563EB',
     'high',     '#EA580C',
-    'medium',   '#D97706',
-    'low',      '#16A34A',
-    /* default */ '#16A34A',
+    'medium',   COLORS.secondary,
+    'low',      COLORS.successLight,
+    /* default */ COLORS.successLight,
 ];
 
 // Heatmap layer style — weight driven by 'weight' property
@@ -375,7 +377,7 @@ const CIRCLE_LAYER_STYLE = {
         9,  0.85,
     ],
     circleStrokeWidth: 1.5,
-    circleStrokeColor: '#ffffff',
+    circleStrokeColor: COLORS.surface,
     circleStrokeOpacity: [
         'interpolate', ['linear'], ['zoom'],
         7,  0,
@@ -393,13 +395,13 @@ const CLUSTER_CIRCLE_STYLE = {
     ],
     circleColor: [
         'step', ['get', 'point_count'],
-        '#16A34A',  // <= 4
-        5,  '#D97706',
+        COLORS.successLight,  // <= 4
+        5,  COLORS.secondary,
         20, '#EA580C',
     ],
     circleOpacity: 0.85,
     circleStrokeWidth: 2,
-    circleStrokeColor: '#ffffff',
+    circleStrokeColor: COLORS.surface,
 };
 
 // Cluster count text style
@@ -407,13 +409,17 @@ const CLUSTER_COUNT_STYLE = {
     textField: '{point_count}',
     textFont: ['Open Sans Bold', 'Arial Unicode MS Bold'],
     textSize: 12,
-    textColor: '#ffffff',
+    textColor: COLORS.surface,
     textIgnorePlacement: true,
     textAllowOverlap: true,
 };
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function ViolationHeatmap({ navigation }) {
+    const reduced = useReducedMotion();
+    const [severities, setSeverities] = useState(['low', 'medium', 'high', 'critical']);
+    const [toast, setToast] = useState(null);
+    const sequence = useRef(0);
     const [points, setPoints]             = useState([]);
     const [loading, setLoading]           = useState(true);
     const [refreshing, setRefreshing]     = useState(false);
@@ -429,18 +435,20 @@ export default function ViolationHeatmap({ navigation }) {
 
     // Pulse animation for live indicator
     useEffect(() => {
-        if (refreshing) {
-            Animated.loop(
+        if (refreshing && !reduced) {
+            const animation = Animated.loop(
                 Animated.sequence([
                     Animated.timing(pulseAnim, { toValue: 0.3, duration: 600, useNativeDriver: true }),
                     Animated.timing(pulseAnim, { toValue: 1,   duration: 600, useNativeDriver: true }),
                 ])
-            ).start();
+            );
+            animation.start();
+            return () => animation.stop();
         } else {
             pulseAnim.stopAnimation();
             pulseAnim.setValue(1);
         }
-    }, [refreshing]);
+    }, [refreshing, reduced, pulseAnim]);
 
     // ── Load data from Supabase ────────────────────────────────────────────────
     const loadData = useCallback(async (showSpinner = true, bbox = null) => {
@@ -448,11 +456,14 @@ export default function ViolationHeatmap({ navigation }) {
         if (showSpinner) setLoading(true);
         else             setRefreshing(true);
 
-        const days = TIME_FILTER_DAYS[timeFilter] ?? 3650;
-        const { data, error } = await fetchHeatmapPoints(bbox || bboxRef.current, days);
+        const request = ++sequence.current;
+        let data, error;
+        try { ({ data, error } = await fetchHeatmapPoints(bbox || bboxRef.current, 3650)); }
+        catch (failure) { error = failure; }
+        if (!isMounted.current || request !== sequence.current) return;
 
         if (error) {
-            if (__DEV__) console.warn('[Heatmap] Load error:', error.message);
+            setToast('Could not refresh map data. Tap refresh to retry.');
         } else if (data) {
             let validPoints = 0;
             let omittedPoints = 0;
@@ -462,21 +473,9 @@ export default function ViolationHeatmap({ navigation }) {
                 const lat = typeof p.latitude === 'number' ? p.latitude : parseFloat(p.latitude);
                 const lng = typeof p.longitude === 'number' ? p.longitude : parseFloat(p.longitude);
 
-                // Geocode fallback for location_address — max 15 calls
-                let resolvedLat = lat;
-                let resolvedLng = lng;
-
-                if ((!isFinite(lat) || !isFinite(lng) || (lat === 0 && lng === 0)) && p.location_address) {
-                    try {
-                        const geo = await Location.geocodeAsync(p.location_address);
-                        if (geo?.length > 0) {
-                            resolvedLat = geo[0].latitude;
-                            resolvedLng = geo[0].longitude;
-                        }
-                    } catch (_) {
-                        // Geocode failed — point will be omitted below
-                    }
-                }
+                // Never invent evidence coordinates from an address or approximate geocode.
+                const resolvedLat = lat;
+                const resolvedLng = lng;
 
                 // Final validity check — no fabrication allowed
                 if (!isFinite(resolvedLat) || !isFinite(resolvedLng) ||
@@ -513,7 +512,7 @@ export default function ViolationHeatmap({ navigation }) {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [timeFilter]);
+    }, []);
 
     // Mount/unmount guard
     useEffect(() => {
@@ -521,10 +520,10 @@ export default function ViolationHeatmap({ navigation }) {
         return () => { isMounted.current = false; };
     }, []);
 
-    // Re-fetch when time filter changes
+    // Fetch the available viewport dataset once; chips filter it locally.
     useEffect(() => {
         loadData(true);
-    }, [timeFilter]);
+    }, [loadData]);
 
     // Real-time subscription: refresh on new approvals
     useEffect(() => {
@@ -563,14 +562,16 @@ export default function ViolationHeatmap({ navigation }) {
     }, []);
 
     // ── GeoJSON data ──────────────────────────────────────────────────────────
-    const geoJSON = useMemo(() => buildGeoJSON(points), [points]);
+    const filteredPoints = useMemo(() => filterHeatmapReports(points, severities, ({ today: 'today', '7_days': 'week', '30_days': 'month', all: 'all' })[timeFilter]), [points, severities, timeFilter]);
+    useEffect(() => { setSelectedItem(null); }, [timeFilter, severities]);
+    const geoJSON = useMemo(() => buildGeoJSON(filteredPoints), [filteredPoints]);
 
     // ── Stats ─────────────────────────────────────────────────────────────────
     const stats = useMemo(() => {
-        const critical = points.filter(p => p.severity === 'critical').length;
-        const high     = points.filter(p => p.severity === 'high').length;
-        return { total: points.length, critical, high };
-    }, [points]);
+        const critical = filteredPoints.filter(p => p.severity === 'critical').length;
+        const high     = filteredPoints.filter(p => p.severity === 'high').length;
+        return { total: filteredPoints.length, critical, high };
+    }, [filteredPoints]);
 
     const formatLastUpdated = () => {
         if (!lastUpdated) return '';
@@ -582,7 +583,7 @@ export default function ViolationHeatmap({ navigation }) {
 
     // ── Handle press on GeoJSONSource (cluster or individual point) ────────────
     const handleSourcePress = useCallback((event) => {
-        const feature = event?.nativeEvent?.payload;
+        const feature = event?.nativeEvent?.payload || event?.nativeEvent?.features?.[0] || event?.features?.[0];
         if (!feature?.properties) return;
 
         const props = feature.properties;
@@ -593,7 +594,7 @@ export default function ViolationHeatmap({ navigation }) {
             if (coords && cameraRef.current) {
                 cameraRef.current.flyTo({ center: coords, duration: 600 });
                 // Attempt to expand cluster by zooming
-                cameraRef.current.zoomTo((props.cluster_expansion_zoom ?? 10) + 1, { duration: 600 });
+                cameraRef.current.easeTo({ center: coords, zoom: (props.cluster_expansion_zoom ?? 10) + 1, duration: reduced ? 0 : 600 });
             }
             // Show cluster summary in popup
             setSelectedItem({ ...props, cluster: true });
@@ -618,7 +619,7 @@ export default function ViolationHeatmap({ navigation }) {
                 }
             );
         } catch (err) {
-            if (__DEV__) console.warn('[Heatmap] fitBounds MMR failed:', err?.message);
+            if (__DEV__) console.warn('[Heatmap] Default-area framing unavailable.');
         }
     }, []);
 
@@ -645,16 +646,25 @@ export default function ViolationHeatmap({ navigation }) {
                 }
             );
         } catch (err) {
-            if (__DEV__) console.warn('[Heatmap] fitBounds reports failed:', err?.message);
+            if (__DEV__) console.warn('[Heatmap] Report framing unavailable.');
         }
     }, [points]);
 
+    const handleMyLocation = async () => {
+        try {
+            const permission = await Location.requestForegroundPermissionsAsync();
+            if (!permission.granted) { if (isMounted.current) setToast('Location permission denied. Enable it in device settings.'); return; }
+            const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            if (isMounted.current) cameraRef.current?.flyTo({ center: [position.coords.longitude, position.coords.latitude], duration: reduced ? 0 : 600 });
+        } catch { if (isMounted.current) setToast('Location unavailable. Check GPS and try again.'); }
+    };
     const renderFilter = (label, value) => {
         const active = timeFilter === value;
         return (
             <TouchableOpacity
                 key={value}
                 style={[styles.filterBtn, active && styles.filterBtnActive]}
+                accessibilityRole="button" accessibilityLabel={label + ' time range'} accessibilityState={{ selected: active }}
                 onPress={() => setTimeFilter(value)}
                 activeOpacity={0.7}
             >
@@ -665,7 +675,7 @@ export default function ViolationHeatmap({ navigation }) {
 
     return (
         <View style={styles.container}>
-            <FocusAwareStatusBar barStyle="dark-content" statusBgColor="#F4F6F9" />
+            <FocusAwareStatusBar barStyle="dark-content" statusBgColor={COLORS.background} />
 
             {/* ── Map (MapLibre v11) ── */}
             <Map
@@ -734,21 +744,24 @@ export default function ViolationHeatmap({ navigation }) {
                     <View style={styles.headerRow}>
                         <View>
                             <Text style={styles.headerTitle}>Live Violation Map</Text>
-                            <Text style={styles.headerSub}>Approved reports only · Location protected</Text>
+                            <Text style={styles.headerSub}>Approved reports · Available viewport data</Text>
                         </View>
                         {/* Live indicator */}
                         <Animated.View style={[styles.liveIndicator, { opacity: pulseAnim }]}>
                             <View style={styles.liveDot} />
-                            <Text style={styles.liveText}>LIVE</Text>
+                            <Text style={styles.liveText}>{refreshing ? 'UPDATING' : 'MAP'}</Text>
                         </Animated.View>
                     </View>
 
                     {/* Time filters */}
                     <View style={styles.filterRow}>
                         {renderFilter('Today', 'today')}
-                        {renderFilter('7 Days', '7_days')}
-                        {renderFilter('30 Days', '30_days')}
+                        {renderFilter('Week', '7_days')}
+                        {renderFilter('Month', '30_days')}
                         {renderFilter('All', 'all')}
+                    </View>
+                    <View style={[styles.filterRow, { flexWrap: 'wrap' }]}>
+                        {['low', 'medium', 'high', 'critical'].map(severity => <PressableScale key={severity} accessibilityLabel={severity + ' severity'} accessibilityState={{ selected: severities.includes(severity) }} onPress={() => setSeverities(previous => previous.includes(severity) ? previous.filter(value => value !== severity) : [...previous, severity])} style={[styles.filterBtn, { minHeight: 44 }, severities.includes(severity) && styles.filterBtnActive]}><Text style={styles.filterText}>{severities.includes(severity) ? '✓ ' : ''}{SEVERITY_CONFIG[severity].label}</Text></PressableScale>)}
                     </View>
                 </View>
 
@@ -792,7 +805,8 @@ export default function ViolationHeatmap({ navigation }) {
             {/* Reset to MMR Region */}
             <TouchableOpacity
                 style={[styles.fab, styles.fabResetMMR]}
-                onPress={handleResetToMMR}
+                onPress={handleMyLocation}
+                accessibilityRole="button" accessibilityLabel="Center on my location"
                 activeOpacity={0.85}
             >
                 <Ionicons name="locate" size={20} color={COLORS.primary} />
@@ -836,8 +850,8 @@ export default function ViolationHeatmap({ navigation }) {
                 <View style={styles.emptyOverlay} pointerEvents="none">
                     <View style={styles.emptyCard}>
                         <Ionicons name="map-outline" size={36} color={COLORS.textTertiary} />
-                        <Text style={styles.emptyTitle}>No approved reports</Text>
-                        <Text style={styles.emptySub}>Approved reports will appear here automatically.</Text>
+                        <Text style={styles.emptyTitle}>No reports match your filters</Text>
+                        <Text style={styles.emptySub}>Try another severity or time range, or refresh the map.</Text>
                     </View>
                 </View>
             )}
@@ -846,7 +860,7 @@ export default function ViolationHeatmap({ navigation }) {
             <Modal
                 visible={!!selectedItem}
                 transparent
-                animationType="slide"
+                animationType={reduced ? 'none' : 'slide'}
                 onRequestClose={() => setSelectedItem(null)}
             >
                 <TouchableOpacity
@@ -859,6 +873,7 @@ export default function ViolationHeatmap({ navigation }) {
                     </View>
                 </TouchableOpacity>
             </Modal>
+            <FeedbackToast visible={!!toast} message={toast || ''} variant="warning" onDismiss={() => setToast(null)} />
         </View>
     );
 }
@@ -885,8 +900,8 @@ const styles = StyleSheet.create({
     headerSub:   { fontFamily: 'Nunito-Medium', fontSize: 11, color: COLORS.textTertiary, marginTop: 2 },
 
     liveIndicator: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#FEF2F2', paddingHorizontal: SPACING.sm, paddingVertical: 4, borderRadius: BORDER_RADIUS.full },
-    liveDot:       { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#DC2626' },
-    liveText:      { fontFamily: 'Nunito-Bold', fontSize: 10, color: '#DC2626', letterSpacing: 1 },
+    liveDot:       { width: 7, height: 7, borderRadius: 3.5, backgroundColor: COLORS.errorLight },
+    liveText:      { fontFamily: 'Nunito-Bold', fontSize: 10, color: COLORS.errorLight, letterSpacing: 1 },
 
     filterRow:       { flexDirection: 'row', backgroundColor: COLORS.surfaceContainerLow, borderRadius: BORDER_RADIUS.md, padding: 3 },
     filterBtn:       { flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: BORDER_RADIUS.sm },

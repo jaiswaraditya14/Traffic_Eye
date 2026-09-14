@@ -10,28 +10,16 @@
  *   3. Prints a provider priority table and configuration summary.
  *   4. Never prints, logs, or returns any API key values.
  *
- * For actual live API latency benchmarks, uncomment Section 4.
+ * Developer-only utility. Supply server-only environment variables explicitly;
+ * this script never loads the mobile app's .env. See docs/AI_PHASE1_SETUP.md.
  */
 
 'use strict';
 
-// ─── Safety: never reveal keys ────────────────────────────────────────────────
-const maskKey = (key) => {
-    if (!key || key.length < 8) return '(not set)';
-    return key.slice(0, 4) + '••••' + key.slice(-3);
-};
-
-// ─── Load env vars from .env if available ─────────────────────────────────────
-try {
-    require('dotenv').config();
-} catch {
-    // dotenv not available — continue with process.env
-}
-
 const KEYS = {
-    nvidia:  [process.env.EXPO_PUBLIC_NVIDIA_API_KEY_1, process.env.EXPO_PUBLIC_NVIDIA_API_KEY].filter(Boolean),
-    gemini:  [process.env.EXPO_PUBLIC_GEMINI_API_KEY_1, process.env.EXPO_PUBLIC_GEMINI_API_KEY_2, process.env.EXPO_PUBLIC_GEMINI_API_KEY_3, process.env.EXPO_PUBLIC_GEMINI_API_KEY].filter(Boolean),
-    groq:    [process.env.EXPO_PUBLIC_GROQ_API_KEY_1, process.env.EXPO_PUBLIC_GROQ_API_KEY_2, process.env.EXPO_PUBLIC_GROQ_API_KEY_3, process.env.EXPO_PUBLIC_GROQ_API_KEY_4, process.env.EXPO_PUBLIC_GROQ_API_KEY_5, process.env.EXPO_PUBLIC_GROQ_API_KEY_6, process.env.EXPO_PUBLIC_GROQ_API_KEY].filter(Boolean),
+    nvidia:  [process.env.NVIDIA_API_KEY_1, process.env.NVIDIA_API_KEY_2, process.env.NVIDIA_API_KEY_3].filter(Boolean),
+    gemini:  [process.env.GEMINI_API_KEY_1, process.env.GEMINI_API_KEY_2, process.env.GEMINI_API_KEY_3].filter(Boolean),
+    groq:    [process.env.GROQ_API_KEY_1, process.env.GROQ_API_KEY_2, process.env.GROQ_API_KEY_3, process.env.GROQ_API_KEY_4, process.env.GROQ_API_KEY_5, process.env.GROQ_API_KEY_6].filter(Boolean),
 };
 
 // ─── Section 1: Configuration Summary ────────────────────────────────────────
@@ -40,9 +28,10 @@ console.log('  Traffic Eye — AI Pipeline Benchmark & Configuration Validator')
 console.log('═══════════════════════════════════════════════════════════════\n');
 
 console.log('📡  Provider Configuration:');
-console.log(`  NVIDIA  — ${KEYS.nvidia.length} key(s) [${KEYS.nvidia.map(k => maskKey(k)).join(', ')}]`);
-console.log(`  Gemini  — ${KEYS.gemini.length} key(s) [${KEYS.gemini.map(k => maskKey(k)).join(', ')}]`);
-console.log(`  Groq    — ${KEYS.groq.length} key(s) [${KEYS.groq.map(k => maskKey(k)).join(', ')}]\n`);
+console.log(`  NVIDIA  — ${KEYS.nvidia.length} server key slot(s) configured`);
+console.log(`  Gemini  — ${KEYS.gemini.length} server key slot(s) configured`);
+console.log(`  Groq    — ${KEYS.groq.length} server key slot(s) configured\n`);
+console.log('  Local benchmark inventory only; this does not inspect deployed Supabase secrets.');
 
 console.log('🏗️  Pipeline Architecture:');
 console.log('  Stage 0  — Local Preprocessing (0ms, 0 API calls)');
@@ -184,7 +173,7 @@ console.log('══════════════════════�
 console.log(`  Rule engine: ${fixturesPassed}/${FIXTURES.length} fixtures correct`);
 console.log(`  Throughput:  ${opsPerSec.toLocaleString()} evaluations/second`);
 console.log(`  Config:      NVIDIA(${KEYS.nvidia.length}) Gemini(${KEYS.gemini.length}) Groq(${KEYS.groq.length})`);
-console.log(`  Keys never printed — ${maskKey('placeholder')} format used`);
+console.log('  Only configured key-slot counts are printed; no key fragments.');
 console.log('═══════════════════════════════════════════════════════════════\n');
 
 const fixturesFailed = FIXTURES.length - fixturesPassed;

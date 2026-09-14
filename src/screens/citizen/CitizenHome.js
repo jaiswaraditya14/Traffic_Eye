@@ -1,46 +1,49 @@
 import React, { useRef, useEffect } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
-    Animated, StatusBar, Image,
+    Animated, StatusBar, Image, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../context';
-import { FocusAwareStatusBar } from '../../components';
+import { COLORS } from '../../utils/theme';
+import useReducedMotion from '../../hooks/useReducedMotion';
+import { useNotifications } from '../../context/NotificationContext';
+import { FocusAwareStatusBar, AnimatedCounter, StatSkeleton, CardSkeleton, EmptyState, PressableScale, GlassCard } from '../../components';
 import * as Location from 'expo-location';
 import { reverseGeocode } from '../../services/geoService';
-import { formatNumber } from '../../utils';
-import { fetchCitizenReports, subscribeToReportUpdates, fetchNotifications } from '../../services/reports';
+import { fetchCitizenReports, subscribeToReportUpdates } from '../../services/reports';
 import { useFocusEffect } from '@react-navigation/native';
 
 // ── Design Tokens (Civic Authority) ──
 const C = {
-    navy: '#0A1E3F',
-    navyMid: '#0F2C59',
-    navyLight: '#1E3A8A',
-    amber: '#D97706',
-    amberDark: '#B45309',
-    amberSurface: '#FEF3C7',
-    white: '#FFFFFF',
-    offWhite: '#F4F6F9',
-    surface: '#FFFFFF',
-    surfaceLow: '#F8FAFC',
-    textPrimary: '#0F172A',
-    textSecondary: '#475569',
-    textTertiary: '#64748B',
-    border: '#CBD5E1',
-    success: '#15803D',
-    successSurface: '#DCFCE7',
-    warning: '#B45309',
-    warningSurface: '#FEF3C7',
-    error: '#B91C1C',
-    errorSurface: '#FEE2E2',
-    primarySurface: '#EFF6FF',
+    navy: COLORS.primaryDark,
+    navyMid: COLORS.primary,
+    navyLight: COLORS.primaryLight,
+    amber: COLORS.secondary,
+    amberDark: COLORS.secondaryDark,
+    amberSurface: COLORS.secondarySurface,
+    white: COLORS.surface,
+    offWhite: COLORS.background,
+    surface: COLORS.surface,
+    surfaceLow: COLORS.surfaceContainerLow,
+    textPrimary: COLORS.textPrimary,
+    textSecondary: COLORS.textSecondary,
+    textTertiary: COLORS.textTertiary,
+    border: COLORS.surfaceContainerHighest,
+    success: COLORS.success,
+    successSurface: COLORS.successSurface,
+    warning: COLORS.secondaryDark,
+    warningSurface: COLORS.secondarySurface,
+    error: COLORS.error,
+    errorSurface: COLORS.errorSurface,
+    primarySurface: COLORS.primarySurface,
 };
 
 export default function CitizenHome({ navigation }) {
     const { profile } = useAuth();
+    const reduced = useReducedMotion();
     const userPoints = profile?.points_balance || 0;
     const firstName = profile?.full_name?.split(' ')[0] || 'User';
     const [userCity, setUserCity] = React.useState(profile?.jurisdiction || 'Mumbai, Maharashtra');
@@ -49,6 +52,7 @@ export default function CitizenHome({ navigation }) {
     const slideAnims = useRef([0, 1, 2, 3].map(() => new Animated.Value(30))).current;
 
     useEffect(() => {
+        let active = true;
         const fetchCity = async () => {
             try {
                 const { status } = await Location.getForegroundPermissionsAsync();
@@ -56,6 +60,7 @@ export default function CitizenHome({ navigation }) {
                     const pos = await Location.getLastKnownPositionAsync();
                     if (pos?.coords) {
                         const geo = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+                        if (!active) return;
                         if (geo?.city && geo?.state) {
                             setUserCity(`${geo.city}, ${geo.state}`);
                         } else if (geo?.city) {
@@ -70,36 +75,44 @@ export default function CitizenHome({ navigation }) {
             }
         };
         fetchCity();
+        return () => { active = false; };
     }, []);
 
     useEffect(() => {
-        Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
-        Animated.stagger(80, slideAnims.map(anim =>
-            Animated.spring(anim, { toValue: 0, tension: 80, friction: 12, useNativeDriver: true })
-        )).start();
-    }, []);
+        if (reduced) { fadeAnim.setValue(1); slideAnims.forEach(value => value.setValue(0)); return; }
+        const animation = Animated.parallel([
+            Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+            Animated.stagger(80, slideAnims.map(anim => Animated.spring(anim, { toValue: 0, tension: 80, friction: 12, useNativeDriver: true }))),
+        ]);
+        animation.start();
+        return () => animation.stop();
+    }, [reduced, fadeAnim, slideAnims]);
 
     // Stats data
     const [reports, setReports] = React.useState([]);
-    const [unreadCount, setUnreadCount] = React.useState(0);
-
+    const { unreadCount } = useNotifications();
+    const [loading, setLoading] = React.useState(true);
+    const [refreshing, setRefreshing] = React.useState(false);
+    const [loadError, setLoadError] = React.useState(false);
+    const [focusKey, setFocusKey] = React.useState(0);
+    const sequence = useRef(0);
     const loadData = React.useCallback(async () => {
-        if (!profile?.id) return;
-        const [reportsResult, notifsResult] = await Promise.all([
-            fetchCitizenReports(profile.id),
-            fetchNotifications(profile.id),
-        ]);
-        if (!reportsResult.error && reportsResult.data) {
-            setReports(reportsResult.data);
-        }
-        if (!notifsResult.error && notifsResult.data) {
-            setUnreadCount(notifsResult.data.filter(n => !n.is_read).length);
-        }
+        const request = ++sequence.current;
+        if (!profile?.id) { setLoading(false); return; }
+        try {
+            const result = await fetchCitizenReports(profile.id);
+            if (request !== sequence.current) return;
+            if (result.error) throw result.error;
+            setReports(result.data || []); setLoadError(false);
+        } catch { if (request === sequence.current) setLoadError(true); }
+        finally { if (request === sequence.current) { setLoading(false); setRefreshing(false); } }
     }, [profile?.id]);
 
     useFocusEffect(
         React.useCallback(() => {
+            setFocusKey(key => key + 1);
             loadData();
+            return () => { sequence.current++; };
         }, [loadData])
     );
 
@@ -109,7 +122,7 @@ export default function CitizenHome({ navigation }) {
             const ch = subscribeToReportUpdates(
                 profile.id,
                 (payload) => setReports(prev => prev.map(r => r.id === payload.new.id ? { ...r, ...payload.new } : r)),
-                (payload) => setReports(prev => [payload.new, ...prev]),
+                (payload) => setReports(prev => [payload.new, ...prev.filter(row => row.id !== payload.new.id)]),
             );
             return () => { if (ch) ch.unsubscribe(); };
         }, [profile?.id])
@@ -118,7 +131,7 @@ export default function CitizenHome({ navigation }) {
     const quickStats = [
         { label: 'Reports', value: reports.length.toString(), icon: 'document-text', color: C.navyMid, bg: C.primarySurface },
         { label: 'Verified', value: reports.filter(r => r.status === 'approved').length.toString(), icon: 'checkmark-circle', color: C.success, bg: C.successSurface },
-        { label: 'Points', value: formatNumber(userPoints), icon: 'trophy', color: C.amberDark, bg: C.amberSurface },
+        { label: 'Points', value: userPoints, icon: 'trophy', color: C.amberDark, bg: C.amberSurface },
     ];
 
     const getStatusConfig = (status) => ({
@@ -150,8 +163,8 @@ export default function CitizenHome({ navigation }) {
             sub: 'Know your penalties',
             screen: 'FineInformation',
             icon: 'document-text',
-            accent: '#F59E0B',
-            accentBg: '#FEF3C7',
+            accent: COLORS.secondaryLight,
+            accentBg: COLORS.secondarySurface,
             stat: '96', statLabel: 'Offences listed',
             gradColors: [C.navy, C.navyMid],
         },
@@ -162,9 +175,9 @@ export default function CitizenHome({ navigation }) {
             screen: 'TrafficSigns',
             icon: 'warning',
             accent: '#F87171',
-            accentBg: '#FEE2E2',
+            accentBg: COLORS.errorSurface,
             stat: '31+', statLabel: 'Signs explained',
-            gradColors: ['#1D4ED8', '#1E3A8A'],
+            gradColors: ['#1D4ED8', COLORS.primaryLight],
         },
         {
             id: '3',
@@ -181,9 +194,9 @@ export default function CitizenHome({ navigation }) {
 
     const QUICK_SERVICES = [
         { id: '5', title: 'Speed Limits',      icon: 'speedometer',      color: '#6366F1', bg: '#EDE9FE', screen: 'SpeedLimits' },
-        { id: '6', title: 'Emergency',          icon: 'call',             color: '#EF4444', bg: '#FEE2E2', screen: 'EmergencyContacts' },
+        { id: '6', title: 'Emergency',          icon: 'call',             color: '#EF4444', bg: COLORS.errorSurface, screen: 'EmergencyContacts' },
         { id: '7', title: 'My Image Reports',   icon: 'shield-checkmark', color: '#059669', bg: '#D1FAE5', screen: 'ImageReportStatus' },
-        { id: '8', title: 'Fine Calculator',    icon: 'calculator',       color: '#D97706', bg: '#FEF3C7', screen: 'FineCalculator' },
+        { id: '8', title: 'Fine Calculator',    icon: 'calculator',       color: COLORS.secondary, bg: COLORS.secondarySurface, screen: 'FineCalculator' },
     ];
 
     const insets = useSafeAreaInsets();
@@ -199,7 +212,7 @@ export default function CitizenHome({ navigation }) {
         <View style={styles.container}>
             <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
             <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-                <ScrollView showsVerticalScrollIndicator={false}>
+                <ScrollView showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} tintColor={COLORS.secondary} colors={[COLORS.secondary]} progressBackgroundColor={COLORS.primaryDark} />}>
 
                     {/* ── Navy Header ── */}
                     <LinearGradient
@@ -216,10 +229,10 @@ export default function CitizenHome({ navigation }) {
                             </View>
                             <TouchableOpacity
                                 onPress={() =>
-                                    navigation.getParent()?.navigate('Notifications') ??
-                                    navigation.navigate('Notifications')
+                                    (navigation.getParent() || navigation).navigate('Notifications')
                                 }
                                 style={styles.notifButton}
+                                accessibilityRole="button" accessibilityLabel={'Notifications, ' + unreadCount + ' unread'}
                             >
                                 <Ionicons name="notifications-outline" size={20} color={C.white} />
                                 {unreadCount > 0 && (
@@ -234,10 +247,10 @@ export default function CitizenHome({ navigation }) {
 
                         {/* Stats bar inside header */}
                         <View style={styles.statsBar}>
-                            {quickStats.map((stat, idx) => (
+                            {loading ? [0, 1, 2].map(key => <StatSkeleton key={key} style={{ flex: 1 }} />) : quickStats.map((stat, idx) => (
                                 <React.Fragment key={idx}>
                                     <View style={styles.statItem}>
-                                        <Text style={styles.statValue}>{stat.value}</Text>
+                                        <AnimatedCounter to={Number(stat.value)} trigger={focusKey} style={styles.statValue} />
                                         <Text style={styles.statLabel}>{stat.label}</Text>
                                     </View>
                                     {idx < quickStats.length - 1 && (
@@ -251,51 +264,24 @@ export default function CitizenHome({ navigation }) {
                     {/* ── Content Area ── */}
                     <View style={styles.content}>
 
-                        {/* ── Dashboard Hero: Report Violation ── */}
-                        <Animated.View
-                            style={{
-                                opacity: fadeAnim,
-                                transform: [{ translateY: slideAnims[0] }],
-                            }}
-                        >
-                            <TouchableOpacity
-                                activeOpacity={0.9}
-                                onPress={() =>
-                                    navigation.getParent()?.navigate('NewReport') ??
-                                    navigation.navigate('NewReport')
-                                }
-                                style={styles.heroOuter}
-                            >
-                                <LinearGradient
-                                    colors={[C.amberDark, C.amber]}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 1 }}
-                                    style={styles.reportHero}
-                                >
-                                    {/* Glassy overlay effect */}
-                                    <View style={styles.heroOverlay}>
-                                        <View style={styles.heroContent}>
-                                            <View style={styles.heroBadge}>
-                                                <Ionicons name="flash" size={10} color={C.white} />
-                                                <Text style={styles.heroBadgeText}>AI-POWERED</Text>
-                                            </View>
-                                            <Text style={styles.heroTitle}>Report Violation</Text>
-                                            <Text style={styles.heroSubtitle}>Ensure road safety with instant AI verification</Text>
-
-                                            <View style={styles.heroActionBtn}>
-                                                <Text style={styles.heroActionText}>Start Scan</Text>
-                                                <Ionicons name="camera" size={16} color={C.amberDark} />
-                                            </View>
-                                        </View>
-
-                                        {/* Stylized camera icon circle frame */}
-                                        <View style={styles.heroIconFrame}>
-                                            <Ionicons name="scan-outline" size={80} color="rgba(255,255,255,0.15)" />
-                                        </View>
-                                    </View>
+                        {loadError && <View accessibilityRole="alert" style={{ flexDirection: 'row', gap: 8, padding: 12, backgroundColor: COLORS.warningSurface }}>
+                            <Ionicons name="cloud-offline-outline" size={20} color={COLORS.warning} /><Text style={{ flex: 1, color: COLORS.warning }}>Could not refresh reports. Pull down to retry.</Text>
+                        </View>}
+                        <View style={{ flexDirection: 'row', gap: 12, marginVertical: 16 }}>
+                            {[{ label: 'Photo Report', screen: 'NewReport', icon: 'camera', colors: [COLORS.secondaryDark, COLORS.secondary] }, { label: 'Video Report', screen: 'VideoReport', icon: 'videocam', colors: [COLORS.primaryDark, COLORS.primary] }].map(action => <PressableScale key={action.screen} style={{ flex: 1 }} accessibilityLabel={action.label} onPress={() => (navigation.getParent() || navigation).navigate(action.screen)}>
+                                <LinearGradient colors={action.colors} style={{ borderRadius: 20, padding: 16, minHeight: 140, justifyContent: 'space-between' }}>
+                                    <Ionicons name={action.icon} color={COLORS.white} size={28} />
+                                    <Text style={{ fontFamily: 'DMSans-Bold', fontSize: 18, color: COLORS.white }}>{action.label}</Text>
                                 </LinearGradient>
-                            </TouchableOpacity>
-                        </Animated.View>
+                            </PressableScale>)}
+                        </View>
+                        <GlassCard style={{ backgroundColor: COLORS.secondarySurface, marginBottom: 20 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                <Ionicons name="trophy" size={28} color={COLORS.secondary} />
+                                <View style={{ flex: 1 }}><AnimatedCounter to={userPoints} trigger={focusKey} suffix=" pts" style={{ color: COLORS.primary, fontSize: 24, fontFamily: 'DMSans-Bold' }} /><Text style={{ color: COLORS.textSecondary }}>Your road-safety rewards</Text></View>
+                                <PressableScale accessibilityLabel="Redeem rewards" onPress={() => navigation.navigate('Rewards')} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: COLORS.primary }}>Redeem →</Text></PressableScale>
+                            </View>
+                        </GlassCard>
 
                         {/* ── Recent Activity ── */}
                         <Animated.View
@@ -311,7 +297,7 @@ export default function CitizenHome({ navigation }) {
                                 </TouchableOpacity>
                             </View>
 
-                            {recentActivity.length === 0 ? (
+                            {loading ? <><CardSkeleton /><CardSkeleton /></> : recentActivity.length === 0 ? (
                                 <View style={styles.emptyActivity}>
                                     <Ionicons name="document-outline" size={36} color={C.textTertiary} />
                                     <Text style={styles.emptyActivityText}>No reports yet</Text>
@@ -386,8 +372,7 @@ export default function CitizenHome({ navigation }) {
                                         style={styles.serviceCard}
                                         activeOpacity={0.75}
                                         onPress={() =>
-                                            navigation.getParent()?.navigate(action.screen) ??
-                                            navigation.navigate(action.screen)
+                                            (navigation.getParent() || navigation).navigate(action.screen)
                                         }
                                     >
                                         <View style={[styles.serviceIcon, { backgroundColor: action.bg }]}>
@@ -417,8 +402,7 @@ export default function CitizenHome({ navigation }) {
                                         key={item.id}
                                         activeOpacity={0.85}
                                         onPress={() =>
-                                            navigation.getParent()?.navigate(item.screen) ??
-                                            navigation.navigate(item.screen)
+                                            (navigation.getParent() || navigation).navigate(item.screen)
                                         }
                                     >
                                         <LinearGradient
@@ -464,7 +448,7 @@ export default function CitizenHome({ navigation }) {
                                 onPress={() => navigation.navigate('MapLibreTest')}
                                 activeOpacity={0.8}
                             >
-                                <Ionicons name="map" size={16} color="#0A1E3F" />
+                                <Ionicons name="map" size={16} color={COLORS.primaryDark} />
                                 <Text style={devBtnTextStyle}>🗺 MapLibre Native Runtime Test</Text>
                             </TouchableOpacity>
                         )}
@@ -478,7 +462,7 @@ export default function CitizenHome({ navigation }) {
 // Dev-only inline styles (no StyleSheet entry needed)
 const devBtnStyle = {
     margin: 16,
-    backgroundColor: '#F59E0B',
+    backgroundColor: COLORS.secondaryLight,
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 20,
@@ -490,7 +474,7 @@ const devBtnStyle = {
 const devBtnTextStyle = {
     fontSize: 14,
     fontFamily: 'Nunito-Bold',
-    color: '#0A1E3F',
+    color: COLORS.primaryDark,
 };
 
 const styles = StyleSheet.create({
@@ -599,80 +583,6 @@ const styles = StyleSheet.create({
     },
 
     // Hero
-    heroOuter: {
-        marginBottom: 28,
-        shadowColor: C.amber,
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.25,
-        shadowRadius: 20,
-        elevation: 8,
-    },
-    reportHero: {
-        borderRadius: 24,
-        overflow: 'hidden',
-        height: 180, // 16:9 ish
-    },
-    heroOverlay: {
-        flex: 1,
-        padding: 24,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    heroContent: {
-        flex: 1,
-        justifyContent: 'center',
-    },
-    heroBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 6,
-        alignSelf: 'flex-start',
-        marginBottom: 10,
-    },
-    heroBadgeText: {
-        fontSize: 9,
-        fontFamily: 'Nunito-ExtraBold',
-        color: C.white,
-        letterSpacing: 0.5,
-    },
-    heroTitle: {
-        fontSize: 24,
-        fontFamily: 'Nunito-Bold',
-        color: C.white,
-        letterSpacing: -0.5,
-    },
-    heroSubtitle: {
-        fontSize: 13,
-        color: 'rgba(255,255,255,0.85)',
-        marginTop: 4,
-        lineHeight: 18,
-        maxWidth: '80%',
-    },
-    heroActionBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        backgroundColor: C.white,
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 12,
-        alignSelf: 'flex-start',
-        marginTop: 16,
-    },
-    heroActionText: {
-        fontSize: 14,
-        fontFamily: 'Nunito-Bold',
-        color: C.amberDark,
-    },
-    heroIconFrame: {
-        position: 'absolute',
-        right: -20,
-        bottom: -20,
-    },
 
     // Section
     section: {
@@ -790,14 +700,6 @@ const styles = StyleSheet.create({
     cardBar: {
         width: 4,
         alignSelf: 'stretch',
-    },
-    activityIcon: {
-        width: 42,
-        height: 42,
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-        margin: 14,
     },
     activityContent: {
         flex: 1,

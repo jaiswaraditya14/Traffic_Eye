@@ -31,7 +31,7 @@ export const FocusAwareStatusBar = ({
         ? insets.top
         : Platform.OS === 'android'
             ? (RNStatusBar.currentHeight || 24)
-            : 44;
+            : 0;
 
     const defaultFillColor = finalBarStyle === 'light-content' ? '#002452' : '#F8F9FB';
     const fillBg = statusBgColor || defaultFillColor;

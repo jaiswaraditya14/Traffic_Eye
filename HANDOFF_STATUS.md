@@ -1,6 +1,6 @@
 # Traffic Eye — Production Repair: Status
 
-_Last updated: 2026-09-09. Branch: `Pre_Main` (mirrored to `Pre_dev`)._
+_Last updated: 2026-09-10. Branch: `Pre_Main` (mirrored to `Pre_dev`)._
 
 This tracks the production-hardening pass described in
 `TRAFFIC_EYE_REWRITTEN_COMPREHENSIVE_FIX_PROMPT.md`. It is a **partial**
@@ -22,7 +22,7 @@ anything is production-ready.
   (`./node_modules/.bin/supabase`).
 - Confirmed provider-credential exposure **without printing secret values**.
 
-### Phase 1 — AI provider secrets moved off the client (code complete)
+### Phase 1 — AI provider secrets moved off the client (complete)
 This is the main body of work in this checkpoint.
 - **`src/config/ai.config.js`** — gutted. No longer holds any API keys, provider
   endpoints, or model lists. Now exposes only the permitted `stages`, an Edge
@@ -43,6 +43,35 @@ This is the main body of work in this checkpoint.
     timeouts, key rotation. Keys read from Edge secrets, never logged.
   - `prompts.ts` — vision / OCR / audit prompts now live here.
   - `_shared/http.ts` — CORS, typed error codes, sanitized logging.
+
+### Phase 1 cleanup — .env, ignore rules, and documentation
+- **`.env`** — all exposed `EXPO_PUBLIC_*` AI provider keys (Gemini ×2, Groq ×6,
+  NVIDIA ×1) removed from the live `.env`. Only `EXPO_PUBLIC_SUPABASE_URL` and
+  `EXPO_PUBLIC_SUPABASE_ANON_KEY` remain. Source tree confirmed clean of leaked
+  provider keys (no `nvapi-`, `gsk_*`, or `AQ.Ab8*` in any tracked file).
+- **`.env.example`** — already updated to list only Supabase public config plus
+  server-only secret names as comments.
+- **`.easignore`** — already updated: `android/` is NOT excluded (bare workflow
+  native modules preserved); `.env*` files excluded at every depth; server-only
+  code (`supabase/functions/`, `supabase/migrations/`, `scripts/benchmark_*`)
+  excluded from mobile upload.
+- **`.gitignore`** — already updated: `.env*` files ignored at every depth;
+  only the reviewed `.env.example` is tracked.
+- **`docs/AI_DETECTION_IMPLEMENTATION.md`** — Gemini key removed from current
+  tree; replaced with exposure notice + rotation instructions.
+
+### Audit fixes (AUDIT_CHANGES.md Issues 1–5 — all confirmed resolved)
+- **Issue 1 (CRITICAL)** — `.easignore` no longer excludes `android/`. Native
+  `MediaStoreResolverModule.kt` and `MediaStoreResolverPackage.kt` survive EAS
+  build. Gradle build caches are excluded instead.
+- **Issue 2 (HIGH)** — `CitizenHome.js` thumbnail now reads
+  `r.image_url || r.media?.[0]?.file_url || null`.
+- **Issue 3 (MEDIUM)** — `CitizenNavigator.js` MapLibreTest route wrapped in
+  `{__DEV__ && ...}`, excluded from production builds.
+- **Issue 4 (HIGH)** — `MapLibreMap.js` bottom bar height is now measured via
+  `onLayout` callback instead of static pixel estimate.
+- **Issue 5 (MEDIUM)** — `app.json` permissions cleaned: `READ_EXTERNAL_STORAGE`,
+  `WRITE_EXTERNAL_STORAGE`, `READ_MEDIA_AUDIO` removed.
 
 ### Backend reproducibility (in progress but usable)
 - **`supabase/migrations/20260420000000_baseline_deployed_bootstrap.sql`** —
@@ -68,7 +97,7 @@ This is the main body of work in this checkpoint.
 - No Android Gradle build run this session.
 - No physical-device EXIF test (owner will do this).
 
-### Phase 1 remainder
+### Phase 1 remainder (owner actions only — no code changes needed)
 - Provider keys still need **owner-side rotation** — every key that ever shipped
   in an `EXPO_PUBLIC_*` var or was committed to docs must be treated as
   compromised and rotated in each provider console.
@@ -77,9 +106,9 @@ This is the main body of work in this checkpoint.
   history rewrite needs explicit approval.
 - `supabase secrets set` for `NVIDIA_API_KEY_*`, `GEMINI_API_KEY_*`,
   `GROQ_API_KEY_*` must be done before `ai-analyze` works.
-- The `ai_analysis_events` table the function writes to **does not exist yet** —
-  it must be created in the forward-only repair migration.
-- `.env.example`, `.easignore`/`.gitignore` not yet updated to drop the public AI keys.
+- Apply `database/PHASE1_SQL_EDITOR.sql` (= migration
+  `20260909182341_phase1_ai_analysis_events.sql`) to the live Supabase project
+  via the SQL Editor before deploying `ai-analyze`.
 
 ### Phases 2–9 — NOT started
 - **Phase 2 (DB security):** role-escalation in `handle_new_user`, `SECURITY

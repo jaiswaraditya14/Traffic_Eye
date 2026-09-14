@@ -227,7 +227,7 @@ export const forwardGeocode = async (query, options = {}) => {
                 }
             }
         } catch (photonErr) {
-            console.warn('[geoService] Photon forward geocode failed, trying Nominatim fallback:', photonErr.message);
+            if (__DEV__) console.warn('[geoService] Primary forward geocoder unavailable; trying fallback.');
         }
 
         // 2. Fallback to Nominatim
@@ -248,7 +248,7 @@ export const forwardGeocode = async (query, options = {}) => {
                 }
             }
         } catch (nomErr) {
-            console.warn('[geoService] Nominatim forward geocode failed, trying expo-location fallback:', nomErr.message);
+            if (__DEV__) console.warn('[geoService] Secondary forward geocoder unavailable; trying device fallback.');
         }
 
         // 3. Fallback to native expo-location geocodeAsync
@@ -270,7 +270,7 @@ export const forwardGeocode = async (query, options = {}) => {
                 return normalized;
             }
         } catch (expoErr) {
-            console.warn('[geoService] expo-location forward geocode failed:', expoErr.message);
+            if (__DEV__) console.warn('[geoService] Device forward geocoder unavailable.');
         }
 
         return [];
@@ -338,7 +338,7 @@ export const reverseGeocode = async (latitude, longitude) => {
                 }
             }
         } catch (photonErr) {
-            console.warn('[geoService] Photon reverse geocode failed, trying Nominatim fallback:', photonErr.message);
+            if (__DEV__) console.warn('[geoService] Primary reverse geocoder unavailable; trying fallback.');
         }
 
         // 2. Fallback to Nominatim
@@ -358,7 +358,7 @@ export const reverseGeocode = async (latitude, longitude) => {
                 }
             }
         } catch (nomErr) {
-            console.warn('[geoService] Nominatim reverse geocode failed, trying expo-location fallback:', nomErr.message);
+            if (__DEV__) console.warn('[geoService] Secondary reverse geocoder unavailable; trying device fallback.');
         }
 
         // 3. Fallback to native expo-location reverseGeocodeAsync
@@ -372,7 +372,7 @@ export const reverseGeocode = async (latitude, longitude) => {
                 }
             }
         } catch (expoErr) {
-            console.warn('[geoService] expo-location reverse geocode failed:', expoErr.message);
+            if (__DEV__) console.warn('[geoService] Device reverse geocoder unavailable.');
         }
 
         // Final safe fallback

@@ -18,39 +18,41 @@ import {
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FocusAwareStatusBar } from '../../components';
+import { FocusAwareStatusBar, ConfirmationModal, FeedbackToast, PressableScale, StatusPill, CardSkeleton } from '../../components';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context';
 import { fetchReportById, submitOfficerDecision } from '../../services/reports';
+import { COLORS } from '../../utils/theme';
+import useReducedMotion from '../../hooks/useReducedMotion';
 import { rewardService, supabase } from '../../services';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ── Tokens ────────────────────────────────────────────────────────────────
 const C = {
-    navy:           '#0A1E3F',
+    navy:           COLORS.primaryDark,
     navyDeep:       '#00102B',
-    navyMid:        '#0F2C59',
-    amber:          '#F59E0B',
-    amberDark:      '#D97706',
-    white:          '#FFFFFF',
-    offWhite:       '#F4F6F9',
-    surface:        '#FFFFFF',
+    navyMid:        COLORS.primary,
+    amber:          COLORS.secondaryLight,
+    amberDark:      COLORS.secondary,
+    white:          COLORS.surface,
+    offWhite:       COLORS.background,
+    surface:        COLORS.surface,
     surfaceLow:     '#F2F4F6',
-    textPrimary:    '#0F172A',
-    textSecondary:  '#475569',
-    textTertiary:   '#64748B',
-    border:         '#E2E8F0',
+    textPrimary:    COLORS.textPrimary,
+    textSecondary:  COLORS.textSecondary,
+    textTertiary:   COLORS.textTertiary,
+    border:         COLORS.surfaceContainerHigh,
     success:        '#059669',
     successSurface: '#D1FAE5',
-    error:          '#DC2626',
-    errorSurface:   '#FEE2E2',
+    error:          COLORS.errorLight,
+    errorSurface:   COLORS.errorSurface,
 };
 
 const SEVERITY_CFG = {
     critical: { color: '#2563EB', bg: '#DBEAFE', label: 'Critical', icon: 'flame',           reward: 100 },
     high:     { color: '#EA580C', bg: '#FFEDD5', label: 'High',     icon: 'warning',          reward: 100 },
-    medium:   { color: '#D97706', bg: '#FEF3C7', label: 'Medium',   icon: 'alert-circle',     reward: 70  },
+    medium:   { color: COLORS.secondary, bg: COLORS.secondarySurface, label: 'Medium',   icon: 'alert-circle',     reward: 70  },
     low:      { color: '#059669', bg: '#D1FAE5', label: 'Low',      icon: 'checkmark-circle', reward: 50  },
 };
 
@@ -94,6 +96,15 @@ export default function ImageReportReview({ route, navigation }) {
     const { reportId: rawReportId, report: reportParam } = route.params ?? {};
     const reportId     = rawReportId || reportParam?.id;
     const { user }     = useAuth();
+    const reduced = useReducedMotion();
+    const mounted = useRef(true);
+    const submittingRef = useRef(false);
+    const backTimer = useRef(null);
+    const [confirmation, setConfirmation] = useState(null);
+    const [toast, setToast] = useState(null);
+    const [violations, setViolations] = useState([]);
+    const [overrideText, setOverrideText] = useState('');
+    useEffect(() => { mounted.current = true; return () => { mounted.current = false; clearTimeout(backTimer.current); }; }, []);
     const insets       = useSafeAreaInsets();
 
     const [report,   setReport]   = useState(reportParam || null);
@@ -123,8 +134,10 @@ export default function ImageReportReview({ route, navigation }) {
         if (!report) setLoading(true);
         try {
             const { data, error } = await fetchReportById(reportId);
+            if (!mounted.current) return;
             if (!error && data) {
                 setReport(data);
+                setViolations(data.ai_raw_result?.allViolations?.length ? data.ai_raw_result.allViolations : (data.violation_type || '').split(',').map(value => value.trim()).filter(Boolean));
                 if (data.status !== 'pending') setAlreadyReviewed(true);
             } else if (!report) {
                 // Direct query fallback
@@ -133,6 +146,7 @@ export default function ImageReportReview({ route, navigation }) {
                     .select('*')
                     .eq('id', reportId)
                     .maybeSingle();
+                if (!mounted.current) return;
                 if (directData) {
                     setReport(directData);
                     if (directData.status !== 'pending') setAlreadyReviewed(true);
@@ -142,13 +156,13 @@ export default function ImageReportReview({ route, navigation }) {
                 }
             }
         } catch (err) {
-            if (__DEV__) console.warn('[ImageReportReview] Load failed:', err?.message);
+            if (__DEV__) console.warn('[ImageReportReview] Report load failed.');
             if (!report) {
                 Alert.alert('Notice', 'Could not load report details.');
                 navigation.goBack();
             }
         } finally {
-            setLoading(false);
+            if (mounted.current) setLoading(false);
         }
     };
 
@@ -159,25 +173,17 @@ export default function ImageReportReview({ route, navigation }) {
             return;
         }
 
-        const sevCfg = SEVERITY_CFG[report?.severity] || SEVERITY_CFG.medium;
-        const rewardInfo = decision === 'approved' ? `\n\n🏆 Reward: +${sevCfg.reward} pts (${sevCfg.label} severity)` : '';
-
-        Alert.alert(
-            decision === 'approved' ? 'Approve Report?' : 'Reject Report?',
-            `This will ${decision === 'approved' ? 'approve' : 'reject'} the report and notify the citizen.${remarks ? `\n\nRemark: ${remarks}` : ''}${rewardInfo}`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: decision === 'approved' ? '✅ Approve' : '❌ Reject',
-                    style: decision === 'rejected' ? 'destructive' : 'default',
-                    onPress: () => submitDecision(decision),
-                },
-            ]
-        );
+        if (decision === 'approved' && !violations.length) {
+            setToast({ message: 'Select at least one violation before approval.', variant: 'warning' }); return;
+        }
+        Keyboard.dismiss();
+        setConfirmation(decision);
     };
 
     const submitDecision = async (decision) => {
-        if (submitting || alreadyReviewed) return;
+        if (submittingRef.current || alreadyReviewed) return;
+        submittingRef.current = true;
+        setConfirmation(null);
         Keyboard.dismiss();
         setSubmitting(true);
         try {
@@ -186,45 +192,45 @@ export default function ImageReportReview({ route, navigation }) {
                 user.id,
                 decision,
                 remarks.trim() || null,
-                internal.trim() || null,
+                // The existing RPC has no override column. Preserve the AI record and
+                // save the officer's assessment explicitly in its supported internal note.
+                JSON.stringify({ officerViolations: violations, note: internal.trim() || null }),
             );
 
-            if (error) {
-                setSubmitting(false);
-                Alert.alert('Submission Failed', error.message ?? 'An error occurred. Please try again.');
-                return;
-            }
-
-            if (data?.already_reviewed) {
-                setSubmitting(false);
+            if (!mounted.current) return;
+            if (error) throw error;
+            if (!data) throw new Error('No decision returned');
+            if (data.already_reviewed) {
                 setAlreadyReviewed(true);
-                Alert.alert(
-                    'Report Already Reviewed',
-                    data.message || 'This report has already been reviewed by an officer.',
-                    [{ text: 'OK', onPress: () => navigation.goBack() }]
-                );
+                setToast({ message: 'This report has already been reviewed. No second decision was applied.', variant: 'info' });
                 return;
             }
-
+            setAlreadyReviewed(true);
+            setReport(previous => previous ? { ...previous, status: decision } : previous);
             setDecisionType(decision);
+            setToast({ message: 'Decision saved successfully.', variant: 'success' });
 
             // Animate success
             Animated.parallel([
-                Animated.spring(successScale,   { toValue: 1, useNativeDriver: true }),
+                Animated.timing(successScale,   { toValue: 1, duration: reduced ? 0 : 250, useNativeDriver: true }),
                 Animated.timing(successOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
             ]).start(() => {
-                setTimeout(() => navigation.goBack(), 1200);
+                if (mounted.current) backTimer.current = setTimeout(() => { if (mounted.current) navigation.goBack(); }, 1500);
             });
         } catch (err) {
-            setSubmitting(false);
-            Alert.alert('Error', err.message || 'An unexpected error occurred.');
+            if (mounted.current) setToast({ message: 'Decision could not be saved. Check your connection and tap approve or reject to retry.', variant: 'error' });
+        } finally {
+            submittingRef.current = false;
+            if (mounted.current) setSubmitting(false);
         }
     };
+
+    useEffect(() => () => { successScale.stopAnimation(); successOpacity.stopAnimation(); }, [successScale, successOpacity]);
 
     if (loading) {
         return (
             <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="large" color={C.navyMid} />
+                <CardSkeleton />
                 <Text style={{ marginTop: 12, fontFamily: 'Nunito-Medium', color: C.textSecondary }}>Loading report…</Text>
             </View>
         );
@@ -352,8 +358,8 @@ export default function ImageReportReview({ route, navigation }) {
                                     }}
                                     activeOpacity={0.8}
                                 >
-                                    <Ionicons name="document-text-outline" size={14} color="#FFF" />
-                                    <Text style={{ fontSize: 12, fontFamily: 'Nunito-Bold', color: '#FFF' }}>
+                                    <Ionicons name="document-text-outline" size={14} color={COLORS.surface} />
+                                    <Text style={{ fontSize: 12, fontFamily: 'Nunito-Bold', color: COLORS.surface }}>
                                         View Previous Report #{report.duplicate_report_id.slice(0, 8).toUpperCase()}
                                     </Text>
                                 </TouchableOpacity>
@@ -380,7 +386,7 @@ export default function ImageReportReview({ route, navigation }) {
                                 marginBottom: 16,
                             }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                                    <Ionicons name="shield-alert" size={20} color="#DC2626" />
+                                    <Ionicons name="shield-alert" size={20} color={COLORS.errorLight} />
                                     <Text style={{ fontSize: 14, fontFamily: 'Nunito-ExtraBold', color: '#991B1B' }}>
                                         FRAUD & EVIDENCE RISK DETECTED
                                     </Text>
@@ -390,17 +396,17 @@ export default function ImageReportReview({ route, navigation }) {
                                 </Text>
                                 {isLowConf && (
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                                        <Ionicons name="alert-circle" size={14} color="#DC2626" />
-                                        <Text style={{ fontSize: 12, fontFamily: 'Nunito-SemiBold', color: '#B91C1C' }}>
+                                        <Ionicons name="alert-circle" size={14} color={COLORS.errorLight} />
+                                        <Text style={{ fontSize: 12, fontFamily: 'Nunito-SemiBold', color: COLORS.error }}>
                                             Low AI Confidence ({Math.round(aiConf * 100)}%) — Plate or offense is ambiguous
                                         </Text>
                                     </View>
                                 )}
                                 {isFakeOrSuspect && (
                                     <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 4 }}>
-                                        <Ionicons name="alert-circle" size={14} color="#DC2626" style={{ marginTop: 1 }} />
+                                        <Ionicons name="alert-circle" size={14} color={COLORS.errorLight} style={{ marginTop: 1 }} />
                                         <View style={{ flex: 1 }}>
-                                            <Text style={{ fontSize: 12, fontFamily: 'Nunito-SemiBold', color: '#B91C1C' }}>
+                                            <Text style={{ fontSize: 12, fontFamily: 'Nunito-SemiBold', color: COLORS.error }}>
                                                 Stage 0 Authenticity Flag ({auth?.confidence ?? 80}% conf):
                                             </Text>
                                             <Text style={{ fontSize: 11, fontFamily: 'Nunito-Medium', color: '#991B1B', marginTop: 2 }}>
@@ -415,7 +421,7 @@ export default function ImageReportReview({ route, navigation }) {
 
                     {/* ── AI Analysis Card ── */}
                     {!isVideoReport && (
-                        <LinearGradient colors={['#F0FDF4', '#DCFCE7']} style={s.aiCard}>
+                        <LinearGradient colors={['#F0FDF4', COLORS.successSurface]} style={s.aiCard}>
                             <View style={s.aiCardHeader}>
                                 <Ionicons name="sparkles" size={18} color={C.success} />
                                 <Text style={s.aiCardTitle}>AI Analysis</Text>
@@ -452,13 +458,23 @@ export default function ImageReportReview({ route, navigation }) {
                         </LinearGradient>
                     )}
 
+                    {!!(report?.ai_raw_result?.requiresManualReview || report?.ai_raw_result?.aiUnavailable) && <StatusPill status="pending" label="Manual review — AI assessment unavailable or inconclusive" />}
+                    <View style={s.card}>
+                        <Text style={s.cardTitle}>Officer violation assessment</Text>
+                        <Text style={{ color: COLORS.textSecondary, marginBottom: 12 }}>Saved in officer notes. Original AI evidence is preserved.</Text>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                            {Array.from(new Set([...violations, 'Signal Jump', 'No Helmet', 'Wrong Parking', 'Wrong Way', 'Speeding'])).map(violation => <PressableScale key={violation} disabled={submitting || alreadyReviewed} accessibilityLabel={violation} accessibilityState={{ selected: violations.includes(violation) }} onPress={() => setViolations(items => items.includes(violation) ? items.filter(item => item !== violation) : [...items, violation])} style={{ padding: 12, minHeight: 44, borderRadius: 12, backgroundColor: violations.includes(violation) ? COLORS.secondarySurface : COLORS.surfaceContainer }}><Text>{violations.includes(violation) ? '✓ ' : ''}{violation}</Text></PressableScale>)}
+                        </View>
+                        <TextInput accessibilityLabel="Additional violation" editable={!submitting && !alreadyReviewed} value={overrideText} onChangeText={setOverrideText} maxLength={100} placeholder="Add another violation" style={{ padding: 12, minHeight: 44 }} />
+                        <PressableScale accessibilityLabel="Add violation" disabled={!overrideText.trim() || submitting || alreadyReviewed} onPress={() => { setViolations(items => [...new Set([...items, overrideText.trim()])]); setOverrideText(''); }} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: COLORS.primary }}>Add violation</Text></PressableScale>
+                    </View>
                     {/* ── Reward Preview ── */}
                     <View style={s.rewardPreview}>
-                        <LinearGradient colors={['#FFFBEB', '#FEF3C7']} style={s.rewardPreviewGrad}>
+                        <LinearGradient colors={['#FFFBEB', COLORS.secondarySurface]} style={s.rewardPreviewGrad}>
                             <Ionicons name="trophy" size={24} color={C.amberDark} />
                             <View style={{ flex: 1 }}>
-                                <Text style={s.rewardPreviewTitle}>Reward on Approval</Text>
-                                <Text style={s.rewardPreviewSub}>Based on {sevCfg.label.toLowerCase()} severity level</Text>
+                                <Text style={s.rewardPreviewTitle}>Estimated Reward on Approval</Text>
+                                <Text style={s.rewardPreviewSub}>Final amount is calculated by the server</Text>
                             </View>
                             <Text style={s.rewardPreviewPts}>+{sevCfg.reward} pts</Text>
                         </LinearGradient>
@@ -469,7 +485,7 @@ export default function ImageReportReview({ route, navigation }) {
                         <Text style={s.cardTitle}>Submission Details</Text>
                         <InfoRow label="Reported At"  value={submitted} />
                         <InfoRow label="Location"     value={report?.location_address} />
-                        {report?.latitude && (
+                        {Number.isFinite(report?.latitude) && Number.isFinite(report?.longitude) && (
                             <InfoRow label="Coordinates" value={`${report.latitude?.toFixed(5)}, ${report.longitude?.toFixed(5)}`} />
                         )}
                         <InfoRow label="Report ID"    value={`#${report?.id?.slice(0, 8).toUpperCase()}`} mono />
@@ -496,7 +512,7 @@ export default function ImageReportReview({ route, navigation }) {
                     <View style={s.inputBox}>
                         <TextInput
                             style={s.input}
-                            placeholder="Private notes not visible to citizen…"
+                            placeholder="Officer review notes…"
                             placeholderTextColor={C.textTertiary}
                             value={internal}
                             onChangeText={setInternal}
@@ -538,6 +554,8 @@ export default function ImageReportReview({ route, navigation }) {
                     </TouchableOpacity>
                 </View>
             </SafeAreaView>
+            <ConfirmationModal visible={!!confirmation} title={confirmation === 'approved' ? 'Approve report?' : 'Reject report?'} message="This saves your decision and notifies the citizen. Rewards, if applicable, are calculated by the server." confirmLabel={confirmation === 'approved' ? 'Approve' : 'Reject'} tone={confirmation === 'rejected' ? 'danger' : 'default'} loading={submitting} onCancel={() => setConfirmation(null)} onConfirm={() => submitDecision(confirmation)} />
+            <FeedbackToast visible={!!toast} message={toast?.message || ''} variant={toast?.variant || 'info'} onDismiss={() => setToast(null)} />
 
             {/* Success/Reject overlay */}
             <Animated.View
@@ -556,7 +574,7 @@ export default function ImageReportReview({ route, navigation }) {
                     <Text style={s.successTitle}>
                         {decisionType === 'approved' ? 'Report Approved!' : 'Report Rejected'}
                     </Text>
-                    <Text style={s.successSub}>Citizen has been notified in real-time.</Text>
+                    <Text style={s.successSub}>Your review decision has been saved.</Text>
                 </LinearGradient>
             </Animated.View>
 
@@ -621,7 +639,7 @@ const s = StyleSheet.create({
     },
     galleryVideoContainer: {
         width: '100%', height: 260, borderRadius: 14, overflow: 'hidden',
-        marginBottom: 12, backgroundColor: '#000',
+        marginBottom: 12, backgroundColor: COLORS.black,
     },
     galleryVideo: { width: '100%', height: '100%' },
 

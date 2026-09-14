@@ -90,7 +90,7 @@ export default function CitizenSignUp({ navigation }) {
             playSuccessAnimation();
         } catch (error) {
             Alert.alert('Error', 'Something went wrong. Please try again.');
-            if (__DEV__) console.warn('Sign up error:', error?.message || 'Unknown error');
+            if (__DEV__) console.warn('[AUTH] Citizen sign up failed.');
         } finally {
             setLoading(false);
         }

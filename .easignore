@@ -6,6 +6,18 @@ node_modules/
 dist/
 web-build/
 
+# Environment files must never enter the mobile build upload, including nested
+# Edge Function env files. EAS public Supabase variables are configured separately.
+.env*
+**/.env*
+!/.env.example
+
+# Server-only AI code and developer benchmarks are not mobile application assets.
+supabase/functions/
+supabase/migrations/
+supabase/tests/
+scripts/benchmark_ai_*.js
+
 # Native folders
 # NOTE: android/ is intentionally NOT excluded here.
 # This project uses bare-workflow native modules (MediaStoreResolverModule.kt,

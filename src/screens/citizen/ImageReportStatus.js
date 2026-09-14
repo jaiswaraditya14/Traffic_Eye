@@ -1,3 +1,4 @@
+import { COLORS } from '../../utils/theme';
 /**
  * ImageReportStatus.js
  *
@@ -14,7 +15,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MobileContainer, FocusAwareStatusBar } from '../../components';
+import { MobileContainer, FocusAwareStatusBar, ReportTimeline, CardSkeleton, FeedbackToast, EmptyState } from '../../components';
+import useReducedMotion from '../../hooks/useReducedMotion';
 import { useAuth } from '../../context';
 import {
     fetchCitizenReports,
@@ -23,29 +25,29 @@ import {
 
 // ── Design tokens ──────────────────────────────────────────────────────────
 const C = {
-    navy:            '#0A1E3F',
-    navyMid:         '#0F2C59',
+    navy:            COLORS.primaryDark,
+    navyMid:         COLORS.primary,
     navyLight:       '#2D4F8E',
-    amber:           '#F59E0B',
-    white:           '#FFFFFF',
-    offWhite:        '#F4F6F9',
-    surface:         '#FFFFFF',
-    textPrimary:     '#0F172A',
-    textSecondary:   '#475569',
-    textTertiary:    '#64748B',
-    border:          '#E2E8F0',
+    amber:           COLORS.secondaryLight,
+    white:           COLORS.surface,
+    offWhite:        COLORS.background,
+    surface:         COLORS.surface,
+    textPrimary:     COLORS.textPrimary,
+    textSecondary:   COLORS.textSecondary,
+    textTertiary:    COLORS.textTertiary,
+    border:          COLORS.surfaceContainerHigh,
     approved:        '#059669',
     approvedSurface: '#D1FAE5',
-    rejected:        '#DC2626',
-    rejectedSurface: '#FEE2E2',
-    pending:         '#D97706',
-    pendingSurface:  '#FEF3C7',
+    rejected:        COLORS.errorLight,
+    rejectedSurface: COLORS.errorSurface,
+    pending:         COLORS.secondary,
+    pendingSurface:  COLORS.secondarySurface,
 };
 
 const SEVERITY_MAP = {
     critical: { color: '#2563EB', bg: '#DBEAFE', label: 'Critical' },
     high:     { color: '#EA580C', bg: '#FFEDD5', label: 'High' },
-    medium:   { color: '#D97706', bg: '#FEF3C7', label: 'Medium' },
+    medium:   { color: COLORS.secondary, bg: COLORS.secondarySurface, label: 'Medium' },
     low:      { color: '#059669', bg: '#D1FAE5', label: 'Low' },
 };
 
@@ -59,22 +61,29 @@ function getStatusConfig(status) {
 
 // ── Pulsing live indicator ─────────────────────────────────────────────────
 function LiveDot({ color = C.approved }) {
+    const reduced = useReducedMotion();
     const pulse = useRef(new Animated.Value(0.4)).current;
     useEffect(() => {
-        Animated.loop(Animated.sequence([
+        if (reduced) { pulse.setValue(1); return; }
+        const animation = Animated.loop(Animated.sequence([
             Animated.timing(pulse, { toValue: 1,   duration: 800, useNativeDriver: true }),
             Animated.timing(pulse, { toValue: 0.4, duration: 800, useNativeDriver: true }),
-        ])).start();
-    }, []);
+        ]));
+        animation.start();
+        return () => animation.stop();
+    }, [pulse, reduced]);
     return <Animated.View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color, opacity: pulse }} />;
 }
 
 // ── Confidence bar ────────────────────────────────────────────────────────
 function ConfBar({ score }) {
+    const reduced = useReducedMotion();
     const w = useRef(new Animated.Value(0)).current;
     useEffect(() => {
-        Animated.timing(w, { toValue: score ?? 0, duration: 900, delay: 300, useNativeDriver: false }).start();
-    }, [score]);
+        const animation = Animated.timing(w, { toValue: Math.max(0, Math.min(1, Number(score) || 0)), duration: reduced ? 0 : 900, useNativeDriver: false });
+        animation.start();
+        return () => animation.stop();
+    }, [score, reduced, w]);
     const pct   = Math.round((score ?? 0) * 100);
     const color = pct >= 75 ? C.approved : pct >= 50 ? C.amber : C.rejected;
     return (
@@ -94,7 +103,7 @@ function ConfBar({ score }) {
 function DataRow({ icon, label, value, sensitive }) {
     return (
         <View style={ds.row}>
-            <View style={[ds.iconBox, sensitive && { backgroundColor: '#FEF3C7' }]}>
+            <View style={[ds.iconBox, sensitive && { backgroundColor: COLORS.secondarySurface }]}>
                 <Ionicons name={icon} size={14} color={sensitive ? C.amber : C.navyMid} />
             </View>
             <View style={ds.rowText}>
@@ -113,16 +122,18 @@ const ds = StyleSheet.create({
 });
 
 // ── Single report card ────────────────────────────────────────────────────
-function ReportCard({ report, navigation }) {
+const ReportCard = React.memo(function ReportCard({ report, navigation }) {
+    const reduced = useReducedMotion();
     const [expanded, setExpanded] = useState(false);
     const expandAnim = useRef(new Animated.Value(0)).current;
     const statusCfg  = getStatusConfig(report.status);
     const sevCfg     = SEVERITY_MAP[report.severity] || SEVERITY_MAP.medium;
-    const review     = report.officer_review;
+    const review     = Array.isArray(report.officer_review) ? report.officer_review[0] : report.officer_review;
 
     useEffect(() => {
-        Animated.timing(expandAnim, { toValue: expanded ? 1 : 0, duration: 250, useNativeDriver: false }).start();
-    }, [expanded]);
+        const animation = Animated.timing(expandAnim, { toValue: expanded ? 1 : 0, duration: reduced ? 0 : 250, useNativeDriver: false });
+        animation.start(); return () => animation.stop();
+    }, [expanded, reduced, expandAnim]);
 
     const shortId    = report.id?.slice(0, 8).toUpperCase();
     const submitted  = report.submitted_at
@@ -187,11 +198,11 @@ function ReportCard({ report, navigation }) {
                 </View>
             </TouchableOpacity>
 
+            <ReportTimeline report={report} />
             {/* Expanded detail */}
             {expanded && (
                 <Animated.View style={[rcs.expanded, {
                     opacity: expandAnim,
-                    maxHeight: expandAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 700] }),
                 }]}>
                     <View style={rcs.expandedInner}>
                         <View style={rcs.divider} />
@@ -209,7 +220,7 @@ function ReportCard({ report, navigation }) {
                             <DataRow icon="location-outline"         label="Location"          value={report.location_address} />
                             <DataRow icon="time-outline"             label="Reported At"       value={submitted} />
                             <DataRow icon="image-outline"            label="Evidence Image"    value={report.image_url ? 'Submitted ✓' : 'Not provided'} />
-                            <DataRow icon="person-outline"           label="Your Identity"     value="Shared with officer (required by law)" sensitive />
+                            <DataRow icon="person-outline"           label="Your Identity"     value="Shared with reviewing officers" sensitive />
                         </View>
 
                         {/* ── Officer review ── */}
@@ -235,10 +246,10 @@ function ReportCard({ report, navigation }) {
                                         <Text style={rcs.reviewMetaText}>Officer: {review.officer.full_name}</Text>
                                     )}
                                     <Text style={rcs.reviewMetaText}>
-                                        Reviewed: {new Date(review.review_timestamp).toLocaleString('en-IN', {
+                                        Reviewed: {review.review_timestamp ? new Date(review.review_timestamp).toLocaleString('en-IN', {
                                             day: '2-digit', month: 'short', year: 'numeric',
                                             hour: '2-digit', minute: '2-digit',
-                                        })}
+                                        }) : 'Pending'}
                                     </Text>
                                 </View>
                             </View>
@@ -263,7 +274,7 @@ function ReportCard({ report, navigation }) {
             )}
         </View>
     );
-}
+});
 
 const rcs = StyleSheet.create({
     wrapper:     { marginHorizontal: 16, marginBottom: 14, borderRadius: 20, overflow: 'hidden', backgroundColor: C.surface, shadowColor: C.navy, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.07, shadowRadius: 12, elevation: 3 },
@@ -296,14 +307,17 @@ const rcs = StyleSheet.create({
     remarksText:   { flex: 1, fontSize: 13, fontFamily: 'Nunito-SemiBold', color: C.textPrimary, lineHeight: 18 },
     reviewMeta:    { gap: 2 },
     reviewMetaText: { fontSize: 11, fontFamily: 'Nunito-Medium', color: C.textTertiary },
-    pendingBox:    { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FEF3C7', borderRadius: 12, padding: 12, marginBottom: 14 },
+    pendingBox:    { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: COLORS.secondarySurface, borderRadius: 12, padding: 12, marginBottom: 14 },
     pendingText:   { fontSize: 13, fontFamily: 'Nunito-SemiBold', color: C.amber },
     fullBtn:       { backgroundColor: C.navy, borderRadius: 12, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
     fullBtnText:   { fontSize: 14, fontFamily: 'Nunito-Bold', color: C.white },
 });
 
 // ── Main screen ─────────────────────────────────────────────────────────
-export default function ImageReportStatus({ navigation }) {
+export default function ImageReportStatus({ navigation, route }) {
+    const reduced = useReducedMotion();
+    const [toast, setToast] = useState(null);
+    const sequence = useRef(0);
     const { user }                   = useAuth();
     const [reports, setReports]      = useState([]);
     const [loading, setLoading]      = useState(true);
@@ -312,6 +326,7 @@ export default function ImageReportStatus({ navigation }) {
     const slideAnim                  = useRef(new Animated.Value(24)).current;
 
     const load = useCallback(async (isRefresh = false) => {
+        const request = ++sequence.current;
         if (!user?.id) {
             setLoading(false);
             setRefreshing(false);
@@ -320,22 +335,25 @@ export default function ImageReportStatus({ navigation }) {
         if (!isRefresh) setLoading(true);
         try {
             const { data, error } = await fetchCitizenReports(user.id);
-            if (!error && data) setReports(data);
+            if (request !== sequence.current) return;
+            if (error) throw error;
+            if (data) setReports(data);
         } catch (err) {
-            if (__DEV__) console.warn('[ImageReportStatus] Load failed:', err?.message);
+            if (request === sequence.current) setToast('Could not load reports. Pull down to retry.');
         } finally {
-            setLoading(false);
-            setRefreshing(false);
+            if (request === sequence.current) { setLoading(false); setRefreshing(false); }
         }
     }, [user?.id]);
 
     useEffect(() => {
         load();
-        Animated.parallel([
-            Animated.timing(fadeAnim,  { toValue: 1, duration: 400, useNativeDriver: true }),
+        const animation = Animated.parallel([
+            Animated.timing(fadeAnim,  { toValue: 1, duration: reduced ? 0 : 400, useNativeDriver: true }),
             Animated.timing(slideAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
-        ]).start();
-    }, [load]);
+        ]);
+        animation.start();
+        return () => { sequence.current++; animation.stop(); };
+    }, [load, reduced, fadeAnim, slideAnim]);
 
     // Realtime subscription
     useEffect(() => {
@@ -343,7 +361,7 @@ export default function ImageReportStatus({ navigation }) {
         const ch = subscribeToReportUpdates(
             user.id,
             (payload) => setReports(prev => prev.map(r => r.id === payload.new.id ? { ...r, ...payload.new } : r)),
-            (payload) => setReports(prev => [payload.new, ...prev]),
+            (payload) => setReports(prev => [payload.new, ...prev.filter(r => r.id !== payload.new.id)]),
         );
         return () => { if (ch) ch.unsubscribe(); };
     }, [user?.id]);
@@ -398,7 +416,7 @@ export default function ImageReportStatus({ navigation }) {
             <Animated.View style={{ flex: 1, opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
                 {loading ? (
                     <View style={s.centered}>
-                        <ActivityIndicator size="large" color={C.navyMid} />
+                        <CardSkeleton />
                         <Text style={s.loadingText}>Loading reports…</Text>
                     </View>
                 ) : (
@@ -421,7 +439,7 @@ export default function ImageReportStatus({ navigation }) {
                                 <Text style={s.emptySub}>Your submitted image reports will appear here.</Text>
                             </View>
                         ) : (
-                            reports.map(r => (
+                            reports.filter(r => !route?.params?.reportId || r.id === route.params.reportId).map(r => (
                                 <ReportCard key={r.id} report={r} navigation={navigation} />
                             ))
                         )}
@@ -434,6 +452,7 @@ export default function ImageReportStatus({ navigation }) {
                     </ScrollView>
                 )}
             </Animated.View>
+            <FeedbackToast visible={!!toast} message={toast || ''} variant="error" onDismiss={() => setToast(null)} />
         </MobileContainer>
     );
 }
@@ -450,7 +469,7 @@ const s = StyleSheet.create({
     statCount:    { fontSize: 20, fontFamily: 'Nunito-ExtraBold' },
     statLabel:    { fontSize: 11, fontFamily: 'Nunito-SemiBold', color: C.textTertiary, marginTop: 1 },
 
-    disclosureBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, margin: 16, backgroundColor: '#EFF6FF', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#BFDBFE' },
+    disclosureBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, margin: 16, backgroundColor: COLORS.primarySurface, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: COLORS.primaryBorder },
     disclosureText:   { flex: 1, fontSize: 12, fontFamily: 'Nunito-SemiBold', color: C.navyMid, lineHeight: 17 },
 
     list:     { paddingTop: 4, paddingBottom: 40 },

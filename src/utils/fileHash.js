@@ -54,12 +54,10 @@ export async function computeFileSha256(uri) {
                 encoding: FileSystem.EncodingType.Base64,
             });
         } catch (readErr) {
-            console.warn('[SHA256] File read failed:', readErr.message, 'URI:', cleanUri);
             return null;
         }
 
         if (!base64) {
-            console.warn('[SHA256] File read returned empty content for URI:', cleanUri);
             return null;
         }
 
@@ -88,23 +86,13 @@ export async function computeFileSha256(uri) {
                     base64,
                     { encoding: Crypto.CryptoEncoding.HEX }
                 );
-                console.warn('[SHA256] Using base64-string fallback (Crypto.digest unavailable). Hash is NOT equivalent to sha256sum.');
             } catch (digestStrErr) {
-                console.warn('[SHA256] Both digest methods failed:', digestStrErr.message);
                 return null;
             }
         }
 
-        if (__DEV__) {
-            console.log('[SHA256]');
-            console.log(`  sourceUri: ${cleanUri}`);
-            console.log(`  fileSize:  ${fileSize} bytes`);
-            console.log(`  sha256:    ${sha256}`);
-        }
-
         return { sha256, fileSize, sourceUri: cleanUri };
     } catch (err) {
-        console.warn('[SHA256] Unexpected hash computation error:', err.message);
         return null;
     }
 }

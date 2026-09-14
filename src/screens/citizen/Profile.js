@@ -1,3 +1,4 @@
+import { COLORS } from '../../utils/theme';
 import React, { useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
@@ -13,30 +14,30 @@ import { supabase } from '../../services/supabase';
 
 // ── Design Tokens ──
 const C = {
-    navy: '#0A1E3F',
-    navyMid: '#0F2C59',
-    amber: '#D97706',
-    amberDark: '#B45309',
-    amberSurface: '#FEF3C7',
-    white: '#FFFFFF',
-    offWhite: '#F4F6F9',
-    surface: '#FFFFFF',
-    surfaceLow: '#F8FAFC',
-    textPrimary: '#0F172A',
-    textSecondary: '#475569',
-    textTertiary: '#64748B',
-    border: '#CBD5E1',
-    success: '#15803D',
-    successSurface: '#DCFCE7',
-    error: '#B91C1C',
-    errorSurface: '#FEE2E2',
-    primarySurface: '#EFF6FF',
-    info: '#0F2C59',
-    infoSurface: '#EFF6FF',
+    navy: COLORS.primaryDark,
+    navyMid: COLORS.primary,
+    amber: COLORS.secondary,
+    amberDark: COLORS.secondaryDark,
+    amberSurface: COLORS.secondarySurface,
+    white: COLORS.surface,
+    offWhite: COLORS.background,
+    surface: COLORS.surface,
+    surfaceLow: COLORS.surfaceContainerLow,
+    textPrimary: COLORS.textPrimary,
+    textSecondary: COLORS.textSecondary,
+    textTertiary: COLORS.textTertiary,
+    border: COLORS.surfaceContainerHighest,
+    success: COLORS.success,
+    successSurface: COLORS.successSurface,
+    error: COLORS.error,
+    errorSurface: COLORS.errorSurface,
+    primarySurface: COLORS.primarySurface,
+    info: COLORS.primary,
+    infoSurface: COLORS.primarySurface,
 };
 
 export default function Profile({ navigation }) {
-    const { setIsAuthenticated, setUserRole } = useAppContext();
+    const { setIsAuthenticated, setUserRole, demoMode } = useAppContext();
     const { profile, signOut } = useAuth();
     const [loggingOut, setLoggingOut] = useState(false);
     const [reportCount, setReportCount] = useState(0);
@@ -77,7 +78,7 @@ export default function Profile({ navigation }) {
                         setUserRole(null);
                     } catch (error) {
                         Alert.alert('Error', 'Failed to sign out. Please try again.');
-                        console.error(error);
+                        if (__DEV__) console.warn('[Profile] Sign out failed.');
                     } finally {
                         setLoggingOut(false);
                     }
@@ -112,6 +113,7 @@ export default function Profile({ navigation }) {
         {
             title: 'App',
             items: [
+                { icon: 'information-circle-outline', label: 'About Traffic Eye', screen: 'About', color: C.navyMid },
                 { icon: 'star-outline', label: 'Rate App', screen: null, color: C.amberDark },
                 { icon: 'share-social-outline', label: 'Share App', screen: null, color: C.amberDark },
                 { icon: 'document-text-outline', label: 'Terms & Privacy', screen: 'Privacy', color: C.amberDark },
@@ -142,7 +144,7 @@ export default function Profile({ navigation }) {
                                 <Text style={styles.heroEmail}>{displayEmail}</Text>
                                 <View style={styles.memberBadge}>
                                     <Ionicons name="shield-checkmark" size={9} color={C.amber} />
-                                    <Text style={styles.memberBadgeText}>CITIZEN</Text>
+                                    <Text style={styles.memberBadgeText}>{demoMode ? "DEMO MODE" : "CITIZEN"}</Text>
                                 </View>
                             </View>
                         </View>
@@ -415,12 +417,12 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         paddingVertical: 18,
         borderWidth: 1,
-        borderColor: '#FEE2E2',
+        borderColor: COLORS.errorSurface,
     },
     signOutText: {
         fontSize: 16,
         fontFamily: 'Nunito-Bold',
-        color: '#B91C1C',
+        color: COLORS.error,
     },
 
     // Version footer
@@ -438,17 +440,17 @@ const styles = StyleSheet.create({
     versionAppName: {
         fontSize: 13,
         fontFamily: 'Nunito-Bold',
-        color: '#64748B',
+        color: COLORS.textTertiary,
     },
     versionText: {
         fontSize: 11,
         fontFamily: 'Nunito-Medium',
-        color: '#94A3B8',
+        color: COLORS.gray400,
     },
     versionGov: {
         fontSize: 10,
         fontFamily: 'Nunito-Regular',
-        color: '#CBD5E1',
+        color: COLORS.surfaceContainerHighest,
     },
 });
 

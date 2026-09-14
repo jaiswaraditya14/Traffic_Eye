@@ -82,7 +82,7 @@ export default function ReportDetail({ navigation, route }) {
                 if (directData) setReport(directData);
             }
         } catch (err) {
-            if (__DEV__) console.warn('[ReportDetail] Failed to load report:', err?.message);
+            if (__DEV__) console.warn('[ReportDetail] Report load failed.');
         } finally {
             setLoading(false);
         }

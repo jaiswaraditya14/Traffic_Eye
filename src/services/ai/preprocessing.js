@@ -203,12 +203,9 @@ export async function checkLocalIntegrity(imageUri) {
             ? 'POSSIBLE_INTEGRITY_ISSUE'
             : 'SUFFICIENT';
 
-        console.log(`[Preprocessing] Integrity: ${status} (score=${suspiciousScore}) ${width}×${height}px ${sizeBytes ? Math.round(sizeBytes/1024)+'KB' : ''}`);
-
         return { status, integrityDetails: details, width, height, sizeBytes };
 
     } catch (err) {
-        console.warn('[Preprocessing] Integrity check error:', err.message);
         return {
             status: 'POSSIBLE_INTEGRITY_ISSUE',
             integrityDetails: ['Local integrity check encountered an unexpected error.'],

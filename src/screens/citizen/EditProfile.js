@@ -50,7 +50,7 @@ export default function EditProfile({ navigation }) {
                 { text: 'OK', onPress: () => navigation.goBack() }
             ]);
         } catch (error) {
-            if (__DEV__) console.warn('Failed to update profile:', error?.message || 'Unknown error');
+            if (__DEV__) console.warn('[EditProfile] Profile update failed.');
             Alert.alert('Error', 'Failed to update profile. Please try again.');
         } finally {
             setLoading(false);

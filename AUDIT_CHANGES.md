@@ -1,5 +1,10 @@
 # Traffic Eye — EAS Android Audit Required Changes
 
+> This is a historical audit. For the current server-only AI setup and remaining
+> owner rotation actions, see [Phase 1 setup](docs/AI_PHASE1_SETUP.md) and
+> `HANDOFF_STATUS.md`. Historical public AI variable names below identify exposure;
+> they are not configuration instructions. Supabase Google OAuth remains in use.
+
 > **Audit conducted:** 2026-08-19 (Local time: 22:14 IST)
 > **Auditor role:** Senior React Native / EAS Android QA Engineer
 > **Method:** Static code inspection + configuration analysis

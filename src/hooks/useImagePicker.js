@@ -1,7 +1,7 @@
 // useImagePicker hook
 // Encapsulates image picking and camera capture logic
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import { Alert } from 'react-native';
@@ -9,14 +9,22 @@ import { Alert } from 'react-native';
 const VIDEO_SIZE_LIMIT_BYTES = 5 * 1024 * 1024; // 5 MB
 
 export default function useImagePicker() {
+    const mounted = useRef(true);
     const [image, setImage] = useState(null);
     const [exifData, setExifData] = useState(null);
     const [loading, setLoading] = useState(false);
+    useEffect(() => {
+        mounted.current = true;
+        return () => { mounted.current = false; };
+    }, []);
+    const beginLoading = () => { if (mounted.current) setLoading(true); };
+    const endLoading = () => { if (mounted.current) setLoading(false); };
 
     const pickFromGallery = async () => {
         try {
-            setLoading(true);
+            beginLoading();
             const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!mounted.current) return null;
             if (status !== 'granted') {
                 Alert.alert('Permission Required', 'Please grant photo library access to select images.');
                 return null;
@@ -38,15 +46,12 @@ export default function useImagePicker() {
                 quality: 1,
                 exif: true,
             });
+            if (!mounted.current) return null;
 
             if (!result.canceled && result.assets?.length > 0) {
                 const asset = result.assets[0];
-                try {
-                    console.log('[IMAGE ASSET]', JSON.stringify(asset, null, 2));
-                } catch {
-                    console.log('[IMAGE ASSET]', asset);
-                }
-                setExifData(asset.exif || null);
+                // Evidence metadata may contain private GPS or access-bearing URIs; never log it.
+                if (mounted.current) setExifData(asset.exif || null);
                 return {
                     uri: asset.uri,
                     exif: asset.exif || null,
@@ -60,18 +65,18 @@ export default function useImagePicker() {
             }
             return null;
         } catch (error) {
-            console.error('[useImagePicker] Error picking image:', error);
-            Alert.alert('Error', 'Failed to pick image from gallery.');
+            if (mounted.current) Alert.alert('Error', 'Failed to pick image from gallery.');
             return null;
         } finally {
-            setLoading(false);
+            endLoading();
         }
     };
 
     const captureFromCamera = async () => {
         try {
-            setLoading(true);
+            beginLoading();
             const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (!mounted.current) return null;
             if (status !== 'granted') {
                 Alert.alert('Permission Required', 'Please grant camera access to capture photos.');
                 return null;
@@ -83,15 +88,12 @@ export default function useImagePicker() {
                 quality: 1,
                 exif: true,
             });
+            if (!mounted.current) return null;
 
             if (!result.canceled && result.assets?.length > 0) {
                 const asset = result.assets[0];
-                try {
-                    console.log('[IMAGE ASSET]', JSON.stringify(asset, null, 2));
-                } catch {
-                    console.log('[IMAGE ASSET]', asset);
-                }
-                setExifData(asset.exif || null);
+                // Evidence metadata may contain private GPS or access-bearing URIs; never log it.
+                if (mounted.current) setExifData(asset.exif || null);
                 return {
                     uri: asset.uri,
                     exif: asset.exif || null,
@@ -105,29 +107,31 @@ export default function useImagePicker() {
             }
             return null;
         } catch (error) {
-            console.error('[useImagePicker] Error capturing image:', error);
-            Alert.alert('Error', 'Failed to capture photo.');
+            if (mounted.current) Alert.alert('Error', 'Failed to capture photo.');
             return null;
         } finally {
-            setLoading(false);
+            endLoading();
         }
     };
 
     const pickVideoFromGallery = async () => {
         try {
-            setLoading(true);
+            beginLoading();
             const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!mounted.current) return null;
             if (status !== 'granted') {
                 Alert.alert('Permission Required', 'Please grant photo library access to select videos.');
                 return null;
             }
 
             const result = await ImagePicker.launchImageLibraryAsync({
+                videoMaxDuration: 15,
                 mediaTypes: ['videos'],
                 allowsEditing: false,
                 quality: 0.8,
                 exif: true,
             });
+            if (!mounted.current) return null;
 
             if (!result.canceled && result.assets?.length > 0) {
                 const asset = result.assets[0];
@@ -138,22 +142,22 @@ export default function useImagePicker() {
                     );
                     return null;
                 }
-                return { uri: asset.uri, exif: asset.exif || null };
+                return { uri: asset.uri, exif: asset.exif || null, duration: asset.duration, mimeType: asset.mimeType, fileSize: asset.fileSize, fileName: asset.fileName };
             }
             return null;
         } catch (error) {
-            console.error('Error picking video:', error);
-            Alert.alert('Error', 'Failed to pick video from gallery.');
+            if (mounted.current) Alert.alert('Error', 'Failed to pick video from gallery.');
             return null;
         } finally {
-            setLoading(false);
+            endLoading();
         }
     };
 
     const captureVideoFromCamera = async () => {
         try {
-            setLoading(true);
+            beginLoading();
             const { status } = await ImagePicker.requestCameraPermissionsAsync();
+            if (!mounted.current) return null;
             if (status !== 'granted') {
                 Alert.alert('Permission Required', 'Please grant camera access to record videos.');
                 return null;
@@ -165,6 +169,7 @@ export default function useImagePicker() {
                 quality: 0.8,
                 exif: true,
             });
+            if (!mounted.current) return null;
 
             if (!result.canceled && result.assets?.length > 0) {
                 const asset = result.assets[0];
@@ -175,15 +180,14 @@ export default function useImagePicker() {
                     );
                     return null;
                 }
-                return { uri: asset.uri, exif: asset.exif || null };
+                return { uri: asset.uri, exif: asset.exif || null, duration: asset.duration, mimeType: asset.mimeType, fileSize: asset.fileSize, fileName: asset.fileName };
             }
             return null;
         } catch (error) {
-            console.error('Error capturing video:', error);
-            Alert.alert('Error', 'Failed to record video.');
+            if (mounted.current) Alert.alert('Error', 'Failed to record video.');
             return null;
         } finally {
-            setLoading(false);
+            endLoading();
         }
     };
 

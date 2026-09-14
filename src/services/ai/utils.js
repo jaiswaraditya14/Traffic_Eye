@@ -62,6 +62,15 @@ export class AiStageError extends Error {
 // improve on retry, so the pipeline fails closed instead of burning time.
 const RETRYABLE_CODES = new Set(['PROVIDER_UNAVAILABLE', 'PROVIDER_TIMEOUT', 'NETWORK']);
 
+// Never propagate arbitrary response strings into downstream diagnostics.
+const SERVER_CODES = new Set([
+    'METHOD_NOT_ALLOWED', 'UNAUTHENTICATED', 'FORBIDDEN', 'BAD_REQUEST',
+    'PAYLOAD_TOO_LARGE', 'UNSUPPORTED_MEDIA_TYPE', 'QUOTA_EXCEEDED',
+    'PROVIDER_UNAVAILABLE', 'PROVIDER_TIMEOUT', 'PROVIDER_BAD_OUTPUT',
+    'NOT_CONFIGURED', 'INTERNAL',
+]);
+const safeCorrelationId = (value) => typeof value === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(value) ? value : null;
+
 export const isRetryableAiError = (err) =>
     err instanceof AiStageError && RETRYABLE_CODES.has(err.code);
 
@@ -77,7 +86,8 @@ export const isRetryableAiError = (err) =>
  * @returns {Promise<{ text: string, provider: string, model: string, latencyMs: number, correlationId: string }>}
  * @throws {AiStageError}
  */
-export const invokeAiStage = async ({ stage, imageBase64, evidenceSummary, candidates }) => {
+export const invokeAiStage = async ({ stage, imageBase64, evidenceSummary, candidates }, { signal } = {}) => {
+    if (signal?.aborted) throw new AiStageError('CANCELLED', null, 'AI request cancelled.');
     if (!AI_CONFIG.stages.includes(stage)) {
         throw new AiStageError('BAD_REQUEST', null, `Unknown AI stage: ${stage}`);
     }
@@ -90,6 +100,8 @@ export const invokeAiStage = async ({ stage, imageBase64, evidenceSummary, candi
     // The function derives the caller from that token; nothing identifying is
     // sent in the body.
     const controller = new AbortController();
+    const onAbort = () => controller.abort();
+    signal?.addEventListener('abort', onAbort, { once: true });
     const timer = setTimeout(() => controller.abort(), AI_CONFIG.edgeFunctionTimeoutMs);
 
     let response;
@@ -101,23 +113,34 @@ export const invokeAiStage = async ({ stage, imageBase64, evidenceSummary, candi
     } catch {
         // Transport-level failure (offline, DNS, aborted). No provider detail
         // exists to leak here.
+        if (signal?.aborted) throw new AiStageError('CANCELLED', null, 'AI request cancelled.');
         throw new AiStageError('NETWORK', null, 'AI service unreachable.');
     } finally {
         clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
     }
 
-    const { data, error } = response;
+    if (signal?.aborted) throw new AiStageError('CANCELLED', null, 'AI request cancelled.');
+    const { data, error } = response || {};
 
     if (error) {
         // supabase-js surfaces a non-2xx as FunctionsHttpError with the parsed
         // body on `context`. Prefer the server's typed code; never surface the
         // raw message, which may contain transport internals.
-        let code = 'PROVIDER_UNAVAILABLE';
+        const status = Number(error.context?.status);
+        const httpCode = ({
+            400: 'BAD_REQUEST', 401: 'UNAUTHENTICATED', 403: 'FORBIDDEN',
+            404: 'NOT_CONFIGURED', 405: 'METHOD_NOT_ALLOWED', 413: 'PAYLOAD_TOO_LARGE',
+            415: 'UNSUPPORTED_MEDIA_TYPE', 429: 'QUOTA_EXCEEDED',
+            502: 'PROVIDER_UNAVAILABLE', 503: 'PROVIDER_UNAVAILABLE', 504: 'PROVIDER_TIMEOUT',
+        })[status];
+        let code = httpCode || 'INTERNAL';
         let correlationId = null;
         try {
             const body = await error.context?.json?.();
-            if (body?.code) code = body.code;
-            if (body?.correlationId) correlationId = body.correlationId;
+            // A malformed/non-JSON auth or quota response must never become retryable.
+            if (SERVER_CODES.has(body?.code) && !(status >= 400 && status < 500)) code = body.code;
+            correlationId = safeCorrelationId(body?.correlationId);
         } catch {
             // Body was not JSON — keep the conservative default.
         }
@@ -125,7 +148,7 @@ export const invokeAiStage = async ({ stage, imageBase64, evidenceSummary, candi
     }
 
     if (!data?.ok || typeof data.text !== 'string') {
-        throw new AiStageError(data?.code || 'PROVIDER_BAD_OUTPUT', data?.correlationId ?? null, 'AI stage returned no result.');
+        throw new AiStageError(SERVER_CODES.has(data?.code) ? data.code : 'PROVIDER_BAD_OUTPUT', safeCorrelationId(data?.correlationId), 'AI stage returned no result.');
     }
 
     return {
@@ -133,6 +156,6 @@ export const invokeAiStage = async ({ stage, imageBase64, evidenceSummary, candi
         provider: data.provider ?? null,
         model: data.model ?? null,
         latencyMs: data.latencyMs ?? 0,
-        correlationId: data.correlationId ?? null,
+        correlationId: safeCorrelationId(data.correlationId),
     };
 };

@@ -1,45 +1,57 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
-    Image, Animated, StatusBar, ActivityIndicator
+    Image, Animated, StatusBar, ActivityIndicator, RefreshControl
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MobileContainer, FocusAwareStatusBar } from '../../components';
+import { MobileContainer, FocusAwareStatusBar, ProgressRing, StatSkeleton, CardSkeleton, EmptyState, StatusPill } from '../../components';
 import { useAuth } from '../../context';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../services';
-import { fetchPendingReports, fetchReviewedReports } from '../../services/reports';
+import { COLORS, GRADIENTS } from '../../utils/theme';
+import useReducedMotion from '../../hooks/useReducedMotion';
+import { useNotifications } from '../../context/NotificationContext';
+import { officerJurisdictionFilters, sortOfficerQueue } from '../../utils/productExperience';
+import { fetchPendingReports, fetchReviewedReports, subscribeToOfficerQueue } from '../../services/reports';
 
 // ── Design Tokens (Civic Authority — Officer Side) ──
 const C = {
-    navy: '#0A1E3F',
-    navyMid: '#0F2C59',
-    navyLight: '#1E3A8A',
-    amber: '#D97706',
-    amberDark: '#B45309',
-    amberSurface: '#FEF3C7',
-    white: '#FFFFFF',
-    offWhite: '#F4F6F9',
-    surface: '#FFFFFF',
-    surfaceLow: '#F8FAFC',
-    textPrimary: '#0F172A',
-    textSecondary: '#475569',
-    textTertiary: '#64748B',
-    border: '#CBD5E1',
-    success: '#15803D',
-    successSurface: '#DCFCE7',
-    warning: '#B45309',
-    warningSurface: '#FEF3C7',
-    error: '#B91C1C',
-    errorSurface: '#FEE2E2',
-    critical: '#1E3A8A',
-    primarySurface: '#EFF6FF',
+    navy: COLORS.primaryDark,
+    navyMid: COLORS.primary,
+    navyLight: COLORS.primaryLight,
+    amber: COLORS.secondary,
+    amberDark: COLORS.secondaryDark,
+    amberSurface: COLORS.secondarySurface,
+    white: COLORS.surface,
+    offWhite: COLORS.background,
+    surface: COLORS.surface,
+    surfaceLow: COLORS.surfaceContainerLow,
+    textPrimary: COLORS.textPrimary,
+    textSecondary: COLORS.textSecondary,
+    textTertiary: COLORS.textTertiary,
+    border: COLORS.surfaceContainerHighest,
+    success: COLORS.success,
+    successSurface: COLORS.successSurface,
+    warning: COLORS.secondaryDark,
+    warningSurface: COLORS.secondarySurface,
+    error: COLORS.error,
+    errorSurface: COLORS.errorSurface,
+    critical: COLORS.primaryLight,
+    primarySurface: COLORS.primarySurface,
 };
 
 export default function OfficerDashboard({ navigation }) {
     const { profile } = useAuth();
+    const reduced = useReducedMotion();
+    const { unreadCount } = useNotifications();
+    const [totalPending, setTotalPending] = useState(0);
+    const [refreshing, setRefreshing] = useState(false);
+    const [loadError, setLoadError] = useState(false);
+    const [live, setLive] = useState(false);
+    const [focusKey, setFocusKey] = useState(0);
+    const requestSequence = useRef(0);
     const officerName = profile?.full_name?.split(' ')[0] || 'Officer';
     const officerTitle = profile?.badge_title || 'Traffic Inspector';
     const officerZone = profile?.jurisdiction 
@@ -57,11 +69,13 @@ export default function OfficerDashboard({ navigation }) {
     const [loadingData, setLoadingData] = useState(true);
 
     const fetchData = useCallback(async () => {
-        setLoadingData(true);
+        const request = ++requestSequence.current;
+        if (!profile?.id || profile.role !== 'officer') return;
         try {
             // Fetch routed pending reports & slice for dashboard top 10
-            const { data: activePending } = await fetchPendingReports(profile, true);
-            const pending = activePending ? activePending.slice(0, 10) : [];
+            const { data: activePending, error: pendingError } = await fetchPendingReports(profile, true);
+            if (pendingError) throw pendingError;
+            const pending = sortOfficerQueue(activePending || []).slice(0, 5);
 
             // Build jurisdiction-scoped count filters (same as fetchPendingReports)
             let approvedQuery = supabase
@@ -74,73 +88,67 @@ export default function OfficerDashboard({ navigation }) {
                 .eq('status', 'rejected');
 
             // Apply same OR-based jurisdiction filter so counts match the officer's area
-            if (profile && profile.role === 'officer') {
-                let filters = [];
-                if (profile.badge_id) {
-                    const digits = profile.badge_id.match(/\d+$/);
-                    if (digits) {
-                        const suffix = digits[0].padStart(3, '0');
-                        filters.push(`location_address.ilike.%400${suffix}%`);
-                    }
-                }
-                if (profile.jurisdiction) {
-                    filters.push(`location_address.ilike.%${profile.jurisdiction}%`);
-                }
-                if (filters.length > 0) {
-                    const orStr = filters.join(',');
-                    approvedQuery = approvedQuery.or(orStr);
-                    rejectedQuery = rejectedQuery.or(orStr);
-                }
+            const filters = officerJurisdictionFilters(profile);
+            if (filters.length > 0) {
+                const orStr = filters.join(',');
+                approvedQuery = approvedQuery.or(orStr);
+                rejectedQuery = rejectedQuery.or(orStr);
             }
 
-            const [{ count: aCount }, { count: rCount }] = await Promise.all([
+            const [{ count: aCount, error: aError }, { count: rCount, error: rError }] = await Promise.all([
                 approvedQuery,
                 rejectedQuery,
             ]);
 
+            if (aError || rError) throw aError || rError;
             // Fetch routed reviewed reports (filtered to rejected in UI logic)
-            const { data: allReviewed } = await fetchReviewedReports(profile);
+            const { data: allReviewed, error: reviewedError } = await fetchReviewedReports(profile);
             const rejected = allReviewed ? allReviewed.filter(r => r.status === 'rejected').slice(0, 5) : [];
 
+            if (reviewedError) throw reviewedError;
+            if (request !== requestSequence.current) return;
+            setLoadError(false); setTotalPending((activePending || []).length);
             setPendingReports(pending || []);
             setRejectedReports(rejected || []);
             setApprovedCount(aCount || 0);
             setRejectedCount(rCount || 0);
         } catch (e) {
-            console.error('Officer dashboard fetch error:', e);
+            if (request === requestSequence.current) setLoadError(true);
         } finally {
-            setLoadingData(false);
+            if (request === requestSequence.current) { setLoadingData(false); setRefreshing(false); }
         }
     }, [profile]);
 
     useFocusEffect(
         useCallback(() => {
+            setFocusKey(key => key + 1);
             fetchData();
+            return () => { requestSequence.current++; };
         }, [fetchData])
     );
 
     // Subscribe to realtime changes on image_reports
     useFocusEffect(
         useCallback(() => {
-            const ch = supabase
-                .channel('officer_dashboard')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'image_reports' },
-                    () => fetchData()
-                )
-                .subscribe();
-            return () => ch.unsubscribe();
+            if (!profile?.id) return;
+            let active = true;
+            const ch = subscribeToOfficerQueue(fetchData, fetchData, status => { if (active) setLive(status === 'SUBSCRIBED'); }, 'dashboard');
+            return () => { active = false; supabase.removeChannel(ch); setLive(false); };
         }, [fetchData])
     );
 
     useEffect(() => {
-        Animated.parallel([
+        if (reduced) { fadeAnim.setValue(1); slideAnim.setValue(0); return; }
+        const animation = Animated.parallel([
             Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
             Animated.spring(slideAnim, { toValue: 0, tension: 70, friction: 12, useNativeDriver: true }),
-        ]).start();
-    }, []);
+        ]);
+        animation.start();
+        return () => animation.stop();
+    }, [reduced, fadeAnim, slideAnim]);
 
     const stats = [
-        { label: 'Pending', value: pendingReports.length.toString(), icon: 'time-outline', color: C.warning, bg: C.warningSurface, target: 'Pending' },
+        { label: 'Pending', value: totalPending, icon: 'time-outline', color: C.warning, bg: C.warningSurface, target: 'Pending' },
         { label: 'Verified', value: approvedCount.toString(), icon: 'checkmark-circle-outline', color: C.success, bg: C.successSurface, target: 'Verified', params: { status: 'approved' } },
         { label: 'Rejected', value: rejectedCount.toString(), icon: 'close-circle-outline', color: C.error, bg: C.errorSurface, target: 'Verified', params: { status: 'rejected' } },
     ];
@@ -153,8 +161,8 @@ export default function OfficerDashboard({ navigation }) {
     };
 
     const getPriorityConfig = (severity) => ({
-        critical: { color: C.critical, bg: C.errorSurface, label: 'CRITICAL', barColor: C.critical },
-        high:     { color: C.error, bg: '#FFE4E4', label: 'HIGH', barColor: C.error },
+        critical: { color: C.error, bg: C.errorSurface, label: 'CRITICAL', barColor: C.error },
+        high:     { color: C.warning, bg: C.warningSurface, label: 'HIGH', barColor: C.amber },
         medium:   { color: C.warning, bg: C.warningSurface, label: 'MEDIUM', barColor: C.amber },
         low:      { color: C.textTertiary, bg: C.surfaceLow, label: 'LOW', barColor: C.border },
     }[severity] || { color: C.warning, bg: C.warningSurface, label: 'MEDIUM', barColor: C.amber });
@@ -163,11 +171,11 @@ export default function OfficerDashboard({ navigation }) {
         <View style={styles.container}>
             <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
             <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-                <ScrollView showsVerticalScrollIndicator={false}>
+                <ScrollView showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData(); }} tintColor={COLORS.secondary} colors={[COLORS.secondary]} progressBackgroundColor={COLORS.primaryDark} />}>
 
                     {/* ── Navy Officer Header ── */}
                     <LinearGradient
-                        colors={[C.navy, C.navyMid]}
+                        colors={GRADIENTS.heroDark}
                         style={[styles.header, { paddingTop: insets.top + 16 }]}
                     >
                         <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
@@ -196,11 +204,12 @@ export default function OfficerDashboard({ navigation }) {
                                         activeOpacity={0.8}
                                     >
                                         <Ionicons name="notifications-outline" size={20} color={C.white} />
-                                        <View style={styles.notifDot} />
+                                        {unreadCount > 0 && <View style={styles.notifDot} />}
                                     </TouchableOpacity>
                                 </View>
                             </View>
 
+                            <StatusPill status={live ? 'approved' : 'pending'} label={live ? '● LIVE' : 'Connecting / offline'} />
                             {/* Priority Alert Banner */}
                             <TouchableOpacity
                                 style={styles.alertBanner}
@@ -211,7 +220,7 @@ export default function OfficerDashboard({ navigation }) {
                                     <Ionicons name="warning" size={18} color={C.amberDark} />
                                 </View>
                                 <View style={styles.alertContent}>
-                                    <Text style={styles.alertTitle}>{pendingReports.length} Pending Report{pendingReports.length !== 1 ? 's' : ''}</Text>
+                                    <Text style={styles.alertTitle}>{totalPending} Pending Report{totalPending !== 1 ? 's' : ''}</Text>
                                     <Text style={styles.alertSubtitle}>Require immediate review</Text>
                                 </View>
                                 <View style={styles.alertButton}>
@@ -229,22 +238,21 @@ export default function OfficerDashboard({ navigation }) {
                             { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
                         ]}
                     >
-                        {stats.map((stat, idx) => (
+                        {loadingData ? [0, 1, 2].map(key => <StatSkeleton key={key} style={{ flex: 1 }} />) : stats.map((stat, idx) => (
                             <TouchableOpacity 
                                 key={idx} 
                                 style={styles.statCard}
                                 activeOpacity={0.8}
                                 onPress={() => navigation.navigate(stat.target, stat.params)}
                             >
-                                <View style={[styles.statIconBg, { backgroundColor: stat.bg }]}>
-                                    <Ionicons name={stat.icon} size={20} color={stat.color} />
-                                </View>
-                                <Text style={styles.statValue}>{stat.value}</Text>
-                                <Text style={styles.statLabel}>{stat.label}</Text>
+                                <ProgressRing value={Number(stat.value) / Math.max(1, totalPending + approvedCount + rejectedCount)} count={Number(stat.value)} color={stat.color} label={stat.label} trigger={focusKey} />
                             </TouchableOpacity>
                         ))}
                     </Animated.View>
 
+                    {loadError && <View accessibilityRole="alert" style={{ flexDirection: 'row', padding: 16, gap: 8, backgroundColor: COLORS.warningSurface }}>
+                        <Ionicons name="cloud-offline-outline" size={20} color={COLORS.warning} /><Text style={{ color: COLORS.warning, flex: 1 }}>Could not refresh the queue. Pull down to retry.</Text>
+                    </View>}
                     {/* ── Quick Actions ── */}
                     <Animated.View
                         style={[styles.section, { opacity: fadeAnim }]}
@@ -261,10 +269,10 @@ export default function OfficerDashboard({ navigation }) {
                             </View>
                             <View style={styles.actionCardContent}>
                                 <Text style={styles.actionCardTitle}>Review Pending Reports</Text>
-                                <Text style={styles.actionCardDesc}>{pendingReports.length} report{pendingReports.length !== 1 ? 's' : ''} waiting for verification</Text>
+                                <Text style={styles.actionCardDesc}>{totalPending} report{totalPending !== 1 ? 's' : ''} waiting for verification</Text>
                             </View>
                             <View style={styles.amberCountBadge}>
-                                <Text style={styles.amberCountText}>{pendingReports.length}</Text>
+                                <Text style={styles.amberCountText}>{totalPending}</Text>
                             </View>
                         </TouchableOpacity>
 
@@ -292,8 +300,8 @@ export default function OfficerDashboard({ navigation }) {
                                 <Ionicons name="document-text" size={22} color="#0284C7" />
                             </View>
                             <View style={styles.actionCardContent}>
-                                <Text style={styles.actionCardTitle}>Export Reports (Excel)</Text>
-                                <Text style={styles.actionCardDesc}>Download .xlsx spreadsheets by date range</Text>
+                                <Text style={styles.actionCardTitle}>Export Reports</Text>
+                                <Text style={styles.actionCardDesc}>Preview PDF or share Excel by date range</Text>
                             </View>
                             <Ionicons name="chevron-forward" size={18} color={C.textTertiary} />
                         </TouchableOpacity>
@@ -311,18 +319,16 @@ export default function OfficerDashboard({ navigation }) {
                         </View>
 
                         {loadingData ? (
-                            <ActivityIndicator size="small" color={C.navyMid} style={{ marginTop: 20 }} />
+                            <><CardSkeleton /><CardSkeleton /></>
                         ) : pendingReports.length === 0 ? (
-                            <View style={{alignItems: 'center', marginTop: 20, marginBottom: 20}}>
-                                <Ionicons name="checkmark-circle-outline" size={40} color={C.success} />
-                                <Text style={{color: C.textSecondary, marginTop: 8, fontFamily: 'Nunito-Medium'}}>All caught up! No pending reports.</Text>
-                            </View>
+                            <EmptyState icon="checkmark-circle-outline" title="All caught up!" subtitle="No pending reports in your jurisdiction." />
                         ) : (
                             pendingReports.map((report) => {
                                 const config = getPriorityConfig(report.severity);
                                 return (
                                     <TouchableOpacity
                                         key={report.id}
+                                        accessibilityRole="button" accessibilityLabel={'Review ' + report.violation_type + ', ' + report.severity + ' severity'}
                                         style={styles.reportCard}
                                         activeOpacity={0.8}
                                         onPress={() =>
@@ -604,28 +610,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.07,
         shadowRadius: 8,
         elevation: 2,
-    },
-    statIconBg: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    statValue: {
-        fontSize: 20,
-        fontFamily: 'Nunito-Bold',
-        color: C.textPrimary,
-        letterSpacing: -0.5,
-    },
-    statLabel: {
-        fontSize: 10,
-        color: C.textTertiary,
-        fontFamily: 'Nunito-SemiBold',
-        letterSpacing: 0.3,
-        marginTop: 2,
-        textTransform: 'uppercase',
     },
 
     // ── Section ──

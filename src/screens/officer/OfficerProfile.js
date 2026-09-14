@@ -1,3 +1,4 @@
+import { COLORS } from '../../utils/theme';
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,24 +11,24 @@ import { supabase } from '../../services';
 import { FocusAwareStatusBar } from '../../components';
 
 const C = {
-    navy: '#0A1E3F',
-    navyMid: '#0F2C59',
-    amber: '#F59E0B',
-    white: '#FFFFFF',
-    offWhite: '#F4F6F9',
-    surface: '#FFFFFF',
-    textPrimary: '#0F172A',
-    textSecondary: '#475569',
-    textTertiary: '#64748B',
+    navy: COLORS.primaryDark,
+    navyMid: COLORS.primary,
+    amber: COLORS.secondaryLight,
+    white: COLORS.surface,
+    offWhite: COLORS.background,
+    surface: COLORS.surface,
+    textPrimary: COLORS.textPrimary,
+    textSecondary: COLORS.textSecondary,
+    textTertiary: COLORS.textTertiary,
     border: '#E5E7EB',
-    error: '#B91C1C',
+    error: COLORS.error,
     errorSurface: '#FFDAD6',
     success: '#059669',
     successSurface: '#D1FAE5',
 };
 
 export default function OfficerProfile({ navigation }) {
-    const { setIsAuthenticated, setUserRole } = useAppContext();
+    const { setIsAuthenticated, setUserRole, demoMode } = useAppContext();
     const { profile, signOut } = useAuth();
     const [loggingOut, setLoggingOut] = useState(false);
     const [stats, setStats] = useState({ verified: 0, rejected: 0, thisMonth: 0 });
@@ -57,7 +58,7 @@ export default function OfficerProfile({ navigation }) {
                 setStats({ verified, rejected, thisMonth });
             }
         } catch (error) {
-            console.error('Error fetching officer stats:', error);
+            if (__DEV__) console.warn('[OfficerProfile] Statistics unavailable.');
         }
     }, [profile?.id]);
 
@@ -81,7 +82,7 @@ export default function OfficerProfile({ navigation }) {
                         setUserRole(null);
                     } catch (error) {
                         Alert.alert('Error', 'Failed to sign out. Please try again.');
-                        console.error(error);
+                        if (__DEV__) console.warn('[OfficerProfile] Sign out failed.');
                     } finally {
                         setLoggingOut(false);
                     }
@@ -110,7 +111,7 @@ export default function OfficerProfile({ navigation }) {
             <LinearGradient colors={[C.navy, C.navyMid]} style={styles.heroSection}>
                 <SafeAreaView edges={['top']} style={styles.heroSafeTop}>
                     <View style={styles.heroTopRow}>
-                        <Text style={styles.heroTitle}>Officer Profile</Text>
+                        <Text style={styles.heroTitle}>{demoMode ? "Officer Profile · Demo Mode" : "Officer Profile"}</Text>
                         <TouchableOpacity onPress={handleContact} style={styles.headsetBtn}>
                             <Ionicons name="headset" size={20} color={C.white} />
                         </TouchableOpacity>
@@ -164,12 +165,15 @@ export default function OfficerProfile({ navigation }) {
                 <Text style={styles.sectionHeader}>Analytics & Map</Text>
                 <View style={styles.menuGroup}>
                     <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('LiveMap')} activeOpacity={0.7}>
-                        <View style={[styles.menuIconBg, { backgroundColor: '#FEF3C7' }]}><Ionicons name="flame" size={20} color={C.amber} /></View>
+                        <View style={[styles.menuIconBg, { backgroundColor: COLORS.secondarySurface }]}><Ionicons name="flame" size={20} color={C.amber} /></View>
                         <Text style={styles.menuItemText}>Live Violation Heatmap</Text>
                         <Ionicons name="chevron-forward" size={18} color={C.textTertiary} />
                     </TouchableOpacity>
                 </View>
 
+                <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('About')} accessibilityRole="button" accessibilityLabel="About Traffic Eye">
+                    <Text style={styles.menuItemText}>About Traffic Eye</Text>
+                </TouchableOpacity>
                 {/* ── Menu Options ── */}
                 <Text style={styles.sectionHeader}>Preferences</Text>
                 <View style={styles.menuGroup}>
@@ -245,7 +249,7 @@ const styles = StyleSheet.create({
     menuGroup: { backgroundColor: C.surface, borderRadius: 20, marginBottom: 24, shadowColor: C.navyMid, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: '#F2F4F6' },
     menuItem: { flexDirection: 'row', alignItems: 'center', padding: 16 },
     menuDivider: { height: 1, backgroundColor: '#F2F4F6', marginLeft: 64 },
-    menuIconBg: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F4F6F9', justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+    menuIconBg: { width: 40, height: 40, borderRadius: 12, backgroundColor: COLORS.background, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
     menuItemText: { flex: 1, fontSize: 16, fontFamily: 'Nunito-SemiBold', color: C.textPrimary },
 
     footerVersion: { alignItems: 'center', marginTop: 10 },

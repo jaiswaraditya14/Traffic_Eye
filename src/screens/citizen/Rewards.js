@@ -1,14 +1,17 @@
+import { COLORS } from '../../utils/theme';
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, TouchableOpacity,
-    Animated, StatusBar, Image, Alert, ActivityIndicator, Modal, Dimensions, Platform
+    Animated, StatusBar, Image, Alert, ActivityIndicator, Modal, Dimensions, Platform, RefreshControl
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useAuth } from '../../context';
-import { FocusAwareStatusBar } from '../../components';
+import { FocusAwareStatusBar, Celebration, PressableScale, ConfirmationModal, FeedbackToast, StatSkeleton } from '../../components';
+import useReducedMotion from '../../hooks/useReducedMotion';
+import { rewardAvailability } from '../../utils/productExperience';
 import { rewardService, REDEEM_CATALOG } from '../../services';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Clipboard from 'expo-clipboard';
@@ -18,40 +21,47 @@ const CARD_WIDTH = (width - 56) / 2;
 
 // ── Shared Design Tokens (Civic Curator palette) ──
 const C = {
-    navy: '#0A1E3F',
+    navy: COLORS.primaryDark,
     navyDeep: '#051329',
-    navyMid: '#0F2C59',
-    amber: '#D97706',
-    amberDark: '#B45309',
-    amberSurface: '#FEF3C7',
-    secondary: '#B45309',
-    secondaryContainer: '#F59E0B',
-    white: '#FFFFFF',
-    offWhite: '#F4F6F9',
-    surfaceLow: '#F8FAFC',
-    surfaceContainer: '#F1F5F9',
-    bluePrimary: '#0F2C59',
-    textPrimary: '#0F172A',
-    textSecondary: '#475569',
-    textTertiary: '#64748B',
-    outlineVariant: '#CBD5E1',
-    success: '#15803D',
-    successSurface: '#DCFCE7',
-    error: '#B91C1C',
-    errorSurface: '#FEE2E2',
+    navyMid: COLORS.primary,
+    amber: COLORS.secondary,
+    amberDark: COLORS.secondaryDark,
+    amberSurface: COLORS.secondarySurface,
+    secondary: COLORS.secondaryDark,
+    secondaryContainer: COLORS.secondaryLight,
+    white: COLORS.surface,
+    offWhite: COLORS.background,
+    surfaceLow: COLORS.surfaceContainerLow,
+    surfaceContainer: COLORS.surfaceContainer,
+    bluePrimary: COLORS.primary,
+    textPrimary: COLORS.textPrimary,
+    textSecondary: COLORS.textSecondary,
+    textTertiary: COLORS.textTertiary,
+    outlineVariant: COLORS.surfaceContainerHighest,
+    success: COLORS.success,
+    successSurface: COLORS.successSurface,
+    error: COLORS.error,
+    errorSurface: COLORS.errorSurface,
 };
 
 // Tag color map
 const TAG_COLORS = {
     'STARTER': { bg: '#EDE9FE', text: '#6366F1' },
     'POPULAR': { bg: '#CFFAFE', text: '#0891B2' },
-    'ESSENTIAL': { bg: '#FEE2E2', text: '#DC2626' },
-    'PREMIUM': { bg: '#FEF3C7', text: '#D97706' },
+    'ESSENTIAL': { bg: COLORS.errorSurface, text: COLORS.errorLight },
+    'PREMIUM': { bg: COLORS.secondarySurface, text: COLORS.secondary },
     'TOP TIER': { bg: '#DBEAFE', text: '#1D4ED8' },
-    'ULTIMATE': { bg: '#D7E2FF', text: '#0A1E3F' },
+    'ULTIMATE': { bg: '#D7E2FF', text: COLORS.primaryDark },
 };
 
 export default function Rewards() {
+    const reduced = useReducedMotion();
+    const mounted = useRef(true);
+    const redeemBusy = useRef(false);
+    const requestSequence = useRef(0);
+    const [pendingReward, setPendingReward] = useState(null);
+    const [toast, setToast] = useState(null);
+    useEffect(() => { mounted.current = true; return () => { mounted.current = false; requestSequence.current++; }; }, []);
     const { profile, refreshProfile } = useAuth();
     const [userPoints, setUserPoints] = useState(profile?.points_balance || 0);
     // Keep local points in sync with freshly fetched profile
@@ -81,22 +91,20 @@ export default function Rewards() {
     const cardAnims = useRef(REDEEM_CATALOG.map(() => new Animated.Value(0))).current;
 
     const loadData = async () => {
+        const request = ++requestSequence.current;
         setLoadingData(true);
-        // Re-fetch profile from DB so points_balance is always current
-        if (refreshProfile) await refreshProfile();
-        
-        // 1. Fetch unified activity history
-        const historyRes = await rewardService.getActivityHistory(30);
-        if (historyRes.success) setHistory(historyRes.history);
-        
-        // 2. Fetch redeemed (unlocked) items
-        const redeemedRes = await rewardService.getRedeemedItems();
-        if (redeemedRes.success) setRedeemedItems(redeemedRes.redeemed);
-        
-        setLoadingData(false);
+        try {
+            if (refreshProfile) await refreshProfile();
+            const [historyRes, redeemedRes] = await Promise.all([rewardService.getActivityHistory(30), rewardService.getRedeemedItems()]);
+            if (!mounted.current || request !== requestSequence.current) return;
+            if (!historyRes.success || !redeemedRes.success) throw new Error('Reward data unavailable');
+            setHistory(historyRes.history || []); setRedeemedItems(redeemedRes.redeemed || {});
+        } catch { if (mounted.current && request === requestSequence.current) setToast('Could not refresh rewards. Pull down to retry.'); }
+        finally { if (mounted.current && request === requestSequence.current) setLoadingData(false); }
     };
 
     const animateCardEntries = () => {
+        if (reduced) { cardAnims.forEach(value => value.setValue(1)); return; }
         cardAnims.forEach(a => a.setValue(0));
         const animations = cardAnims.map((anim, index) =>
             Animated.timing(anim, {
@@ -112,22 +120,26 @@ export default function Rewards() {
     useFocusEffect(
         useCallback(() => {
             loadData();
-            Animated.parallel([
+            const entrance = Animated.parallel([
                 Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
                 Animated.spring(gridSlideAnim, { toValue: 0, tension: 50, friction: 9, useNativeDriver: true }),
                 Animated.spring(headerScaleAnim, { toValue: 1, tension: 60, friction: 8, useNativeDriver: true })
-            ]).start();
+            ]);
+            if (reduced) { fadeAnim.setValue(1); gridSlideAnim.setValue(0); headerScaleAnim.setValue(1); }
+            else entrance.start();
             if (activeTab === 'Gifts') animateCardEntries();
             return () => {
+                entrance.stop(); cardAnims.forEach(value => value.stopAnimation());
                 fadeAnim.setValue(0);
                 gridSlideAnim.setValue(30);
                 headerScaleAnim.setValue(0.96);
             };
-        }, [])
+        }, [reduced])
     );
 
 
     const handleRedeem = (item) => {
+        if (redeemBusy.current || loadingData) return;
         // 1. Check if already unlocked (Persistent Unlock)
         const redeemedData = redeemedItems[item.id];
         if (redeemedData) {
@@ -151,31 +163,25 @@ export default function Rewards() {
             return;
         }
 
-        // 2. Normal redemption flow
-        if (userPoints < item.pts) {
-            Alert.alert("Locked", `Earn ${item.pts - userPoints} more points to unlock this reward.`);
-            return;
-        }
+        // 2. Guard local state; the server remains authoritative and idempotent.
+        const availability = rewardAvailability(item, userPoints);
+        if (availability.disabled) { setToast(availability.label); return; }
+        setPendingReward(item);
+    };
 
-        Alert.alert("Confirm Redemption", `Redeem ${item.pts} points for: ${item.title}?`, [
-            { text: "Cancel", style: "cancel" },
-            { 
-                text: "Redeem Now", 
-                onPress: async () => {
-                    setRedeeming(true);
-                    const res = await rewardService.redeemItem(item);
-                    setRedeeming(false);
-                    if (res.success) {
-                        setRedeemedItemTitle(item.title);
-                        setCurrentCoupon(res.couponCode);
-                        setCouponModalVisible(true);
-                        loadData(); // Refresh balance, history and redeemed state
-                    } else {
-                        Alert.alert("Redemption Failed", res.error || "Please try again.");
-                    }
-                }
-            }
-        ]);
+    const confirmRedeem = async () => {
+        const item = pendingReward;
+        if (!item || redeemBusy.current || redeemedItems[item.id] || rewardAvailability(item, userPoints).disabled) return;
+        redeemBusy.current = true; setPendingReward(null); setRedeeming(true);
+        try {
+            const res = await rewardService.redeemItem(item);
+            if (!mounted.current) return;
+            if (!res.success) throw new Error('Redemption failed');
+            setRedeemedItemTitle(item.title); setCurrentCoupon(res.couponCode); setCouponModalVisible(true);
+            setRedeemedItems(items => ({ ...items, [item.id]: { couponCode: res.couponCode, expiresAt: res.expiresAt } }));
+            await loadData();
+        } catch { if (mounted.current) setToast('Redemption could not be confirmed. Refresh rewards before retrying.'); }
+        finally { redeemBusy.current = false; if (mounted.current) setRedeeming(false); }
     };
 
     const copyCouponCode = async () => {
@@ -194,6 +200,7 @@ export default function Rewards() {
                 end={{ x: 1, y: 1 }}
                 style={[styles.headerArea, { paddingTop: insets.top + 18 }]}
             >
+                <Celebration sparkle />
                 {/* Decorative circles */}
                 <View style={styles.headerDecor1} />
                 <View style={styles.headerDecor2} />
@@ -220,7 +227,7 @@ export default function Rewards() {
                     </View>
                     <View style={styles.balanceInfo}>
                         <Text style={styles.balanceLabel}>MY POINTS BALANCE</Text>
-                        <Text style={styles.balanceValue}>{userPoints.toLocaleString()}</Text>
+                        {loadingData ? <StatSkeleton /> : <Text style={styles.balanceValue}>{userPoints.toLocaleString()}</Text>}
                         <View style={styles.balanceBadge}>
                             <Ionicons name="star" size={11} color={C.amberDark} />
                             <Text style={styles.balanceBadgeText}>
@@ -279,7 +286,8 @@ export default function Rewards() {
 
             <View style={styles.grid}>
                 {REDEEM_CATALOG.map((item, index) => {
-                    const isLocked = !redeemedItems[item.id] && userPoints < item.pts;
+                    const availability = rewardAvailability(item, userPoints, !!redeemedItems[item.id]);
+                    const isLocked = !redeemedItems[item.id] && availability.disabled;
                     const animValue = cardAnims[index] || new Animated.Value(1);
                     
                     return (
@@ -300,8 +308,10 @@ export default function Rewards() {
                                 }],
                             }}
                         >
-                            <TouchableOpacity 
-                                style={styles.giftCard}
+                            <PressableScale
+                                accessibilityLabel={item.title + ', ' + availability.label}
+                                disabled={redeeming || loadingData || isLocked}
+                                style={[styles.giftCard, isLocked && { opacity: 0.65 }]}
                                 activeOpacity={isLocked ? 0.9 : 0.7}
                                 onPress={() => handleRedeem(item)}
                             >
@@ -321,7 +331,7 @@ export default function Rewards() {
                                             end={{ x: 1, y: 1 }}
                                         >
                                             <View style={styles.iconCircle}>
-                                                <Ionicons name={item.icon || 'gift'} size={36} color="#FFF" />
+                                                <Ionicons name={item.icon || 'gift'} size={36} color={COLORS.surface} />
                                             </View>
                                         </LinearGradient>
                                     )}
@@ -362,33 +372,29 @@ export default function Rewards() {
                                         <View style={styles.lockedFooter}>
                                             <View style={styles.lockedPtsRow}>
                                                 <Ionicons name="lock-closed" size={10} color={C.textTertiary} />
-                                                <Text style={styles.lockedPtsText}>{item.pts - userPoints} pts to go</Text>
+                                                <Text style={styles.lockedPtsText}>{availability.label}</Text>
                                             </View>
                                             <View style={styles.progressBarBg}>
                                                 <View style={[styles.progressBarFill, { width: `${Math.min((userPoints / item.pts) * 100, 100)}%` }]} />
                                             </View>
                                         </View>
                                     ) : (
-                                        <TouchableOpacity 
-                                            style={styles.redeemBtn}
-                                            onPress={() => handleRedeem(item)}
-                                            activeOpacity={0.8}
-                                        >
+                                        <View style={styles.redeemBtn}>
                                             <LinearGradient
                                                 colors={redeemedItems[item.id] ? [C.success, '#047857'] : [C.navy, C.navyDeep]}
                                                 style={styles.redeemBtnGrad}
                                                 start={{ x: 0, y: 0 }}
                                                 end={{ x: 1, y: 1 }}
                                             >
-                                                <Ionicons name={redeemedItems[item.id] ? "ticket-outline" : "gift-outline"} size={12} color="#FFF" />
+                                                <Ionicons name={redeemedItems[item.id] ? "ticket-outline" : "gift-outline"} size={12} color={COLORS.surface} />
                                                 <Text style={styles.redeemBtnText}>
-                                                    {redeemedItems[item.id] ? 'VIEW CODE' : 'REDEEM'}
+                                                    {redeemedItems[item.id] ? 'Redeemed ✓ · View code' : 'REDEEM'}
                                                 </Text>
                                             </LinearGradient>
-                                        </TouchableOpacity>
+                                        </View>
                                     )}
                                 </View>
-                            </TouchableOpacity>
+                            </PressableScale>
                         </Animated.View>
                     );
                 })}
@@ -519,7 +525,7 @@ export default function Rewards() {
         <View style={styles.container}>
             <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
             <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-                <ScrollView showsVerticalScrollIndicator={false}>
+                <ScrollView showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={loadingData} onRefresh={loadData} colors={[C.amber]} />}>
                     {renderHeader()}
                     
                     <View style={{ marginTop: 62, paddingHorizontal: 20 }}>
@@ -533,9 +539,11 @@ export default function Rewards() {
                     </View>
                 </ScrollView>
             </SafeAreaView>
+            <ConfirmationModal visible={!!pendingReward} title="Redeem reward?" message={pendingReward ? 'Use ' + pendingReward.pts + ' points for ' + pendingReward.title + '?' : ''} confirmLabel="Redeem" loading={redeeming} onConfirm={confirmRedeem} onCancel={() => setPendingReward(null)} />
+            <FeedbackToast visible={!!toast} message={toast || ''} variant="error" onDismiss={() => setToast(null)} />
 
             {/* Coupon Modal */}
-            <Modal transparent={true} visible={couponModalVisible} animationType="fade">
+            <Modal transparent={true} visible={couponModalVisible} animationType={reduced ? 'none' : 'fade'} onRequestClose={() => setCouponModalVisible(false)}>
                 <View style={styles.modalOverlay}>
                     <Animated.View style={styles.modalContent}>
                         <View style={styles.modalConfetti}>
@@ -606,7 +614,7 @@ const styles = StyleSheet.create({
     },
     headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 },
     headerLabel: { fontSize: 10, fontFamily: 'Nunito-ExtraBold', color: C.amber, letterSpacing: 2, marginBottom: 4 },
-    headerTitle: { fontSize: 26, fontFamily: 'Nunito-Bold', color: '#FFF', letterSpacing: -0.5 },
+    headerTitle: { fontSize: 26, fontFamily: 'Nunito-Bold', color: COLORS.surface, letterSpacing: -0.5 },
     authorityShield: { 
         width: 44, height: 44, borderRadius: 14, 
         backgroundColor: 'rgba(255,255,255,0.1)', 
@@ -619,7 +627,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         bottom: -52,
         left: 20, right: 20,
-        backgroundColor: '#FFF',
+        backgroundColor: COLORS.surface,
         borderRadius: 24,
         flexDirection: 'row',
         alignItems: 'center',
@@ -653,7 +661,7 @@ const styles = StyleSheet.create({
     // ── Tabs ──
     tabBar: { 
         flexDirection: 'row', 
-        backgroundColor: '#FFF', 
+        backgroundColor: COLORS.surface,
         borderRadius: 18, 
         padding: 5, 
         marginBottom: 24,
@@ -679,7 +687,7 @@ const styles = StyleSheet.create({
     grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
     giftCard: {
         width: CARD_WIDTH,
-        backgroundColor: '#FFF',
+        backgroundColor: COLORS.surface,
         borderRadius: 22,
         marginBottom: 16,
         overflow: 'hidden',
@@ -711,7 +719,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10, paddingVertical: 5,
         borderRadius: 20,
         ...Platform.select({
-            ios: { shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
+            ios: { shadowColor: COLORS.black, shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
             android: { elevation: 3 },
         }),
     },
@@ -728,7 +736,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255,255,255,0.92)', 
         justifyContent: 'center', alignItems: 'center',
         ...Platform.select({
-            ios: { shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 8 },
+            ios: { shadowColor: COLORS.black, shadowOpacity: 0.1, shadowRadius: 8 },
             android: { elevation: 4 },
         }),
     },
@@ -749,22 +757,22 @@ const styles = StyleSheet.create({
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
         paddingVertical: 10, gap: 6, borderRadius: 14,
     },
-    redeemBtnText: { fontSize: 11, fontFamily: 'Nunito-ExtraBold', color: '#FFF', letterSpacing: 0.8 },
+    redeemBtnText: { fontSize: 11, fontFamily: 'Nunito-ExtraBold', color: COLORS.surface, letterSpacing: 0.8 },
 
     // ── Earn Points ──
 
 
     // ── Earn Points Enhancement ──
     subSectionTitle: { fontSize: 16, fontFamily: 'Nunito-Bold', color: C.textPrimary, marginBottom: 16, marginTop: 10 },
-    howItWorks: { marginBottom: 30, backgroundColor: '#FFF', borderRadius: 24, padding: 20, elevation: 2, shadowColor: C.navy, shadowOpacity: 0.04, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
+    howItWorks: { marginBottom: 30, backgroundColor: COLORS.surface, borderRadius: 24, padding: 20, elevation: 2, shadowColor: C.navy, shadowOpacity: 0.04, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
     workStep: { flexDirection: 'row', gap: 16, marginBottom: 20 },
     stepNum: { width: 28, height: 28, borderRadius: 14, backgroundColor: C.navy, justifyContent: 'center', alignItems: 'center' },
-    stepNumText: { color: '#FFF', fontSize: 14, fontFamily: 'Nunito-ExtraBold' },
+    stepNumText: { color: COLORS.surface, fontSize: 14, fontFamily: 'Nunito-ExtraBold' },
     stepTitle: { fontSize: 14, fontFamily: 'Nunito-Bold', color: C.navy, marginBottom: 4 },
     stepDesc: { fontSize: 12, fontFamily: 'Nunito-Medium', color: C.textSecondary, lineHeight: 18 },
     
     redemptionGuide: { marginBottom: 30 },
-    guideCard: { borderRadius: 24, padding: 20, borderWidth: 1, borderColor: '#F1F5F9' },
+    guideCard: { borderRadius: 24, padding: 20, borderWidth: 1, borderColor: COLORS.surfaceContainer },
     guideHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
     guideTitle: { fontSize: 16, fontFamily: 'Nunito-Bold', color: C.amberDark },
     guideText: { fontSize: 13, fontFamily: 'Nunito-Medium', color: C.textSecondary, lineHeight: 22 },
@@ -787,7 +795,7 @@ const styles = StyleSheet.create({
     emptyTextSub: { fontSize: 14, fontFamily: 'Nunito-Medium', color: C.textTertiary, textAlign: 'center', marginTop: 6 },
     activityRow: { 
         flexDirection: 'row', alignItems: 'center', 
-        backgroundColor: '#FFF', padding: 16, borderRadius: 20, 
+        backgroundColor: COLORS.surface, padding: 16, borderRadius: 20,
         marginBottom: 10,
         ...Platform.select({
             ios: { shadowColor: C.navy, shadowOpacity: 0.04, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } },
@@ -804,9 +812,9 @@ const styles = StyleSheet.create({
     // ── Modal ──
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,24,52,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 },
     modalContent: { 
-        width: '100%', backgroundColor: '#FFF', borderRadius: 32, padding: 32, alignItems: 'center',
+        width: '100%', backgroundColor: COLORS.surface, borderRadius: 32, padding: 32, alignItems: 'center',
         ...Platform.select({
-            ios: { shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 40 },
+            ios: { shadowColor: COLORS.black, shadowOpacity: 0.25, shadowRadius: 40 },
             android: { elevation: 24 },
         }),
     },
@@ -815,7 +823,7 @@ const styles = StyleSheet.create({
     modalTitle: { fontSize: 24, fontFamily: 'Nunito-Black', color: C.navy, marginBottom: 10, textAlign: 'center' },
     modalSub: { fontSize: 14, fontFamily: 'Nunito-Medium', color: C.textSecondary, textAlign: 'center', marginBottom: 24, lineHeight: 22 },
     couponBox: { 
-        backgroundColor: '#FFFBEB', borderWidth: 2, borderColor: '#FDE68A', borderStyle: 'dashed',
+        backgroundColor: '#FFFBEB', borderWidth: 2, borderColor: COLORS.secondaryBorder, borderStyle: 'dashed',
         borderRadius: 22, width: '100%', padding: 22, alignItems: 'center', marginBottom: 24,
     },
     couponLabel: { fontSize: 10, fontFamily: 'Nunito-ExtraBold', color: C.amberDark, letterSpacing: 1.5, marginBottom: 10 },
@@ -823,19 +831,19 @@ const styles = StyleSheet.create({
     couponCode: { fontSize: 26, fontFamily: 'Nunito-Black', color: C.textPrimary, letterSpacing: 3 },
     copyIconBg: { 
         width: 32, height: 32, borderRadius: 10, 
-        backgroundColor: '#FDE68A', justifyContent: 'center', alignItems: 'center', marginLeft: 12,
+        backgroundColor: COLORS.secondaryBorder, justifyContent: 'center', alignItems: 'center', marginLeft: 12,
     },
     couponHint: { fontSize: 10, fontFamily: 'Nunito-Medium', color: C.textTertiary, marginTop: 8 },
     modalCloseBtn: { width: '100%', borderRadius: 16, overflow: 'hidden' },
     modalCloseBtnGrad: { paddingVertical: 16, alignItems: 'center', borderRadius: 16 },
-    modalCloseText: { fontSize: 16, fontFamily: 'Nunito-Bold', color: '#FFF' },
+    modalCloseText: { fontSize: 16, fontFamily: 'Nunito-Bold', color: COLORS.surface },
 
     loadingOverlay: { backgroundColor: 'rgba(0,24,52,0.6)', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
     loadingCard: { 
-        backgroundColor: '#FFF', borderRadius: 24, paddingHorizontal: 40, paddingVertical: 30, 
+        backgroundColor: COLORS.surface, borderRadius: 24, paddingHorizontal: 40, paddingVertical: 30,
         alignItems: 'center', gap: 14,
         ...Platform.select({
-            ios: { shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 20 },
+            ios: { shadowColor: COLORS.black, shadowOpacity: 0.2, shadowRadius: 20 },
             android: { elevation: 12 },
         }),
     },

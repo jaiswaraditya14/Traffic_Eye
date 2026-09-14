@@ -61,7 +61,7 @@ export default function CitizenSignIn({ navigation }) {
                 return;
             }
         } catch (error) {
-            if (__DEV__) console.warn('Sign in error:', error?.message || 'Unknown error');
+            if (__DEV__) console.warn('[AUTH] Citizen sign in failed.');
             Alert.alert('Error', 'Something went wrong. Please try again.');
         } finally {
             setLoading(false);
@@ -80,7 +80,7 @@ export default function CitizenSignIn({ navigation }) {
 
             const { data, error } = await signInWithGoogle(redirectUri);
             if (error) {
-                if (__DEV__) console.warn('[AUTH] GOOGLE_OAUTH_FAILED | error:', error?.message);
+                if (__DEV__) console.warn('[AUTH] Google OAuth initialization failed.');
                 Alert.alert('Configuration Error', error.message);
                 return;
             }
@@ -88,7 +88,7 @@ export default function CitizenSignIn({ navigation }) {
             if (data?.url) {
                 if (__DEV__) console.log('[AUTH] GOOGLE_BROWSER_OPENING');
                 const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
-                if (__DEV__) console.log('[AUTH] GOOGLE_CALLBACK_RECEIVED | type:', result.type);
+                if (__DEV__) console.log('[AUTH] Google OAuth callback received.');
 
                 if (result.type === 'success' && result.url) {
                     const resultUrl = result.url;
@@ -122,7 +122,7 @@ export default function CitizenSignIn({ navigation }) {
                     const access_token = getFragment(resultUrl, 'access_token');
                     const refresh_token = getFragment(resultUrl, 'refresh_token');
                     if (access_token && refresh_token) {
-                        if (__DEV__) console.log('[AUTH] IMPLICIT_TOKENS_RECEIVED | access_token exists:', !!access_token, '| refresh_token exists:', !!refresh_token);
+                        if (__DEV__) console.log('[AUTH] OAuth credentials received.');
                         const { error: sessionError } = await supabase.auth.setSession({ access_token, refresh_token });
                         if (sessionError) throw sessionError;
                         if (__DEV__) console.log('[AUTH] SESSION_ESTABLISHED | onAuthStateChange will handle profile');
@@ -137,7 +137,7 @@ export default function CitizenSignIn({ navigation }) {
                 }
             }
         } catch (error) {
-            if (__DEV__) console.warn('[AUTH] GOOGLE_SIGN_IN_ERROR:', error?.message);
+            if (__DEV__) console.warn('[AUTH] Google sign in failed.');
             Alert.alert('Sign-In Failed', error?.message || 'Failed to sign in with Google. Please try again.');
         } finally {
             setGoogleLoading(false);

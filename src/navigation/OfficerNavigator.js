@@ -8,6 +8,7 @@ import { COLORS, BORDER_RADIUS, SHADOWS, FONT_SIZES, FONT_WEIGHTS, SPACING } fro
 
 // Import Screens from barrel
 import {
+    About,
     OfficerDashboard,
     PendingQueue,
     VerifiedReports,
@@ -77,6 +78,7 @@ export default function OfficerNavigator() {
             }}
         >
             <Stack.Screen name="OfficerMain" component={OfficerTabNavigator} />
+            <Stack.Screen name="About" component={About} />
             <Stack.Screen name="PermissionsRequest" component={PermissionsRequest} />
             <Stack.Screen name="ReportVerification" component={ReportVerification} />
             <Stack.Screen name="ImageReportReview" component={ImageReportReview} />

@@ -121,8 +121,6 @@ export default function ImageCropModal({ visible, imageUri, onCropDone, onCancel
                 );
             });
 
-            console.log(`[Crop] Input: ${natW}×${natH}`);
-
             // ── Step 2: Compute how the image renders inside the square
             //           CROP_SIZE × CROP_SIZE viewport (contain mode) ─────────
             const imgAspect = natW / natH;
@@ -171,9 +169,6 @@ export default function ImageCropModal({ visible, imageUri, onCropDone, onCancel
             const cropW = Math.round((cr - cl) * scaleX);
             const cropH = Math.round((cb - ct) * scaleY);
 
-            console.log(`[Crop] Rendered region: (${cl.toFixed(1)},${ct.toFixed(1)}) → (${cr.toFixed(1)},${cb.toFixed(1)})`);
-            console.log(`[Crop] NaturalCrop: x=${cropX}, y=${cropY}, w=${cropW}, h=${cropH}`);
-
             // ── Step 5: Execute manipulation ─────────────────────────────────
             const actions = [];
 
@@ -197,11 +192,9 @@ export default function ImageCropModal({ visible, imageUri, onCropDone, onCancel
                 { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
             );
 
-            console.log(`[Crop] Success: ${manipResult.uri}`);
             onCropDone(manipResult.uri);
 
         } catch (error) {
-            console.error('[Crop] Process failed:', error);
             onCropDone(imageUri);
         } finally {
             setProcessing(false);

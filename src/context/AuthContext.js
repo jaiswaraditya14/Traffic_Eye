@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { AppState, Alert } from 'react-native';
 import { supabase, authService } from '../services';
-import { sendLocalNotification } from '../services/notifications';
 
 const AuthContext = createContext({});
 
@@ -56,7 +55,7 @@ export function AuthProvider({ children }) {
                         fetchProfile(session.user.id);
                     }
                 } catch (error) {
-                    if (__DEV__) console.warn('[AUTH] onAuthStateChange outer error:', error?.message);
+                    if (__DEV__) console.warn('[AUTH] Auth-state processing failed.');
                 } finally {
                     if (isMounted.current) setLoading(false);
                 }
@@ -127,11 +126,11 @@ export function AuthProvider({ children }) {
                             // Profile upsert failed (DB/RLS error) — but the auth session IS valid.
                             // Keep user authenticated with profile=null → ProfileLoadingScreen.
                             // Do NOT sign out — this is a database failure, not an auth failure.
-                            if (__DEV__) console.warn('[AUTH] PROFILE_UPSERT_FAILED | status:', insertError?.code, '| session remains valid');
+                            if (__DEV__) console.warn('[AUTH] Profile initialization failed; session remains valid.');
                             if (isMounted.current) setProfile(null);
                         }
                     } else {
-                        if (__DEV__) console.log('[AUTH] PROFILE_FETCH_SUCCESS | role:', data?.role);
+                        if (__DEV__) console.log('[AUTH] Profile fetch completed.');
                         if (isMounted.current) setProfile(data);
                     }
                 })(),
@@ -141,7 +140,7 @@ export function AuthProvider({ children }) {
             // Catches: network errors, DB errors, RLS violations, and PROFILE_TIMEOUT.
             // CRITICAL: Profile fetch failure MUST NOT sign the user out.
             // Verify session state via Supabase before deciding any action.
-            if (__DEV__) console.warn('[AUTH] PROFILE_FETCH_FAILED | reason:', err?.message?.substring(0, 80));
+            if (__DEV__) console.warn('[AUTH] Profile fetch failed.');
 
             if (err?.message === 'PROFILE_TIMEOUT') {
                 // Timeout: session is likely still valid. Keep user authenticated.
@@ -200,49 +199,7 @@ export function AuthProvider({ children }) {
         if (user?.id) await fetchProfile(user.id);
     };
 
-    // ── Realtime: fire OS notification when a new DB notification arrives ──────
-    useEffect(() => {
-        if (!user?.id) return;
-
-        const channel = supabase
-            .channel(`notifications_push_${user.id}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'notifications',
-                    filter: `user_id=eq.${user.id}`,
-                },
-                (payload) => {
-                    const notif = payload?.new;
-                    if (!notif) return;
-
-                    // Map notification type to a human-readable title
-                    const titleMap = {
-                        report_approved:  '✅ Report Approved',
-                        report_rejected:  '❌ Report Rejected',
-                        report_pending:   '⏳ Report Under Review',
-                        points_awarded:   '🏆 Points Awarded!',
-                        reward_redeemed:  '🎁 Reward Redeemed',
-                        system:           '📢 Traffic Eye',
-                    };
-
-                    const title = titleMap[notif.type] || '📢 Traffic Eye';
-                    const body  = notif.message || 'You have a new notification.';
-
-                    // Fire local OS notification — respects phone mute/DND/ringtone
-                    sendLocalNotification(title, body, {
-                        screen:   notif.report_id ? 'ReportDetail' : 'Notifications',
-                        reportId: notif.report_id ?? null,
-                        notifId:  notif.id,
-                    });
-                }
-            )
-            .subscribe();
-
-        return () => { supabase.removeChannel(channel); };
-    }, [user?.id]);
+    // NotificationProvider owns the single per-user notification subscription.
 
     const value = {
         user,

@@ -292,12 +292,6 @@ export function hasValidGpsValues(rawLat, rawLng, latRef, lngRef) {
 
 // ─── EXIF GPS Parser ─────────────────────────────────────────────────────────
 export function parseExifGPS(exif) {
-    try {
-        console.log('[RAW EXIF]', JSON.stringify(exif, null, 2));
-    } catch {
-        console.log('[RAW EXIF]', exif);
-    }
-
     if (!exif || typeof exif !== 'object') {
         return null;
     }
@@ -337,13 +331,6 @@ export function parseExifGPS(exif) {
         lngRef = lngRef ?? exif['GPS:GPSLongitudeRef'] ?? exif['GPS:LongitudeRef'] ?? exif['Exif.GPSInfo.GPSLongitudeRef'];
     }
 
-    console.log('[EXIF GPS] Raw Values:', {
-        rawLat,
-        rawLng,
-        latRef,
-        lngRef
-    });
-
     // Step 0: null / undefined check
     if (rawLat === undefined || rawLng === undefined || rawLat === null || rawLng === null) {
         return null;
@@ -354,9 +341,6 @@ export function parseExifGPS(exif) {
     // BEFORE wasting cycles on parseCoordinateComponent.
     const gpsValidity = hasValidGpsValues(rawLat, rawLng, latRef, lngRef);
     if (!gpsValidity.valid) {
-        console.log('[EXIF GPS] Validity gate → GPS_NOT_FOUND:', gpsValidity.reason, '|', {
-            rawLat, rawLng, latRef, lngRef,
-        });
         return null;
     }
     // ─────────────────────────────────────────────────────────────────────────
@@ -365,11 +349,6 @@ export function parseExifGPS(exif) {
     const parsedLat = parseCoordinateComponent(rawLat);
     const parsedLng = parseCoordinateComponent(rawLng);
 
-    console.log('[EXIF GPS] Normalized Decimal:', {
-        parsedLat,
-        parsedLng
-    });
-
     if (parsedLat === null || parsedLng === null) {
         return null;
     }
@@ -377,11 +356,6 @@ export function parseExifGPS(exif) {
     // Step B: Apply N/S and E/W Ref
     const finalLat = applyRef(parsedLat, latRef);
     const finalLng = applyRef(parsedLng, lngRef);
-
-    console.log('[EXIF GPS] Final Coordinates:', {
-        finalLat,
-        finalLng
-    });
 
     // Step C: Validate bounds
     return validateCoordinates(finalLat, finalLng);

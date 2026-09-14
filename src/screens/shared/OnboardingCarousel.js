@@ -1,71 +1,56 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     View, Text, StyleSheet, ScrollView, Dimensions,
-    TouchableOpacity, Image, StatusBar, Animated,
+    TouchableOpacity, Image, StatusBar, Animated, useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { COLORS } from '../../utils/theme';
+import useReducedMotion from '../../hooks/useReducedMotion';
 import { FocusAwareStatusBar } from '../../components';
 
 const { width } = Dimensions.get('window');
 
 const C = {
-    navy: '#0F2C59',
-    navyMid: '#1E3A8A',
-    amber: '#D97706',
-    amberDark: '#B45309',
-    white: '#FFFFFF',
-    offWhite: '#F4F6F9',
-    textPrimary: '#0F172A',
-    textSecondary: '#475569',
-    textTertiary: '#64748B',
-    border: '#CBD5E1',
+    navy: COLORS.primary,
+    navyMid: COLORS.primaryLight,
+    amber: COLORS.secondary,
+    amberDark: COLORS.secondaryDark,
+    white: COLORS.surface,
+    offWhite: COLORS.background,
+    textPrimary: COLORS.textPrimary,
+    textSecondary: COLORS.textSecondary,
+    textTertiary: COLORS.textTertiary,
+    border: COLORS.surfaceContainerHighest,
 };
 
 const slides = [
-    {
-        image: require('../../../assets/images/1.jpg'),
-        icon: 'camera',
-        iconColor: C.navyMid,
-        iconBg: '#D7E2FF',
-        title: 'Report Violations',
-        description: 'Capture traffic violations with your phone camera. Help keep roads safe and earn rewards for your community.',
-        accent: C.navyMid,
-    },
-    {
-        image: require('../../../assets/images/onboarding_ai.jpg'),
-        icon: 'scan',
-        iconColor: '#047857',
-        iconBg: '#D1FAE5',
-        title: 'AI Verification',
-        description: 'AI instantly analyzes license plates, violation types, and location with government-grade accuracy.',
-        accent: '#047857',
-    },
-    {
-        image: require('../../../assets/images/onboarding_rewards.jpg'),
-        icon: 'trophy',
-        iconColor: C.amberDark,
-        iconBg: '#FEF3C7',
-        title: 'Earn Rewards',
-        description: 'Get recognition for verified reports. Accumulate points, unlock achievements and make a real difference.',
-        accent: C.amberDark,
-    },
+    { image: require('../../../assets/images/onboarding_1.png'), icon: 'camera', title: 'See a violation? Snap it!', description: 'Capture photo or video evidence instantly', accent: COLORS.primary, iconColor: COLORS.primary, iconBg: COLORS.primarySurface },
+    { image: require('../../../assets/images/onboarding_2.png'), icon: 'scan', title: 'AI analyzes in seconds', description: 'Smart detection of plates, violations, and locations', accent: COLORS.primary, iconColor: COLORS.primary, iconBg: COLORS.primarySurface },
+    { image: require('../../../assets/images/onboarding_3.png'), icon: 'shield-checkmark', title: 'Officers verify and act', description: 'Verified reports lead to real enforcement', accent: COLORS.success, iconColor: COLORS.success, iconBg: COLORS.successSurface },
+    { image: require('../../../assets/images/onboarding_4.png'), icon: 'trophy', title: 'Earn rewards, save lives', description: 'Collect points for every approved report', accent: COLORS.secondary, iconColor: COLORS.secondary, iconBg: COLORS.secondarySurface },
 ];
 
 
 
 export default function OnboardingCarousel({ navigation }) {
+    const { width, height } = useWindowDimensions();
+    const reduced = useReducedMotion();
+    const scrollX = useRef(new Animated.Value(0)).current;
     const [currentSlide, setCurrentSlide] = useState(0);
     const { setHasSeenOnboarding } = useAppContext();
     const scrollViewRef = useRef(null);
     const buttonScale = useRef(new Animated.Value(1)).current;
 
+    useEffect(() => () => { buttonScale.stopAnimation(); scrollX.stopAnimation(); }, [buttonScale, scrollX]);
+    useEffect(() => { scrollViewRef.current?.scrollTo({ x: width * currentSlide, animated: false }); }, [width]);
     const handleNext = () => {
         if (currentSlide < slides.length - 1) {
             const next = currentSlide + 1;
             setCurrentSlide(next);
-            scrollViewRef.current?.scrollTo({ x: width * next, animated: true });
+            scrollViewRef.current?.scrollTo({ x: width * next, animated: !reduced });
         } else {
             setHasSeenOnboarding(true);
         }
@@ -79,32 +64,33 @@ export default function OnboardingCarousel({ navigation }) {
     };
 
     const onPressIn = () =>
-        Animated.spring(buttonScale, { toValue: 0.96, useNativeDriver: true }).start();
+        !reduced && Animated.spring(buttonScale, { toValue: 0.96, useNativeDriver: true }).start();
     const onPressOut = () =>
-        Animated.spring(buttonScale, { toValue: 1, useNativeDriver: true }).start();
+        !reduced && Animated.spring(buttonScale, { toValue: 1, useNativeDriver: true }).start();
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
             <FocusAwareStatusBar barStyle="dark-content" statusBgColor={C.offWhite} />
 
-            <ScrollView
+            <Animated.ScrollView
                 ref={scrollViewRef}
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
-                onScroll={handleScroll}
+                onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: true })}
+                onMomentumScrollEnd={handleScroll}
                 scrollEventThrottle={16}
                 style={styles.scrollView}
             >
                 {slides.map((s, index) => (
-                    <View key={index} style={[styles.slide, { width }]}>
+                    <ScrollView key={index} style={{ width }} contentContainerStyle={[styles.slide, { width }]} showsVerticalScrollIndicator={false} accessibilityElementsHidden={currentSlide !== index}>
 
                         {/* ── Large rounded image card ── */}
-                        <View style={styles.imageContainer}>
+                        <Animated.View style={[styles.imageContainer, { width: width - 32, height: Math.min(290, height * 0.36), marginTop: 16, transform: [{ translateX: reduced ? 0 : scrollX.interpolate({ inputRange: [(index - 1) * width, index * width, (index + 1) * width], outputRange: [-22, 0, 22], extrapolate: 'clamp' }) }] }]}>
                             <Image
                                 source={s.image}
                                 style={styles.slideImage}
-                                resizeMode="cover"
+                                resizeMode="contain"
                             />
                             {/* Accent top bar */}
                             <View style={[styles.accentBar, { backgroundColor: s.accent }]} />
@@ -113,7 +99,7 @@ export default function OnboardingCarousel({ navigation }) {
                                 colors={['transparent', 'rgba(248,249,251,0.55)', C.offWhite]}
                                 style={styles.imageGradient}
                             />
-                        </View>
+                        </Animated.View>
 
                         {/* ── Icon badge overlapping image bottom ── */}
                         <View style={[styles.iconBadge, { backgroundColor: s.iconBg }]}>
@@ -125,9 +111,9 @@ export default function OnboardingCarousel({ navigation }) {
                             <Text style={styles.slideTitle}>{s.title}</Text>
                             <Text style={styles.slideDescription}>{s.description}</Text>
                         </View>
-                    </View>
+                    </ScrollView>
                 ))}
-            </ScrollView>
+            </Animated.ScrollView>
 
             {/* ── Bottom Controls ── */}
             <View style={styles.bottomSection}>
@@ -135,6 +121,7 @@ export default function OnboardingCarousel({ navigation }) {
                     {slides.map((s, index) => (
                         <View
                             key={index}
+                            accessible accessibilityLabel={'Page ' + (index + 1) + ' of 4'} accessibilityState={{ selected: index === currentSlide }}
                             style={[
                                 styles.indicator,
                                 index === currentSlide
@@ -173,7 +160,7 @@ export default function OnboardingCarousel({ navigation }) {
                                 style={styles.nextButtonGradient}
                             >
                                 <Text style={styles.nextButtonText}>
-                                    {currentSlide === slides.length - 1 ? 'Get Started' : 'Continue'}
+                                    {currentSlide === slides.length - 1 ? 'Get Started' : 'Next'}
                                 </Text>
                                 <Ionicons
                                     name={currentSlide === slides.length - 1 ? 'checkmark' : 'arrow-forward'}
@@ -187,10 +174,10 @@ export default function OnboardingCarousel({ navigation }) {
 
                 <View style={styles.trustRow}>
                     <Ionicons name="shield-checkmark" size={12} color={C.textTertiary} />
-                    <Text style={styles.trustText}>Government approved  •  Secure  •  Private</Text>
+                    <Text style={styles.trustText}>Community road safety • Academic Project</Text>
                 </View>
             </View>
-        </View>
+        </SafeAreaView>
     );
 }
 
@@ -203,7 +190,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     slide: {
-        flex: 1,
+        flexGrow: 1,
         backgroundColor: C.offWhite,
     },
 
@@ -287,7 +274,7 @@ const styles = StyleSheet.create({
     // ── Bottom controls ──
     bottomSection: {
         paddingHorizontal: 28,
-        paddingBottom: 44,
+        paddingBottom: 12,
         backgroundColor: C.offWhite,
     },
     indicators: {
@@ -313,7 +300,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 22,
         paddingVertical: 18,
         borderRadius: 16,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: COLORS.surface,
         borderWidth: 1,
         borderColor: '#E5E7EB',
     },

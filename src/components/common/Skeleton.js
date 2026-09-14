@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Animated, StyleSheet } from 'react-native';
+import useReducedMotion from '../../hooks/useReducedMotion';
 import { COLORS, BORDER_RADIUS, SPACING } from '../../utils/theme';
 
 /**
@@ -11,9 +12,11 @@ import { COLORS, BORDER_RADIUS, SPACING } from '../../utils/theme';
  * - style: additional styles
  */
 export const Skeleton = ({ width = '100%', height = 16, borderRadius = BORDER_RADIUS.md, style }) => {
+    const reduced = useReducedMotion();
     const shimmerAnim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
+        if (reduced) { shimmerAnim.setValue(1); return; }
         const loop = Animated.loop(
             Animated.sequence([
                 Animated.timing(shimmerAnim, {
@@ -30,7 +33,7 @@ export const Skeleton = ({ width = '100%', height = 16, borderRadius = BORDER_RA
         );
         loop.start();
         return () => loop.stop();
-    }, []);
+    }, [reduced, shimmerAnim]);
 
     const opacity = shimmerAnim.interpolate({
         inputRange: [0, 1],

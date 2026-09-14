@@ -5,25 +5,28 @@
 import React, { useRef, useEffect } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
-    Animated, BackHandler, SafeAreaView,
+    Animated, BackHandler,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FocusAwareStatusBar } from '../../components';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import useReducedMotion from '../../hooks/useReducedMotion';
+import { COLORS } from '../../utils/theme';
+import { FocusAwareStatusBar, Celebration, AnimatedCounter, StatusPill, FeedbackToast } from '../../components';
 
 const C = {
-    navy: '#0A1E3F',
-    navyMid: '#0F2C59',
-    amber: '#D97706',
-    white: '#FFFFFF',
-    offWhite: '#F4F6F9',
-    surface: '#FFFFFF',
-    textPrimary: '#0F172A',
-    textSecondary: '#475569',
-    textTertiary: '#64748B',
-    success: '#15803D',
-    successSurface: '#DCFCE7',
-    border: '#E2E8F0',
+    navy: COLORS.primaryDark,
+    navyMid: COLORS.primary,
+    amber: COLORS.secondary,
+    white: COLORS.surface,
+    offWhite: COLORS.background,
+    surface: COLORS.surface,
+    textPrimary: COLORS.textPrimary,
+    textSecondary: COLORS.textSecondary,
+    textTertiary: COLORS.textTertiary,
+    success: COLORS.success,
+    successSurface: COLORS.successSurface,
+    border: COLORS.surfaceContainerHigh,
 };
 
 const NEXT_STEPS = [
@@ -32,7 +35,7 @@ const NEXT_STEPS = [
         color: '#1D4ED8',
         bg: '#DBEAFE',
         title: 'AI Analysis',
-        desc: 'Our AI verifies the licence plate, location, and violation type.',
+        desc: 'Your evidence is attached. Any AI assessment is advisory, not a final decision.',
     },
     {
         icon: 'shield-checkmark',
@@ -43,14 +46,19 @@ const NEXT_STEPS = [
     },
     {
         icon: 'notifications',
-        color: '#B45309',
-        bg: '#FEF3C7',
+        color: COLORS.secondaryDark,
+        bg: COLORS.secondarySurface,
         title: 'You Get Notified',
         desc: "You'll receive an in-app notification once your report is approved or actioned.",
     },
 ];
 
-export default function ReportSuccess({ navigation }) {
+export default function ReportSuccess({ navigation, route }) {
+    const reduced = useReducedMotion();
+    const demo = route?.params?.demo === true || route?.params?.verifiedData?.demo === true;
+    const reward = Number(route?.params?.reward_amount || 0);
+    const [toast, setToast] = React.useState(true);
+    const stroke = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(0.4)).current;
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const stepsAnim = useRef(new Animated.Value(0)).current;
@@ -58,21 +66,26 @@ export default function ReportSuccess({ navigation }) {
 
     useEffect(() => {
         // Entrance
-        Animated.sequence([
+        const entrance = Animated.sequence([
             Animated.parallel([
                 Animated.spring(scaleAnim, { toValue: 1, tension: 55, friction: 7, useNativeDriver: true }),
                 Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
             ]),
             Animated.timing(stepsAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
-        ]).start();
+        ]);
+        if (reduced) { scaleAnim.setValue(1); fadeAnim.setValue(1); stepsAnim.setValue(1); }
+        else entrance.start();
+        const draw = Animated.timing(stroke, { toValue: 1, duration: reduced ? 0 : 600, useNativeDriver: true });
+        draw.start();
 
         // Pulse ring loop
-        Animated.loop(
+        const pulse = Animated.loop(
             Animated.sequence([
                 Animated.timing(ringAnim, { toValue: 1.12, duration: 1200, useNativeDriver: true }),
                 Animated.timing(ringAnim, { toValue: 0.8, duration: 1200, useNativeDriver: true }),
             ])
-        ).start();
+        );
+        if (!reduced) pulse.start();
 
         // Block hardware back → go home
         const onBackPress = () => {
@@ -80,8 +93,8 @@ export default function ReportSuccess({ navigation }) {
             return true;
         };
         const backSub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
-        return () => backSub.remove();
-    }, [navigation]);
+        return () => { backSub.remove(); entrance.stop(); pulse.stop(); draw.stop(); };
+    }, [navigation, reduced, scaleAnim, fadeAnim, stepsAnim, ringAnim, stroke]);
 
     return (
         <View style={styles.container}>
@@ -98,19 +111,24 @@ export default function ReportSuccess({ navigation }) {
                         <Animated.View style={[styles.pulseRing, { transform: [{ scale: ringAnim }] }]} />
                         <View style={styles.iconOuter}>
                             <View style={styles.iconInner}>
-                                <Ionicons name="checkmark-circle" size={64} color={C.success} />
+                                <View accessible accessibilityLabel="Report completed" style={{ width: 56, height: 48 }}>
+                                    <Animated.View style={{ position: 'absolute', left: 5, top: 26, width: 22, height: 6, borderRadius: 3, backgroundColor: COLORS.success, opacity: stroke.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 1, 1] }), transform: [{ rotate: '45deg' }] }} />
+                                    <Animated.View style={{ position: 'absolute', left: 17, top: 20, width: 38, height: 6, borderRadius: 3, backgroundColor: COLORS.success, opacity: stroke.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 0, 1] }), transform: [{ rotate: '-45deg' }] }} />
+                                </View>
                             </View>
                         </View>
                     </Animated.View>
 
                     {/* ── Title ── */}
-                    <Text style={styles.title}>Report Submitted!</Text>
+                    <Text style={styles.title}>{demo ? 'Demo Complete!' : 'Report Submitted!'}</Text>
                     <Text style={styles.subtitle}>
-                        Your report has been received and AI analysis has begun. The officer will be notified.
+                        {demo ? 'This demonstration was not saved and no officer was notified.' : 'Your report has been received and is awaiting officer review.'}
                     </Text>
 
+                    {demo && <StatusPill status="pending" label="Demo — not saved" />}
+                    {!demo && reward > 0 && <AnimatedCounter to={reward} suffix=" pts earned" style={{ fontSize: 24, color: COLORS.secondary }} />}
                     {/* ── What happens next ── */}
-                    <Animated.View style={[styles.stepsCard, { opacity: stepsAnim }]}>
+                    {!demo && <Animated.View style={[styles.stepsCard, { opacity: stepsAnim }]}>
                         <View style={styles.stepsHeader}>
                             <Ionicons name="time-outline" size={16} color={C.navyMid} />
                             <Text style={styles.stepsTitle}>What happens next?</Text>
@@ -130,13 +148,13 @@ export default function ReportSuccess({ navigation }) {
                                 </View>
                             </View>
                         ))}
-                    </Animated.View>
+                    </Animated.View>}
 
                     {/* ── Buttons ── */}
                     <View style={styles.btnGroup}>
                         <TouchableOpacity
                             style={styles.primaryBtn}
-                            onPress={() => navigation.reset({ index: 0, routes: [{ name: 'CitizenMain' }] })}
+                            onPress={() => navigation.reset({ index: 1, routes: [{ name: 'CitizenMain' }, { name: 'NewReport' }] })}
                             activeOpacity={0.88}
                         >
                             <LinearGradient
@@ -145,7 +163,7 @@ export default function ReportSuccess({ navigation }) {
                                 style={styles.primaryGrad}
                             >
                                 <Ionicons name="home" size={18} color={C.amber} />
-                                <Text style={styles.primaryText}>Back to Home</Text>
+                                <Text style={styles.primaryText}>Report Another</Text>
                             </LinearGradient>
                         </TouchableOpacity>
 
@@ -162,6 +180,8 @@ export default function ReportSuccess({ navigation }) {
                     <View style={{ height: 32 }} />
                 </Animated.ScrollView>
             </SafeAreaView>
+            <Celebration />
+            <FeedbackToast visible={toast} message={demo ? 'Demo — not saved' : 'Report submitted successfully'} variant="success" onDismiss={() => setToast(false)} />
         </View>
     );
 }
@@ -183,7 +203,7 @@ const styles = StyleSheet.create({
         width: 140,
         height: 140,
         borderRadius: 70,
-        backgroundColor: '#DCFCE7',
+        backgroundColor: COLORS.successSurface,
         opacity: 0.5,
     },
     iconOuter: {

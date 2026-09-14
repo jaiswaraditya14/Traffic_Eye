@@ -66,7 +66,7 @@ export async function checkLocalAuthenticity(imageUri) {
             });
             headerAscii = decodeBase64Ascii(base64Header.substring(0, 16384));
         } catch (readErr) {
-            console.warn('[LocalAuthenticity] Header read warning:', readErr.message);
+            // A missing or unreadable header is handled as inconclusive evidence.
         }
 
         if (headerAscii) {
@@ -107,7 +107,6 @@ export async function checkLocalAuthenticity(imageUri) {
 
             if (!hasCameraExif && lowerHeader.length > 2000) {
                 suspiciousScore += 15;
-                console.log('[LocalAuthenticity] Image lacks camera EXIF metadata (possible web download or AI image)');
             }
         }
 
@@ -123,11 +122,9 @@ export async function checkLocalAuthenticity(imageUri) {
             isLocalCheck: true,
         };
 
-        console.log(`[LocalAuthenticity] Result: authentic=${result.authentic}, score=${suspiciousScore}, flags=[${flags.join(', ')}]`);
         return result;
 
     } catch (err) {
-        console.warn('[LocalAuthenticity] Unexpected error — defaulting to authentic:', err.message);
         return { authentic: true, confidence: 0, reason: 'Local authenticity check error.', flags: [], isLocalCheck: true };
     }
 }

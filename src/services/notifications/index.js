@@ -26,13 +26,14 @@ export const NOTIFICATION_CHANNEL_ID = 'traffic-eye-default';
 try {
     Notifications.setNotificationHandler({
         handleNotification: async () => ({
-            shouldShowAlert: true,
+            shouldShowBanner: true,
+            shouldShowList: true,
             shouldPlaySound: !isExpoGo, // Safe on native APK
             shouldSetBadge: true,
         }),
     });
 } catch (e) {
-    if (__DEV__) console.log('[Notifications] setNotificationHandler skipped:', e?.message);
+    if (__DEV__) console.log('[Notifications] Notification handler setup skipped.');
 }
 
 /**
@@ -57,7 +58,7 @@ export async function setupNotifications() {
                     bypassDnd: false,
                 });
             } catch (chanErr) {
-                if (__DEV__) console.log('[Notifications] Channel setup note:', chanErr?.message);
+                if (__DEV__) console.log('[Notifications] Android channel setup unavailable.');
             }
         }
 
@@ -76,7 +77,7 @@ export async function setupNotifications() {
 
         return status === 'granted';
     } catch (err) {
-        if (__DEV__) console.log('[Notifications] setupNotifications caught:', err?.message);
+        if (__DEV__) console.log('[Notifications] Notification setup unavailable.');
         return false;
     }
 }
@@ -86,8 +87,11 @@ export async function setupNotifications() {
  *
  * Dispatches local notification with system sound and mute support.
  */
-export async function sendLocalNotification(title, body, data = {}) {
+export async function sendLocalNotification(title, body, data = {}, isCurrent = () => true) {
     try {
+        if (Platform.OS === 'web') return;
+        const permission = await Notifications.getPermissionsAsync();
+        if (!isCurrent() || permission.status !== 'granted') return;
         await Notifications.scheduleNotificationAsync({
             content: {
                 title,
@@ -98,10 +102,10 @@ export async function sendLocalNotification(title, body, data = {}) {
                     channelId: NOTIFICATION_CHANNEL_ID,
                 }),
             },
-            trigger: null,
+            trigger: Platform.OS === 'android' ? { channelId: NOTIFICATION_CHANNEL_ID } : null,
         });
     } catch (err) {
-        if (__DEV__) console.log('[Notifications] sendLocalNotification note:', err?.message);
+        if (__DEV__) console.log('[Notifications] Local notification could not be scheduled.');
     }
 }
 
@@ -145,7 +149,7 @@ export async function getExpoPushToken() {
         });
         return token;
     } catch (err) {
-        if (__DEV__) console.log('[Notifications] Push token retrieval:', err?.message);
+        if (__DEV__) console.log('[Notifications] Push token retrieval unavailable.');
         return null;
     }
 }

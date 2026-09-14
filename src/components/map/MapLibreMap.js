@@ -128,7 +128,7 @@ export default function MapLibreMap({
                 return geo.displayName;
             }
         } catch (err) {
-            if (__DEV__) console.warn('[MapLibreMap] Address lookup failed:', err.message);
+            if (__DEV__) console.warn('[MapLibreMap] Address lookup failed.');
         } finally {
             setIsResolvingAddress(false);
         }
@@ -190,7 +190,9 @@ export default function MapLibreMap({
             if (!pos?.coords) {
                 try {
                     pos = await Location.getLastKnownPositionAsync();
-                } catch (_) {}
+                } catch (_) {
+                    // The unavailable-location fallback below handles this failure.
+                }
             }
 
             if (!pos?.coords) {
@@ -222,7 +224,7 @@ export default function MapLibreMap({
                 onLocationSelect({ latitude, longitude, address: addr });
             }
         } catch (err) {
-            console.warn('[MapLibreMap] Auto-locate error:', err?.message);
+            if (__DEV__) console.warn('[MapLibreMap] Auto-location unavailable.');
             setLocationError('Unable to determine your current location. Showing Mumbai as default.');
             flyToCoord(DEFAULT_LAT, DEFAULT_LNG, DEFAULT_ZOOM);
         } finally {
@@ -298,12 +300,16 @@ export default function MapLibreMap({
                     accuracy: Location.Accuracy.Balanced,
                     timeout: 8000,
                 });
-            } catch (_) {}
+            } catch (_) {
+                // Try a cached location before showing the unavailable-location alert.
+            }
 
             if (!pos?.coords) {
                 try {
                     pos = await Location.getLastKnownPositionAsync();
-                } catch (_) {}
+                } catch (_) {
+                    // The unavailable-location alert below handles this failure.
+                }
             }
 
             if (!pos?.coords) {
@@ -333,7 +339,7 @@ export default function MapLibreMap({
                 onLocationSelect({ latitude, longitude, address: addr });
             }
         } catch (err) {
-            console.warn('[MapLibreMap] GPS error:', err?.message);
+            if (__DEV__) console.warn('[MapLibreMap] GPS unavailable.');
             Alert.alert('Location Error', 'Failed to get your current location. Please try again.');
         } finally {
             setIsAutoLocating(false);
@@ -358,7 +364,7 @@ export default function MapLibreMap({
                 setSearchResults(results || []);
                 setShowResultsList(true);
             } catch (err) {
-                if (__DEV__) console.warn('[MapLibreMap] Search error:', err.message);
+                if (__DEV__) console.warn('[MapLibreMap] Search unavailable.');
             } finally {
                 setIsSearching(false);
             }

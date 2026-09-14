@@ -359,12 +359,9 @@ export function hasValidGpsValues(rawLat, rawLng, latRef, lngRef) {
  * @returns {{ latitude: number, longitude: number, lat: number, lng: number } | null} Validated coordinates or null
  */
 export function parseExifGPS(exif) {
-    try {
-        console.log('[RAW EXIF]', JSON.stringify(exif, null, 2));
-    } catch {
-        console.log('[RAW EXIF]', exif);
-    }
-
+    // Privacy: this function is intentionally silent. Raw EXIF dictionaries and
+    // decoded coordinates are sensitive evidence metadata and must never reach
+    // logs. Availability is surfaced later via logExifDiagnostics() as booleans.
     if (!exif || typeof exif !== 'object') {
         return null;
     }
@@ -404,13 +401,6 @@ export function parseExifGPS(exif) {
         lngRef = lngRef ?? exif['GPS:GPSLongitudeRef'] ?? exif['GPS:LongitudeRef'] ?? exif['Exif.GPSInfo.GPSLongitudeRef'];
     }
 
-    console.log('[EXIF GPS] Raw Values:', {
-        rawLat,
-        rawLng,
-        latRef,
-        lngRef
-    });
-
     // Step 0: null / undefined check
     if (rawLat === undefined || rawLng === undefined || rawLat === null || rawLng === null) {
         return null;
@@ -421,7 +411,6 @@ export function parseExifGPS(exif) {
     // BEFORE wasting cycles on parseCoordinateComponent.
     const gpsValidity = hasValidGpsValues(rawLat, rawLng, latRef, lngRef);
     if (!gpsValidity.valid) {
-        console.log(`[EXIF GPS] Validity gate → ${gpsValidity.state} (${gpsValidity.reason}):`, gpsValidity.details);
         return null;
     }
     // ─────────────────────────────────────────────────────────────────────────
@@ -430,11 +419,6 @@ export function parseExifGPS(exif) {
     const parsedLat = parseCoordinateComponent(rawLat);
     const parsedLng = parseCoordinateComponent(rawLng);
 
-    console.log('[EXIF GPS] Normalized Decimal:', {
-        parsedLat,
-        parsedLng
-    });
-
     if (parsedLat === null || parsedLng === null) {
         return null;
     }
@@ -442,11 +426,6 @@ export function parseExifGPS(exif) {
     // Step B: Apply N/S and E/W Ref
     const finalLat = applyRef(parsedLat, latRef);
     const finalLng = applyRef(parsedLng, lngRef);
-
-    console.log('[EXIF GPS] Final Coordinates:', {
-        finalLat,
-        finalLng
-    });
 
     // Step C: Validate bounds (-90..90, -180..180, non-zero)
     return validateCoordinates(finalLat, finalLng);
@@ -618,80 +597,17 @@ export function parseJpegBinaryExif(bytes) {
 
 // ─── Diagnostic Logging ──────────────────────────────────────────────────────
 /**
- * Prints structured [ORIGINAL MEDIA], [ORIGINAL EXIF], [SHA256], [GPS] diagnostic blocks.
- *
- * Requirements 12 & 13:
- *   - [ORIGINAL MEDIA] (pickerUri, originalContentUri, mediaStoreId, displayName, isOriginal, bytesRead)
- *   - [ORIGINAL EXIF] (exifFound, gpsFound, latitude, longitude, gpsSource)
- *   - Diagnostic distinction: PICKER_COPY, ORIGINAL_CONTENT_URI, ORIGINAL_FILE
+ * Logs availability only. Evidence metadata, file paths, coordinates, hashes,
+ * and raw platform error messages must never enter developer or production logs.
  */
-export function logExifDiagnostics({
-    originalContentUri,
-    originalUri,
-    pickerUri,
-    fileName,
-    displayName,
-    mimeType,
-    fileSize,
-    assetId,
-    mediaStoreId,
-    isOriginal,
-    bytesRead,
-    mediaPathType,
-    exifExists,
-    exifKeys = [],
-    gpsTags = {},
-    coordinates,
-    gpsSource,
-    reason,
-    extractionMethod,
-    sha256Result,
-}) {
+export function logExifDiagnostics({ exifExists, coordinates, isOriginal, sha256Result } = {}) {
     if (!__DEV__) return;
-
-    const latStr = coordinates?.latitude != null ? coordinates.latitude.toFixed(6) : 'None';
-    const lngStr = coordinates?.longitude != null ? coordinates.longitude.toFixed(6) : 'None';
-    const resolvedGpsFound = Boolean(coordinates);
-
-    // ── [ORIGINAL MEDIA] (Requirement 13) ───────────────────────────────────
-    console.log('[ORIGINAL MEDIA]');
-    console.log(`  pickerUri:          ${pickerUri || 'None'}`);
-    console.log(`  originalContentUri: ${originalContentUri || originalUri || 'None (Unavailable in Expo Go - Requires Development Build)'}`);
-    console.log(`  mediaStoreId:       ${mediaStoreId || 'null'}`);
-    console.log(`  displayName:        ${displayName || fileName || 'None'}`);
-    console.log(`  isOriginal:         ${Boolean(isOriginal)}`);
-    console.log(`  bytesRead:          ${bytesRead != null ? bytesRead + ' bytes' : (fileSize != null ? fileSize + ' bytes' : 'None')}`);
-    console.log(`  mediaPathType:      ${mediaPathType || 'PICKER_COPY'}`);
-
-    // ── [ORIGINAL EXIF] (Requirement 13) ────────────────────────────────────
-    console.log('[ORIGINAL EXIF]');
-    console.log(`  exifFound:          ${Boolean(exifExists)}`);
-    console.log(`  gpsFound:           ${resolvedGpsFound}`);
-    console.log(`  latitude:           ${latStr}`);
-    console.log(`  longitude:          ${lngStr}`);
-    console.log(`  gpsSource:          ${resolvedGpsFound ? (gpsSource || 'EXIF_ORIGINAL') : 'GPS_UNAVAILABLE'}`);
-    if (reason) {
-        console.log(`  reason:             ${reason}`);
-    }
-
-    // ── [SHA256] ────────────────────────────────────────────────────────────
-    if (sha256Result) {
-        console.log('[SHA256]');
-        console.log(`  sourceUri:          ${sha256Result.sourceUri}`);
-        console.log(`  fileSize:           ${sha256Result.fileSize} bytes`);
-        console.log(`  sha256:             ${sha256Result.sha256}`);
-        console.log(`  isOriginal:         ${sha256Result.isOriginal ? 'true (Original DCIM MediaStore file bytes)' : 'false (Photo Picker cache copy - Development Build required for original bytes)'}`);
-    } else {
-        console.log('[SHA256]  Not computed (file read failed or URI unavailable)');
-    }
-
-    // ── [GPS RAW METADATA] ───────────────────────────────────────────────────
-    console.log('[GPS RAW METADATA]');
-    console.log(`  rawLatitude:        ${gpsTags.GPSLatitude !== undefined ? JSON.stringify(gpsTags.GPSLatitude) : 'Not in EXIF dict'}`);
-    console.log(`  rawLongitude:       ${gpsTags.GPSLongitude !== undefined ? JSON.stringify(gpsTags.GPSLongitude) : 'Not in EXIF dict'}`);
-    console.log(`  latitudeRef:        ${gpsTags.GPSLatitudeRef !== undefined ? JSON.stringify(gpsTags.GPSLatitudeRef) : 'Not in EXIF dict'}`);
-    console.log(`  longitudeRef:       ${gpsTags.GPSLongitudeRef !== undefined ? JSON.stringify(gpsTags.GPSLongitudeRef) : 'Not in EXIF dict'}`);
-    console.log(`  layer:              ${extractionMethod || 'None'}`);
+    console.log('[EXIF]', {
+        exifFound: Boolean(exifExists),
+        gpsFound: Boolean(coordinates),
+        isOriginal: Boolean(isOriginal),
+        hashAvailable: Boolean(sha256Result?.sha256),
+    });
 }
 
 // ─── Internal SHA-256 helper ──────────────────────────────────────────────────
@@ -709,7 +625,7 @@ async function _computeSha256ForPipeline(uri) {
                 encoding: FileSystem.EncodingType?.Base64 || 'base64',
             });
         } catch (readErr) {
-            if (__DEV__) console.log('[SHA256] File read failed:', readErr.message);
+            if (__DEV__) console.log('[SHA256] File read failed:');
             return null;
         }
         if (!base64) return null;
@@ -733,7 +649,7 @@ async function _computeSha256ForPipeline(uri) {
         }
         return { sha256, fileSize, sourceUri: cleanUri };
     } catch (err) {
-        if (__DEV__) console.log('[SHA256] Unexpected error:', err.message);
+        if (__DEV__) console.log('[SHA256] Unexpected error:');
         return null;
     }
 }
@@ -873,7 +789,7 @@ export async function extractImageLocation(assetOrUri) {
                     // Non-JPEG format: binary JPEG parser skipped.
                     // GPS comes from native ExifInterface only (checked next step).
                     exifExists = true;
-                    if (__DEV__) console.log(`[EXIF Extractor] Skipping JPEG binary parser for format: ${mimeType}`);
+                    if (__DEV__) console.log('[EXIF Extractor] JPEG parsing not applicable to this media format.');
                 }
 
                 // 1A.2: Native ExifInterface GPS
@@ -888,7 +804,7 @@ export async function extractImageLocation(assetOrUri) {
                 }
             }
         } catch (nativeErr) {
-            if (__DEV__) console.log('[EXIF Extractor] Native MediaStoreResolver skipped:', nativeErr.message);
+            if (__DEV__) console.log('[EXIF Extractor] Native MediaStoreResolver skipped:');
         }
     }
 
@@ -934,7 +850,7 @@ export async function extractImageLocation(assetOrUri) {
                             // Fail closed: if identity cannot be proven, skip this stage.
                         }
                     } catch (searchErr) {
-                        if (__DEV__) console.log('[EXIF Extractor] MediaStore search skipped:', searchErr.message);
+                        if (__DEV__) console.log('[EXIF Extractor] MediaStore search skipped:');
                     }
                 }
 
@@ -957,7 +873,7 @@ export async function extractImageLocation(assetOrUri) {
                                     sha256Result = { ...origSha, isOriginal: true };
                                 }
                             } catch (origShaErr) {
-                                if (__DEV__) console.log('[SHA256] Original DCIM hash failed:', origShaErr.message);
+                                if (__DEV__) console.log('[SHA256] Original DCIM hash failed:');
                             }
                         }
 
@@ -994,11 +910,11 @@ export async function extractImageLocation(assetOrUri) {
                                         gpsUnavailableReason = null;
                                     }
                                 } else if (__DEV__) {
-                                    console.log(`[EXIF Extractor] Skipping JPEG binary parser for DCIM file: ${mimeType}`);
+                                    console.log('[EXIF Extractor] JPEG parsing not applicable to this media format.');
                                 }
                             }
                         } catch (dcimErr) {
-                            if (__DEV__) console.log('[EXIF Extractor] Original DCIM binary read failed:', dcimErr.message);
+                            if (__DEV__) console.log('[EXIF Extractor] Original DCIM binary read failed:');
                         }
 
                         // MediaStore pre-indexed location
@@ -1040,7 +956,7 @@ export async function extractImageLocation(assetOrUri) {
                     console.log('  Original DCIM file requires a Development Build with ACCESS_MEDIA_LOCATION.');
                 }
             } else {
-                if (__DEV__) console.log('[EXIF Extractor] Stage 1B MediaStore unexpected error:', mlErr.message);
+                if (__DEV__) console.log('[EXIF Extractor] Stage 1B MediaStore unexpected error:');
             }
         }
     }
@@ -1113,13 +1029,13 @@ export async function extractImageLocation(assetOrUri) {
                     }
                 }
             } catch (readErr) {
-                if (__DEV__) console.log('[EXIF Extractor] Picker copy binary read failed:', readErr.message);
+                if (__DEV__) console.log('[EXIF Extractor] Picker copy binary read failed:');
             }
         } else if (!coords && pickerMimeUnsupported) {
             // Non-JPEG format from picker — GPS_UNAVAILABLE; no binary parsing attempted.
             // Native ExifInterface (Stage 1A) is the only supported path for these formats.
             gpsUnavailableReason = `UNSUPPORTED_FORMAT_FOR_PICKER_BINARY: ${mimeType}`;
-            if (__DEV__) console.log(`[EXIF Extractor] Picker binary parse skipped for format: ${mimeType}. Use native MediaStoreResolver for GPS extraction.`);
+            if (__DEV__) console.log('[EXIF Extractor] JPEG parsing not applicable to this media format.');
         }
     }
 

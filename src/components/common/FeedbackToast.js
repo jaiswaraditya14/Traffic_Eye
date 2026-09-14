@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Platform, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import useReducedMotion from '../../hooks/useReducedMotion';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS } from '../../utils/theme';
 
 /**
@@ -34,7 +35,9 @@ export const FeedbackToast = ({
     const translateY = useRef(new Animated.Value(-140)).current;
     const opacity    = useRef(new Animated.Value(0)).current;
     const timerRef   = useRef(null);
-    const isShowing  = useRef(false);
+    const dismissRef = useRef(onDismiss);
+    dismissRef.current = onDismiss;
+    const reduced = useReducedMotion();
 
     const HIDE_Y = -140; // safely above any screen
 
@@ -48,74 +51,17 @@ export const FeedbackToast = ({
     const config = variantConfig[variant] || variantConfig.success;
 
     useEffect(() => {
-        clearTimeout(timerRef.current);
-
-        if (visible) {
-            isShowing.current = true;
-
-            // Reset to hidden position before animating in — prevents stale-position flash
-            translateY.setValue(HIDE_Y);
-            opacity.setValue(0);
-
-            Animated.parallel([
-                Animated.spring(translateY, {
-                    toValue: 0,
-                    useNativeDriver: true,
-                    damping: 22,
-                    stiffness: 260,
-                }),
-                Animated.timing(opacity, {
-                    toValue: 1,
-                    duration: 220,
-                    useNativeDriver: true,
-                }),
-            ]).start();
-
-            if (onDismiss) {
-                timerRef.current = setTimeout(() => {
-                    Animated.parallel([
-                        Animated.timing(translateY, {
-                            toValue: HIDE_Y,
-                            duration: 280,
-                            useNativeDriver: true,
-                        }),
-                        Animated.timing(opacity, {
-                            toValue: 0,
-                            duration: 220,
-                            useNativeDriver: true,
-                        }),
-                    ]).start(({ finished }) => {
-                        if (finished) {
-                            isShowing.current = false;
-                            onDismiss();
-                        }
-                    });
-                }, duration);
-            }
-        } else {
-            // Animate out if currently visible, otherwise snap to hidden
-            if (isShowing.current) {
-                isShowing.current = false;
-                Animated.parallel([
-                    Animated.timing(translateY, {
-                        toValue: HIDE_Y,
-                        duration: 280,
-                        useNativeDriver: true,
-                    }),
-                    Animated.timing(opacity, {
-                        toValue: 0,
-                        duration: 220,
-                        useNativeDriver: true,
-                    }),
-                ]).start(() => onDismiss?.());
-            } else {
-                translateY.setValue(HIDE_Y);
-                opacity.setValue(0);
-            }
-        }
-
-        return () => clearTimeout(timerRef.current);
-    }, [visible]);
+        let active = true;
+        translateY.stopAnimation();
+        opacity.stopAnimation();
+        const animation = Animated.parallel([
+            Animated.timing(translateY, { toValue: visible ? 0 : HIDE_Y, duration: reduced ? 0 : 220, useNativeDriver: true }),
+            Animated.timing(opacity, { toValue: visible ? 1 : 0, duration: reduced ? 0 : 220, useNativeDriver: true }),
+        ]);
+        animation.start();
+        if (visible) timerRef.current = setTimeout(() => { if (active) dismissRef.current?.(); }, duration);
+        return () => { active = false; clearTimeout(timerRef.current); animation.stop(); };
+    }, [visible, message, subtitle, duration, reduced, translateY, opacity]);
 
     // Safe-area top: prefer insets, fall back to StatusBar height on Android
     const safeTop = insets.top > 0
@@ -126,7 +72,10 @@ export const FeedbackToast = ({
 
     return (
         <Animated.View
-            pointerEvents={visible ? 'auto' : 'none'}
+            pointerEvents="none"
+            accessibilityLiveRegion="polite"
+            accessibilityElementsHidden={!visible}
+            importantForAccessibility={visible ? 'auto' : 'no-hide-descendants'}
             style={[
                 styles.toast,
                 {
@@ -141,11 +90,11 @@ export const FeedbackToast = ({
                 <Ionicons name={config.icon} size={22} color={config.color} />
             </View>
             <View style={styles.textContainer}>
-                <Text style={[styles.message, { color: config.color }]} numberOfLines={2}>
+                <Text style={[styles.message, { color: config.color }]}>
                     {message}
                 </Text>
                 {!!subtitle && (
-                    <Text style={styles.subtitle} numberOfLines={2}>{subtitle}</Text>
+                    <Text style={styles.subtitle}>{subtitle}</Text>
                 )}
             </View>
         </Animated.View>

@@ -1,10 +1,11 @@
 import 'react-native-url-polyfill/auto';
 import 'react-native-get-random-values';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as WebBrowser from 'expo-web-browser';
-import * as Notifications from 'expo-notifications';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { NotificationProvider } from './src/context/NotificationContext';
 import * as SplashScreen from 'expo-splash-screen';
 import { createNavigationContainerRef } from '@react-navigation/native';
 import { AppProvider, AuthProvider } from './src/context';
@@ -28,7 +29,6 @@ export const navigationRef = createNavigationContainerRef();
 
 export default function App() {
   const { fontsLoaded, fontError } = useDMSansFonts();
-  const notifResponseListener = useRef(null);
 
   useEffect(() => {
     // Set up Android notification channel + request OS permission
@@ -37,26 +37,6 @@ export default function App() {
       if (__DEV__) console.warn('[App] Notification setup failed:', err?.message);
     });
 
-    // Handle notification taps (user taps a banner to open the app)
-    notifResponseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      const data = response?.notification?.request?.content?.data;
-      if (!data) return;
-
-      // Navigate based on the data payload set in sendLocalNotification()
-      if (navigationRef.isReady()) {
-        if (data.screen === 'ReportDetail' && data.reportId) {
-          navigationRef.navigate('ReportDetail', { reportId: data.reportId });
-        } else if (data.screen === 'Notifications') {
-          navigationRef.navigate('Notifications');
-        }
-      }
-    });
-
-    return () => {
-      if (notifResponseListener.current) {
-        Notifications.removeNotificationSubscription(notifResponseListener.current);
-      }
-    };
   }, []);
 
   // While fonts are loading, keep the native splash on screen by rendering
@@ -69,12 +49,16 @@ export default function App() {
 
   return (
     <ErrorBoundary>
+      <SafeAreaProvider>
       <AuthProvider>
         <AppProvider>
+          <NotificationProvider navigationRef={navigationRef}>
           <StatusBar style="auto" />
           <AppNavigator navigationRef={navigationRef} />
+        </NotificationProvider>
         </AppProvider>
       </AuthProvider>
+      </SafeAreaProvider>
     </ErrorBoundary>
   );
 }

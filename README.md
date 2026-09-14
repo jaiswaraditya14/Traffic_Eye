@@ -66,6 +66,12 @@ npm install
 
 This will download all required packages (may take a few minutes on first run).
 
+Copy `.env.example` to `.env` and fill in the public Supabase URL and anon key for
+the project used by Google sign-in. AI credentials belong only in Supabase Edge
+Function secrets; see [Phase 1 setup](docs/AI_PHASE1_SETUP.md) for owner setup and
+key-rotation steps. This project uses its committed native Android directory;
+do not run `expo prebuild --clean`.
+
 ### 3. Start the Development Server
 
 ```bash

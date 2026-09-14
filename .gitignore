@@ -30,9 +30,10 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
-.env
-.env*.local
+# Environment files at any depth; only the reviewed root example is safe to track.
+.env*
+**/.env*
+!/.env.example
 
 # typescript
 *.tsbuildinfo
@@ -48,4 +49,13 @@ scripts/*.b64
 
 # Editor
 .vscode/
+
+# Local Prompt 2 bundle verification output
+/dist-prompt2-check/
+
+# Local Prompt 3 QA/build outputs
+/.npm-cache-prompt3/
+/coverage/
+/dist-prompt3-android/
+/dist-prompt3-ios/
 

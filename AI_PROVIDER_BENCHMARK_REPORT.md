@@ -1,4 +1,9 @@
 # AI Provider Benchmark Report
+
+> Historical benchmark snapshot, not current setup instructions. AI credentials
+> now belong only in Supabase Edge Function secrets. See
+> [Phase 1 setup](docs/AI_PHASE1_SETUP.md) for current configuration and rotation.
+
 *Traffic Eye ? Three-Provider Audit (NVIDIA ? Gemini ? Groq) ? 2026-08-18T13:37:41.284Z*
 
 > ?? **Security**: No API key values are stored in this report.
@@ -9,9 +14,9 @@
 
 | Provider | Keys Available | Slots |
 |----------|---------------|-------|
-| NVIDIA NIM | 1 | EXPO_PUBLIC_NVIDIA_API_KEY_1 |
-| Gemini | 2 | EXPO_PUBLIC_GEMINI_API_KEY_1, _2 |
-| Groq | 6 | EXPO_PUBLIC_GROQ_API_KEY_1 ? _6 |
+| NVIDIA NIM | 1 | Legacy client-exposed provider slot 1; rotate |
+| Gemini | 2 | Legacy client-exposed provider slots 1-2; rotate |
+| Groq | 6 | Legacy client-exposed provider slots 1-6; rotate |
 
 ---
 
@@ -126,7 +131,7 @@ Here's a thinking |
 
 ---
 
-## Final Production Pipeline
+## Historical Pipeline Snapshot
 
 | Stage | Primary | Fallback | Notes |
 |-------|---------|----------|-------|
@@ -161,7 +166,10 @@ Here's a thinking |
 
 ---
 
-## Recommended ai.config.js Update
+## Historical Model Configuration (do not copy into the mobile app)
+
+Provider/model selection now lives in `supabase/functions/ai-analyze/providers.ts`.
+The following records the old benchmark recommendation only.
 
 ```json
 {

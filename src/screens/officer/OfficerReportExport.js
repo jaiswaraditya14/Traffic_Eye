@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     View,
     Text,
@@ -7,43 +7,52 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     Alert,
-    Platform,
+    Platform, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as Print from 'expo-print';
+import { buildReportPdfHtml, reportSummary } from '../../utils/reportPdf';
+import { buildReportCsv } from '../../utils/reportCsv';
+import { COLORS } from '../../utils/theme';
 import * as Sharing from 'expo-sharing';
-import * as XLSX from 'xlsx';
 
 import { useAuth } from '../../context';
 import { fetchReportsByDateRange } from '../../services/reports';
-import { FocusAwareStatusBar } from '../../components';
+import { FocusAwareStatusBar, FeedbackToast, EmptyState, PressableScale, CardSkeleton } from '../../components';
 
 const C = {
-    navy: '#0A1E3F',
+    navy: COLORS.primaryDark,
     navyMid: '#16325C',
     navyLight: '#234B80',
-    amber: '#D97706',
-    amberLight: '#FEF3C7',
+    amber: COLORS.secondary,
+    amberLight: COLORS.secondarySurface,
     amberDark: '#92400E',
-    white: '#FFFFFF',
-    offWhite: '#F8FAFC',
-    surface: '#FFFFFF',
-    textPrimary: '#0F172A',
-    textSecondary: '#475569',
-    textTertiary: '#94A3B8',
-    border: '#E2E8F0',
-    borderLight: '#F1F5F9',
+    white: COLORS.surface,
+    offWhite: COLORS.surfaceContainerLow,
+    surface: COLORS.surface,
+    textPrimary: COLORS.textPrimary,
+    textSecondary: COLORS.textSecondary,
+    textTertiary: COLORS.gray400,
+    border: COLORS.surfaceContainerHigh,
+    borderLight: COLORS.surfaceContainer,
     success: '#059669',
     successSurface: '#D1FAE5',
-    error: '#DC2626',
-    errorSurface: '#FEE2E2',
+    error: COLORS.errorLight,
+    errorSurface: COLORS.errorSurface,
 };
 
 export default function OfficerReportExport({ navigation }) {
     const { profile } = useAuth();
+    const mounted = useRef(true);
+    const sequence = useRef(0);
+    const exportBusy = useRef(false);
+    const [toast, setToast] = useState(null);
+    const [pdfUri, setPdfUri] = useState(null);
+    useEffect(() => { mounted.current = true; return () => { mounted.current = false; sequence.current++; }; }, []);
 
     // Default Date Range: 1st of current month to Today
     const [fromDate, setFromDate] = useState(() => {
@@ -85,7 +94,10 @@ export default function OfficerReportExport({ navigation }) {
 
     // Fetch matching reports whenever dates or status filter change
     const loadReportCount = useCallback(async () => {
-        if (isDateRangeInvalid) {
+        const request = ++sequence.current;
+        setPdfUri(null);
+        if (!profile?.id || isDateRangeInvalid) {
+            if (mounted.current && request === sequence.current) setLoadingCount(false);
             setReports([]);
             return;
         }
@@ -98,12 +110,11 @@ export default function OfficerReportExport({ navigation }) {
                 statusFilter,
                 profile
             );
+            if (request !== sequence.current || !mounted.current) return;
             if (error) throw error;
             setReports(data || []);
         } catch (err) {
-            console.error('Error fetching export reports:', err);
-            Alert.alert('Error', 'Unable to fetch report count for selected range.');
-            setReports([]);
+            if (request === sequence.current && mounted.current) { setToast('Unable to fetch reports. Pull down to retry.'); setReports([]); }
         } finally {
             setLoadingCount(false);
         }
@@ -152,8 +163,8 @@ export default function OfficerReportExport({ navigation }) {
         }
     };
 
-    // Format single report timestamp for Excel
-    const formatTimestampForExcel = (dateString) => {
+    // Format single report timestamp for spreadsheet export
+    const formatTimestampForSpreadsheet = (dateString) => {
         if (!dateString) return 'N/A';
         const d = new Date(dateString);
         const pad = (n) => String(n).padStart(2, '0');
@@ -169,7 +180,7 @@ export default function OfficerReportExport({ navigation }) {
     };
 
     // Format violation string preserving all violations
-    const formatViolationForExcel = (report) => {
+    const formatViolationForSpreadsheet = (report) => {
         // If raw array of violations exists, join them
         if (Array.isArray(report.ai_raw_result?.allViolations) && report.ai_raw_result.allViolations.length > 0) {
             return report.ai_raw_result.allViolations.join(', ');
@@ -180,8 +191,8 @@ export default function OfficerReportExport({ navigation }) {
         return report.violation_type || 'Unspecified Violation';
     };
 
-    // Export to Excel handler
-    const handleExportExcel = async () => {
+    // Export a standards-compatible CSV without a vulnerable workbook parser.
+    const handleExportSpreadsheet = async () => {
         if (isDateRangeInvalid) {
             Alert.alert('Invalid Range', 'From Date cannot be later than To Date.');
             return;
@@ -195,70 +206,63 @@ export default function OfficerReportExport({ navigation }) {
             return;
         }
 
+        if (exportBusy.current) return;
+        exportBusy.current = true;
         setExporting(true);
         try {
-            // 1. Prepare exact rows matching required columns:
-            // - Date
-            // - Violation
-            // - Vehicle Plate Number
-            // - Address
-            const excelRows = reports.map((r) => ({
-                'Date': formatTimestampForExcel(r.submitted_at),
-                'Violation': formatViolationForExcel(r),
-                'Vehicle Plate Number': r.vehicle_number || 'N/A',
-                'Address': r.location_address || 'N/A',
+            const spreadsheetRows = reports.map((r) => ({
+                date: formatTimestampForSpreadsheet(r.submitted_at),
+                violation: formatViolationForSpreadsheet(r),
+                vehiclePlateNumber: r.vehicle_number || 'N/A',
+                address: r.location_address || 'N/A',
             }));
-
-            // 2. Create Sheet & Workbook
-            const worksheet = XLSX.utils.json_to_sheet(excelRows);
-
-            // Set column widths for clean readability
-            worksheet['!cols'] = [
-                { wch: 25 }, // Date
-                { wch: 32 }, // Violation
-                { wch: 24 }, // Vehicle Plate Number
-                { wch: 48 }, // Address
-            ];
-
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, 'Traffic Reports');
-
-            // 3. Generate base64 binary
-            const base64Data = XLSX.write(workbook, {
-                type: 'base64',
-                bookType: 'xlsx',
-            });
-
-            // 4. Build exact filename format: Traffic_Reports_<FromDate>_to_<ToDate>.xlsx
+            const csv = buildReportCsv(spreadsheetRows);
             const fromStr = formatDateYMD(fromDate);
             const toStr = formatDateYMD(toDate);
-            const fileName = `Traffic_Reports_${fromStr}_to_${toStr}.xlsx`;
+            const fileName = `Traffic_Reports_${fromStr}_to_${toStr}.csv`;
             const fileUri = `${FileSystem.documentDirectory || FileSystem.cacheDirectory}${fileName}`;
-
-            // 5. Write file locally
-            await FileSystem.writeAsStringAsync(fileUri, base64Data, {
-                encoding: FileSystem.EncodingType?.Base64 || 'base64',
+            await FileSystem.writeAsStringAsync(fileUri, csv, {
+                encoding: FileSystem.EncodingType?.UTF8 || 'utf8',
             });
-
-            // 6. Share or Save via system dialog
             const canShare = await Sharing.isAvailableAsync();
             if (canShare) {
                 await Sharing.shareAsync(fileUri, {
-                    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    mimeType: 'text/csv',
                     dialogTitle: `Export Traffic Reports (${fromStr} to ${toStr})`,
-                    UTI: 'com.microsoft.excel.xlsx',
+                    UTI: 'public.comma-separated-values-text',
                 });
             } else {
                 Alert.alert('Export Complete', `File saved to device:\n${fileName}`);
             }
         } catch (error) {
-            console.error('Error generating Excel export:', error);
-            Alert.alert('Export Failed', error.message || 'An error occurred while generating the Excel spreadsheet.');
+            if (mounted.current) setToast('Could not generate the spreadsheet. Please retry.');
         } finally {
-            setExporting(false);
+            exportBusy.current = false;
+            if (mounted.current) setExporting(false);
         }
     };
 
+    const generatePdf = async () => {
+        if (exportBusy.current || loadingCount || isDateRangeInvalid || !reports.length) return;
+        exportBusy.current = true; setExporting(true);
+        try {
+            const file = await Print.printToFileAsync({ html: buildReportPdfHtml(reports, fromDate, toDate) });
+            if (mounted.current) setPdfUri(file.uri);
+        } catch { if (mounted.current) setToast('PDF generation failed. Please try again.'); }
+        finally { exportBusy.current = false; if (mounted.current) setExporting(false); }
+    };
+    const usePdf = async (share) => {
+        if (!pdfUri || exportBusy.current) return;
+        exportBusy.current = true;
+        try {
+            if (share) {
+                if (!await Sharing.isAvailableAsync()) throw new Error('Sharing unavailable');
+                if (mounted.current) await Sharing.shareAsync(pdfUri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf', dialogTitle: 'Share Traffic Eye reports' });
+            } else await Print.printAsync({ uri: pdfUri });
+        } catch { if (mounted.current) setToast('Could not open the PDF. Please retry on a supported device.'); }
+        finally { exportBusy.current = false; }
+    };
+    const summary = reportSummary(reports);
     return (
         <View style={styles.container}>
             <FocusAwareStatusBar barStyle="light-content" statusBgColor={C.navy} />
@@ -276,7 +280,7 @@ export default function OfficerReportExport({ navigation }) {
                         </TouchableOpacity>
                         <View style={styles.headerTitleContainer}>
                             <Text style={styles.headerTitle}>Officer Report Export</Text>
-                            <Text style={styles.headerSubtitle}>Official Enforcement Records (.xlsx)</Text>
+                            <Text style={styles.headerSubtitle}>Report records · PDF and CSV</Text>
                         </View>
                         <View style={styles.headerRightBadge}>
                             <Ionicons name="document-text" size={16} color={C.amber} />
@@ -288,6 +292,7 @@ export default function OfficerReportExport({ navigation }) {
                     style={styles.content}
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
+                    refreshControl={<RefreshControl refreshing={loadingCount} onRefresh={loadReportCount} colors={[COLORS.secondary]} />}
                 >
                     {/* ── Date Range Selection Card ── */}
                     <View style={styles.card}>
@@ -395,6 +400,17 @@ export default function OfficerReportExport({ navigation }) {
                         </View>
                     </View>
 
+                    <View style={styles.card}>
+                        <Text style={styles.cardTitle}>PDF Report Summary</Text>
+                        {loadingCount ? <CardSkeleton /> : <Text style={{ color: COLORS.textSecondary, marginVertical: 12 }}>Total {summary.total} · Approved {summary.approved} · Rejected {summary.rejected} · Pending {summary.pending}</Text>}
+                        {!loadingCount && !reports.length && <EmptyState icon="document-text-outline" title="No reports found in this date range" subtitle="Choose another range or pull down to refresh." />}
+                        {reports.slice(0, 5).map(report => <View key={report.id} style={{ paddingVertical: 8, borderBottomWidth: 1, borderColor: COLORS.borderLight }}><Text style={{ color: COLORS.primary }}>{report.violation_type} · {report.vehicle_number || 'Plate unavailable'}</Text><Text style={{ color: COLORS.textSecondary }}>{report.location_address} · {report.severity} · {report.status} · {formatTimestampForSpreadsheet(report.submitted_at)}</Text></View>)}
+                        <PressableScale accessibilityLabel="Generate PDF" disabled={exporting || loadingCount || !reports.length || isDateRangeInvalid} onPress={generatePdf} style={{ padding: 16, marginTop: 12, backgroundColor: COLORS.primary, borderRadius: 12 }}><Text style={{ color: COLORS.white }}>{exporting ? 'Generating…' : 'Generate PDF'}</Text></PressableScale>
+                        {!!pdfUri && <View style={{ flexDirection: 'row', gap: 16 }}>
+                            <PressableScale accessibilityLabel="Preview PDF" onPress={() => usePdf(false)} style={{ paddingVertical: 16 }}><Text>Preview PDF</Text></PressableScale>
+                            <PressableScale accessibilityLabel="Share PDF" onPress={() => usePdf(true)} style={{ paddingVertical: 16 }}><Text>Share PDF</Text></PressableScale>
+                        </View>}
+                    </View>
                     {/* ── Export Summary & Preview Card ── */}
                     <View style={styles.card}>
                         <View style={styles.cardHeader}>
@@ -428,7 +444,7 @@ export default function OfficerReportExport({ navigation }) {
                                     </View>
                                     <View style={styles.fileFormatBox}>
                                         <Ionicons name="grid" size={16} color={C.success} />
-                                        <Text style={styles.fileFormatText}>Excel (.xlsx)</Text>
+                                        <Text style={styles.fileFormatText}>Spreadsheet (.csv)</Text>
                                     </View>
                                 </View>
 
@@ -436,7 +452,7 @@ export default function OfficerReportExport({ navigation }) {
                                 <View style={styles.filenameBox}>
                                     <Ionicons name="document-text-outline" size={14} color={C.textSecondary} />
                                     <Text style={styles.filenameText} numberOfLines={1}>
-                                        Traffic_Reports_{formatDateYMD(fromDate)}_to_{formatDateYMD(toDate)}.xlsx
+                                        Traffic_Reports_{formatDateYMD(fromDate)}_to_{formatDateYMD(toDate)}.csv
                                     </Text>
                                 </View>
 
@@ -465,7 +481,7 @@ export default function OfficerReportExport({ navigation }) {
                             styles.exportBtn,
                             (isDateRangeInvalid || reports.length === 0 || exporting) && styles.exportBtnDisabled,
                         ]}
-                        onPress={handleExportExcel}
+                        onPress={handleExportSpreadsheet}
                         disabled={isDateRangeInvalid || reports.length === 0 || exporting}
                         activeOpacity={0.88}
                     >
@@ -480,7 +496,7 @@ export default function OfficerReportExport({ navigation }) {
                                     <Ionicons name="download-outline" size={20} color={C.white} />
                                     <Text style={styles.exportBtnText}>
                                         {reports.length > 0
-                                            ? `Export ${reports.length} Report${reports.length !== 1 ? 's' : ''} to Excel`
+                                            ? `Export ${reports.length} Report${reports.length !== 1 ? 's' : ''} to CSV`
                                             : 'No Reports to Export'}
                                     </Text>
                                 </>
@@ -511,6 +527,7 @@ export default function OfficerReportExport({ navigation }) {
                 )}
 
             </SafeAreaView>
+            <FeedbackToast visible={!!toast} message={toast || ''} variant="error" onDismiss={() => setToast(null)} />
         </View>
     );
 }
@@ -584,7 +601,7 @@ const styles = StyleSheet.create({
         marginBottom: 16,
         borderWidth: 1,
         borderColor: C.border,
-        shadowColor: '#000',
+        shadowColor: COLORS.black,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.04,
         shadowRadius: 8,
@@ -638,7 +655,7 @@ const styles = StyleSheet.create({
     },
     dateBox: {
         flex: 1,
-        backgroundColor: '#F8FAFC',
+        backgroundColor: COLORS.surfaceContainerLow,
         borderWidth: 1.5,
         borderColor: C.border,
         borderRadius: 14,
@@ -810,7 +827,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
-        backgroundColor: '#F1F5F9',
+        backgroundColor: COLORS.surfaceContainer,
         borderRadius: 10,
         paddingHorizontal: 12,
         paddingVertical: 8,
@@ -824,7 +841,7 @@ const styles = StyleSheet.create({
     },
 
     columnsSpecBox: {
-        backgroundColor: '#F8FAFC',
+        backgroundColor: COLORS.surfaceContainerLow,
         borderRadius: 12,
         padding: 12,
         borderWidth: 1,
@@ -875,7 +892,7 @@ const styles = StyleSheet.create({
         elevation: 4,
     },
     exportBtnDisabled: {
-        backgroundColor: '#94A3B8',
+        backgroundColor: COLORS.gray400,
         shadowOpacity: 0,
         elevation: 0,
     },

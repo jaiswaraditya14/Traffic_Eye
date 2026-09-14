@@ -7,17 +7,24 @@
 //   'MANUAL'        — User typed address or selected pin on map
 //   'NOT_FOUND'     — No location available
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as Location from 'expo-location';
 import { Alert } from 'react-native';
 import { validateCoordinates } from '../utils/exifParser';
 import { reverseGeocode } from '../services/geoService';
 
 export default function useLocation() {
+    const mounted = useRef(true);
     const [location, setLocation] = useState(null);
     const [address, setAddress] = useState('');
     const [locationSource, setLocationSource] = useState(null);
     const [loading, setLoading] = useState(false);
+    useEffect(() => {
+        mounted.current = true;
+        return () => { mounted.current = false; };
+    }, []);
+    const beginLoading = () => { if (mounted.current) setLoading(true); };
+    const endLoading = () => { if (mounted.current) setLoading(false); };
 
     /**
      * Request and acquire current live device GPS coordinates.
@@ -29,10 +36,12 @@ export default function useLocation() {
      */
     const detectLocation = async (guardUserInput = false, silent = false) => {
         try {
-            setLoading(true);
+            beginLoading();
             let { status } = await Location.getForegroundPermissionsAsync();
+            if (!mounted.current) return null;
             if (status !== 'granted') {
                 const permRes = await Location.requestForegroundPermissionsAsync();
+                if (!mounted.current) return null;
                 status = permRes.status;
             }
             if (status !== 'granted') {
@@ -94,33 +103,35 @@ export default function useLocation() {
             }
 
             const finalCoords = { latitude: valid.latitude, longitude: valid.longitude };
-            setLocation(finalCoords);
-            setLocationSource('LIVE_LOCATION');
+            if (mounted.current) {
+                setLocation(finalCoords);
+                setLocationSource('LIVE_LOCATION');
+            }
 
             // Attempt reverse geocoding via geoService (Photon -> Nominatim -> expo-location)
             let resolvedAddress = `${valid.latitude.toFixed(6)}, ${valid.longitude.toFixed(6)}`;
             try {
                 const geoResult = await reverseGeocode(valid.latitude, valid.longitude);
+                if (!mounted.current) return null;
                 if (geoResult?.displayName && geoResult.displayName.trim()) {
                     resolvedAddress = geoResult.displayName.trim();
                 }
             } catch (geocodeError) {
-                console.warn('[useLocation] Reverse geocoding failed (using coords):', geocodeError.message);
+                // Coordinates remain usable when address lookup is unavailable.
             }
 
-            if (!guardUserInput || !address.trim()) {
+            if (mounted.current && (!guardUserInput || !address.trim())) {
                 setAddress(resolvedAddress);
             }
 
             return { coords: finalCoords, address: resolvedAddress, source: 'LIVE_LOCATION' };
         } catch (error) {
-            console.error('[useLocation] Error detecting live location:', error.message);
             if (!silent) {
                 Alert.alert('Location Error', 'Failed to detect current device location. Please ensure GPS is turned on.');
             }
             return null;
         } finally {
-            setLoading(false);
+            endLoading();
         }
     };
 
@@ -137,34 +148,36 @@ export default function useLocation() {
     const reverseGeocodeFromCoords = async (latitude, longitude, source = 'IMAGE_EXIF', guardUserInput = false) => {
         const valid = validateCoordinates(latitude, longitude);
         if (!valid) {
-            console.warn('[useLocation] Invalid coordinates passed to reverseGeocodeFromCoords:', { latitude, longitude });
             return null;
         }
 
         const finalCoords = { latitude: valid.latitude, longitude: valid.longitude };
-        setLocation(finalCoords);
-        setLocationSource(source);
+        if (mounted.current) {
+            setLocation(finalCoords);
+            setLocationSource(source);
+        }
 
         try {
-            setLoading(true);
+            beginLoading();
             let resolvedAddress = `${valid.latitude.toFixed(6)}, ${valid.longitude.toFixed(6)}`;
 
             try {
                 const geoResult = await reverseGeocode(valid.latitude, valid.longitude);
+                if (!mounted.current) return null;
                 if (geoResult?.displayName && geoResult.displayName.trim()) {
                     resolvedAddress = geoResult.displayName.trim();
                 }
             } catch (geocodeError) {
-                console.warn('[useLocation] Reverse geocode network error (preserving coords):', geocodeError.message);
+                // Preserve the coordinates and use the numeric fallback address.
             }
 
-            if (!guardUserInput || !address.trim()) {
+            if (mounted.current && (!guardUserInput || !address.trim())) {
                 setAddress(resolvedAddress);
             }
 
             return { coords: finalCoords, address: resolvedAddress, source };
         } finally {
-            setLoading(false);
+            endLoading();
         }
     };
 
@@ -196,14 +209,15 @@ export default function useLocation() {
         let fallbackAddr = `${valid.latitude.toFixed(6)}, ${valid.longitude.toFixed(6)}`;
         try {
             const geoResult = await reverseGeocode(valid.latitude, valid.longitude);
+            if (!mounted.current) return;
             if (geoResult?.displayName && geoResult.displayName.trim()) {
                 setAddress(geoResult.displayName.trim());
                 return;
             }
         } catch (geocodeError) {
-            console.warn('[useLocation] Manual pin geocoding failed:', geocodeError.message);
+            // Preserve the pin and use the numeric fallback address.
         }
-        setAddress(fallbackAddr);
+        if (mounted.current) setAddress(fallbackAddr);
     };
 
     return {
