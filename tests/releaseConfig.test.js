@@ -46,8 +46,15 @@ test('adaptive icon nontransparent content remains inside the documented safe zo
 });
 
 test('native Android manifest disables app-data backup and legacy external storage', () => {
+    const app = JSON.parse(read('app.json').toString('utf8')).expo;
     const manifest = read('android/app/src/main/AndroidManifest.xml').toString('utf8');
+    expect(app.android.package).toBe('com.trafficviolationapp');
+    expect(app.android.versionCode).toBe(1);
+    expect(app.android.permissions).toContain('android.permission.ACCESS_NETWORK_STATE');
     expect(manifest).toContain('android:allowBackup="false"');
+    expect(manifest).toContain('android:usesCleartextTraffic="false"');
+    expect(manifest).toContain('android.permission.ACCESS_NETWORK_STATE');
+    expect(manifest).not.toContain('android.permission.SYSTEM_ALERT_WINDOW');
     expect(manifest).not.toContain('android:requestLegacyExternalStorage');
 });
 

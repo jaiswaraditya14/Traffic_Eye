@@ -176,7 +176,7 @@ export default function NewReport({ navigation }) {
             setVideo(null);
             setMediaType('image');
             setImage(result.uri);
-            setImageMetadata({ mimeType: result.mimeType, fileName: result.fileName });
+            setImageMetadata({ mimeType: result.mimeType, fileName: result.fileName, fileSize: result.fileSize });
             await handleLocationExtraction(result);
         }
     };
@@ -187,7 +187,7 @@ export default function NewReport({ navigation }) {
             setVideo(null);
             setMediaType('image');
             setImage(result.uri);
-            setImageMetadata({ mimeType: result.mimeType, fileName: result.fileName });
+            setImageMetadata({ mimeType: result.mimeType, fileName: result.fileName, fileSize: result.fileSize });
             await handleLocationExtraction(result);
         }
     };

@@ -13,7 +13,7 @@ jest.mock('../../supabase', () => {
     } } };
 });
 jest.mock('expo-file-system/legacy', () => ({
-    readAsStringAsync: jest.fn(), EncodingType: { Base64: 'base64' },
+    getInfoAsync: jest.fn(), readAsStringAsync: jest.fn(), EncodingType: { Base64: 'base64' },
 }));
 jest.mock('expo-crypto', () => ({ randomUUID: () => '11111111-1111-4111-8111-111111111111' }));
 jest.mock('base64-arraybuffer', () => ({ decode: jest.fn(() => new Uint8Array([1, 2, 3]).buffer) }));
@@ -40,6 +40,7 @@ beforeEach(() => {
     supabase.storage.__remove.mockResolvedValue({ error: null });
     supabase.storage.__getPublicUrl.mockReturnValue({ data: { publicUrl: 'https://synthetic.invalid/evidence.jpg' } });
     FileSystem.readAsStringAsync.mockResolvedValue('AQID');
+    FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 3 });
     decode.mockReturnValue(new Uint8Array([1, 2, 3]).buffer);
     jest.spyOn(console, 'warn').mockImplementation(() => {});
 });
@@ -249,6 +250,14 @@ describe('media validation and cleanup', () => {
         expect(validateMediaFile('file:///a.jpg', size).valid).toBe(false);
     });
     test('accepts the maximum size', () => expect(validateMediaFile('file:///a.jpg', 52428800).valid).toBe(true));
+    test('rejects an unsafe in-memory upload before reading or contacting storage', async () => {
+        supabase.from.mockReturnValue(allow());
+        FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 12 * 1024 * 1024 + 1 });
+        const result = await submitReportWithMedia(args());
+        expect(result.error.code).toBe('UPLOAD_FAILED');
+        expect(FileSystem.readAsStringAsync).not.toHaveBeenCalled();
+        expect(supabase.storage.__upload).not.toHaveBeenCalled();
+    });
     test('missing path cleanup is a no-op', async () => {
         expect(await removeReportMedia(null)).toEqual({ error: null });
         expect(supabase.storage.__remove).not.toHaveBeenCalled();

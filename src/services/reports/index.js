@@ -17,6 +17,10 @@ const MEDIA_TYPES = {
     mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm',
 };
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
+// Supabase React Native uploads require an in-memory ArrayBuffer. Keep the
+// original evidence unchanged, but reject oversized inputs before Base64 can
+// amplify memory usage and terminate the app on lower-memory Android devices.
+const MAX_IN_MEMORY_UPLOAD_SIZE = 12 * 1024 * 1024;
 const safeDiagnostic = (event) => {
     if (__DEV__) console.warn('[reports]', event);
 };
@@ -65,6 +69,14 @@ export async function uploadReportMedia(userId, fileUri, mimeType, options = {})
         if (!/^[A-Za-z0-9_-]+$/.test(objectId)) throw new Error('Invalid object id');
         const fileName = objectId + '.' + validation.extension;
         const storagePath = userId + '/' + fileName;
+        let fileSize = options.fileSize;
+        if (fileSize == null) {
+            const fileInfo = await FileSystem.getInfoAsync(fileUri, { size: true });
+            fileSize = fileInfo?.exists === false ? 0 : fileInfo?.size;
+        }
+        if (!Number.isFinite(fileSize) || fileSize <= 0 || fileSize > MAX_IN_MEMORY_UPLOAD_SIZE) {
+            throw new Error('Evidence is too large for a safe mobile upload');
+        }
         const base64 = await FileSystem.readAsStringAsync(fileUri, {
             encoding: EncodingType?.Base64 || 'base64',
         });

@@ -108,7 +108,7 @@ export default function AIResultsVerification({ navigation, route }) {
 
             const cleanImageUri = currentReport?.image || '';
             const media = cleanImageUri
-                ? { uri: cleanImageUri, fileType: 'image', mimeType: currentReport?.mimeType, fileName: currentReport?.fileName }
+                ? { uri: cleanImageUri, fileType: 'image', mimeType: currentReport?.mimeType, fileName: currentReport?.fileName, fileSize: currentReport?.fileSize }
                 : null;
 
             const { data: created, error } = await reportService.submitReportWithMedia({
