@@ -41,6 +41,7 @@ export {
     validateCoordinates,
     hasValidGpsValues,
     extractImageLocation,
+    extractExifFromImage,
     parseJpegBinaryExif,
     logExifDiagnostics,
 } from './exifParser';

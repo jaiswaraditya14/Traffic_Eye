@@ -49,7 +49,7 @@ export default function NewReport({ navigation }) {
 
     const {
         location, address, setAddress, locationSource, setLocationSource, loading: loadingLocation,
-        detectLocation, setManualLocation, reverseGeocodeFromCoords
+        detectLocation, setManualLocation, reverseGeocodeFromCoords, clearLocation
     } = useLocation();
 
     const [trustLevel, setTrustLevel] = useState(null);
@@ -63,6 +63,8 @@ export default function NewReport({ navigation }) {
     const [fullscreenImage, setFullscreenImage] = useState(null);
 
     const [autoFillStatus, setAutoFillStatus] = useState(null);
+    const extractionGeneration = useRef(0);
+    const [metadataStatus, setMetadataStatus] = useState(null);
     const bannerAnim = useRef(new Animated.Value(0)).current;
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const bannerTimer = useRef(null);
@@ -73,7 +75,7 @@ export default function NewReport({ navigation }) {
     const demoReport = demoMode ? buildDemoReport() : null;
     const evidenceImage = demoReport?.image || image;
     const errors = validateNewReport(demoReport || { image: image || video, location, address });
-    const canContinue = !demoLoading && !loadingLocation && Object.keys(errors).length === 0;
+    const canContinue = !demoLoading && !loadingLocation && !['reading', 'extracting'].includes(autoFillStatus) && Object.keys(errors).length === 0;
     const openSettings = () => Linking.openSettings().catch(() => Alert.alert('Settings unavailable', 'Open your device settings and select Traffic Eye permissions.'));
 
     const showBanner = useCallback((status) => {
@@ -104,15 +106,23 @@ export default function NewReport({ navigation }) {
         }
     }, [autoFillStatus, pulseAnim]);
 
-    useEffect(() => { return () => { if (bannerTimer.current) clearTimeout(bannerTimer.current); }; }, []);
+    useEffect(() => { return () => { extractionGeneration.current++; if (bannerTimer.current) clearTimeout(bannerTimer.current); }; }, []);
 
     // ── Location Extraction Pipeline ──
     const handleLocationExtraction = useCallback(async (asset) => {
+        const generation = ++extractionGeneration.current;
+        clearLocation();
+        setSelectedCoordinate(null);
+        setTrustLevel(null);
+        setMetadataStatus(null);
         showBanner('reading');
 
         try {
             // STEP 1: Extract GPS coordinates directly from original evidence
             const locResult = await extractImageLocation(asset);
+            if (generation !== extractionGeneration.current) return;
+            setMetadataStatus(locResult?.status || 'FILE_ACCESS_FAILED');
+            setImageMetadata(previous => ({ ...previous, locationMetadataStatus: locResult?.status, locationProvenance: locResult?.provenance }));
 
             if (locResult && locResult.gpsFound && locResult.latitude != null && locResult.longitude != null) {
                 showBanner('extracting');
@@ -122,8 +132,9 @@ export default function NewReport({ navigation }) {
                     locResult.gpsSource || 'EXIF_ORIGINAL',
                     false
                 );
+                if (generation !== extractionGeneration.current) return;
                 if (geocodeRes && geocodeRes.coords) {
-                    setTrustLevel('Verified Location (Image Metadata)');
+                    setTrustLevel('Location from image metadata');
                     showBanner('success');
                     hideBanner(5000);
                     return;
@@ -141,13 +152,15 @@ export default function NewReport({ navigation }) {
             setLocationSource(locResult?.gpsSource || 'GPS_UNAVAILABLE');
             showBanner('no-gps');
         } catch (err) {
+            if (generation !== extractionGeneration.current) return;
             if (__DEV__) console.warn('[NewReport] Location extraction failed.');
             setLocationSource('GPS_UNAVAILABLE');
             showBanner('no-gps');
         }
-    }, [reverseGeocodeFromCoords, showBanner, hideBanner, setLocationSource]);
+    }, [reverseGeocodeFromCoords, showBanner, hideBanner, setLocationSource, clearLocation]);
 
     const handleDetectLiveLocation = async () => {
+        extractionGeneration.current++;
         try {
             showBanner('detecting-live');
             const permission = await Location.requestForegroundPermissionsAsync();
@@ -397,9 +410,11 @@ export default function NewReport({ navigation }) {
                                             <Ionicons name="alert-circle-outline" size={18} color={C.warning} />
                                         </View>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={styles.bannerNoGpsTitle}>LOCATION NOT FOUND</Text>
+                                            <Text testID={'image-metadata-' + (metadataStatus || 'unavailable')} style={styles.bannerNoGpsTitle}>LOCATION NOT FOUND</Text>
                                             <Text style={styles.bannerNoGpsSub}>
-                                                No location found from image. The image does not contain usable GPS information.
+                                                {metadataStatus === 'ORIGINAL_METADATA_INACCESSIBLE' || metadataStatus === 'FILE_ACCESS_FAILED'
+                                                    ? 'Image metadata could not be accessed. This does not establish whether the original contains GPS.'
+                                                    : 'No usable GPS location was found in the selected image metadata.'}
                                             </Text>
                                         </View>
                                     </View>
@@ -529,8 +544,9 @@ export default function NewReport({ navigation }) {
                     showUserLocation={true}
                     showConfirmButton={true}
                     confirmText="Confirm Location"
-                    autoLocateOnMount={true}
+                    autoLocateOnMount={false}
                     onConfirm={({ coordinate, address }) => {
+                        extractionGeneration.current++;
                         setIsMapVisible(false);
                         if (coordinate) {
                             setManualLocation(coordinate, address);

@@ -1,7 +1,7 @@
 /* eslint-env jest */
 import React from 'react';
 import renderer, { act } from 'react-test-renderer';
-import { Alert } from 'react-native';
+import { Alert, Platform, NativeModules } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import useImagePicker from '../useImagePicker';
@@ -19,6 +19,7 @@ const deferred = () => { let resolve; const promise = new Promise(done => { reso
 beforeEach(() => {
     global.IS_REACT_ACT_ENVIRONMENT = true;
     latest = null;
+    Platform.OS = 'ios';
     ImagePicker.requestMediaLibraryPermissionsAsync.mockResolvedValue({ status: 'granted' });
     ImagePicker.requestCameraPermissionsAsync.mockResolvedValue({ status: 'granted' });
     MediaLibrary.getPermissionsAsync.mockResolvedValue({ granted: true });
@@ -26,7 +27,7 @@ beforeEach(() => {
     ImagePicker.launchCameraAsync.mockResolvedValue({ canceled: true, assets: [] });
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => { delete NativeModules.MediaStoreResolver; jest.restoreAllMocks(); });
 
 test('permission denial is user-visible and always clears loading', async () => {
     ImagePicker.requestMediaLibraryPermissionsAsync.mockResolvedValue({ status: 'denied' });
@@ -61,5 +62,28 @@ test('successful image selection returns original metadata without logging it', 
     expect(result).toMatchObject(asset);
     expect(latest.exifData).toEqual(asset.exif);
     expect(log).not.toHaveBeenCalled();
+    await act(async () => view.unmount());
+});
+
+test('Android uses the document picker without blocking on broad-library permission', async () => {
+    Platform.OS = 'android';
+    ImagePicker.requestMediaLibraryPermissionsAsync.mockResolvedValue({ status: 'denied' });
+    let view;
+    await act(async () => { view = renderer.create(<Harness />); });
+    await act(async () => { await latest.pickFromGallery(); });
+    expect(ImagePicker.requestMediaLibraryPermissionsAsync).not.toHaveBeenCalled();
+    expect(ImagePicker.launchImageLibraryAsync).toHaveBeenCalledWith(expect.objectContaining({ legacy: true, allowsEditing: false, quality: 1, exif: true }));
+    expect(Alert.alert).not.toHaveBeenCalled();
+    await act(async () => view.unmount());
+});
+test('native Android picker retains the exact source URI and uses a local evidence copy', async () => {
+    Platform.OS = 'android';
+    const asset = { uri: 'file:///cache/evidence.jpg', sourceUri: 'content://com.android.providers.media.documents/document/image%3A17', assetId: '17', mimeType: 'image/jpeg' };
+    NativeModules.MediaStoreResolver = { pickOriginalImage: jest.fn().mockResolvedValue(asset) };
+    let view, result;
+    await act(async () => { view = renderer.create(<Harness />); });
+    await act(async () => { result = await latest.pickFromGallery(); });
+    expect(result).toMatchObject({ ...asset, selectionKind: 'gallery' });
+    expect(ImagePicker.launchImageLibraryAsync).not.toHaveBeenCalled();
     await act(async () => view.unmount());
 });

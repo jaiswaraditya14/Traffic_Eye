@@ -96,7 +96,7 @@ export async function checkLocalIntegrity(imageUri) {
         };
     }
 
-    const cleanUri = imageUri.split('?')[0];
+    const cleanUri = imageUri; // Provider query parameters can carry read access.
     const lowerUri = cleanUri.toLowerCase();
     const details  = [];
     let suspiciousScore = 0;
@@ -223,7 +223,7 @@ export async function checkLocalIntegrity(imageUri) {
  * @returns {Promise<string>} base64-encoded JPEG (no data: prefix)
  */
 export async function prepareVisionImage(imageUri) {
-    const cleanUri = imageUri.split('?')[0];
+    const cleanUri = imageUri;
     let tempUri = null;
     try {
         const img = await ImageManipulator.manipulateAsync(
@@ -247,7 +247,7 @@ export async function prepareVisionImage(imageUri) {
  * @returns {Promise<string>} base64-encoded JPEG (no data: prefix)
  */
 export async function prepareOcrImage(imageUri) {
-    const cleanUri = imageUri.split('?')[0];
+    const cleanUri = imageUri;
     let tempUri = null;
     try {
         const img = await ImageManipulator.manipulateAsync(

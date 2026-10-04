@@ -20,6 +20,7 @@ import { createGpsJpegFixture } from './fixtures/gpsJpegFixture';
 // imported from the production module; neither Core parser copy is imported.
 jest.mock('expo-file-system/legacy', () => ({
     readAsStringAsync: jest.fn(),
+    getInfoAsync: jest.fn(),
     EncodingType: { Base64: 'base64' },
 }));
 jest.mock('expo-media-library', () => ({
@@ -55,6 +56,7 @@ beforeEach(() => {
     Platform.OS = 'android';
     nativeResolver.mockResolvedValue(null);
     FileSystem.readAsStringAsync.mockResolvedValue(null);
+    FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: 202 });
     MediaLibrary.getPermissionsAsync.mockResolvedValue({ granted: false });
     MediaLibrary.requestPermissionsAsync.mockResolvedValue({ granted: false });
     MediaLibrary.getAssetsAsync.mockResolvedValue({ assets: [] });
@@ -146,13 +148,13 @@ describe('production EXIF normalization', () => {
         expect(validateCoordinates(latitude, longitude)).toBeNull();
     });
 
-    test('distinguishes missing tags from Android redaction', () => {
+    test('missing tags differ from valid zeros; zeros alone cannot prove redaction', () => {
         expect(hasValidGpsValues(undefined, undefined, undefined, undefined))
             .toMatchObject({ valid: false, state: 'GPS_NOT_PRESENT', reason: 'NO_GPS_TAGS' });
         expect(hasValidGpsValues(0, 0, '', ''))
-            .toMatchObject({ valid: false, state: 'GPS_UNAVAILABLE', reason: 'ANDROID_PHOTO_PICKER_REDACTION' });
+            .toMatchObject({ valid: true, state: 'GPS_VALID' });
         expect(parseExifGPS({ GPSLatitude: 0, GPSLongitude: 0, GPSLatitudeRef: '', GPSLongitudeRef: '' }))
-            .toBeNull();
+            .toMatchObject({ latitude: 0, longitude: 0 });
     });
 });
 
@@ -217,7 +219,7 @@ describe('production extraction pipeline with mocked platform I/O', () => {
         Crypto.digest.mockResolvedValue(new Uint8Array(32).buffer);
         const result = await extractImageLocation({ uri: pickerUri, mimeType: 'image/jpeg' });
         expect(result).toMatchObject({ gpsFound: true, source: 'EXIF_PICKER_COPY', extractionMethod: 'BINARY_APP1_HEADER' });
-        expect(FileSystem.readAsStringAsync).toHaveBeenCalledWith(pickerUri, expect.objectContaining({ position: 0 }));
+        expect(FileSystem.readAsStringAsync).toHaveBeenCalledWith(pickerUri, expect.objectContaining({ encoding: 'base64' }));
     });
 
     test.each(['image/png', 'image/heic', 'image/heif', 'image/webp'])('does not JPEG-parse picker bytes marked %s', async (mimeType) => {
@@ -227,11 +229,12 @@ describe('production extraction pipeline with mocked platform I/O', () => {
         expect(result).toMatchObject({ gpsFound: false, source: 'GPS_UNAVAILABLE' });
         // The one read is hashing I/O, not a JPEG header extraction.
         expect(FileSystem.readAsStringAsync).toHaveBeenCalledTimes(1);
-        expect(FileSystem.readAsStringAsync).not.toHaveBeenCalledWith(pickerUri, expect.objectContaining({ position: 0 }));
+        expect(result.status).toBe('UNSUPPORTED_FORMAT');
     });
 
     test('passes decoded file bytes to the production Crypto.digest path', async () => {
         const syntheticBytes = new Uint8Array([0, 1, 2, 127, 128, 255]);
+        FileSystem.getInfoAsync.mockResolvedValue({ exists: true, size: syntheticBytes.length });
         FileSystem.readAsStringAsync.mockResolvedValue(Buffer.from(syntheticBytes).toString('base64'));
         Crypto.digest.mockResolvedValue(new Uint8Array(32).fill(0xab).buffer);
         const result = await extractImageLocation({ uri: pickerUri, mimeType: 'image/png' });
@@ -283,16 +286,4 @@ describe('EXIF diagnostics privacy', () => {
     });
 });
 
-// These are deferred Phase 4 requirements, not passing coverage claims. The
-// existing Core/CoreCommonJS copies remain unused by this suite until Phase 4
-// consolidates production parsing. Do not assert the current defects are valid.
-describe('deferred Phase 4 EXIF repair requirements', () => {
-    test.todo('accept valid numeric zero latitude and zero longitude through the complete parser');
-    test.todo('accept inherently signed decimal GPS without hemisphere refs');
-    test.todo('reject trailing junk, zero string denominators, invalid DMS ranges, and contradictory refs');
-    test.todo('bound all JPEG/TIFF reads and continue past non-EXIF APP1 segments');
-    test.todo('preserve full URI query parameters through extraction and hashing');
-    test.todo('never resolve a null asset ID by filename, dimensions, or recent-gallery heuristics');
-    test.todo('never replace a raw-byte hash with a hash of base64 text when Crypto.digest fails');
-    test.todo('consolidate the unused Core/CoreCommonJS parser copies with the production parser');
-});
+// Former Phase 4 TODOs now have executable coverage in exifRepair.test.js.

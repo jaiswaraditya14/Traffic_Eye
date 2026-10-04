@@ -39,7 +39,7 @@ export async function checkLocalAuthenticity(imageUri) {
     }
 
     try {
-        const cleanUri = imageUri.split('?')[0];
+        const cleanUri = imageUri;
         const lowerUri = cleanUri.toLowerCase();
         const flags = [];
         let suspiciousScore = 0;

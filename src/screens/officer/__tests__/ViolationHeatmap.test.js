@@ -10,7 +10,11 @@ test('severity and week filters combine', () => expect(filterHeatmapReports(poin
 test('invalid/future dates excluded from bounded ranges', () => expect(filterHeatmapReports([{ severity: 'high', submitted_at: 'invalid', ...coordinates }, { severity: 'high', submitted_at: '2027-01-01', ...coordinates }], ['high'], 'week', now)).toEqual([]));
 test.each([
     { latitude: null, longitude: 72 }, { latitude: 91, longitude: 72 }, { latitude: 19, longitude: -181 },
-    { latitude: 0, longitude: 0 }, { latitude: 'invalid', longitude: 72 },
+    { latitude: '12junk', longitude: 72 }, { latitude: 'invalid', longitude: 72 },
 ])('invalid coordinates are excluded: %j', invalid => {
     expect(filterHeatmapReports([{ severity: 'high', submitted_at: '2026-09-13T01:00:00', ...invalid }], ['high'], 'all', now)).toEqual([]);
+});
+test('valid zero coordinates remain visible on the officer map', () => {
+    const zero = { id: 'zero', severity: 'high', latitude: 0, longitude: 0 };
+    expect(filterHeatmapReports([zero], ['high'], 'all', now)).toEqual([zero]);
 });

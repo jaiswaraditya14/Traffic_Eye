@@ -15,6 +15,7 @@ import { reverseGeocode } from '../services/geoService';
 
 export default function useLocation() {
     const mounted = useRef(true);
+    const locationGeneration = useRef(0);
     const [location, setLocation] = useState(null);
     const [address, setAddress] = useState('');
     const [locationSource, setLocationSource] = useState(null);
@@ -35,6 +36,7 @@ export default function useLocation() {
      * @returns {Promise<{ coords: { latitude: number, longitude: number }, address: string, source: string } | null>}
      */
     const detectLocation = async (guardUserInput = false, silent = false) => {
+        const generation = ++locationGeneration.current;
         try {
             beginLoading();
             let { status } = await Location.getForegroundPermissionsAsync();
@@ -67,6 +69,7 @@ export default function useLocation() {
             }
 
             // Tier 2: Fallback to last known position (instant on Android/iOS)
+            if (generation !== locationGeneration.current) return null;
             if (!loc?.coords) {
                 try {
                     loc = await Location.getLastKnownPositionAsync();
@@ -87,6 +90,7 @@ export default function useLocation() {
                 }
             }
 
+            if (generation !== locationGeneration.current) return null;
             if (!loc?.coords) {
                 if (!silent) {
                     Alert.alert('Location Error', 'Failed to detect current device location. Please ensure device GPS is turned on.');
@@ -112,7 +116,7 @@ export default function useLocation() {
             let resolvedAddress = `${valid.latitude.toFixed(6)}, ${valid.longitude.toFixed(6)}`;
             try {
                 const geoResult = await reverseGeocode(valid.latitude, valid.longitude);
-                if (!mounted.current) return null;
+                if (!mounted.current || generation !== locationGeneration.current) return null;
                 if (geoResult?.displayName && geoResult.displayName.trim()) {
                     resolvedAddress = geoResult.displayName.trim();
                 }
@@ -120,7 +124,7 @@ export default function useLocation() {
                 // Coordinates remain usable when address lookup is unavailable.
             }
 
-            if (mounted.current && (!guardUserInput || !address.trim())) {
+            if (mounted.current && generation === locationGeneration.current && (!guardUserInput || !address.trim())) {
                 setAddress(resolvedAddress);
             }
 
@@ -146,6 +150,7 @@ export default function useLocation() {
      * @returns {Promise<{ coords: { latitude: number, longitude: number }, address: string, source: string } | null>}
      */
     const reverseGeocodeFromCoords = async (latitude, longitude, source = 'IMAGE_EXIF', guardUserInput = false) => {
+        const generation = locationGeneration.current;
         const valid = validateCoordinates(latitude, longitude);
         if (!valid) {
             return null;
@@ -163,7 +168,7 @@ export default function useLocation() {
 
             try {
                 const geoResult = await reverseGeocode(valid.latitude, valid.longitude);
-                if (!mounted.current) return null;
+                if (!mounted.current || generation !== locationGeneration.current) return null;
                 if (geoResult?.displayName && geoResult.displayName.trim()) {
                     resolvedAddress = geoResult.displayName.trim();
                 }
@@ -171,7 +176,7 @@ export default function useLocation() {
                 // Preserve the coordinates and use the numeric fallback address.
             }
 
-            if (mounted.current && (!guardUserInput || !address.trim())) {
+            if (mounted.current && generation === locationGeneration.current && (!guardUserInput || !address.trim())) {
                 setAddress(resolvedAddress);
             }
 
@@ -182,6 +187,7 @@ export default function useLocation() {
     };
 
     const clearLocation = () => {
+        locationGeneration.current++;
         setLocation(null);
         setAddress('');
         setLocationSource(null);
@@ -194,6 +200,7 @@ export default function useLocation() {
      * @param {string} [presetAddress]
      */
     const setManualLocation = async (coords, presetAddress = null) => {
+        const generation = ++locationGeneration.current;
         const valid = validateCoordinates(coords?.latitude, coords?.longitude);
         if (!valid) return;
 
@@ -209,7 +216,7 @@ export default function useLocation() {
         let fallbackAddr = `${valid.latitude.toFixed(6)}, ${valid.longitude.toFixed(6)}`;
         try {
             const geoResult = await reverseGeocode(valid.latitude, valid.longitude);
-            if (!mounted.current) return;
+            if (!mounted.current || generation !== locationGeneration.current) return;
             if (geoResult?.displayName && geoResult.displayName.trim()) {
                 setAddress(geoResult.displayName.trim());
                 return;
@@ -217,7 +224,7 @@ export default function useLocation() {
         } catch (geocodeError) {
             // Preserve the pin and use the numeric fallback address.
         }
-        if (mounted.current) setAddress(fallbackAddr);
+        if (mounted.current && generation === locationGeneration.current) setAddress(fallbackAddr);
     };
 
     return {

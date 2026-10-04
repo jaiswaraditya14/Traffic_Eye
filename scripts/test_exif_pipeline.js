@@ -12,6 +12,7 @@ const result = spawnSync(process.execPath, [
     '--runInBand',
     '--runTestsByPath',
     path.join(repositoryRoot, 'src/utils/__tests__/exifParser.test.js'),
+    path.join(repositoryRoot, 'src/utils/__tests__/exifRepair.test.js'),
     ...process.argv.slice(2),
 ], {
     cwd: repositoryRoot,

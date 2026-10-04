@@ -35,7 +35,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { forwardGeocode, reverseGeocode, debounce } from '../../services/geoService';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS } from '../../utils';
+import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS, validateCoordinates } from '../../utils';
 
 // OpenFreeMap vector tile style (zero API key required)
 export const OPEN_FREE_MAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
@@ -139,7 +139,7 @@ export default function MapLibreMap({
 
     // Initial address lookup when there is a pre-selected coordinate
     useEffect(() => {
-        if (currentCoord?.latitude && currentCoord?.longitude) {
+        if (validateCoordinates(currentCoord?.latitude, currentCoord?.longitude)) {
             fetchAddressForCoord(currentCoord.latitude, currentCoord.longitude);
         }
     }, []);
@@ -148,7 +148,7 @@ export default function MapLibreMap({
     const flyToCoord = useCallback((lat, lng, zoom = DEFAULT_ZOOM) => {
         if (!cameraRef.current) return;
         if (!isFinite(lat) || !isFinite(lng)) return;
-        cameraRef.current.flyTo({ center: [lng, lat], duration: 600 });
+        cameraRef.current.flyTo({ center: [lng, lat], zoom, duration: 600 });
     }, []);
 
     // ── Auto-locate on mount ──────────────────────────────────────────────────
@@ -204,12 +204,7 @@ export default function MapLibreMap({
 
             const { latitude, longitude } = pos.coords;
 
-            // Validate coordinates are realistic (not 0,0 Null Island)
-            if (
-                !isFinite(latitude) ||
-                !isFinite(longitude) ||
-                (Math.abs(latitude) < 0.001 && Math.abs(longitude) < 0.001)
-            ) {
+            if (!validateCoordinates(latitude, longitude)) {
                 setLocationError('Invalid GPS coordinates. Showing Mumbai as default.');
                 flyToCoord(DEFAULT_LAT, DEFAULT_LNG, DEFAULT_ZOOM);
                 return;
@@ -321,11 +316,7 @@ export default function MapLibreMap({
             }
 
             const { latitude, longitude } = pos.coords;
-            if (
-                !isFinite(latitude) ||
-                !isFinite(longitude) ||
-                (Math.abs(latitude) < 0.001 && Math.abs(longitude) < 0.001)
-            ) {
+            if (!validateCoordinates(latitude, longitude)) {
                 Alert.alert('Location Error', 'Received invalid GPS coordinates from your device.');
                 return;
             }
@@ -424,9 +415,9 @@ export default function MapLibreMap({
             >
                 <Camera
                     ref={cameraRef}
-                    defaultSettings={{
-                        centerCoordinate: [startLng, startLat],
-                        zoomLevel: DEFAULT_ZOOM,
+                    initialViewState={{
+                        center: [startLng, startLat],
+                        zoom: DEFAULT_ZOOM,
                     }}
                 />
 

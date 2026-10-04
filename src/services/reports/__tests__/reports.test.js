@@ -108,6 +108,13 @@ describe('duplicate validation', () => {
 });
 
 describe('canonical submission', () => {
+    test.each([[12.5, 45.25], [0, 0]])('extracted (%s,%s) survives upload and storage insertion', async (latitude, longitude) => {
+        const insert = chain({ data: CREATED, error: null }), link = chain({ data: {}, error: null });
+        supabase.from.mockReturnValueOnce(allow()).mockReturnValueOnce(insert).mockReturnValueOnce(link);
+        expect((await submitReportWithMedia(args({ report: { ...REPORT, latitude, longitude, location_source: 'EXIF_ORIGINAL' } }))).error).toBeNull();
+        expect(insert.insert).toHaveBeenCalledWith([expect.objectContaining({ latitude, longitude, location_source: 'EXIF_ORIGINAL' })]);
+        expect(supabase.storage.__upload).toHaveBeenCalledWith(expect.any(String), expect.any(ArrayBuffer), expect.objectContaining({ contentType: 'image/jpeg' }));
+    });
     test('validates before upload, normalizes final plate and strips privileged workflow input', async () => {
         const insert = chain({ data: CREATED, error: null }), link = chain({ data: {}, error: null });
         supabase.from.mockReturnValueOnce(allow()).mockReturnValueOnce(insert).mockReturnValueOnce(link);

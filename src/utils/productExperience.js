@@ -1,3 +1,4 @@
+import { validateCoordinates } from './exifParserCore';
 export const SEVERITY_PRIORITY = { critical: 4, high: 3, medium: 2, low: 1 };
 export const validTime = value => value == null ? null : (Number.isFinite(Date.parse(value)) ? Date.parse(value) : null);
 export const sortOfficerQueue = reports => [...reports].sort((a, b) =>
@@ -18,11 +19,7 @@ export function filterHeatmapReports(reports, severities, range, now = new Date(
     });
 }
 export function hasValidReportCoordinates(report) {
-    const latitude = typeof report?.latitude === 'number' ? report.latitude : parseFloat(report?.latitude);
-    const longitude = typeof report?.longitude === 'number' ? report.longitude : parseFloat(report?.longitude);
-    return Number.isFinite(latitude) && Number.isFinite(longitude)
-        && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180
-        && !(latitude === 0 && longitude === 0);
+    return Boolean(validateCoordinates(report?.latitude, report?.longitude));
 }
 export function officerJurisdictionFilters(profile) {
     if (!profile || profile.role !== 'officer') return [];

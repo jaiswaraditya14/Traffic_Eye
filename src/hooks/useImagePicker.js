@@ -3,8 +3,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
-import * as MediaLibrary from 'expo-media-library';
-import { Alert } from 'react-native';
+import { Alert, Platform, NativeModules } from 'react-native';
 
 const VIDEO_SIZE_LIMIT_BYTES = 5 * 1024 * 1024; // 5 MB
 
@@ -23,28 +22,27 @@ export default function useImagePicker() {
     const pickFromGallery = async () => {
         try {
             beginLoading();
-            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (!mounted.current) return null;
-            if (status !== 'granted') {
-                Alert.alert('Permission Required', 'Please grant photo library access to select images.');
-                return null;
-            }
-
-            // Request MediaLibrary permission on Android for photo/video only (avoid audio permission rejection)
-            try {
-                let mPerm = await MediaLibrary.getPermissionsAsync(false, ['photo', 'video']);
-                if (!mPerm?.granted) {
-                    await MediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
+            // Android's system/document picker needs no broad-library grant.
+            // Original-location access is requested by the extractor afterwards.
+            if (Platform.OS !== 'android') {
+                const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                if (!mounted.current) return null;
+                if (status !== 'granted') {
+                    Alert.alert('Permission Required', 'Please grant photo library access to select images.');
+                    return null;
                 }
-            } catch (pErr) {
-                // Non-fatal if platform doesn't support MediaLibrary request
             }
 
-            const result = await ImagePicker.launchImageLibraryAsync({
+            const nativePicker = Platform.OS === 'android' && NativeModules.MediaStoreResolver?.pickOriginalImage;
+            const selected = nativePicker ? await NativeModules.MediaStoreResolver.pickOriginalImage() : null;
+            const result = nativePicker ? { canceled: !selected, assets: selected ? [selected] : [] } : await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ['images'],
                 allowsEditing: false,
                 quality: 1,
                 exif: true,
+                // ACTION_GET_CONTENT can provide an exact MediaStore/document
+                // asset ID; opaque Photo Picker IDs cannot safely be guessed.
+                legacy: Platform.OS === 'android',
             });
             if (!mounted.current) return null;
 
@@ -54,11 +52,13 @@ export default function useImagePicker() {
                 if (mounted.current) setExifData(asset.exif || null);
                 return {
                     uri: asset.uri,
+                    sourceUri: asset.sourceUri || null,
+                    selectionKind: 'gallery',
                     exif: asset.exif || null,
                     assetId: asset.assetId || null,
                     width: asset.width,
                     height: asset.height,
-                    mimeType: asset.mimeType || asset.type || 'image/jpeg',
+                    mimeType: asset.mimeType || null,
                     fileName: asset.fileName || null,
                     fileSize: asset.fileSize || null,
                 };
@@ -100,7 +100,7 @@ export default function useImagePicker() {
                     assetId: asset.assetId || null,
                     width: asset.width,
                     height: asset.height,
-                    mimeType: asset.mimeType || asset.type || 'image/jpeg',
+                    mimeType: asset.mimeType || null,
                     fileName: asset.fileName || null,
                     fileSize: asset.fileSize || null,
                 };
