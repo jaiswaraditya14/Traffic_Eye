@@ -60,3 +60,6 @@ scripts/*.b64
 /dist-prompt3-ios/
 local.properties
 
+
+# Large binary files (APKs exceed GitHub's size limit)
+*.apk
