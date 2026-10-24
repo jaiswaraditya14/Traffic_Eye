@@ -64,7 +64,7 @@ function ProfileLoadingScreen() {
                     onPress={() => signOut()}
                     activeOpacity={0.8}
                 >
-                    <Text style={profileLoadingStyles.cancelText}>Cancel &amp; Sign In Again</Text>
+                    <Text style={profileLoadingStyles.cancelText}>Cancel & Sign In Again</Text>
                 </TouchableOpacity>
             )}
         </Animated.View>

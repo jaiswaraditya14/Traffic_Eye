@@ -1,7 +1,7 @@
 import 'react-native-url-polyfill/auto';
 import 'react-native-get-random-values';
 import React, { useEffect } from 'react';
-import { View } from 'react-native';
+import { View, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as WebBrowser from 'expo-web-browser';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -21,8 +21,10 @@ SplashScreen.preventAutoHideAsync().catch(() => {
     // Safe to ignore — the JS SplashScreen animation will still play.
 });
 
-// Complete any pending auth sessions
-WebBrowser.maybeCompleteAuthSession();
+// Complete any pending auth sessions on web popups
+if (Platform.OS === 'web') {
+  WebBrowser.maybeCompleteAuthSession();
+}
 
 // Navigation ref — allows navigating from outside the Navigator tree (e.g. on notification tap)
 export const navigationRef = createNavigationContainerRef();
@@ -37,6 +39,12 @@ export default function App() {
       if (__DEV__) console.warn('[App] Notification setup failed:', err?.message);
     });
 
+    // Safety fallback: ensure native splash screen never hangs indefinitely
+    const fallbackTimer = setTimeout(() => {
+      SplashScreen.hideAsync().catch(() => {});
+    }, 4000);
+
+    return () => clearTimeout(fallbackTimer);
   }, []);
 
   // While fonts are loading, keep the native splash on screen by rendering

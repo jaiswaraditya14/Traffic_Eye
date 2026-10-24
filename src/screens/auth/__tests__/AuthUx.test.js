@@ -58,8 +58,21 @@ async function fill(placeholder, value) {
 }
 
 async function press(label) {
-    const button = view.root.findAllByType(TouchableOpacity)
-        .find(node => textOf(node).includes(label));
+    const textNodes = view.root.findAll(node =>
+        node.children && node.children.some(c => typeof c === 'string' && c.includes(label))
+    );
+    let button = null;
+    for (const textNode of textNodes) {
+        let current = textNode;
+        while (current) {
+            if (typeof current.props?.onPress === 'function') {
+                button = current;
+                break;
+            }
+            current = current.parent;
+        }
+        if (button) break;
+    }
     expect(button).toBeDefined();
     await act(async () => button.props.onPress());
 }

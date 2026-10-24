@@ -58,8 +58,8 @@
   "private": true,
   "jest": {
     "preset": "jest-expo",
-    "setupFiles": [
-      "./node_modules/@react-native-async-storage/async-storage/jest/async-storage-mock.js"
+    "setupFilesAfterEnv": [
+      "<rootDir>/jest-setup.js"
     ],
     "testMatch": [
       "<rootDir>/src/**/*.test.[jt]s?(x)",
