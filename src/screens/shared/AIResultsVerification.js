@@ -8,8 +8,7 @@ import { COLORS } from '../../utils/theme';
 import { confidencePercent } from '../../utils/productExperience';
 import { isDemoEvidence } from '../../services/demoMode';
 import { FocusAwareStatusBar, ProgressRing, PressableScale, FeedbackToast, AIStatusBadge } from '../../components';
-
-
+import { resolveReportLocation } from '../../services/reports/locationResolver';
 
 export default function AIResultsVerification({ navigation, route }) {
     const { currentReport } = useAppContext();
@@ -80,20 +79,28 @@ export default function AIResultsVerification({ navigation, route }) {
             }
             const severityLower = (aiResults?.severity || 'medium').toLowerCase();
             const normSeverity = ['low', 'medium', 'high', 'critical'].includes(severityLower) ? severityLower : 'medium';
-            // location_source is persisted only when the optional DB column exists.
-            // Run: ALTER TABLE image_reports ADD COLUMN IF NOT EXISTS location_source TEXT;
-            const locationSourcePayload = currentReport?.locationSource
-                ? { location_source: currentReport.locationSource }
-                : {};
+
+            // Resolve location ONCE at submission according to the 4-tier priority:
+            // 1. EXIF GPS, 2. Live Device GPS, 3. Typed address geocoded, 4. Pincode centroid approx
+            const resolvedLoc = await resolveReportLocation({
+                exifLocation: (currentReport?.locationSource === 'EXIF_ORIGINAL' || currentReport?.locationSource === 'EXIF_PICKER_COPY')
+                    ? currentReport.location
+                    : null,
+                deviceLocation: (currentReport?.locationSource === 'LIVE_DEVICE_LOCATION' || currentReport?.locationSource === 'LIVE_LOCATION')
+                    ? currentReport.location
+                    : currentReport?.location,
+                address: address || currentReport?.address || '',
+                existingSource: currentReport?.locationSource,
+            });
 
             // Report payload WITHOUT user_id/image_url/image_storage_path — the
             // service fills those in from the authenticated user and the uploaded
             // object, so there is exactly one place that knows the storage layout.
             const report = {
-                latitude:              currentReport?.location?.latitude ?? null,
-                longitude:             currentReport?.location?.longitude ?? null,
-                location_address:      address || currentReport?.address || null,
-                ...locationSourcePayload,
+                latitude:              resolvedLoc.latitude,
+                longitude:             resolvedLoc.longitude,
+                location_address:      resolvedLoc.address || address || currentReport?.address || null,
+                location_source:       resolvedLoc.locationSource,
                 violation_type:        violationType,
                 violation_description: aiResults?.description || null,
                 severity:              normSeverity,

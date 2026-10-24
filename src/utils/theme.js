@@ -96,6 +96,20 @@ export const COLORS = {
     mutedText: '#64748B',       // alias (naming parity)
 };
 
+// ── Live Violation Map Shared Palette (reused by chips, pins & legend) ────────
+export const MAP_SEVERITY_THEME = {
+    low: { label: 'Low', color: '#FACC15', lightBg: 'rgba(250, 204, 21, 0.16)', border: '#EAB308', weight: 1 },
+    medium: { label: 'Medium', color: '#F97316', lightBg: 'rgba(249, 115, 22, 0.16)', border: '#EA580C', weight: 2 },
+    high: { label: 'High', color: '#DC2626', lightBg: 'rgba(220, 38, 38, 0.16)', border: '#B91C1C', weight: 3 },
+    critical: { label: 'Critical', color: '#DC2626', lightBg: 'rgba(220, 38, 38, 0.22)', border: '#991B1B', weight: 4 },
+};
+
+export const MAP_STATUS_THEME = {
+    pending: { label: 'Pending', color: '#3B82F6', lightBg: 'rgba(59, 130, 246, 0.16)', border: '#2563EB', icon: 'time-outline' },
+    approved: { label: 'Verified', color: '#16A34A', lightBg: 'rgba(22, 163, 74, 0.16)', border: '#15803D', icon: 'checkmark-circle-outline' },
+    rejected: { label: 'Rejected', color: '#6B7280', lightBg: 'rgba(107, 114, 128, 0.16)', border: '#4B5563', icon: 'close-circle-outline' },
+};
+
 // Legacy dark colors (kept for backward compat with any remaining usage)
 export const DARK_COLORS = {
     primary: '#90ABFF',

@@ -6,16 +6,59 @@ export const sortOfficerQueue = reports => [...reports].sort((a, b) =>
     || (validTime(a.submitted_at) ?? Infinity) - (validTime(b.submitted_at) ?? Infinity)
     || String(a.id).localeCompare(String(b.id)));
 
-export function filterHeatmapReports(reports, severities, range, now = new Date()) {
-    const cutoff = new Date(now);
-    if (range === 'today') cutoff.setHours(0, 0, 0, 0);
-    else if (range === 'week') cutoff.setDate(cutoff.getDate() - 7);
-    else if (range === 'month') cutoff.setMonth(cutoff.getMonth() - 1);
-    return reports.filter(report => {
+export function filterHeatmapReports(reports, severitiesOrOptions, range = 'all', now = new Date()) {
+    let severities = ['low', 'medium', 'high', 'critical'];
+    let statuses = null;
+    let violationTypes = null;
+    let area = null;
+    let timeRange = range;
+    let nowDate = now;
+
+    if (severitiesOrOptions && typeof severitiesOrOptions === 'object' && !Array.isArray(severitiesOrOptions)) {
+        severities = severitiesOrOptions.severities || severities;
+        statuses = severitiesOrOptions.statuses || null;
+        violationTypes = severitiesOrOptions.violationTypes || null;
+        area = severitiesOrOptions.area || null;
+        timeRange = severitiesOrOptions.range || 'all';
+        nowDate = severitiesOrOptions.now || new Date();
+    } else if (Array.isArray(severitiesOrOptions)) {
+        severities = severitiesOrOptions;
+    }
+
+    const cutoff = new Date(nowDate);
+    if (timeRange === 'today') cutoff.setHours(0, 0, 0, 0);
+    else if (timeRange === 'week') cutoff.setDate(cutoff.getDate() - 7);
+    else if (timeRange === 'month') cutoff.setMonth(cutoff.getMonth() - 1);
+
+    return (reports || []).filter(report => {
         const at = validTime(report.submitted_at);
-        return hasValidReportCoordinates(report)
-            && severities.includes(String(report.severity).toLowerCase())
-            && (range === 'all' || (at != null && at >= cutoff.getTime() && at <= now.getTime()));
+        if (!hasValidReportCoordinates(report)) return false;
+
+        const repSev = String(report.severity || 'low').toLowerCase();
+        if (severities && !severities.map(s => s.toLowerCase()).includes(repSev)) return false;
+
+        if (statuses && statuses.length > 0) {
+            const repStatus = String(report.status || 'pending').toLowerCase();
+            const normStatuses = statuses.map(s => s.toLowerCase() === 'verified' ? 'approved' : s.toLowerCase());
+            if (!normStatuses.includes(repStatus)) return false;
+        }
+
+        if (violationTypes && violationTypes.length > 0) {
+            const repVio = String(report.violation_type || '');
+            if (!violationTypes.includes(repVio)) return false;
+        }
+
+        if (area && typeof area === 'string' && area.trim()) {
+            const search = area.trim().toLowerCase();
+            const addr = String(report.location_address || '').toLowerCase();
+            if (!addr.includes(search)) return false;
+        }
+
+        if (timeRange !== 'all') {
+            if (at == null || at < cutoff.getTime() || at > nowDate.getTime()) return false;
+        }
+
+        return true;
     });
 }
 export function hasValidReportCoordinates(report) {

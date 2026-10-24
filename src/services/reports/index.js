@@ -752,25 +752,48 @@ export async function fetchApprovedMapReports() {
 }
 
 /**
- * Fetch anonymized heatmap points via optimized RPC.
- * Supports bounding-box and time filtering for performance.
+ * Fetch report map points via optimized RPC.
+ * Supports bounding-box, time, status, severity, violation type, and area filtering.
  *
- * @param {object|null} bbox  - { minLat, maxLat, minLng, maxLng } or null for all
- * @param {number}      daysBack - how many days back to query (default 30)
+ * @param {object|null} bboxOrOptions - { bbox, daysBack, statuses, severities, violationTypes, searchArea } or bbox
+ * @param {number}      legacyDaysBack - how many days back to query (default 3650)
  */
-export async function fetchHeatmapPoints(bbox = null, daysBack = 30) {
+export async function fetchHeatmapPoints(bboxOrOptions = null, legacyDaysBack = 3650) {
+    let bbox = null;
+    let daysBack = legacyDaysBack;
+    let statuses = null;
+    let severities = null;
+    let violationTypes = null;
+    let searchArea = null;
+
+    if (bboxOrOptions && typeof bboxOrOptions === 'object' && ('statuses' in bboxOrOptions || 'severities' in bboxOrOptions || 'daysBack' in bboxOrOptions || 'violationTypes' in bboxOrOptions || 'searchArea' in bboxOrOptions)) {
+        bbox = bboxOrOptions.bbox ?? null;
+        daysBack = bboxOrOptions.daysBack ?? 3650;
+        statuses = bboxOrOptions.statuses ?? null;
+        severities = bboxOrOptions.severities ?? null;
+        violationTypes = bboxOrOptions.violationTypes ?? null;
+        searchArea = bboxOrOptions.searchArea ?? null;
+    } else {
+        bbox = bboxOrOptions;
+    }
+
     const params = {
-        p_days_back: daysBack,
-        p_min_lat:   bbox?.minLat  ?? null,
-        p_max_lat:   bbox?.maxLat  ?? null,
-        p_min_lng:   bbox?.minLng  ?? null,
-        p_max_lng:   bbox?.maxLng  ?? null,
+        p_min_lat:         bbox?.minLat ?? null,
+        p_max_lat:         bbox?.maxLat ?? null,
+        p_min_lng:         bbox?.minLng ?? null,
+        p_max_lng:         bbox?.maxLng ?? null,
+        p_days_back:       daysBack || 3650,
+        p_statuses:        statuses && statuses.length > 0 ? statuses : null,
+        p_severities:      severities && severities.length > 0 ? severities.map(s => s.toLowerCase()) : null,
+        p_violation_types: violationTypes && violationTypes.length > 0 ? violationTypes : null,
+        p_search_area:     searchArea && searchArea.trim() ? searchArea.trim() : null,
     };
+
     const { data, error } = await supabase.rpc('get_approved_heatmap_points', params);
     if (error) {
         // Graceful fallback: direct query when RPC is unavailable
-        if (__DEV__) console.warn('[Heatmap] RPC unavailable; using the bounded direct-query fallback.');
-        const { data: fallbackData, error: fallbackError } = await supabase
+        if (__DEV__) console.warn('[Heatmap] RPC query fallback; executing direct Supabase query.');
+        let query = supabase
             .from('image_reports')
             .select(`
                 id,
@@ -779,6 +802,8 @@ export async function fetchHeatmapPoints(bbox = null, daysBack = 30) {
                 location_address,
                 violation_type,
                 severity,
+                status,
+                location_source,
                 reviewed_at,
                 submitted_at,
                 image_url,
@@ -786,9 +811,26 @@ export async function fetchHeatmapPoints(bbox = null, daysBack = 30) {
                     officer:profiles ( full_name, badge_id, jurisdiction )
                 )
             `)
-            .eq('status', 'approved')
-            .order('reviewed_at', { ascending: false })
-            .limit(500);
+            .not('latitude', 'is', null)
+            .not('longitude', 'is', null);
+
+        if (statuses && statuses.length > 0) {
+            query = query.in('status', statuses);
+        }
+        if (severities && severities.length > 0) {
+            query = query.in('severity', severities.map(s => s.toLowerCase()));
+        }
+        if (violationTypes && violationTypes.length > 0) {
+            query = query.in('violation_type', violationTypes);
+        }
+        if (searchArea && searchArea.trim()) {
+            query = query.ilike('location_address', `%${searchArea.trim()}%`);
+        }
+
+        const { data: fallbackData, error: fallbackError } = await query
+            .order('submitted_at', { ascending: false })
+            .limit(600);
+
         if (fallbackError) {
             if (__DEV__) console.warn('[Heatmap] Direct-query fallback unavailable.');
             return { data: [], error: fallbackError };
