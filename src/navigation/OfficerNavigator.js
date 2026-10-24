@@ -20,6 +20,7 @@ import {
     VerifiedReportDetail,
     ViolationHeatmap,
     OfficerReportExport,
+    OfficerAnalytics,
     Notifications,
 } from '../screens';
 
@@ -85,6 +86,7 @@ export default function OfficerNavigator() {
             <Stack.Screen name="VerifiedReportDetail" component={VerifiedReportDetail} />
             <Stack.Screen name="OfficerSettings" component={OfficerSettings} />
             <Stack.Screen name="OfficerReportExport" component={OfficerReportExport} />
+            <Stack.Screen name="OfficerAnalytics" component={OfficerAnalytics} />
             <Stack.Screen name="OfficerNotifications" component={Notifications} />
         </Stack.Navigator>
     );

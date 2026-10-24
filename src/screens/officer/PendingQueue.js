@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FocusAwareStatusBar } from '../../components';
+import { AIStatusBadge } from '../../components/common/AIStatusBadge';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFocusEffect } from '@react-navigation/native';
 import { fetchPendingReports, subscribeToOfficerQueue, submitOfficerDecision } from '../../services/reports';

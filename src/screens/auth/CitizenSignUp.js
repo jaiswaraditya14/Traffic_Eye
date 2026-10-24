@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MobileContainer, FocusAwareStatusBar } from '../../components';
 import { useAuth } from '../../context';
+import { supabase } from '../../services';
 import {
     isValidEmail, isValidPassword, isValidPhone,
     validateRequiredFields, passwordsMatch,
@@ -43,6 +44,7 @@ export default function CitizenSignUp({ navigation }) {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [signUpSuccess, setSignUpSuccess] = useState(false);
+    const [resending, setResending] = useState(false);
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const successScaleAnim = useRef(new Animated.Value(0.5)).current;
@@ -96,8 +98,26 @@ export default function CitizenSignUp({ navigation }) {
         }
     };
 
-    const handleResendEmail = () => {
-        Alert.alert('Email Resent', `A new verification email has been sent to ${email}. Please check your inbox and spam folder.`);
+    const handleResendEmail = async () => {
+        if (resending) return;
+        setResending(true);
+        try {
+            const { error } = await supabase.auth.resend({
+                type: 'signup',
+                email: email.trim(),
+                options: { emailRedirectTo: 'trafficeye://signup-success' },
+            });
+            if (error) {
+                Alert.alert('Resend Failed', error.message || 'Could not resend the verification email. Please try again.');
+                return;
+            }
+            Alert.alert('Email Resent', `A new verification email has been sent to ${email.trim()}. Please check your inbox and spam folder.`);
+        } catch (error) {
+            Alert.alert('Resend Failed', 'Something went wrong. Please try again.');
+            if (__DEV__) console.warn('[AUTH] Verification email resend failed.');
+        } finally {
+            setResending(false);
+        }
     };
 
     // ── Success: Email Verification Screen ──
@@ -164,8 +184,16 @@ export default function CitizenSignUp({ navigation }) {
                             </LinearGradient>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.resendRow} onPress={handleResendEmail}>
-                            <Ionicons name="refresh" size={14} color={C.navyMid} />
+                        <TouchableOpacity
+                            style={styles.resendRow}
+                            onPress={handleResendEmail}
+                            disabled={resending}
+                        >
+                            {resending ? (
+                                <ActivityIndicator size="small" color={C.navyMid} />
+                            ) : (
+                                <Ionicons name="refresh" size={14} color={C.navyMid} />
+                            )}
                             <Text style={styles.resendText}>Didn&apos;t receive the email? Resend</Text>
                         </TouchableOpacity>
 
@@ -260,7 +288,7 @@ export default function CitizenSignUp({ navigation }) {
                                     <Ionicons name="lock-closed" size={17} color="#94A3B8" />
                                     <TextInput
                                         style={styles.textInput}
-                                        placeholder="Min 8 unique characters"
+                                        placeholder="At least 6 characters"
                                         placeholderTextColor="#94A3B8"
                                         value={password}
                                         onChangeText={setPassword}
@@ -270,6 +298,7 @@ export default function CitizenSignUp({ navigation }) {
                                         <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={17} color="#94A3B8" />
                                     </TouchableOpacity>
                                 </View>
+                                <Text style={styles.passwordHint}>Password must be at least 6 characters.</Text>
                             </View>
 
                             {/* Confirm Password */}
@@ -435,6 +464,13 @@ const styles = StyleSheet.create({
         color: C.textPrimary,
         fontFamily: 'Nunito-SemiBold',
         padding: 0,
+    },
+    passwordHint: {
+        fontSize: 12,
+        color: C.textTertiary,
+        fontFamily: 'Nunito-Medium',
+        marginTop: 6,
+        marginLeft: 4,
     },
 
     // Sign Up Button

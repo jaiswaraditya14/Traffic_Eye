@@ -28,7 +28,7 @@ function StrengthBar({ password }) {
     const getStrength = (pwd) => {
         let score = 0;
         if (!pwd) return { score: 0, label: '', color: '#E2E8F0' };
-        if (pwd.length >= 8) score++;
+        if (pwd.length >= 6) score++;
         if (/[A-Z]/.test(pwd)) score++;
         if (/[0-9]/.test(pwd)) score++;
         if (/[^A-Za-z0-9]/.test(pwd)) score++;
@@ -87,7 +87,7 @@ export default function NewPassword({ navigation, route }) {
 
     const validate = () => {
         if (!password) { setError('Please enter a new password.'); return false; }
-        if (password.length < 8) { setError('Password must be at least 8 characters.'); return false; }
+        if (password.length < 6) { setError('Password must be at least 6 characters.'); return false; }
         if (password !== confirmPassword) { setError('Passwords do not match.'); return false; }
         return true;
     };
@@ -120,9 +120,6 @@ export default function NewPassword({ navigation, route }) {
                 return;
             }
 
-            // Sign out so user re-authenticates cleanly
-            await supabase.auth.signOut();
-
             setLoading(false);
             setDone(true);
             Animated.parallel([
@@ -135,6 +132,19 @@ export default function NewPassword({ navigation, route }) {
             setLoading(false);
         } finally {
             // Safety fallback, though explicitly called above in branches
+            setLoading(false);
+        }
+    };
+
+    const handleSuccessContinue = async () => {
+        setLoading(true);
+        try {
+            // Keep the success screen visible until the user chooses to continue.
+            await supabase.auth.signOut();
+            navigation.navigate(route.params?.role === 'officer' ? 'OfficerSignIn' : 'CitizenSignIn');
+        } catch (err) {
+            if (__DEV__) console.warn('[AUTH] Sign out after password update failed.');
+        } finally {
             setLoading(false);
         }
     };
@@ -158,13 +168,8 @@ export default function NewPassword({ navigation, route }) {
                         </Text>
                         <TouchableOpacity
                             style={styles.successCTA}
-                            onPress={() => {
-                                if (route.params?.role === 'officer') {
-                                    navigation.navigate('OfficerSignIn');
-                                } else {
-                                    navigation.navigate('CitizenSignIn');
-                                }
-                            }}
+                            onPress={handleSuccessContinue}
+                            disabled={loading}
                             activeOpacity={0.88}
                         >
                             <LinearGradient
@@ -207,7 +212,7 @@ export default function NewPassword({ navigation, route }) {
                     <Animated.View style={[styles.formContainer, { opacity: fadeAnim }]}>
                         <View style={styles.card}>
                             <Text style={styles.cardTitle}>New Password</Text>
-                            <Text style={styles.cardSubtitle}>Must be at least 8 characters</Text>
+                            <Text style={styles.cardSubtitle}>Must be at least 6 characters</Text>
 
                             {/* New Password */}
                             <View style={styles.fieldGroup}>
@@ -216,7 +221,7 @@ export default function NewPassword({ navigation, route }) {
                                     <Ionicons name="lock-closed" size={17} color={pwFocused ? C.navyMid : '#94A3B8'} />
                                     <TextInput
                                         style={styles.textInput}
-                                        placeholder="At least 8 characters"
+                                        placeholder="At least 6 characters"
                                         placeholderTextColor="#94A3B8"
                                         value={password}
                                         onChangeText={v => { setPassword(v); setError(''); }}
@@ -269,7 +274,7 @@ export default function NewPassword({ navigation, route }) {
                             {/* Requirements */}
                             <View style={styles.requirements}>
                                 {[
-                                    { rule: password.length >= 8, label: 'Minimum 8 characters' },
+                                    { rule: password.length >= 6, label: 'Minimum 6 characters' },
                                     { rule: /[A-Z]/.test(password), label: 'One uppercase letter' },
                                     { rule: /[0-9]/.test(password), label: 'One number' },
                                     { rule: /[^A-Za-z0-9]/.test(password), label: 'One special character' },

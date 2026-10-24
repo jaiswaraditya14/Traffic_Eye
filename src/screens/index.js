@@ -42,6 +42,7 @@ export { default as OfficerSettings } from './officer/OfficerSettings';
 export { default as VerifiedReportDetail } from './officer/VerifiedReportDetail';
 export { default as ViolationHeatmap } from './officer/ViolationHeatmap';
 export { default as OfficerReportExport } from './officer/OfficerReportExport';
+export { default as OfficerAnalytics } from './officer/OfficerAnalytics';
 
 // Shared & Dev Screens
 export { default as OnboardingCarousel } from './shared/OnboardingCarousel';

@@ -504,6 +504,9 @@ export async function fetchReportById(reportId) {
                 decision,
                 remarks,
                 internal_notes,
+                corrected_violation_type,
+                corrected_severity,
+                correction_reason,
                 review_timestamp,
                 officer:officer_id ( id, full_name, badge_id, department )
             ),
@@ -567,6 +570,9 @@ export async function fetchReviewedReports(officerProfile = null) {
             officer_review:officer_reviews (
                 decision,
                 remarks,
+                corrected_violation_type,
+                corrected_severity,
+                correction_reason,
                 review_timestamp,
                 officer:officer_id ( full_name, badge_id )
             ),
@@ -596,15 +602,26 @@ export async function fetchReviewedReports(officerProfile = null) {
  * @param {string} officerId
  * @param {'approved'|'rejected'} decision
  * @param {string} [remarks]     - public remark shown to citizen
- * @param {string} [internalNotes] - private note
+ * @param {string} [internalNotes] - private note, never a serialized correction payload
+ * @param {object} [corrections] - optional structured officer corrections
  */
-export async function submitOfficerDecision(reportId, officerId, decision, remarks = null, internalNotes = null) {
+export async function submitOfficerDecision(
+    reportId,
+    officerId,
+    decision,
+    remarks = null,
+    internalNotes = null,
+    corrections = {},
+) {
     const { data, error } = await supabase.rpc('submit_officer_review', {
         p_report_id:  reportId,
         p_officer_id: officerId,
         p_decision:   decision,
         p_remarks:    remarks,
         p_internal:   internalNotes,
+        p_corrected_violation_type: corrections.correctedViolationType || null,
+        p_corrected_severity: corrections.correctedSeverity || null,
+        p_correction_reason: corrections.correctionReason || null,
     });
     return { data, error };
 }
@@ -819,7 +836,12 @@ export async function fetchReportsByDateRange(fromDate, toDate, status = 'all', 
                 location_address,
                 severity,
                 status,
-                ai_raw_result
+                ai_raw_result,
+                officer_review:officer_reviews (
+                    corrected_violation_type,
+                    corrected_severity,
+                    correction_reason
+                )
             `)
             .gte('submitted_at', start.toISOString())
             .lte('submitted_at', end.toISOString())

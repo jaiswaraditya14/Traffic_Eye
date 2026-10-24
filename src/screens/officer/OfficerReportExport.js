@@ -215,6 +215,7 @@ export default function OfficerReportExport({ navigation }) {
                 violation: formatViolationForSpreadsheet(r),
                 vehiclePlateNumber: r.vehicle_number || 'N/A',
                 address: r.location_address || 'N/A',
+                status: r.status ? (r.status.charAt(0).toUpperCase() + r.status.slice(1)) : 'N/A',
             }));
             const csv = buildReportCsv(spreadsheetRows);
             const fromStr = formatDateYMD(fromDate);

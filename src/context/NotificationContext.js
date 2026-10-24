@@ -5,7 +5,7 @@ import { useAuth } from './AuthContext';
 import { supabase } from '../services/supabase';
 import { subscribeToNotifications } from '../services/reports';
 import { sendLocalNotification, setBadgeCount } from '../services/notifications';
-import { startNotificationSession, notificationDestination } from '../services/notifications/lifecycle';
+import { startNotificationSession, notificationDestination, registerPushToken, clearPushToken } from '../services/notifications/lifecycle';
 import { FeedbackToast } from '../components/common/FeedbackToast';
 
 const Context = createContext({ unreadCount: 0, notificationRevision: 0, refreshUnread: async () => {}, latestNotification: null });
@@ -38,9 +38,13 @@ export function NotificationProvider({ children, navigationRef }) {
         setUnreadCount(0); setLatest(null); setToast(null); countSequence.current++;
         setBadgeCount(0);
         const id = user?.id;
-        if (!id) return undefined;
+        if (!id) {
+            clearPushToken();
+            return undefined;
+        }
         refreshUnread();
-        return startNotificationSession({
+        registerPushToken();
+        const endSession = startNotificationSession({
             userId: id, subscribe: subscribeToNotifications, removeChannel: channel => supabase.removeChannel(channel),
             isCurrent: () => identity.current === id,
             isForeground: () => AppState.currentState === 'active',

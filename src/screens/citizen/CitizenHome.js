@@ -15,6 +15,7 @@ import * as Location from 'expo-location';
 import { reverseGeocode } from '../../services/geoService';
 import { fetchCitizenReports, subscribeToReportUpdates } from '../../services/reports';
 import { useFocusEffect } from '@react-navigation/native';
+import { useDrafts } from '../../hooks/useDrafts';
 
 // ── Design Tokens (Civic Authority) ──
 const C = {
@@ -90,6 +91,7 @@ export default function CitizenHome({ navigation }) {
 
     // Stats data
     const [reports, setReports] = React.useState([]);
+    const { count: draftCount, drafts, refresh: refreshDrafts } = useDrafts();
     const { unreadCount } = useNotifications();
     const [loading, setLoading] = React.useState(true);
     const [refreshing, setRefreshing] = React.useState(false);
@@ -112,8 +114,9 @@ export default function CitizenHome({ navigation }) {
         React.useCallback(() => {
             setFocusKey(key => key + 1);
             loadData();
+            refreshDrafts();
             return () => { sequence.current++; };
-        }, [loadData])
+        }, [loadData, refreshDrafts])
     );
 
     useFocusEffect(
@@ -282,6 +285,26 @@ export default function CitizenHome({ navigation }) {
                                 <PressableScale accessibilityLabel="Redeem rewards" onPress={() => navigation.navigate('Rewards')} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: COLORS.primary }}>Redeem →</Text></PressableScale>
                             </View>
                         </GlassCard>
+
+                        {draftCount > 0 && (
+                            <TouchableOpacity
+                                style={styles.draftsCard}
+                                onPress={() => (navigation.getParent() || navigation).navigate('NewReport', { draft: drafts[0] })}
+                                activeOpacity={0.85}
+                            >
+                                <View style={styles.draftsIconBox}>
+                                    <Ionicons name="document-text" size={20} color={C.amberDark} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.draftsTitle}>Unfinished Draft ({draftCount})</Text>
+                                    <Text style={styles.draftsSub}>Tap to resume your saved traffic report</Text>
+                                </View>
+                                <View style={styles.draftsBadge}>
+                                    <Text style={styles.draftsBadgeText}>{draftCount}</Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={16} color={C.amberDark} />
+                            </TouchableOpacity>
+                        )}
 
                         {/* ── Recent Activity ── */}
                         <Animated.View
@@ -768,5 +791,51 @@ const styles = StyleSheet.create({
         color: C.textTertiary,
         marginTop: 4,
         textAlign: 'center',
+    },
+    draftsCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        backgroundColor: '#FFFBEB',
+        borderRadius: 16,
+        padding: 14,
+        marginBottom: 20,
+        borderWidth: 1.5,
+        borderColor: '#FDE68A',
+        shadowColor: C.navy,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+    draftsIconBox: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        backgroundColor: '#FEF3C7',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    draftsTitle: {
+        fontSize: 14,
+        fontFamily: 'Nunito-Bold',
+        color: C.textPrimary,
+    },
+    draftsSub: {
+        fontSize: 11,
+        fontFamily: 'Nunito-Medium',
+        color: C.textSecondary,
+        marginTop: 2,
+    },
+    draftsBadge: {
+        backgroundColor: C.amber,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 10,
+    },
+    draftsBadgeText: {
+        fontSize: 11,
+        fontFamily: 'Nunito-Bold',
+        color: C.navy,
     },
 });

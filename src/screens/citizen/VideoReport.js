@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, ScrollView,
     TextInput, Alert, Animated, ActivityIndicator, StatusBar,
-    Modal, Platform,
+    Modal, Platform, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +18,7 @@ import { validateNewReport } from '../../utils/productExperience';
 import { useAppContext } from '../../context';
 import { buildDemoReport } from '../../services/demoMode';
 import { FocusAwareStatusBar, FeedbackToast, ConfirmationModal } from '../../components';
+import { cacheVideoThumbnail } from '../../hooks/useImagePicker';
 
 // ── Design Tokens (matches existing app exactly) ──
 
@@ -65,13 +66,13 @@ function StepIndicator({ currentStep }) {
 }
 
 // ── Step 1: Upload Video ──
-function StepUpload({ video, onRecordVideo, onPickVideo, onRemoveVideo, loadingPicker }) {
+function StepUpload({ video, thumbnailUri, onRecordVideo, onPickVideo, onRemoveVideo, loadingPicker }) {
     const filename = video ? video.split('/').pop() : null;
 
     return (
         <View style={styles.stepContent}>
             <Text style={styles.stepTitle}>Upload Violation Video</Text>
-            <Text style={styles.stepSubtitle}>Record live or pick an existing clip from your gallery</Text>
+            <Text style={styles.stepSubtitle}>Record or choose up to 15 seconds · 12 MB maximum</Text>
 
             {/* Upload Zone / Preview */}
             {!video ? (
@@ -87,7 +88,9 @@ function StepUpload({ video, onRecordVideo, onPickVideo, onRemoveVideo, loadingP
             ) : (
                 <View style={styles.videoPreviewCard}>
                     <View style={styles.videoThumb}>
-                        <Ionicons name="videocam" size={32} color={COLORS.white} />
+                        {thumbnailUri
+                            ? <Image source={{ uri: thumbnailUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                            : <Ionicons name="videocam" size={32} color={COLORS.white} />}
                         <View style={styles.playBtn}>
                             <Ionicons name="play" size={14} color={COLORS.primaryDark} />
                         </View>
@@ -137,7 +140,7 @@ function StepDetails({
     address, setAddress,
     vehiclePlate, setVehiclePlate,
     onDetectLocation, onOpenMap,
-    loadingLocation, video,
+    loadingLocation, video, thumbnailUri,
 }) {
     const [focusedDesc, setFocusedDesc] = useState(false);
     const [focusedPlate, setFocusedPlate] = useState(false);
@@ -149,7 +152,10 @@ function StepDetails({
             {/* Mini video thumbnail row */}
             <View style={styles.miniVideoRow}>
                 <View style={styles.miniVideoThumb}>
-                    <Ionicons name="videocam" size={16} color={COLORS.white} />
+                    {thumbnailUri
+                        ? <Image source={{ uri: thumbnailUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                        : <Ionicons name="videocam" size={16} color={COLORS.white} />}
+                    <View style={styles.miniVideoIcon}><Ionicons name="videocam" size={11} color={COLORS.white} /></View>
                 </View>
                 <View style={{ flex: 1 }}>
                     <Text style={styles.miniVideoName} numberOfLines={1}>{filename || 'video_clip.mp4'}</Text>
@@ -250,16 +256,13 @@ function StepDetails({
             <View style={styles.dateRow}>
                 <Ionicons name="calendar-outline" size={18} color={COLORS.primary} />
                 <Text style={styles.dateText}>{new Date().toLocaleString('en-IN', { dateStyle: 'long', timeStyle: 'short' })}</Text>
-                <View style={styles.dateEditBadge}>
-                    <Ionicons name="pencil" size={12} color={COLORS.textTertiary} />
-                </View>
             </View>
         </View>
     );
 }
 
 // ── Step 3: Review & Submit ──
-function StepReview({ video, violationType, description, address, vehiclePlate, onSubmit, submitting }) {
+function StepReview({ video, thumbnailUri, violationType, description, address, vehiclePlate, onSubmit, submitting }) {
     const filename = video ? video.split('/').pop() : null;
     const violationLabel = VIOLATION_TYPES.find(v => v.id === violationType)?.label || 'Not selected';
 
@@ -275,14 +278,16 @@ function StepReview({ video, violationType, description, address, vehiclePlate, 
                 {/* Video preview */}
                 <View style={styles.summaryVideoRow}>
                     <View style={styles.summaryVideoThumb}>
-                        <Ionicons name="videocam" size={24} color={COLORS.white} />
+                        {thumbnailUri
+                            ? <Image source={{ uri: thumbnailUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                            : <Ionicons name="videocam" size={24} color={COLORS.white} />}
                         <View style={styles.summaryPlayBtn}>
                             <Ionicons name="play" size={10} color={COLORS.primaryDark} />
                         </View>
                     </View>
                     <View style={{ flex: 1, marginLeft: 12 }}>
                         <Text style={styles.summaryVideoName} numberOfLines={1}>{filename}</Text>
-                        <Text style={styles.summaryVideoSub}>Tap to preview</Text>
+                        <Text style={styles.summaryVideoSub}>Video attached</Text>
                     </View>
                 </View>
 
@@ -332,10 +337,6 @@ function StepReview({ video, violationType, description, address, vehiclePlate, 
                     }
                     <Text style={styles.submitText}>{submitting ? 'Submitting...' : 'Submit Report'}</Text>
                 </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.draftBtn}>
-                <Text style={styles.draftText}>Save as Draft</Text>
             </TouchableOpacity>
         </View>
     );
@@ -450,7 +451,7 @@ export default function VideoReport({ navigation }) {
 
             const cleanVideoUri = video || '';
             const media = cleanVideoUri
-                ? { uri: cleanVideoUri, fileType: 'video', mimeType: videoAsset?.mimeType, fileSize: videoAsset?.fileSize }
+                ? { uri: cleanVideoUri, fileType: 'video', mimeType: videoAsset?.mimeType, fileSize: videoAsset?.fileSize, thumbnailUri: videoAsset?.thumbnailUri }
                 : null;
 
             const { data: created, error } = await reportService.submitReportWithMedia({
@@ -465,6 +466,8 @@ export default function VideoReport({ navigation }) {
             if (error || !created) throw error || new Error('Could not submit your video report.');
 
             if (!mountedRef.current) return;
+            // Local fallback until report_media has a persisted thumbnail column/upload.
+            await cacheVideoThumbnail(created.id, videoAsset?.thumbnailUri);
             navigation.replace('VideoReportSuccess', {
                 reportId: created.id,
                 displayId: `VR-${created.id.slice(-6).toUpperCase()}`,
@@ -535,6 +538,7 @@ export default function VideoReport({ navigation }) {
                     {currentStep === 1 && (
                         <StepUpload
                             video={video}
+                            thumbnailUri={videoAsset?.thumbnailUri}
                             onRecordVideo={handleRecordVideo}
                             onPickVideo={handlePickVideo}
                             onRemoveVideo={handleRemoveVideo}
@@ -555,11 +559,13 @@ export default function VideoReport({ navigation }) {
                             onOpenMap={() => setIsMapVisible(true)}
                             loadingLocation={loadingLocation}
                             video={video}
+                            thumbnailUri={videoAsset?.thumbnailUri}
                         />
                     )}
                     {currentStep === 3 && (
                         <StepReview
                             video={video}
+                            thumbnailUri={videoAsset?.thumbnailUri}
                             violationType={violationType}
                             description={description}
                             address={address}
@@ -739,7 +745,7 @@ const styles = StyleSheet.create({
         width: 72, height: 56, borderRadius: 12,
         backgroundColor: COLORS.primary,
         justifyContent: 'center', alignItems: 'center',
-        position: 'relative',
+        position: 'relative', overflow: 'hidden',
     },
     playBtn: {
         position: 'absolute', bottom: 4, right: 4,
@@ -787,8 +793,9 @@ const styles = StyleSheet.create({
     miniVideoThumb: {
         width: 44, height: 34, borderRadius: 8,
         backgroundColor: COLORS.primary,
-        justifyContent: 'center', alignItems: 'center',
+        justifyContent: 'center', alignItems: 'center', overflow: 'hidden',
     },
+    miniVideoIcon: { position: 'absolute', bottom: 2, right: 2, borderRadius: 6, padding: 2, backgroundColor: COLORS.overlayStrong },
     miniVideoName: { fontSize: 12, fontFamily: 'Nunito-Bold', color: COLORS.textPrimary },
     miniVideoSub: { fontSize: 10, color: COLORS.success, fontFamily: 'Nunito-Medium', marginTop: 2 },
     miniCheckBadge: {},
@@ -889,7 +896,7 @@ const styles = StyleSheet.create({
         width: 80, height: 56, borderRadius: 10,
         backgroundColor: COLORS.primary,
         justifyContent: 'center', alignItems: 'center',
-        position: 'relative',
+        position: 'relative', overflow: 'hidden',
     },
     summaryPlayBtn: {
         position: 'absolute', bottom: 4, right: 4,

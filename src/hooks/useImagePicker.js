@@ -3,9 +3,107 @@
 
 import { useEffect, useRef, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as VideoThumbnails from 'expo-video-thumbnails';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert, Platform, NativeModules } from 'react-native';
 
-const VIDEO_SIZE_LIMIT_BYTES = 5 * 1024 * 1024; // 5 MB
+export const VIDEO_UPLOAD_LIMIT_BYTES = 12 * 1024 * 1024; // 12 MB
+const VIDEO_THUMBNAIL_CACHE_PREFIX = 'traffic-eye:video-thumbnail:';
+
+export async function generateVideoThumbnail(uri) {
+    if (!uri) return null;
+    try {
+        const { uri: thumbnailUri } = await VideoThumbnails.getThumbnailAsync(uri, { time: 0 });
+        return thumbnailUri || null;
+    } catch {
+        // A missing frame must never be replaced with a video file or fake image.
+        return null;
+    }
+}
+
+export async function cacheVideoThumbnail(reportId, thumbnailUri) {
+    if (!reportId || !thumbnailUri) return;
+    try {
+        await AsyncStorage.setItem(VIDEO_THUMBNAIL_CACHE_PREFIX + reportId, thumbnailUri);
+    } catch {
+        // The generated frame still works for the current flow if caching fails.
+    }
+}
+
+export function getReportMediaInfo(report) {
+    const videoMedia = report?.media?.find(media =>
+        media.file_type === 'video' || media.mime_type?.startsWith('video/')
+    );
+    const isVideo = Boolean(videoMedia || report?.ai_raw_result?.source === 'manual_video');
+    return {
+        isVideo,
+        videoUri: videoMedia?.file_url || (isVideo ? report?.image_url : null) || null,
+        imageUri: isVideo ? null : report?.image_url || report?.media?.find(media => media.file_type === 'image')?.file_url || null,
+        thumbnailUri: report?.thumbnail_url || videoMedia?.thumbnail_url || null,
+    };
+}
+
+/** Resolve persisted frames first, then extract a real frame from local/remote video. */
+export function useVideoThumbnails(reports) {
+    const [thumbnails, setThumbnails] = useState({});
+    useEffect(() => {
+        let active = true;
+        const resolveThumbnails = async () => {
+            for (const report of reports || []) {
+                const { isVideo, videoUri, thumbnailUri } = getReportMediaInfo(report);
+                if (!isVideo || !report.id) continue;
+                if (thumbnailUri) {
+                    if (active) setThumbnails(previous => ({ ...previous, [report.id]: thumbnailUri }));
+                    continue;
+                }
+                let resolved = null;
+                try {
+                    resolved = await AsyncStorage.getItem(VIDEO_THUMBNAIL_CACHE_PREFIX + report.id);
+                } catch {
+                    // Fall through to first-frame extraction when local storage is unavailable.
+                }
+                if (!resolved && videoUri) resolved = await generateVideoThumbnail(videoUri);
+                if (resolved) await cacheVideoThumbnail(report.id, resolved);
+                if (active && resolved) setThumbnails(previous => ({ ...previous, [report.id]: resolved }));
+            }
+        };
+        resolveThumbnails();
+        return () => { active = false; };
+    }, [reports]);
+    return thumbnails;
+}
+
+async function getAssetFileSize(asset) {
+    if (Number.isFinite(asset.fileSize)) return asset.fileSize;
+    try {
+        const info = await FileSystem.getInfoAsync(asset.uri, { size: true });
+        if (info?.exists !== false && Number.isFinite(info?.size)) return info.size;
+    } catch {
+        // The upload service performs its own authoritative size check.
+    }
+    return null;
+}
+
+async function videoAssetMetadata(asset) {
+    const fileSize = await getAssetFileSize(asset);
+    if (fileSize != null && fileSize > VIDEO_UPLOAD_LIMIT_BYTES) {
+        Alert.alert(
+            'Video Too Large',
+            `Please choose a video up to 12 MB. This video is ${(fileSize / (1024 * 1024)).toFixed(1)} MB.`
+        );
+        return null;
+    }
+    return {
+        uri: asset.uri,
+        exif: asset.exif || null,
+        duration: asset.duration,
+        mimeType: asset.mimeType,
+        fileSize,
+        fileName: asset.fileName,
+        thumbnailUri: await generateVideoThumbnail(asset.uri),
+    };
+}
 
 export default function useImagePicker() {
     const mounted = useRef(true);
@@ -48,6 +146,12 @@ export default function useImagePicker() {
 
             if (!result.canceled && result.assets?.length > 0) {
                 const asset = result.assets[0];
+                const fileSize = await getAssetFileSize(asset);
+                if (!mounted.current) return null;
+                if (fileSize != null && fileSize > VIDEO_UPLOAD_LIMIT_BYTES) {
+                    Alert.alert('Image Too Large', `Please choose an image up to 12 MB. This image is ${(fileSize / (1024 * 1024)).toFixed(1)} MB.`);
+                    return null;
+                }
                 // Evidence metadata may contain private GPS or access-bearing URIs; never log it.
                 if (mounted.current) setExifData(asset.exif || null);
                 return {
@@ -134,15 +238,8 @@ export default function useImagePicker() {
             if (!mounted.current) return null;
 
             if (!result.canceled && result.assets?.length > 0) {
-                const asset = result.assets[0];
-                if (asset.fileSize && asset.fileSize > VIDEO_SIZE_LIMIT_BYTES) {
-                    Alert.alert(
-                        'Video Too Large',
-                        `Please select a video under 5 MB. This video is ${(asset.fileSize / (1024 * 1024)).toFixed(1)} MB.`
-                    );
-                    return null;
-                }
-                return { uri: asset.uri, exif: asset.exif || null, duration: asset.duration, mimeType: asset.mimeType, fileSize: asset.fileSize, fileName: asset.fileName };
+                const video = await videoAssetMetadata(result.assets[0]);
+                return mounted.current ? video : null;
             }
             return null;
         } catch (error) {
@@ -172,15 +269,8 @@ export default function useImagePicker() {
             if (!mounted.current) return null;
 
             if (!result.canceled && result.assets?.length > 0) {
-                const asset = result.assets[0];
-                if (asset.fileSize && asset.fileSize > VIDEO_SIZE_LIMIT_BYTES) {
-                    Alert.alert(
-                        'Video Too Large',
-                        `The recorded video exceeds 5 MB (${(asset.fileSize / (1024 * 1024)).toFixed(1)} MB). Please record a shorter clip.`
-                    );
-                    return null;
-                }
-                return { uri: asset.uri, exif: asset.exif || null, duration: asset.duration, mimeType: asset.mimeType, fileSize: asset.fileSize, fileName: asset.fileName };
+                const video = await videoAssetMetadata(result.assets[0]);
+                return mounted.current ? video : null;
             }
             return null;
         } catch (error) {

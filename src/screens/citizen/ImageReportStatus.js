@@ -22,6 +22,7 @@ import {
     fetchCitizenReports,
     subscribeToReportUpdates,
 } from '../../services/reports';
+import { AIStatusBadge } from '../../components/common/AIStatusBadge';
 
 // ── Design tokens ──────────────────────────────────────────────────────────
 const C = {
@@ -193,7 +194,26 @@ const ReportCard = React.memo(function ReportCard({ report, navigation }) {
                                 </Text>
                             </View>
                         )}
-                        <ConfBar score={report.ai_confidence} />
+                        {report.ai_confidence === 0 && !report.ai_raw_result ? (
+                            <View style={{ marginTop: 6, alignSelf: 'flex-start' }}>
+                                <AIStatusBadge
+                                    result={report.ai_raw_result}
+                                    confidence={report.ai_confidence}
+                                    authenticityCheck={report.authenticity_check}
+                                />
+                            </View>
+                        ) : (
+                            <>
+                                <ConfBar score={report.ai_confidence} />
+                                <View style={{ marginTop: 4, alignSelf: 'flex-start' }}>
+                                    <AIStatusBadge
+                                        result={report.ai_raw_result}
+                                        confidence={report.ai_confidence}
+                                        authenticityCheck={report.authenticity_check}
+                                    />
+                                </View>
+                            </>
+                        )}
                     </View>
                 </View>
             </TouchableOpacity>
@@ -216,7 +236,7 @@ const ReportCard = React.memo(function ReportCard({ report, navigation }) {
                             <DataRow icon="document-text-outline"    label="AI Description"   value={report.violation_description} />
                             <DataRow icon="car-outline"              label="Vehicle Number"   value={report.vehicle_number} />
                             <DataRow icon="warning-outline"          label="Severity"          value={sevCfg.label} />
-                            <DataRow icon="analytics-outline"        label="AI Confidence"    value={`${Math.round((report.ai_confidence ?? 0) * 100)}%`} />
+                            <DataRow icon="analytics-outline"        label="AI Confidence"    value={report.ai_confidence === 0 && !report.ai_raw_result ? 'Manual Entry' : `${Math.round((report.ai_confidence ?? 0) * 100)}%`} />
                             <DataRow icon="location-outline"         label="Location"          value={report.location_address} />
                             <DataRow icon="time-outline"             label="Reported At"       value={submitted} />
                             <DataRow icon="image-outline"            label="Evidence Image"    value={report.image_url ? 'Submitted ✓' : 'Not provided'} />

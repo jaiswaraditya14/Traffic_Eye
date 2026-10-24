@@ -1,5 +1,6 @@
 // Common Components
 export { default as StatusPill } from './common/StatusPill';
+export { default as AIStatusBadge } from './common/AIStatusBadge';
 export { default as PressableScale } from './common/PressableScale';
 export { default as ConfirmationModal } from './common/ConfirmationModal';
 export { default as GlassCard } from './common/GlassCard';

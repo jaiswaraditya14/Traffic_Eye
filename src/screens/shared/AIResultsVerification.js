@@ -7,7 +7,7 @@ import { reportService } from '../../services';
 import { COLORS } from '../../utils/theme';
 import { confidencePercent } from '../../utils/productExperience';
 import { isDemoEvidence } from '../../services/demoMode';
-import { FocusAwareStatusBar, ProgressRing, PressableScale, FeedbackToast } from '../../components';
+import { FocusAwareStatusBar, ProgressRing, PressableScale, FeedbackToast, AIStatusBadge } from '../../components';
 
 
 
@@ -194,6 +194,11 @@ export default function AIResultsVerification({ navigation, route }) {
                             </View>
                         </View>
 
+                        <AIStatusBadge
+                            result={aiResults}
+                            confidence={confidence / 100}
+                            authenticityCheck={routeAuthResult || currentReport?.authenticityResult}
+                        />
                         <ProgressRing value={confidence / 100} color={confidence < 40 ? COLORS.error : confidence <= 70 ? COLORS.secondary : COLORS.success} label="AI confidence" />
                         {/* Primary message */}
                         <View style={styles.aiAlertBox}>

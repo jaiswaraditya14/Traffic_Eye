@@ -55,8 +55,10 @@ export default function ForgotPassword({ navigation }) {
                 return;
             }
 
-            // Navigate to OTP entry screen, passing the email
-            navigation.navigate('OtpVerification', { email: email.trim() });
+            navigation.navigate('SignUpSuccess', {
+                mode: 'passwordReset',
+                email: email.trim(),
+            });
         } catch (err) {
             setError('Something went wrong. Please try again.');
             if (__DEV__) console.warn('[AUTH] Password reset request failed.');

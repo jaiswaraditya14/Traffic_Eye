@@ -23,3 +23,36 @@ export function notificationDestination(data, profile) {
             ...(report ? { params: { reportId: data.reportId } } : {}) },
     };
 }
+
+export async function registerPushToken(getPushToken = null, rpcCaller = null) {
+    try {
+        const fetchToken = getPushToken || (async () => {
+            const { getExpoPushToken } = require('./index');
+            return getExpoPushToken();
+        });
+        const token = await fetchToken();
+        if (!token) return null;
+        const callRpc = rpcCaller || (async (t) => {
+            const { supabase } = require('../supabase');
+            return supabase.rpc('save_push_token', { p_token: t });
+        });
+        await callRpc(token);
+        return token;
+    } catch (e) {
+        if (__DEV__) console.log('[Notifications] Push token registration skipped/failed.');
+        return null;
+    }
+}
+
+export async function clearPushToken(rpcCaller = null) {
+    try {
+        const callRpc = rpcCaller || (async () => {
+            const { supabase } = require('../supabase');
+            return supabase.rpc('save_push_token', { p_token: null });
+        });
+        await callRpc();
+    } catch (e) {
+        if (__DEV__) console.log('[Notifications] Push token clear skipped/failed.');
+    }
+}
+

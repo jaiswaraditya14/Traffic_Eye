@@ -263,7 +263,7 @@ export default function VerifiedReports({ route, navigation }) {
                         <ActivityIndicator size="large" color={C.navyMid} style={{ marginTop: 60 }} />
                     ) : filteredReports.length === 0 ? (
                         <View style={styles.empty}>
-                            <Ionicons name="checkmark-done-circle-outline" size={52} color={C.textTertiary} />
+                            <Ionicons name={statusFilter === 'rejected' ? 'close-circle-outline' : 'checkmark-done-circle-outline'} size={52} color={C.textTertiary} />
                             <Text style={styles.emptyTitle}>{emptyTitle}</Text>
                             <Text style={styles.emptySub}>{(search || activeFiltersCount > 0) ? 'No reports match your filters.' : emptySub}</Text>
                         </View>
@@ -322,10 +322,17 @@ export default function VerifiedReports({ route, navigation }) {
                                                 <Ionicons name="calendar-outline" size={12} color={C.textTertiary} />
                                                 <Text style={styles.metaText}>{dateApproved}</Text>
                                             </View>
-                                            <View style={styles.officerBadge}>
-                                                <Ionicons name="trophy-outline" size={10} color={C.success} />
-                                                <Text style={styles.officerText}>{report.reward_amount || 0} pts</Text>
-                                            </View>
+                                            {report.status === 'rejected' ? (
+                                                <View style={[styles.officerBadge, { backgroundColor: '#FEE2E2', borderColor: 'rgba(220,38,38,0.2)' }]}>
+                                                    <Ionicons name="close-circle-outline" size={10} color="#DC2626" />
+                                                    <Text style={[styles.officerText, { color: '#DC2626' }]}>Rejected</Text>
+                                                </View>
+                                            ) : (
+                                                <View style={styles.officerBadge}>
+                                                    <Ionicons name="trophy-outline" size={10} color={C.success} />
+                                                    <Text style={styles.officerText}>{report.reward_amount || 0} pts</Text>
+                                                </View>
+                                            )}
                                         </View>
                                     </View>
 

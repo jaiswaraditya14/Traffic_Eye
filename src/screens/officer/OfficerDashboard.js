@@ -305,6 +305,21 @@ export default function OfficerDashboard({ navigation }) {
                             </View>
                             <Ionicons name="chevron-forward" size={18} color={C.textTertiary} />
                         </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.actionCard}
+                            onPress={() => navigation.navigate('OfficerAnalytics')}
+                            activeOpacity={0.8}
+                        >
+                            <View style={[styles.actionIconCircle, { backgroundColor: '#EDE9FE' }]}>
+                                <Ionicons name="bar-chart" size={22} color="#7C3AED" />
+                            </View>
+                            <View style={styles.actionCardContent}>
+                                <Text style={styles.actionCardTitle}>Officer Analytics</Text>
+                                <Text style={styles.actionCardDesc}>Verification rates, turnaround & hotspot insights</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={18} color={C.textTertiary} />
+                        </TouchableOpacity>
                     </Animated.View>
 
                     {/* ── Recent Reports Queue ── */}

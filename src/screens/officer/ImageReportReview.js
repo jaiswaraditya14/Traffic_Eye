@@ -18,7 +18,8 @@ import {
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FocusAwareStatusBar, ConfirmationModal, FeedbackToast, PressableScale, StatusPill, CardSkeleton } from '../../components';
+import { FocusAwareStatusBar, ConfirmationModal, FeedbackToast, PressableScale, CardSkeleton } from '../../components';
+import { AIStatusBadge } from '../../components/common/AIStatusBadge';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context';
 import { fetchReportById, submitOfficerDecision } from '../../services/reports';
@@ -54,6 +55,19 @@ const SEVERITY_CFG = {
     high:     { color: '#EA580C', bg: '#FFEDD5', label: 'High',     icon: 'warning',          reward: 100 },
     medium:   { color: COLORS.secondary, bg: COLORS.secondarySurface, label: 'Medium',   icon: 'alert-circle',     reward: 70  },
     low:      { color: '#059669', bg: '#D1FAE5', label: 'Low',      icon: 'checkmark-circle', reward: 50  },
+};
+
+const getOfficerReview = report => Array.isArray(report?.officer_review)
+    ? report.officer_review[0]
+    : report?.officer_review;
+const getOriginalViolations = report => report?.ai_raw_result?.allViolations?.length
+    ? report.ai_raw_result.allViolations
+    : (report?.violation_type || '').split(',').map(value => value.trim()).filter(Boolean);
+const getInitialViolations = report => {
+    const corrected = getOfficerReview(report)?.corrected_violation_type;
+    return corrected
+        ? corrected.split(',').map(value => value.trim()).filter(Boolean)
+        : getOriginalViolations(report);
 };
 
 // ── Confidence bar ────────────────────────────────────────────────────────
@@ -102,8 +116,10 @@ export default function ImageReportReview({ route, navigation }) {
     const backTimer = useRef(null);
     const [confirmation, setConfirmation] = useState(null);
     const [toast, setToast] = useState(null);
-    const [violations, setViolations] = useState([]);
+    const [violations, setViolations] = useState(() => getInitialViolations(reportParam));
     const [overrideText, setOverrideText] = useState('');
+    const [correctedSeverity, setCorrectedSeverity] = useState(getOfficerReview(reportParam)?.corrected_severity || null);
+    const [correctionReason, setCorrectionReason] = useState(getOfficerReview(reportParam)?.correction_reason || '');
     useEffect(() => { mounted.current = true; return () => { mounted.current = false; clearTimeout(backTimer.current); }; }, []);
     const insets       = useSafeAreaInsets();
 
@@ -137,7 +153,9 @@ export default function ImageReportReview({ route, navigation }) {
             if (!mounted.current) return;
             if (!error && data) {
                 setReport(data);
-                setViolations(data.ai_raw_result?.allViolations?.length ? data.ai_raw_result.allViolations : (data.violation_type || '').split(',').map(value => value.trim()).filter(Boolean));
+                setViolations(getInitialViolations(data));
+                setCorrectedSeverity(getOfficerReview(data)?.corrected_severity || null);
+                setCorrectionReason(getOfficerReview(data)?.correction_reason || '');
                 if (data.status !== 'pending') setAlreadyReviewed(true);
             } else if (!report) {
                 // Direct query fallback
@@ -149,6 +167,9 @@ export default function ImageReportReview({ route, navigation }) {
                 if (!mounted.current) return;
                 if (directData) {
                     setReport(directData);
+                    setViolations(getInitialViolations(directData));
+                    setCorrectedSeverity(getOfficerReview(directData)?.corrected_severity || null);
+                    setCorrectionReason(getOfficerReview(directData)?.correction_reason || '');
                     if (directData.status !== 'pending') setAlreadyReviewed(true);
                 } else {
                     Alert.alert('Notice', 'Could not load report details.');
@@ -166,8 +187,19 @@ export default function ImageReportReview({ route, navigation }) {
         }
     };
 
+    const officerReview = getOfficerReview(report);
+    const originalViolations = getOriginalViolations(report);
+    const correctedViolationType = violations.join(', ');
+    const hasViolationCorrection = correctedViolationType !== originalViolations.join(', ');
+    const hasSeverityCorrection = !!correctedSeverity && correctedSeverity !== report?.severity;
+    const hasCorrection = hasViolationCorrection || hasSeverityCorrection;
+
     const handleDecision = async (decision) => {
         if (!user?.id) return Alert.alert('Error', 'You must be logged in.');
+        if (hasCorrection && !correctionReason.trim()) {
+            Alert.alert('Correction Reason Required', 'Explain why the AI violation type or severity was corrected.');
+            return;
+        }
         if (!remarks.trim() && decision === 'rejected') {
             Alert.alert('Remarks Required', 'Please provide a reason for rejection.');
             return;
@@ -192,9 +224,12 @@ export default function ImageReportReview({ route, navigation }) {
                 user.id,
                 decision,
                 remarks.trim() || null,
-                // The existing RPC has no override column. Preserve the AI record and
-                // save the officer's assessment explicitly in its supported internal note.
-                JSON.stringify({ officerViolations: violations, note: internal.trim() || null }),
+                internal.trim() || null,
+                {
+                    correctedViolationType: hasViolationCorrection ? correctedViolationType || null : null,
+                    correctedSeverity: hasSeverityCorrection ? correctedSeverity : null,
+                    correctionReason: hasCorrection ? correctionReason.trim() : null,
+                },
             );
 
             if (!mounted.current) return;
@@ -206,7 +241,17 @@ export default function ImageReportReview({ route, navigation }) {
                 return;
             }
             setAlreadyReviewed(true);
-            setReport(previous => previous ? { ...previous, status: decision } : previous);
+            setReport(previous => previous ? {
+                ...previous,
+                status: decision,
+                officer_review: [{
+                    ...officerReview,
+                    decision,
+                    corrected_violation_type: hasViolationCorrection ? correctedViolationType || null : null,
+                    corrected_severity: hasSeverityCorrection ? correctedSeverity : null,
+                    correction_reason: hasCorrection ? correctionReason.trim() : null,
+                }],
+            } : previous);
             setDecisionType(decision);
             setToast({ message: 'Decision saved successfully.', variant: 'success' });
 
@@ -236,7 +281,7 @@ export default function ImageReportReview({ route, navigation }) {
         );
     }
 
-    const sevCfg = SEVERITY_CFG[report?.severity] || SEVERITY_CFG.medium;
+    const sevCfg = SEVERITY_CFG[correctedSeverity || report?.severity] || SEVERITY_CFG.medium;
     const allMedia = report?.media || [];
     let mediaImages = allMedia.filter(m => m.file_type === 'image');
     const mediaVideos = allMedia.filter(m => m.file_type === 'video');
@@ -367,57 +412,26 @@ export default function ImageReportReview({ route, navigation }) {
                         </View>
                     )}
 
-                    {/* ── Fraud & Evidence Risk Warning Banner for Officers ── */}
-                    {(() => {
-                        const aiConf = report?.ai_confidence ?? 1;
-                        const auth = report?.authenticity_check;
-                        const isLowConf = aiConf < 0.70;
-                        const isFakeOrSuspect = auth && (auth.authentic === false || (auth.flags && auth.flags.length > 0));
-                        
-                        if (!isLowConf && !isFakeOrSuspect) return null;
+                    <AIStatusBadge
+                        result={report?.ai_raw_result}
+                        confidence={report?.ai_confidence ?? 0}
+                        authenticityCheck={report?.authenticity_check}
+                    />
 
-                        return (
-                            <View style={{
-                                backgroundColor: '#FEF2F2',
-                                borderColor: '#FCA5A5',
-                                borderWidth: 1.5,
-                                borderRadius: 14,
-                                padding: 14,
-                                marginBottom: 16,
-                            }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                                    <Ionicons name="shield-alert" size={20} color={COLORS.errorLight} />
-                                    <Text style={{ fontSize: 14, fontFamily: 'Nunito-ExtraBold', color: '#991B1B' }}>
-                                        FRAUD & EVIDENCE RISK DETECTED
-                                    </Text>
-                                </View>
-                                <Text style={{ fontSize: 12, fontFamily: 'Nunito-Medium', color: '#7F1D1D', marginBottom: 8 }}>
-                                    This report triggered evidence risk flags during automated intake analysis. Please inspect evidence carefully before taking action.
+                    {/* Low confidence and manual review are not evidence-integrity failures. */}
+                    {report?.authenticity_check?.status === 'POSSIBLE_INTEGRITY_ISSUE' && (
+                        <View style={s.integrityWarning}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                <Ionicons name="shield-alert" size={20} color={C.error} />
+                                <Text style={{ fontSize: 14, fontFamily: 'Nunito-ExtraBold', color: '#991B1B' }}>
+                                    EVIDENCE INTEGRITY WARNING
                                 </Text>
-                                {isLowConf && (
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                                        <Ionicons name="alert-circle" size={14} color={COLORS.errorLight} />
-                                        <Text style={{ fontSize: 12, fontFamily: 'Nunito-SemiBold', color: COLORS.error }}>
-                                            Low AI Confidence ({Math.round(aiConf * 100)}%) — Plate or offense is ambiguous
-                                        </Text>
-                                    </View>
-                                )}
-                                {isFakeOrSuspect && (
-                                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 4 }}>
-                                        <Ionicons name="alert-circle" size={14} color={COLORS.errorLight} style={{ marginTop: 1 }} />
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={{ fontSize: 12, fontFamily: 'Nunito-SemiBold', color: COLORS.error }}>
-                                                Stage 0 Authenticity Flag ({auth?.confidence ?? 80}% conf):
-                                            </Text>
-                                            <Text style={{ fontSize: 11, fontFamily: 'Nunito-Medium', color: '#991B1B', marginTop: 2 }}>
-                                                {auth?.reason || 'Possible AI generated, screenshot, or screen capture.'}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                )}
                             </View>
-                        );
-                    })()}
+                            <Text style={{ fontSize: 12, fontFamily: 'Nunito-Medium', color: '#7F1D1D' }}>
+                                {report.authenticity_check.reason || 'Local inspection found a possible evidence integrity issue. Inspect the evidence carefully.'}
+                            </Text>
+                        </View>
+                    )}
 
                     {/* ── AI Analysis Card ── */}
                     {!isVideoReport && (
@@ -458,15 +472,76 @@ export default function ImageReportReview({ route, navigation }) {
                         </LinearGradient>
                     )}
 
-                    {!!(report?.ai_raw_result?.requiresManualReview || report?.ai_raw_result?.aiUnavailable) && <StatusPill status="pending" label="Manual review — AI assessment unavailable or inconclusive" />}
                     <View style={s.card}>
-                        <Text style={s.cardTitle}>Officer violation assessment</Text>
-                        <Text style={{ color: COLORS.textSecondary, marginBottom: 12 }}>Saved in officer notes. Original AI evidence is preserved.</Text>
+                        <Text style={s.cardTitle}>Officer corrections (optional)</Text>
+                        <Text style={{ color: COLORS.textSecondary, marginBottom: 12 }}>
+                            Original AI values remain unchanged. Corrections and their reason are saved as structured review fields.
+                        </Text>
+                        <Text style={s.correctionLabel}>Violation type</Text>
                         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                            {Array.from(new Set([...violations, 'Signal Jump', 'No Helmet', 'Wrong Parking', 'Wrong Way', 'Speeding'])).map(violation => <PressableScale key={violation} disabled={submitting || alreadyReviewed} accessibilityLabel={violation} accessibilityState={{ selected: violations.includes(violation) }} onPress={() => setViolations(items => items.includes(violation) ? items.filter(item => item !== violation) : [...items, violation])} style={{ padding: 12, minHeight: 44, borderRadius: 12, backgroundColor: violations.includes(violation) ? COLORS.secondarySurface : COLORS.surfaceContainer }}><Text>{violations.includes(violation) ? '✓ ' : ''}{violation}</Text></PressableScale>)}
+                            {Array.from(new Set([...violations, ...originalViolations, 'Signal Jump', 'No Helmet', 'Wrong Parking', 'Wrong Way', 'Speeding'])).map(violation => (
+                                <PressableScale
+                                    key={violation}
+                                    disabled={submitting || alreadyReviewed}
+                                    accessibilityLabel={violation}
+                                    accessibilityState={{ selected: violations.includes(violation) }}
+                                    onPress={() => setViolations(items => items.includes(violation) ? items.filter(item => item !== violation) : [...items, violation])}
+                                    style={{ padding: 12, minHeight: 44, borderRadius: 12, backgroundColor: violations.includes(violation) ? COLORS.secondarySurface : COLORS.surfaceContainer }}
+                                >
+                                    <Text>{violations.includes(violation) ? '✓ ' : ''}{violation}</Text>
+                                </PressableScale>
+                            ))}
                         </View>
                         <TextInput accessibilityLabel="Additional violation" editable={!submitting && !alreadyReviewed} value={overrideText} onChangeText={setOverrideText} maxLength={100} placeholder="Add another violation" style={{ padding: 12, minHeight: 44 }} />
                         <PressableScale accessibilityLabel="Add violation" disabled={!overrideText.trim() || submitting || alreadyReviewed} onPress={() => { setViolations(items => [...new Set([...items, overrideText.trim()])]); setOverrideText(''); }} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: COLORS.primary }}>Add violation</Text></PressableScale>
+
+                        <Text style={s.correctionLabel}>Severity</Text>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                            {['low', 'medium', 'high', 'critical'].map(severity => {
+                                const selected = (correctedSeverity || report?.severity) === severity;
+                                return (
+                                    <PressableScale
+                                        key={severity}
+                                        accessibilityLabel={`${SEVERITY_CFG[severity].label} severity`}
+                                        accessibilityState={{ selected }}
+                                        disabled={submitting || alreadyReviewed}
+                                        onPress={() => setCorrectedSeverity(severity)}
+                                        style={[s.severityChoice, selected && { backgroundColor: SEVERITY_CFG[severity].bg, borderColor: SEVERITY_CFG[severity].color }]}
+                                    >
+                                        <Text style={{ color: selected ? SEVERITY_CFG[severity].color : C.textSecondary }}>{SEVERITY_CFG[severity].label}</Text>
+                                    </PressableScale>
+                                );
+                            })}
+                        </View>
+
+                        {hasCorrection && (
+                            <View style={s.correctionComparison}>
+                                <Text style={s.correctionComparisonTitle}>AI vs officer correction</Text>
+                                <InfoRow label="Original AI violation" value={report?.violation_type || originalViolations.join(', ')} />
+                                <InfoRow label="Corrected violation" value={correctedViolationType} />
+                                <InfoRow label="Original AI severity" value={SEVERITY_CFG[report?.severity]?.label || report?.severity} />
+                                <InfoRow label="Corrected severity" value={SEVERITY_CFG[correctedSeverity || report?.severity]?.label} />
+                                {!!officerReview?.correction_reason && <InfoRow label="Saved reason" value={officerReview.correction_reason} />}
+                            </View>
+                        )}
+
+                        {hasCorrection && !alreadyReviewed && (
+                            <>
+                                <TextInput
+                                    accessibilityLabel="Correction reason"
+                                    value={correctionReason}
+                                    onChangeText={setCorrectionReason}
+                                    maxLength={500}
+                                    multiline
+                                    placeholder="Required reason for correcting the AI assessment"
+                                    placeholderTextColor={C.textTertiary}
+                                    style={s.correctionReasonInput}
+                                />
+                                <PressableScale accessibilityLabel="Reset corrections" disabled={submitting} onPress={() => { setViolations(originalViolations); setCorrectedSeverity(null); setCorrectionReason(''); }} style={{ minHeight: 44, justifyContent: 'center' }}>
+                                    <Text style={{ color: COLORS.primary }}>Reset corrections</Text>
+                                </PressableScale>
+                            </>
+                        )}
                     </View>
                     {/* ── Reward Preview ── */}
                     <View style={s.rewardPreview}>
@@ -652,6 +727,13 @@ const s = StyleSheet.create({
     aiValue:      { fontSize: 13, fontFamily: 'Nunito-Bold', color: '#166534' },
     aiDescBox:    { marginTop: 10, backgroundColor: 'rgba(255,255,255,0.6)', borderRadius: 10, padding: 10 },
     aiDescText:   { fontSize: 13, fontFamily: 'Nunito-SemiBold', color: C.textPrimary, lineHeight: 19 },
+
+    integrityWarning: { backgroundColor: '#FEF2F2', borderColor: '#FCA5A5', borderWidth: 1.5, borderRadius: 14, padding: 14, marginBottom: 16 },
+    correctionLabel: { fontSize: 12, fontFamily: 'Nunito-Bold', color: C.textSecondary, marginTop: 10, marginBottom: 8 },
+    severityChoice: { paddingHorizontal: 12, paddingVertical: 10, minHeight: 44, borderRadius: 10, borderWidth: 1, borderColor: C.border },
+    correctionComparison: { backgroundColor: C.surfaceLow, borderRadius: 12, paddingHorizontal: 12, marginTop: 16 },
+    correctionComparisonTitle: { fontSize: 12, fontFamily: 'Nunito-Bold', color: C.navyMid, paddingTop: 10 },
+    correctionReasonInput: { borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 12, marginTop: 12, minHeight: 80, textAlignVertical: 'top', color: C.textPrimary },
 
     // Reward Preview
     rewardPreview: { marginBottom: 16, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(245,158,11,0.2)' },

@@ -75,9 +75,6 @@ export default function EditProfile({ navigation }) {
                     <View style={styles.avatarSection}>
                         <View style={styles.avatar}>
                             <Ionicons name="person" size={40} color={C.white} />
-                            <TouchableOpacity style={styles.editBadge}>
-                                <Ionicons name="camera" size={14} color={C.navyMid} />
-                            </TouchableOpacity>
                         </View>
                     </View>
 

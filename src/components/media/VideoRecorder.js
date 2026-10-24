@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Modal, StyleSheet, AppState, Linking } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as FileSystem from 'expo-file-system/legacy';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import PressableScale from '../common/PressableScale';
 import { COLORS, TYPOGRAPHY, SPACING } from '../../utils/theme';
+import { generateVideoThumbnail, VIDEO_UPLOAD_LIMIT_BYTES } from '../../hooks/useImagePicker';
 
 export const RECORDING_LIMIT_SECONDS = 15;
 export function videoMetadata(uri) {
@@ -42,9 +44,23 @@ export default function VideoRecorder({ onCaptured, onCancel }) {
             if (!seconds) stop();
         }, 200);
         try {
-            // Native limit remains authoritative if JS timers are delayed or suspended.
-            const result = await camera.current.recordAsync({ maxDuration: RECORDING_LIMIT_SECONDS, maxFileSize: 50 * 1024 * 1024 });
-            if (active.current && !cancelled.current && result?.uri) onCaptured(videoMetadata(result.uri));
+            // Native upload target; the service retains its separate 50 MB absolute ceiling.
+            const result = await camera.current.recordAsync({ maxDuration: RECORDING_LIMIT_SECONDS, maxFileSize: VIDEO_UPLOAD_LIMIT_BYTES });
+            if (active.current && !cancelled.current && result?.uri) {
+                let fileSize = null;
+                try {
+                    const info = await FileSystem.getInfoAsync(result.uri, { size: true });
+                    if (info?.exists !== false && Number.isFinite(info?.size)) fileSize = info.size;
+                } catch {
+                    // The upload service performs its own authoritative size check.
+                }
+                if (fileSize != null && fileSize > VIDEO_UPLOAD_LIMIT_BYTES) {
+                    setError(`The recorded video exceeds 12 MB (${(fileSize / (1024 * 1024)).toFixed(1)} MB). Please record a shorter clip.`);
+                    return;
+                }
+                const thumbnailUri = await generateVideoThumbnail(result.uri);
+                if (active.current && !cancelled.current) onCaptured({ ...videoMetadata(result.uri), fileSize, thumbnailUri });
+            }
         } catch { if (active.current && !cancelled.current) setError('Recording failed. Please try again.'); }
         finally { clearInterval(timer.current); busy.current = false; recordingCamera.current = null; if (active.current) setRecording(false); }
     };

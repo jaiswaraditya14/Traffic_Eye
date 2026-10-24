@@ -15,20 +15,42 @@ const C = {
     success: '#059669',
 };
 
-export default function SignUpSuccess({ navigation }) {
+export default function SignUpSuccess({ navigation, route }) {
+    const isPasswordReset = route?.params?.mode === 'passwordReset';
+    const email = route?.params?.email;
+
+    const handleContinue = () => {
+        if (isPasswordReset) {
+            navigation.navigate('OtpVerification', { email });
+        } else {
+            navigation.navigate('CitizenSignIn');
+        }
+    };
+
     return (
         <MobileContainer>
             <FocusAwareStatusBar barStyle="dark-content" statusBgColor={C.offWhite} />
             <View style={styles.container}>
-                <Ionicons name="checkmark-circle" size={100} color={C.success} />
-                <Text style={styles.title}>Signup Successful! 🎉</Text>
-                <Text style={styles.subtitle}>Your email has been successfully confirmed.</Text>
-                <Text style={styles.subtitle}>You can now continue signing in to access your account.</Text>
+                <Ionicons name={isPasswordReset ? 'mail-unread' : 'checkmark-circle'} size={100} color={C.success} />
+                <Text style={styles.title}>{isPasswordReset ? 'Check your email' : 'Signup Successful! 🎉'}</Text>
+                {isPasswordReset ? (
+                    <>
+                        <Text style={styles.subtitle}>
+                            We sent an 8-digit verification code to {email}.
+                        </Text>
+                        <Text style={styles.subtitle}>Enter the code to continue resetting your password.</Text>
+                    </>
+                ) : (
+                    <>
+                        <Text style={styles.subtitle}>Your email has been successfully confirmed.</Text>
+                        <Text style={styles.subtitle}>You can now continue signing in to access your account.</Text>
+                    </>
+                )}
 
-                <TouchableOpacity 
+                <TouchableOpacity
                     style={styles.button}
                     activeOpacity={0.88}
-                    onPress={() => navigation.navigate('CitizenSignIn')}
+                    onPress={handleContinue}
                 >
                     <LinearGradient
                         colors={[C.navy, C.navyMid]}
@@ -36,7 +58,7 @@ export default function SignUpSuccess({ navigation }) {
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
                     >
-                        <Text style={styles.buttonText}>Continue to Sign In</Text>
+                        <Text style={styles.buttonText}>{isPasswordReset ? 'Enter Verification Code' : 'Continue to Sign In'}</Text>
                         <Ionicons name="arrow-forward" size={16} color={C.white} />
                     </LinearGradient>
                 </TouchableOpacity>

@@ -114,8 +114,6 @@ export default function Profile({ navigation }) {
             title: 'App',
             items: [
                 { icon: 'information-circle-outline', label: 'About Traffic Eye', screen: 'About', color: C.navyMid },
-                { icon: 'star-outline', label: 'Rate App', screen: null, color: C.amberDark },
-                { icon: 'share-social-outline', label: 'Share App', screen: null, color: C.amberDark },
                 { icon: 'document-text-outline', label: 'Terms & Privacy', screen: 'Privacy', color: C.amberDark },
             ],
         },

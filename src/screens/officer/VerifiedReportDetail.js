@@ -21,6 +21,7 @@ import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { FocusAwareStatusBar } from '../../components';
+import { AIStatusBadge } from '../../components/common/AIStatusBadge';
 import { fetchReportById } from '../../services/reports';
 import { supabase } from '../../services';
 
@@ -172,12 +173,14 @@ export default function VerifiedReportDetail({ route, navigation }) {
                 evidenceHtml += `<p>📎 <a href="${f.file_url}">${f.file_name || f.file_url}</a></p>`;
             });
 
-            // Officer remarks/notes
+            // Officer remarks/notes & corrections
             const officerReview = Array.isArray(report.officer_review)
                 ? report.officer_review[0]
                 : report.officer_review;
             const officerName   = officerReview?.officer?.full_name || '—';
             const publicRemark  = officerReview?.remarks || '—';
+            const isPdfRejected = report.status === 'rejected';
+            const hasPdfCorrection = Boolean(officerReview?.corrected_violation_type || officerReview?.corrected_severity);
 
             const html = `
 <!DOCTYPE html>
@@ -192,6 +195,7 @@ export default function VerifiedReportDetail({ route, navigation }) {
     .badge-row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
     .badge { padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; display: inline-block; }
     .badge-approved { background: #D1FAE5; color: #059669; }
+    .badge-rejected { background: #FEE2E2; color: #DC2626; }
     .badge-sev { background: ${sevCfg.bg}; color: ${sevCfg.color}; }
     .section { background: #F4F6F9; border-radius: 10px; padding: 20px 24px; margin-bottom: 20px; }
     .section h2 { margin: 0 0 14px; font-size: 14px; font-weight: 700; color: #0F2C59; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -208,10 +212,10 @@ export default function VerifiedReportDetail({ route, navigation }) {
 </head>
 <body>
   <div class="header">
-    <h1>Traffic Eye — Verified Report</h1>
+    <h1>Traffic Eye — ${isPdfRejected ? 'Rejected Report' : 'Verified Report'}</h1>
     <p>Report ID: #${report.id?.slice(0, 8).toUpperCase()}</p>
     <div class="badge-row">
-      <span class="badge badge-approved">✓ Approved</span>
+      <span class="badge ${isPdfRejected ? 'badge-rejected' : 'badge-approved'}">${isPdfRejected ? '✕ Rejected' : '✓ Approved'}</span>
       <span class="badge badge-sev">${sevCfg.label} Severity</span>
     </div>
   </div>
@@ -223,17 +227,33 @@ export default function VerifiedReportDetail({ route, navigation }) {
     <div class="row"><span class="lbl">Location</span><span class="val">${report.location_address || '—'}</span></div>
     ${report.latitude ? `<div class="row"><span class="lbl">Coordinates</span><span class="val">${report.latitude.toFixed(5)}, ${report.longitude.toFixed(5)}</span></div>` : ''}
     <div class="row"><span class="lbl">Date Submitted</span><span class="val">${dateSubmitted}</span></div>
-    <div class="row"><span class="lbl">Date Approved</span><span class="val">${dateApproved}</span></div>
+    <div class="row"><span class="lbl">${isPdfRejected ? 'Date Reviewed' : 'Date Approved'}</span><span class="val">${dateApproved}</span></div>
     <div class="row"><span class="lbl">Report ID</span><span class="val">#${report.id?.slice(0, 8).toUpperCase()}</span></div>
   </div>
 
+  ${hasPdfCorrection ? `
+  <div class="section" style="border-left: 4px solid #D97706;">
+    <h2>Officer Corrections Applied</h2>
+    ${officerReview?.corrected_violation_type ? `<div class="row"><span class="lbl">Corrected Violation</span><span class="val" style="color:#059669;">${officerReview.corrected_violation_type}</span></div>` : ''}
+    ${officerReview?.corrected_severity ? `<div class="row"><span class="lbl">Corrected Severity</span><span class="val" style="color:#059669;">${officerReview.corrected_severity.toUpperCase()}</span></div>` : ''}
+    ${officerReview?.correction_reason ? `<div class="row"><span class="lbl">Correction Reason</span><span class="val">${officerReview.correction_reason}</span></div>` : ''}
+  </div>` : ''}
+
+  ${isPdfRejected ? `
+  <div class="reward-box" style="background: #FEF2F2; border-color: #FECACA;">
+    <span style="font-size:24px;">⛔</span>
+    <div>
+      <div style="font-size:13px;font-weight:600;color:#991B1B;">Report Rejected</div>
+      <div style="font-size:12px;color:#7F1D1D;">No civic points awarded for this report</div>
+    </div>
+  </div>` : `
   <div class="reward-box">
     <span style="font-size:24px;">🏆</span>
     <div>
       <div style="font-size:13px;font-weight:600;color:#92400E;">Points Awarded to Citizen</div>
       <div class="reward-pts">+${report.reward_amount || 0} pts</div>
     </div>
-  </div>
+  </div>`}
 
 
 
@@ -315,6 +335,17 @@ export default function VerifiedReportDetail({ route, navigation }) {
         : report?.officer_review;
     const publicRemark  = officerReview?.remarks;
     const officerName   = officerReview?.officer?.full_name;
+    const isRejected    = report?.status === 'rejected';
+
+    const hasCorrection = Boolean(
+        officerReview?.corrected_violation_type ||
+        officerReview?.corrected_severity
+    );
+    const originalViolation = report?.original_ai_violation_type || report?.ai_raw_result?.violation_type || (Array.isArray(report?.ai_raw_result?.allViolations) ? report.ai_raw_result.allViolations.join(', ') : null) || report?.violation_type;
+    const originalSeverity = report?.original_ai_severity || report?.ai_raw_result?.severity || report?.severity;
+    const correctedViolation = officerReview?.corrected_violation_type;
+    const correctedSeverity = officerReview?.corrected_severity;
+    const correctionReason = officerReview?.correction_reason;
 
     return (
         <View style={s.container}>
@@ -327,7 +358,7 @@ export default function VerifiedReportDetail({ route, navigation }) {
                         <Ionicons name="arrow-back" size={20} color={C.white} />
                     </TouchableOpacity>
                     <View style={{ flex: 1 }}>
-                        <Text style={s.headerTitle}>Verified Report</Text>
+                        <Text style={s.headerTitle}>{isRejected ? 'Rejected Report' : 'Verified Report'}</Text>
                         <Text style={s.headerSub}>#{report?.id?.slice(0, 8).toUpperCase()}</Text>
                     </View>
                     {/* Download PDF button */}
@@ -349,17 +380,72 @@ export default function VerifiedReportDetail({ route, navigation }) {
                     contentContainerStyle={s.scroll}
                     showsVerticalScrollIndicator={false}
                 >
-                    {/* ── Approved Status Banner ── */}
-                    <View style={s.approvedBanner}>
-                        <Ionicons name="checkmark-circle" size={22} color={C.success} />
+                    {/* ── Status Banner (Approved or Rejected) ── */}
+                    <View style={[s.approvedBanner, isRejected && s.rejectedBanner]}>
+                        <Ionicons name={isRejected ? "close-circle" : "checkmark-circle"} size={22} color={isRejected ? C.error : C.success} />
                         <View style={{ flex: 1 }}>
-                            <Text style={s.approvedTitle}>Report Verified</Text>
-                            <Text style={s.approvedSub}>Approved on {dateApproved}</Text>
+                            <Text style={[s.approvedTitle, isRejected && s.rejectedTitle]}>
+                                {isRejected ? 'Report Rejected' : 'Report Verified'}
+                            </Text>
+                            <Text style={[s.approvedSub, isRejected && s.rejectedSub]}>
+                                {isRejected ? `Rejected on ${dateApproved}` : `Approved on ${dateApproved}`}
+                            </Text>
                         </View>
                         <View style={[s.sevPill, { backgroundColor: sevCfg.bg }]}>
                             <Text style={[s.sevPillText, { color: sevCfg.color }]}>{sevCfg.label}</Text>
                         </View>
                     </View>
+
+                    {/* ── AI Assessment Badge ── */}
+                    <View style={{ marginBottom: 14 }}>
+                        <AIStatusBadge
+                            result={report?.ai_raw_result}
+                            confidence={report?.ai_confidence}
+                            authenticityCheck={report?.authenticity_check}
+                        />
+                    </View>
+
+                    {/* ── Corrections Applied Card ── */}
+                    {hasCorrection && (
+                        <View style={s.correctionsCard}>
+                            <View style={s.correctionsHeader}>
+                                <Ionicons name="git-compare-outline" size={18} color={C.amberDark} />
+                                <Text style={s.correctionsTitle}>Officer Corrections Applied</Text>
+                            </View>
+                            <Text style={s.correctionsDesc}>
+                                The reviewing officer adjusted the initial AI / citizen detection.
+                            </Text>
+
+                            {correctedViolation && (
+                                <View style={s.diffBlock}>
+                                    <Text style={s.diffLabel}>Violation Type</Text>
+                                    <View style={s.diffRow}>
+                                        <Text style={s.diffOriginal}>{originalViolation}</Text>
+                                        <Ionicons name="arrow-forward" size={14} color={C.textTertiary} style={{ marginHorizontal: 6 }} />
+                                        <Text style={s.diffCorrected}>{correctedViolation}</Text>
+                                    </View>
+                                </View>
+                            )}
+
+                            {correctedSeverity && (
+                                <View style={s.diffBlock}>
+                                    <Text style={s.diffLabel}>Severity</Text>
+                                    <View style={s.diffRow}>
+                                        <Text style={s.diffOriginal}>{originalSeverity?.toUpperCase()}</Text>
+                                        <Ionicons name="arrow-forward" size={14} color={C.textTertiary} style={{ marginHorizontal: 6 }} />
+                                        <Text style={s.diffCorrected}>{correctedSeverity?.toUpperCase()}</Text>
+                                    </View>
+                                </View>
+                            )}
+
+                            {correctionReason && (
+                                <View style={s.diffReasonBox}>
+                                    <Text style={s.diffReasonLabel}>Reason for Correction:</Text>
+                                    <Text style={s.diffReasonText}>{correctionReason}</Text>
+                                </View>
+                            )}
+                        </View>
+                    )}
 
 
 
@@ -402,15 +488,26 @@ export default function VerifiedReportDetail({ route, navigation }) {
                         </View>
                     )}
 
-                    {/* ── Points Awarded ── */}
-                    <LinearGradient colors={['#FFFBEB', '#FEF3C7']} style={s.rewardCard}>
-                        <Ionicons name="trophy" size={28} color={C.amberDark} />
-                        <View style={{ flex: 1 }}>
-                            <Text style={s.rewardTitle}>Points Awarded</Text>
-                            <Text style={s.rewardSub}>Credited to citizen for this report</Text>
+                    {/* ── Points Awarded (or Rejected Notice) ── */}
+                    {isRejected ? (
+                        <View style={[s.rewardCard, { backgroundColor: C.errorSurface, borderColor: 'rgba(220,38,38,0.2)' }]}>
+                            <Ionicons name="close-circle-outline" size={28} color={C.error} />
+                            <View style={{ flex: 1 }}>
+                                <Text style={[s.rewardTitle, { color: C.error }]}>Report Rejected</Text>
+                                <Text style={s.rewardSub}>No civic reward points credited for this submission</Text>
+                            </View>
+                            <Text style={[s.rewardPts, { color: C.error }]}>0 pts</Text>
                         </View>
-                        <Text style={s.rewardPts}>+{report?.reward_amount || 0}</Text>
-                    </LinearGradient>
+                    ) : (
+                        <LinearGradient colors={['#FFFBEB', '#FEF3C7']} style={s.rewardCard}>
+                            <Ionicons name="trophy" size={28} color={C.amberDark} />
+                            <View style={{ flex: 1 }}>
+                                <Text style={s.rewardTitle}>Points Awarded</Text>
+                                <Text style={s.rewardSub}>Credited to citizen for this report</Text>
+                            </View>
+                            <Text style={s.rewardPts}>+{report?.reward_amount || 0}</Text>
+                        </LinearGradient>
+                    )}
 
                     {/* ── Report Details ── */}
                     <View style={s.card}>
@@ -419,7 +516,7 @@ export default function VerifiedReportDetail({ route, navigation }) {
                         <InfoRow label="Violation Type"  value={report?.violation_type} />
                         <InfoRow label="Vehicle Number"  value={report?.vehicle_number} />
                         <InfoRow label="Date Submitted"  value={dateSubmitted} />
-                        <InfoRow label="Date Approved"   value={dateApproved} />
+                        <InfoRow label={isRejected ? "Date Rejected" : "Date Approved"}   value={dateApproved} />
                     </View>
 
                     {/* ── Location ── */}
@@ -516,17 +613,103 @@ const s = StyleSheet.create({
 
     scroll: { paddingHorizontal: 16, paddingTop: 16 },
 
-    // Approved banner
+    // Approved / Rejected banner
     approvedBanner: {
         flexDirection: 'row', alignItems: 'center', gap: 10,
         backgroundColor: C.successSurface, borderRadius: 14,
         padding: 14, marginBottom: 16,
         borderWidth: 1, borderColor: 'rgba(5,150,105,0.15)',
     },
+    rejectedBanner: {
+        backgroundColor: C.errorSurface,
+        borderColor: 'rgba(220,38,38,0.2)',
+    },
     approvedTitle: { fontSize: 14, fontFamily: 'Nunito-Bold', color: C.success },
+    rejectedTitle: { fontSize: 14, fontFamily: 'Nunito-Bold', color: C.error },
     approvedSub:   { fontSize: 11, fontFamily: 'Nunito-Medium', color: '#065F46', marginTop: 2 },
+    rejectedSub:   { fontSize: 11, fontFamily: 'Nunito-Medium', color: '#991B1B', marginTop: 2 },
     sevPill:       { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
     sevPillText:   { fontSize: 11, fontFamily: 'Nunito-Bold' },
+
+    // Corrections card
+    correctionsCard: {
+        backgroundColor: C.surface,
+        borderRadius: 18,
+        padding: 16,
+        marginBottom: 14,
+        borderWidth: 1.5,
+        borderColor: '#FDE68A',
+        shadowColor: C.navy,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    correctionsHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 4,
+    },
+    correctionsTitle: {
+        fontSize: 14,
+        fontFamily: 'Nunito-Bold',
+        color: C.amberDark,
+    },
+    correctionsDesc: {
+        fontSize: 12,
+        fontFamily: 'Nunito-Medium',
+        color: C.textSecondary,
+        marginBottom: 12,
+    },
+    diffBlock: {
+        backgroundColor: C.surfaceLow,
+        borderRadius: 10,
+        padding: 10,
+        marginBottom: 8,
+    },
+    diffLabel: {
+        fontSize: 10,
+        fontFamily: 'Nunito-ExtraBold',
+        color: C.textTertiary,
+        textTransform: 'uppercase',
+        letterSpacing: 0.6,
+        marginBottom: 4,
+    },
+    diffRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+    },
+    diffOriginal: {
+        fontSize: 13,
+        fontFamily: 'Nunito-Medium',
+        color: C.textTertiary,
+        textDecorationLine: 'line-through',
+    },
+    diffCorrected: {
+        fontSize: 13,
+        fontFamily: 'Nunito-Bold',
+        color: C.success,
+    },
+    diffReasonBox: {
+        marginTop: 4,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: C.border,
+    },
+    diffReasonLabel: {
+        fontSize: 11,
+        fontFamily: 'Nunito-Bold',
+        color: C.textSecondary,
+        marginBottom: 2,
+    },
+    diffReasonText: {
+        fontSize: 12,
+        fontFamily: 'Nunito-Medium',
+        color: C.textPrimary,
+        fontStyle: 'italic',
+    },
 
 
     // Cards
