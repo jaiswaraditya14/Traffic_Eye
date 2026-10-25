@@ -30,7 +30,8 @@ import {
     Camera,
     Marker,
     UserLocation,
-} from '@maplibre/maplibre-react-native';
+    isMapLibreNativeAvailable,
+} from './maplibreNative';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
@@ -227,7 +228,13 @@ export default function MapLibreMap({
         }
     }, [initialCoordinate, autoLocateOnMount, fetchAddressForCoord, flyToCoord, onLocationSelect]);
 
-    // Trigger auto-locate when map finishes loading
+    // Trigger auto-locate when map finishes loading or on Expo Go fallback
+    useEffect(() => {
+        if (!isMapLibreNativeAvailable) {
+            setMapReady(true);
+        }
+    }, []);
+
     useEffect(() => {
         if (mapReady) {
             handleAutoLocate();
@@ -404,48 +411,73 @@ export default function MapLibreMap({
     return (
         <View style={[styles.container, mapContainerStyle]}>
             {/* MapLibre v11 Map */}
-            <Map
-                style={[styles.map, style]}
-                mapStyle={styleUrl}
-                logo={false}
-                attribution={true}
-                attributionPosition={{ bottom: bottomBarHeight + 4, right: 8 }}
-                onPress={handleMapPress}
-                onDidFinishLoadingMap={() => setMapReady(true)}
-            >
-                <Camera
-                    ref={cameraRef}
-                    initialViewState={{
-                        center: [startLng, startLat],
-                        zoom: DEFAULT_ZOOM,
-                    }}
-                />
+            {/* MapLibre v11 Map or Expo Go Safe Fallback */}
+            {!isMapLibreNativeAvailable ? (
+                <TouchableOpacity
+                    style={[styles.map, styles.fallbackMapContainer, style]}
+                    activeOpacity={1}
+                    onPress={handleMapPress}
+                >
+                    <View style={styles.fallbackNotice}>
+                        <Ionicons name="map-outline" size={44} color="#64748B" />
+                        <Text style={styles.fallbackTitle}>Interactive Map (Expo Go)</Text>
+                        <Text style={styles.fallbackSubtitle}>
+                            Vector tile rendering runs on native APK. Tap anywhere, search address, or use GPS to set location.
+                        </Text>
+                    </View>
+                    {currentCoord && isFinite(currentCoord.latitude) && isFinite(currentCoord.longitude) && (
+                        <View style={styles.fallbackPinBadge}>
+                            <Ionicons name="location" size={20} color="#EF4444" />
+                            <Text style={styles.fallbackPinText}>
+                                {currentCoord.latitude.toFixed(5)}, {currentCoord.longitude.toFixed(5)}
+                            </Text>
+                        </View>
+                    )}
+                </TouchableOpacity>
+            ) : (
+                <Map
+                    style={[styles.map, style]}
+                    mapStyle={styleUrl}
+                    logo={false}
+                    attribution={true}
+                    attributionPosition={{ bottom: bottomBarHeight + 4, right: 8 }}
+                    onPress={handleMapPress}
+                    onDidFinishLoadingMap={() => setMapReady(true)}
+                >
+                    <Camera
+                        ref={cameraRef}
+                        initialViewState={{
+                            center: [startLng, startLat],
+                            zoom: DEFAULT_ZOOM,
+                        }}
+                    />
 
-                {showUserLocation && (
-                    <UserLocation visible={true} showsUserHeadingIndicator={true} />
-                )}
-
-                {/* Selected location pin — draggable */}
-                {currentCoord &&
-                    isFinite(currentCoord.latitude) &&
-                    isFinite(currentCoord.longitude) && (
-                        <Marker
-                            id="selected-pin"
-                            lngLat={[currentCoord.longitude, currentCoord.latitude]}
-                            draggable={true}
-                            onDragEnd={handleMarkerDragEnd}
-                        >
-                            <View style={styles.pinWrapper}>
-                                <View style={styles.pinBubble}>
-                                    <Ionicons name="location" size={36} color="#EF4444" />
-                                </View>
-                                <View style={styles.pinDot} />
-                            </View>
-                        </Marker>
+                    {showUserLocation && (
+                        <UserLocation visible={true} showsUserHeadingIndicator={true} />
                     )}
 
-                {children}
-            </Map>
+                    {/* Selected location pin — draggable */}
+                    {currentCoord &&
+                        isFinite(currentCoord.latitude) &&
+                        isFinite(currentCoord.longitude) && (
+                            <Marker
+                                id="selected-pin"
+                                lngLat={[currentCoord.longitude, currentCoord.latitude]}
+                                draggable={true}
+                                onDragEnd={handleMarkerDragEnd}
+                            >
+                                <View style={styles.pinWrapper}>
+                                    <View style={styles.pinBubble}>
+                                        <Ionicons name="location" size={36} color="#EF4444" />
+                                    </View>
+                                    <View style={styles.pinDot} />
+                                </View>
+                            </Marker>
+                        )}
+
+                    {children}
+                </Map>
+            )}
 
             {/* Address search bar — positioned below status bar using insets.top */}
             {showSearch && (
@@ -772,5 +804,44 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: '700',
         color: '#0A1E3F',
+    },
+    fallbackMapContainer: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#F1F5F9',
+        padding: 24,
+    },
+    fallbackNotice: {
+        alignItems: 'center',
+        paddingHorizontal: 20,
+    },
+    fallbackTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#1E293B',
+        marginTop: 10,
+        marginBottom: 6,
+    },
+    fallbackSubtitle: {
+        fontSize: 13,
+        color: '#64748B',
+        textAlign: 'center',
+        lineHeight: 18,
+    },
+    fallbackPinBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 20,
+        marginTop: 18,
+        ...SHADOWS.sm,
+    },
+    fallbackPinText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#334155',
+        marginLeft: 6,
     },
 });

@@ -7,7 +7,7 @@
 
 import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Map, Camera, Marker } from '@maplibre/maplibre-react-native';
+import { Map, Camera, Marker } from '../../components/map/maplibreNative';
 
 const OPEN_FREE_MAP_LIBERTY = 'https://tiles.openfreemap.org/styles/liberty';
 

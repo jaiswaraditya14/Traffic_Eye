@@ -77,6 +77,12 @@ test('indeterminate duplicate lookup does not advance', async () => {
     expect(navigation.replace).not.toHaveBeenCalled();
     expect(Alert.alert).toHaveBeenCalledWith('Could not verify plate', expect.any(String), expect.any(Array));
 });
+test('confirmed duplicate surfaces alert and blocks automatic progression', async () => {
+    checkPlateDuplicate.mockResolvedValue({ isDuplicate: true, existingReportId: 'dup-123' });
+    await mount();
+    expect(navigation.replace).not.toHaveBeenCalled();
+    expect(Alert.alert).toHaveBeenCalledWith('Duplicate Report Detected', expect.stringContaining('MH12AB1234'), expect.any(Array));
+});
 test('AI unavailable can be explicitly confirmed for manual review', async () => {
     aiService.analyzeViolationImage.mockResolvedValue({ description: 'ANALYSIS_FAILED: unavailable' });
     await mount();

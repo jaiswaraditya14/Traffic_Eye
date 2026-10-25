@@ -19,7 +19,8 @@ import {
     Camera,
     GeoJSONSource,
     Layer,
-} from '@maplibre/maplibre-react-native';
+    isMapLibreNativeAvailable,
+} from '../../components/map/maplibreNative';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';

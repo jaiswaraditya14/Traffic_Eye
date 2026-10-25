@@ -88,6 +88,18 @@ describe('duplicate validation', () => {
         expect(await checkPlateDuplicate('mh 12 ab 1234')).toMatchObject({ isDuplicate: true, indeterminate: false, existingReportId: 'existing' });
         expect(supabase.rpc).toHaveBeenCalledWith('check_plate_duplicate', { p_vehicle_number: 'MH12AB1234' });
     });
+    test('passes spatio-temporal options (lat, lng, violationType) to RPC', async () => {
+        supabase.rpc.mockResolvedValue({ data: { is_duplicate: true, existing_report_id: 'existing', distance_meters: 15.2 }, error: null });
+        const res = await checkPlateDuplicate('MH12AB1234', { latitude: 19.076, longitude: 72.877, violationType: 'illegal_parking', radiusMeters: 150 });
+        expect(res).toMatchObject({ isDuplicate: true, distanceMeters: 15.2 });
+        expect(supabase.rpc).toHaveBeenCalledWith('check_plate_duplicate', {
+            p_vehicle_number: 'MH12AB1234',
+            p_latitude: 19.076,
+            p_longitude: 72.877,
+            p_violation_type: 'illegal_parking',
+            p_radius_meters: 150,
+        });
+    });
     test('returns verified nonduplicate', async () => {
         expect(await checkPlateDuplicate('MH12AB1234')).toMatchObject({ isDuplicate: false, indeterminate: false });
     });
@@ -120,7 +132,7 @@ describe('canonical submission', () => {
         supabase.from.mockReturnValueOnce(allow()).mockReturnValueOnce(insert).mockReturnValueOnce(link);
         const result = await submitReportWithMedia(args({ report: { ...REPORT, status: 'approved', reward_amount: 999, submitted_at: 'forged' } }));
         expect(result).toEqual({ data: CREATED, error: null });
-        expect(supabase.rpc).toHaveBeenCalledWith('check_plate_duplicate', { p_vehicle_number: 'MH12AB1234' });
+        expect(supabase.rpc).toHaveBeenCalledWith('check_plate_duplicate', expect.objectContaining({ p_vehicle_number: 'MH12AB1234' }));
         expect(insert.insert).toHaveBeenCalledWith([expect.objectContaining({
             id: CREATED.id, user_id: 'u1', status: 'pending', reward_amount: 0,
             vehicle_number: 'MH12AB1234', image_storage_path: 'u1/' + CREATED.id + '.jpg',

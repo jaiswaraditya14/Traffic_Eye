@@ -169,20 +169,43 @@ export default function AIProcessing({ navigation }) {
                 return;
             }
 
-            // ── Plate-OCR Duplicate Check (fail-closed) ────────────────────────
-            // POSSIBLE_DUPLICATE ≠ automatic rejection — the officer still reviews.
-            // A failed check blocks progression; the shared service also checks the
-            // final edited plate immediately before submission.
+            // ── Plate-OCR & Spatio-temporal Duplicate Check (fail-closed) ───────
             let possibleDuplicate = false;
             let duplicateExistingId = null;
 
             const normalizedPlate = normalizePlate(results?.vehicleNumber);
             if (normalizedPlate) {
-                const { isDuplicate, indeterminate: dupIndeterminate, existingReportId } = await checkPlateDuplicate(normalizedPlate);
+                const { isDuplicate, indeterminate: dupIndeterminate, existingReportId } = await checkPlateDuplicate(
+                    normalizedPlate,
+                    {
+                        latitude: currentReport?.location?.latitude,
+                        longitude: currentReport?.location?.longitude,
+                        violationType: results?.violationType,
+                    }
+                );
                 if (signal.aborted) return;
                 if (isDuplicate) {
                     possibleDuplicate = true;
                     duplicateExistingId = existingReportId;
+                    if (live()) {
+                        Alert.alert(
+                            'Duplicate Report Detected',
+                            `A report for vehicle "${normalizedPlate}" has already been submitted at this location in the past 24 hours.\n\nTo prevent duplicate records, new submissions for this incident are not allowed.`,
+                            [
+                                { text: 'Go Home', onPress: () => navigation.navigate('CitizenHome') },
+                                {
+                                    text: 'Review Details',
+                                    style: 'cancel',
+                                    onPress: () => navigation.replace('AIResultsVerification', {
+                                        aiResults: results,
+                                        possibleDuplicate: true,
+                                        duplicateExistingId: existingReportId,
+                                    }),
+                                },
+                            ]
+                        );
+                        return;
+                    }
                 } else if (dupIndeterminate) {
                     if (live()) Alert.alert(
                         'Could not verify plate',

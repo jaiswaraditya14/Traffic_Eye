@@ -93,6 +93,30 @@ export default function AIResultsVerification({ navigation, route }) {
                 existingSource: currentReport?.locationSource,
             });
 
+            // Spatio-temporal Duplicate Check before submission
+            const normPlate = vehicleNumber.trim().toUpperCase();
+            if (normPlate && !['NOTDETECTED', 'NOTAPPLICABLE', 'N/A', 'PLATE_NOT_READABLE'].includes(normPlate)) {
+                const dupCheck = await reportService.checkPlateDuplicate(normPlate, {
+                    latitude: resolvedLoc.latitude,
+                    longitude: resolvedLoc.longitude,
+                    violationType,
+                });
+
+                if (dupCheck.isDuplicate) {
+                    Alert.alert(
+                        'Duplicate Report Detected',
+                        `A report for vehicle "${normPlate}" with violation "${violationType}" has already been submitted at this location within the past 24 hours.\n\nTo prevent duplicate records, another report cannot be submitted. Thank you for helping keep our roads safe!`,
+                        [
+                            { text: 'Go to Home', onPress: () => navigation.navigate('CitizenHome') },
+                            { text: 'Edit Details', style: 'cancel' },
+                        ]
+                    );
+                    submittingRef.current = false;
+                    setSubmitting(false);
+                    return;
+                }
+            }
+
             // Report payload WITHOUT user_id/image_url/image_storage_path — the
             // service fills those in from the authenticated user and the uploaded
             // object, so there is exactly one place that knows the storage layout.
@@ -178,14 +202,14 @@ export default function AIResultsVerification({ navigation, route }) {
                         )}
                     </View>
 
-                    {/* Possible Duplicate Warning Banner */}
+                    {/* Duplicate Warning Banner */}
                     {possibleDuplicate && (
                         <View style={styles.duplicateBanner}>
-                            <Ionicons name="warning" size={18} color={COLORS.secondaryDark} />
+                            <Ionicons name="alert-circle" size={18} color="#DC2626" />
                             <View style={{ flex: 1 }}>
-                                <Text style={styles.duplicateBannerTitle}>⚠️ Possible Duplicate</Text>
+                                <Text style={styles.duplicateBannerTitle}>⚠️ Duplicate Incident Detected</Text>
                                 <Text style={styles.duplicateBannerText}>
-                                    This vehicle number plate has already been reported. The officer will review both reports independently. You may still submit.
+                                    This vehicle and violation was already reported at this location within the past 24 hours. Submitting this duplicate report is not allowed unless you correct the vehicle plate.
                                 </Text>
                             </View>
                         </View>
@@ -623,14 +647,14 @@ const styles = StyleSheet.create({
     modalClose: { position: 'absolute', top: 60, right: 24, zIndex: 10, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
     modalImg: { width: '100%', height: '85%' },
 
-    // Possible Duplicate Warning Banner
+    // Duplicate Warning Banner
     duplicateBanner: {
         flexDirection: 'row',
         alignItems: 'flex-start',
         gap: 12,
-        backgroundColor: COLORS.secondarySurface,
+        backgroundColor: '#FEF2F2',
         borderWidth: 1.5,
-        borderColor: COLORS.secondary,
+        borderColor: '#F87171',
         borderRadius: 18,
         padding: 16,
         marginBottom: 20,
@@ -638,13 +662,13 @@ const styles = StyleSheet.create({
     duplicateBannerTitle: {
         fontSize: 14,
         fontFamily: 'Nunito-Bold',
-        color: '#92400E',
+        color: '#991B1B',
         marginBottom: 4,
     },
     duplicateBannerText: {
         fontSize: 13,
         fontFamily: 'Nunito-Medium',
-        color: '#78350F',
+        color: '#7F1D1D',
         lineHeight: 19,
     },
 });

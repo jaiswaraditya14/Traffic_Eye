@@ -222,7 +222,7 @@ export async function checkImageHashExists(hash) {
  * @param {string} vehicleNumber - e.g. "MH02CR7036"
  * @returns {Promise<{ isDuplicate: boolean, indeterminate: boolean, existingReportId: string|null, reason?: string }>}
  */
-export async function checkPlateDuplicate(vehicleNumber) {
+export async function checkPlateDuplicate(vehicleNumber, options = {}) {
     const unavailable = reason => ({ isDuplicate: false, indeterminate: true, existingReportId: null, reason });
     if (vehicleNumber != null && typeof vehicleNumber !== 'string') return unavailable('INVALID_RESPONSE');
     const normalized = (vehicleNumber || '').replace(/\s+/g, '').toUpperCase();
@@ -230,7 +230,16 @@ export async function checkPlateDuplicate(vehicleNumber) {
         return { isDuplicate: false, indeterminate: false, existingReportId: null };
     }
     try {
-        const { data, error } = await supabase.rpc('check_plate_duplicate', { p_vehicle_number: normalized });
+        const { latitude, longitude, violationType, radiusMeters } = options || {};
+        const rpcParams = { p_vehicle_number: normalized };
+        if (latitude != null && !Number.isNaN(Number(latitude))) rpcParams.p_latitude = Number(latitude);
+        if (longitude != null && !Number.isNaN(Number(longitude))) rpcParams.p_longitude = Number(longitude);
+        if (violationType && typeof violationType === 'string' && violationType.trim()) {
+            rpcParams.p_violation_type = violationType.trim();
+        }
+        if (radiusMeters != null && !Number.isNaN(Number(radiusMeters))) rpcParams.p_radius_meters = Number(radiusMeters);
+
+        const { data, error } = await supabase.rpc('check_plate_duplicate', rpcParams);
         if (error) {
             safeDiagnostic('DUPLICATE_CHECK_FAILED');
             return unavailable('CHECK_FAILED');
@@ -240,7 +249,14 @@ export async function checkPlateDuplicate(vehicleNumber) {
             safeDiagnostic('DUPLICATE_CHECK_INVALID_RESPONSE');
             return unavailable('INVALID_RESPONSE');
         }
-        return { isDuplicate: data.is_duplicate, indeterminate: false, existingReportId: data.is_duplicate ? data.existing_report_id : null };
+        return {
+            isDuplicate: data.is_duplicate,
+            indeterminate: false,
+            existingReportId: data.is_duplicate ? data.existing_report_id : null,
+            submittedAt: data.submitted_at || null,
+            violationType: data.violation_type || null,
+            distanceMeters: data.distance_meters != null ? data.distance_meters : null,
+        };
     } catch {
         safeDiagnostic('DUPLICATE_CHECK_EXCEPTION');
         return unavailable('EXCEPTION');
@@ -392,7 +408,11 @@ async function performReportSubmission({ userId, report, media, submission, sign
             ? 'Could not verify recent activity. Please check your connection and try again.'
             : 'Hourly report limit reached. Please try again in ' + limit.remainingMinutes + ' minute(s).') };
     }
-    const duplicate = await checkPlateDuplicate(report.vehicle_number);
+    const duplicate = await checkPlateDuplicate(report.vehicle_number, {
+        latitude: report.latitude,
+        longitude: report.longitude,
+        violationType: report.violation_type,
+    });
     if (duplicate.indeterminate) {
         return { data: null, error: submissionError('DUPLICATE_CHECK', 'Could not verify this plate. Please check your connection and try again.') };
     }

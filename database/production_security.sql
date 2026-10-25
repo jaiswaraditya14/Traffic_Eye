@@ -325,8 +325,15 @@ $$;
 
 -- ── 7. check_plate_duplicate — SECURITY DEFINER cross-citizen check ───────
 DROP FUNCTION IF EXISTS public.check_plate_duplicate(TEXT);
+DROP FUNCTION IF EXISTS public.check_plate_duplicate(TEXT, DOUBLE PRECISION, DOUBLE PRECISION, TEXT, DOUBLE PRECISION);
 
-CREATE OR REPLACE FUNCTION public.check_plate_duplicate(p_vehicle_number TEXT)
+CREATE OR REPLACE FUNCTION public.check_plate_duplicate(
+    p_vehicle_number  TEXT,
+    p_latitude        DOUBLE PRECISION DEFAULT NULL,
+    p_longitude       DOUBLE PRECISION DEFAULT NULL,
+    p_violation_type  TEXT             DEFAULT NULL,
+    p_radius_meters   DOUBLE PRECISION DEFAULT 100
+)
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -342,19 +349,58 @@ BEGIN
 
     v_normalized := upper(regexp_replace(trim(p_vehicle_number), '\s+', '', 'g'));
 
-    SELECT id, submitted_at
+    IF length(v_normalized) < 4 OR v_normalized IN ('NOTDETECTED', 'NOTAPPLICABLE', 'N/A', 'PLATE_NOT_READABLE') THEN
+        RETURN jsonb_build_object('is_duplicate', false, 'existing_report_id', NULL);
+    END IF;
+
+    SELECT
+        id,
+        submitted_at,
+        violation_type,
+        latitude,
+        longitude,
+        CASE
+            WHEN p_latitude IS NOT NULL AND p_longitude IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL THEN
+                6371000 * 2 * asin(sqrt(
+                    power(sin(radians(latitude - p_latitude) / 2), 2) +
+                    cos(radians(p_latitude)) * cos(radians(latitude)) *
+                    power(sin(radians(longitude - p_longitude) / 2), 2)
+                ))
+            ELSE NULL
+        END AS distance_meters
     INTO v_report
     FROM public.image_reports
     WHERE vehicle_number = v_normalized
       AND status <> 'rejected'
+      AND submitted_at >= now() - interval '24 hours'
+      AND (
+          p_violation_type IS NULL
+          OR trim(p_violation_type) = ''
+          OR lower(trim(violation_type)) = lower(trim(p_violation_type))
+      )
+      AND (
+          p_latitude IS NULL
+          OR p_longitude IS NULL
+          OR latitude IS NULL
+          OR longitude IS NULL
+          OR (
+              6371000 * 2 * asin(sqrt(
+                  power(sin(radians(latitude - p_latitude) / 2), 2) +
+                  cos(radians(p_latitude)) * cos(radians(latitude)) *
+                  power(sin(radians(longitude - p_longitude) / 2), 2)
+              )) <= COALESCE(p_radius_meters, 100)
+          )
+      )
     ORDER BY submitted_at DESC
     LIMIT 1;
 
     IF FOUND THEN
         RETURN jsonb_build_object(
             'is_duplicate',       true,
-            'existing_report_id', v_report.id,
-            'submitted_at',       v_report.submitted_at
+            'existing_report_id', v_report.id::text,
+            'submitted_at',       v_report.submitted_at,
+            'violation_type',     v_report.violation_type,
+            'distance_meters',    round(COALESCE(v_report.distance_meters, 0)::numeric, 1)
         );
     END IF;
 
@@ -362,8 +408,8 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.check_plate_duplicate(TEXT) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.check_plate_duplicate(TEXT) TO authenticated;
+REVOKE ALL ON FUNCTION public.check_plate_duplicate(TEXT, DOUBLE PRECISION, DOUBLE PRECISION, TEXT, DOUBLE PRECISION) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.check_plate_duplicate(TEXT, DOUBLE PRECISION, DOUBLE PRECISION, TEXT, DOUBLE PRECISION) TO authenticated;
 
 
 -- ── 8. PERFORMANCE INDEXES ────────────────────────────────────────────────
