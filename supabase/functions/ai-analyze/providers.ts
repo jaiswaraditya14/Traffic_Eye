@@ -11,7 +11,7 @@
 
 import { ERR, type ErrCode } from '../_shared/http.ts';
 
-export type Provider = 'tokenharbor' | 'nvidia' | 'gemini' | 'groq';
+export type Provider = 'openrouter' | 'tokenharbor' | 'nvidia' | 'gemini' | 'groq';
 
 export interface Attempt {
   provider: Provider;
@@ -20,6 +20,19 @@ export interface Attempt {
 
 /** Server-owned allow-list. Anything not listed here can never be called. */
 export const ALLOWED_MODELS: Record<Provider, ReadonlySet<string>> = {
+  openrouter: new Set([
+    'nvidia/nemotron-3.5-super-vl:free',
+    'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+    'google/gemma-4-31b-it:free',
+    'google/gemma-4-26b-a4b-it:free',
+    'nvidia/nemotron-3-super-120b-a12b:free',
+    'nvidia/nemotron-3.5-lightning:free',
+    'meta-llama/llama-3.2-11b-vision-instruct:free',
+    'meta-llama/llama-3.2-11b-vision-instruct',
+    'qwen/qwen-2.5-vl-72b-instruct:free',
+    'google/gemini-2.0-flash-001',
+    'google/gemini-2.5-flash',
+  ]),
   tokenharbor: new Set([
     'claude-sonnet-4.6',
     'gemini-3.8-flash',
@@ -37,9 +50,12 @@ export const ALLOWED_MODELS: Record<Provider, ReadonlySet<string>> = {
   groq: new Set(['openai/gpt-oss-20b', 'openai/gpt-oss-120b', 'llama-3.3-70b-versatile']),
 };
 
-/** Ordered attempt chain per stage: primary first, fallback second. */
+/** Ordered attempt chain per stage: OpenRouter primary first, followed by fallbacks. */
 export const STAGE_ATTEMPTS: Record<'vision' | 'ocr' | 'audit', readonly Attempt[]> = {
   vision: [
+    { provider: 'openrouter', model: 'nvidia/nemotron-3.5-super-vl:free' },
+    { provider: 'openrouter', model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free' },
+    { provider: 'openrouter', model: 'google/gemma-4-31b-it:free' },
     { provider: 'tokenharbor', model: 'claude-sonnet-4.6' },
     { provider: 'tokenharbor', model: 'gemini-3.8-flash' },
     { provider: 'nvidia', model: 'nvidia/llama-3.1-nemotron-nano-vl-8b-v1' },
@@ -47,14 +63,20 @@ export const STAGE_ATTEMPTS: Record<'vision' | 'ocr' | 'audit', readonly Attempt
     { provider: 'gemini', model: 'gemini-3.5-flash' },
   ],
   ocr: [
+    { provider: 'openrouter', model: 'nvidia/nemotron-3.5-super-vl:free' },
+    { provider: 'openrouter', model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free' },
+    { provider: 'openrouter', model: 'google/gemma-4-31b-it:free' },
     { provider: 'tokenharbor', model: 'claude-sonnet-4.6' },
     { provider: 'tokenharbor', model: 'gemini-3.8-flash' },
     { provider: 'nvidia', model: 'nvidia/llama-3.1-nemotron-nano-vl-8b-v1' },
     { provider: 'nvidia', model: 'meta/llama-3.2-11b-vision-instruct' },
     { provider: 'gemini', model: 'gemini-3.5-flash' },
   ],
-  // Text audit: Token Harbor mimo-v2.5:free primary, Groq fallback.
+  // Text audit: OpenRouter primary, Token Harbor mimo-v2.5:free secondary, Groq fallback.
   audit: [
+    { provider: 'openrouter', model: 'nvidia/nemotron-3.5-super-vl:free' },
+    { provider: 'openrouter', model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free' },
+    { provider: 'openrouter', model: 'nvidia/nemotron-3-super-120b-a12b:free' },
     { provider: 'tokenharbor', model: 'mimo-v2.5:free' },
     { provider: 'tokenharbor', model: 'claude-sonnet-4.6' },
     { provider: 'groq', model: 'openai/gpt-oss-20b' },
@@ -62,18 +84,19 @@ export const STAGE_ATTEMPTS: Record<'vision' | 'ocr' | 'audit', readonly Attempt
 };
 
 export const STAGE_TIMEOUT_MS: Record<'vision' | 'ocr' | 'audit', number> = {
-  vision: 12_000,
-  ocr: 10_000,
-  audit: 8_000,
+  vision: 18_000,
+  ocr: 12_000,
+  audit: 10_000,
 };
 
 export const STAGE_MAX_TOKENS: Record<'vision' | 'ocr' | 'audit', number> = {
-  vision: 512,
-  ocr: 256,
-  audit: 384,
+  vision: 2048,
+  ocr: 1024,
+  audit: 1500,
 };
 
 const ENV_KEYS: Record<Provider, readonly string[]> = {
+  openrouter: ['OPENROUTER_API_KEY_1', 'OPENROUTER_API_KEY_2', 'OPENROUTER_API_KEY'],
   tokenharbor: ['TOKENHARBOR_API_KEY_1'],
   nvidia: ['NVIDIA_API_KEY_1', 'NVIDIA_API_KEY_2'],
   gemini: ['GEMINI_API_KEY_1'],
@@ -83,12 +106,12 @@ const ENV_KEYS: Record<Provider, readonly string[]> = {
 /** Keys configured for a provider, in rotation order. Values never logged. */
 export function keysFor(provider: Provider): string[] {
   return ENV_KEYS[provider]
-    .map((name) => Deno.env.get(name) || (name.startsWith('TOKENHARBOR_') || name.startsWith('NVIDIA_') || name.startsWith('GEMINI_') || name.startsWith('GROQ_') ? undefined : name))
+    .map((name) => Deno.env.get(name) || (name.startsWith('OPENROUTER_') || name.startsWith('TOKENHARBOR_') || name.startsWith('NVIDIA_') || name.startsWith('GEMINI_') || name.startsWith('GROQ_') ? undefined : name))
     .filter((v): v is string => typeof v === 'string' && v.length > 0);
 }
 
 export function anyProviderConfigured(): boolean {
-  return (['tokenharbor', 'nvidia', 'gemini', 'groq'] as Provider[]).some((p) => keysFor(p).length > 0);
+  return (['openrouter', 'tokenharbor', 'nvidia', 'gemini', 'groq'] as Provider[]).some((p) => keysFor(p).length > 0);
 }
 
 export function providerConfiguredFor(stage: 'vision' | 'ocr' | 'audit'): boolean {
@@ -129,17 +152,19 @@ async function callProvider(a: CallArgs): Promise<string> {
     throw new ProviderError(ERR.INTERNAL, null, 'model not in allow-list');
   }
 
-  const oaiCompatible = a.provider === 'groq' || a.provider === 'nvidia' || a.provider === 'tokenharbor';
+  const oaiCompatible = a.provider === 'openrouter' || a.provider === 'groq' || a.provider === 'nvidia' || a.provider === 'tokenharbor';
   const isGpt120b = a.model === 'openai/gpt-oss-120b';
 
   const url =
-    a.provider === 'tokenharbor'
-      ? 'https://tokenharbor.ai/v1/chat/completions'
-      : a.provider === 'groq'
-        ? 'https://api.groq.com/openai/v1/chat/completions'
-        : a.provider === 'nvidia'
-          ? 'https://integrate.api.nvidia.com/v1/chat/completions'
-          : `https://generativelanguage.googleapis.com/v1beta/models/${a.model}:generateContent`;
+    a.provider === 'openrouter'
+      ? 'https://openrouter.ai/api/v1/chat/completions'
+      : a.provider === 'tokenharbor'
+        ? 'https://tokenharbor.ai/v1/chat/completions'
+        : a.provider === 'groq'
+          ? 'https://api.groq.com/openai/v1/chat/completions'
+          : a.provider === 'nvidia'
+            ? 'https://integrate.api.nvidia.com/v1/chat/completions'
+            : `https://generativelanguage.googleapis.com/v1beta/models/${a.model}:generateContent`;
 
   const body = oaiCompatible
     ? JSON.stringify({
@@ -157,7 +182,11 @@ async function callProvider(a: CallArgs): Promise<string> {
         ],
         ...(a.jsonMode && a.provider === 'groq' ? { response_format: { type: 'json_object' } } : {}),
         temperature: isGpt120b ? 1 : 0.1,
-        ...(a.provider === 'groq' ? { max_completion_tokens: a.maxTokens } : { max_tokens: a.maxTokens }),
+        ...(a.provider === 'groq'
+          ? { max_completion_tokens: a.maxTokens }
+          : a.provider === 'openrouter'
+            ? { max_tokens: Math.max(a.maxTokens, 4096) }
+            : { max_tokens: a.maxTokens }),
         top_p: isGpt120b ? 1 : 0.9,
         ...(isGpt120b ? { reasoning_effort: 'medium' } : {}),
       })
@@ -191,6 +220,7 @@ async function callProvider(a: CallArgs): Promise<string> {
         // Gemini takes the key in a header so it never appears in a URL that
         // could be captured by proxy access logs.
         ...(oaiCompatible ? { Authorization: `Bearer ${a.apiKey}` } : { 'x-goog-api-key': a.apiKey }),
+        ...(a.provider === 'openrouter' ? { 'HTTP-Referer': 'https://trafficeye.app', 'X-Title': 'Traffic Eye AI' } : {}),
       },
       body,
       signal: controller.signal,
@@ -207,8 +237,9 @@ async function callProvider(a: CallArgs): Promise<string> {
     }
 
     const json = await res.json();
+    const choice = json?.choices?.[0];
     const text = oaiCompatible
-      ? json?.choices?.[0]?.message?.content
+      ? (choice?.message?.content || choice?.message?.reasoning)
       : json?.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (typeof text !== 'string' || text.length === 0 || text.length > 16_000) {

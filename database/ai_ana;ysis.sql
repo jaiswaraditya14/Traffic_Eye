@@ -7,7 +7,7 @@ CREATE TABLE public.ai_analysis_events (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     stage text NOT NULL CHECK (stage IN ('vision', 'ocr', 'audit')),
-    provider text CHECK (provider IN ('nvidia', 'gemini', 'groq')),
+    provider text CHECK (provider IN ('openrouter', 'tokenharbor', 'nvidia', 'gemini', 'groq')),
     model text CHECK (char_length(model) <= 128),
     correlation_id text NOT NULL CHECK (correlation_id ~ '^[A-Za-z0-9_-]{8,64}$'),
     attempts integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),

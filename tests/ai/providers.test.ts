@@ -50,6 +50,62 @@ describe('server-owned AI provider transport', () => {
         secrets.GEMINI_API_KEY_1 = 'synthetic-gemini-key';
         expect(providerConfiguredFor('vision')).toBe(true);
         expect(providerConfiguredFor('ocr')).toBe(true);
+        secrets.OPENROUTER_API_KEY_1 = 'synthetic-openrouter-key';
+        expect(providerConfiguredFor('vision')).toBe(true);
+        expect(providerConfiguredFor('ocr')).toBe(true);
+        expect(providerConfiguredFor('audit')).toBe(true);
+    });
+
+    test('OpenRouter is primary for vision and includes required headers and model without leaking credentials', async () => {
+        secrets.OPENROUTER_API_KEY_1 = 'synthetic-openrouter-key';
+        secrets.TOKENHARBOR_API_KEY_1 = 'synthetic-tokenharbor-key';
+        fetchMock.mockResolvedValue(goodResponse('{"vehicle":{"type":"motorcycle"}}'));
+
+        const result = await runStage('vision', 'Synthetic prompt', 'synthetic-image', false);
+
+        expect(result).toEqual({
+            text: '{"vehicle":{"type":"motorcycle"}}',
+            provider: 'openrouter',
+            model: 'nvidia/nemotron-3.5-super-vl:free',
+            attempts: 1,
+            latencyMs: expect.any(Number),
+        });
+        const [url, options] = fetchMock.mock.calls[0];
+        expect(url).toBe('https://openrouter.ai/api/v1/chat/completions');
+        expect(options.headers.Authorization).toBe('Bearer synthetic-openrouter-key');
+        expect(options.headers['HTTP-Referer']).toBe('https://trafficeye.app');
+        expect(options.headers['X-Title']).toBe('Traffic Eye AI');
+        expect(JSON.parse(options.body)).toMatchObject({
+            model: 'nvidia/nemotron-3.5-super-vl:free',
+            messages: [{
+                role: 'user',
+                content: [
+                    { type: 'text', text: 'Synthetic prompt' },
+                    { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,synthetic-image' } },
+                ],
+            }],
+        });
+        expect(JSON.stringify(result)).not.toContain('synthetic-openrouter-key');
+    });
+
+    test('OpenRouter is primary for audit and falls back to secondary provider if OpenRouter fails', async () => {
+        secrets.OPENROUTER_API_KEY_1 = 'synthetic-openrouter-key';
+        secrets.GROQ_API_KEY_1 = 'synthetic-groq-key';
+        // 3 OpenRouter models fail with 429, then Groq succeeds
+        fetchMock
+            .mockResolvedValueOnce({ ok: false, status: 429, body: { cancel: async () => {} } })
+            .mockResolvedValueOnce({ ok: false, status: 429, body: { cancel: async () => {} } })
+            .mockResolvedValueOnce({ ok: false, status: 429, body: { cancel: async () => {} } })
+            .mockResolvedValueOnce(goodResponse('{"audit":"ok"}'));
+
+        const result = await runStage('audit', 'Synthetic prompt', null, true);
+
+        expect(result.provider).toBe('groq');
+        expect(result.attempts).toBe(4);
+        expect(fetchMock.mock.calls[0][0]).toBe('https://openrouter.ai/api/v1/chat/completions');
+        expect(fetchMock.mock.calls[1][0]).toBe('https://openrouter.ai/api/v1/chat/completions');
+        expect(fetchMock.mock.calls[2][0]).toBe('https://openrouter.ai/api/v1/chat/completions');
+        expect(fetchMock.mock.calls[3][0]).toBe('https://api.groq.com/openai/v1/chat/completions');
     });
 
     test('audit uses the fixed Groq endpoint/model and does not return credentials or full provider payloads', async () => {

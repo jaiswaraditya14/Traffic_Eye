@@ -1,15 +1,15 @@
 /**
  * ai/index.js — Traffic Eye Production AI Analysis Pipeline (v3)
  *
- * Architecture: AI SEES → CODE DECIDES → GROQ AUDITS → UNCERTAINTY → MANUAL REVIEW
+ * Architecture: AI SEES → CODE DECIDES → CONSISTENCY AUDIT → UNCERTAINTY → MANUAL REVIEW
  *
  * ┌─────────────────────────────────────────────────────────┐
  * │ Stage 0  — Local Preprocessing & Integrity              │ 0 API calls
- * │ Stage 1  — NVIDIA Vision (primary perception)           │ 12s max, 1 attempt
- * │ Stage 1F — Gemini Vision (fallback, only on failure)    │ 12s max, 1 attempt
+ * │ Stage 1  — OpenRouter Vision (primary perception)       │ 12s max, 1 attempt
+ * │ Stage 1F — Fallback Vision (TokenHarbor/NVIDIA/Gemini)  │ 12s max, 1 attempt
  * │ Stage RE — Local Deterministic Rule Engine              │ 0ms, pure code
  * │ Stage 2  — Conditional OCR (only when plate unresolved) │ 10s max, lazy
- * │ Stage 3  — Groq GPT-OSS-20B Consistency Audit (text)   │ 8s max, no image
+ * │ Stage 3  — Consistency Audit (text)                     │ 8s max, no image
  * └─────────────────────────────────────────────────────────┘
  *
  * Fail-closed policy:
@@ -314,7 +314,7 @@ export const aiService = {
                     );
                     visionRaw     = res.text;
                     providerUsed  = res.provider;
-                    fallbackUsed  = res.provider === 'gemini';
+                    fallbackUsed  = res.provider !== 'openrouter';
                     telemetry.vision_primary_ms = t1.elapsed();
                 } catch (visionErr) {
                     telemetry.vision_primary_ms = t1.elapsed();
