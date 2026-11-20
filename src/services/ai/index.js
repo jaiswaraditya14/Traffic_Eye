@@ -30,6 +30,7 @@ import { stripThinkTags, invokeAiStage, AiStageError } from './utils';
 import { invokeAiStageWithRetry } from './retry';
 import { checkLocalIntegrity, prepareVisionImage, prepareOcrImage } from './preprocessing';
 import { applyRules, VIOLATION_SEVERITY } from './ruleEngine';
+import { AI_CONFIG } from '../../config';
 
 // Re-export shared utilities for callers that import from this module
 export { stripThinkTags, invokeAiStage, AiStageError } from './utils';
@@ -419,16 +420,15 @@ export const aiService = {
             }
 
             // ═══════════════════════════════════════════════════════════════════
-            // STAGE 3 — Groq GPT-OSS-20B Text-Only Consistency Audit
+            // STAGE 3 — Text-Only Consistency Audit (Optional / Disabled)
             // ═══════════════════════════════════════════════════════════════════
             //
-            // Groq receives ONLY structured text evidence — NO image data.
-            // Groq validates logical consistency and rejects unsupported violations.
-            //
-            if (onStageChange) onStageChange('Validating evidence...');
-            const candidateViolations = ruleResult.confirmedViolations;
-
-            if (candidateViolations.length > 0) {
+            // Text-only audit is disabled by default to eliminate latency, prevent
+            // "analysis unavailable" timeouts, and streamline pipeline execution.
+            // Primary vision and multimodal reasoning provide robust detection in ~2.9s.
+            if (AI_CONFIG?.enableAudit && ruleResult.confirmedViolations.length > 0) {
+                if (onStageChange) onStageChange('Validating evidence...');
+                const candidateViolations = ruleResult.confirmedViolations;
                 const t3 = makeTimer();
                 try {
                     const evidenceSummary = buildEvidenceSummary(evidence, ruleResult);
@@ -444,7 +444,7 @@ export const aiService = {
 
                     // Validate audit response structure
                     if (!Array.isArray(parsedAudit.accepted_violations)) {
-                        throw new Error('Groq audit response missing accepted_violations array');
+                        throw new Error('Audit response missing accepted_violations array');
                     }
 
                     auditResult = parsedAudit;

@@ -32,6 +32,10 @@ describe('server-owned AI provider transport', () => {
         return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: text } }] }) };
     }
 
+    function goodGeminiResponse(text = '{"vehicle":{"type":"motorcycle"}}') {
+        return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text }] } }] }) };
+    }
+
     test('no configured key spends no provider credit', async () => {
         await expect(runStage('audit', 'Synthetic prompt', null, true)).rejects.toMatchObject({
             name: 'ProviderError', code: ERR.NOT_CONFIGURED, attempts: 0,
@@ -47,6 +51,44 @@ describe('server-owned AI provider transport', () => {
         expect(providerConfiguredFor('vision')).toBe(true);
         expect(providerConfiguredFor('ocr')).toBe(true);
         expect(providerConfiguredFor('audit')).toBe(true);
+    });
+
+    test('Gemini 3.5 Flash Lite is primary for vision when GEMINI_API_KEY is configured', async () => {
+        secrets.GEMINI_API_KEY = 'synthetic-gemini-key';
+        fetchMock.mockResolvedValue(goodGeminiResponse('{"vehicle":{"type":"motorcycle"}}'));
+
+        const result = await runStage('vision', 'Synthetic prompt', 'synthetic-image', false);
+
+        expect(result).toEqual({
+            text: '{"vehicle":{"type":"motorcycle"}}',
+            provider: 'gemini',
+            model: 'gemini-3.5-flash-lite',
+            attempts: 1,
+            latencyMs: expect.any(Number),
+        });
+        const [url, options] = fetchMock.mock.calls[0];
+        expect(url).toContain('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent');
+        expect(url).toContain('key=synthetic-gemini-key');
+        expect(options.headers['Content-Type']).toBe('application/json');
+        const parsedBody = JSON.parse(options.body);
+        expect(parsedBody.contents[0].parts).toEqual([
+            { text: 'Synthetic prompt' },
+            { inlineData: { mimeType: 'image/jpeg', data: 'synthetic-image' } },
+        ]);
+        expect(JSON.stringify(result)).not.toContain('synthetic-gemini-key');
+    });
+
+    test('Gemini falls back to gemini-2.5-flash on 429 rate limit', async () => {
+        secrets.GEMINI_API_KEY = 'synthetic-gemini-key';
+        fetchMock
+            .mockResolvedValueOnce({ ok: false, status: 429, body: { cancel: async () => {} } })
+            .mockResolvedValueOnce(goodGeminiResponse('{"vehicle":{"type":"car"}}'));
+
+        const result = await runStage('vision', 'Synthetic prompt', 'synthetic-image', false);
+
+        expect(result.provider).toBe('gemini');
+        expect(result.model).toBe('gemini-2.5-flash');
+        expect(result.attempts).toBe(2);
     });
 
     test('OpenRouter is primary for vision and includes required headers and model without leaking credentials', async () => {

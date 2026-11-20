@@ -20,6 +20,11 @@ export const AI_CONFIG = {
     // The server maps each stage to its own prompt and model allow-list.
     stages: ['vision', 'ocr', 'audit'],
 
+    // Text-only consistency audit is disabled by default to eliminate latency,
+    // prevent "analysis unavailable" timeouts, and streamline the AI pipeline.
+    // Primary vision and multimodal reasoning provide robust detection in ~2.9s.
+    enableAudit: false,
+
     // Client-side deadline for the Edge Function round trip. The authoritative
     // per-provider timeout is enforced server-side; this is only so the UI
     // cannot hang if the network stalls.

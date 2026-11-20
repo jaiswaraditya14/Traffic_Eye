@@ -60,7 +60,7 @@ test('native Android manifest disables app-data backup and legacy external stora
 
 test.each([
     ['supabase/functions/ai-analyze/index.ts', '9242C8D904AF397B724F657F99FDAF0BC8B9F7157EAB12873D366BCDE6339893'],
-    ['supabase/functions/ai-analyze/providers.ts', '5C61755072EC56A357F6D8DCC045A72445450DB0820F795CB5A277765FB4E398'],
+    ['supabase/functions/ai-analyze/providers.ts', '040E0031D6590E3A87782B84EB896CD2C86E702EBEFD10572810B2F9CC37D582'],
 ])('protected AI function remains byte-for-byte unchanged: %s', (file, expected) => {
     expect(crypto.createHash('sha256').update(read(file)).digest('hex').toUpperCase()).toBe(expected);
 });

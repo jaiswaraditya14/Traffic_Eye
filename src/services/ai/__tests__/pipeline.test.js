@@ -10,7 +10,7 @@ jest.mock('../retry', () => ({ invokeAiStageWithRetry: jest.fn() }));
 jest.mock('../preprocessing', () => ({ checkLocalIntegrity: jest.fn(), prepareVisionImage: jest.fn(), prepareOcrImage: jest.fn() }));
 jest.mock('../ruleEngine', () => ({ applyRules: jest.fn(), VIOLATION_SEVERITY: { NO_HELMET: 5 } }));
 jest.mock('../authenticity', () => ({ checkImageAuthenticity: jest.fn() }));
-jest.mock('../../../config', () => ({ AI_CONFIG: { stages: ['vision', 'ocr', 'audit'] } }));
+jest.mock('../../../config', () => ({ AI_CONFIG: { stages: ['vision', 'ocr'], enableAudit: false } }));
 jest.mock('../../supabase', () => ({ supabase: { functions: { invoke: jest.fn() } } }));
 
 beforeEach(() => {
@@ -29,17 +29,16 @@ beforeEach(() => {
 });
 afterEach(() => jest.restoreAllMocks());
 
-test('all stages use the retry wrapper and same cancellation signal', async () => {
+test('active pipeline stages use the retry wrapper and same cancellation signal', async () => {
     const controller = new AbortController();
     const uri = 'content://synthetic/image?access=retained';
     await aiService.analyzeViolationImage(uri, { signal: controller.signal });
     expect(checkLocalIntegrity).toHaveBeenCalledWith(uri);
-    expect(invokeAiStageWithRetry.mock.calls.map(([args]) => args.stage)).toEqual(['vision', 'ocr', 'audit']);
+    expect(invokeAiStageWithRetry.mock.calls.map(([args]) => args.stage)).toEqual(['vision', 'ocr']);
     for (const [, options] of invokeAiStageWithRetry.mock.calls) expect(options.signal).toBe(controller.signal);
-    expect(invokeAiStageWithRetry.mock.calls[2][0]).not.toHaveProperty('imageBase64');
 });
 
-test.each(['vision', 'ocr', 'audit'])('cancellation during %s stops the pipeline', async target => {
+test.each(['vision', 'ocr'])('cancellation during %s stops the pipeline', async target => {
     const implementation = invokeAiStageWithRetry.getMockImplementation();
     invokeAiStageWithRetry.mockImplementation(async args => {
         if (args.stage === target) throw new AiStageError('CANCELLED');

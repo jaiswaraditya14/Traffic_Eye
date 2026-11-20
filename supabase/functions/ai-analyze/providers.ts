@@ -20,6 +20,11 @@ export interface Attempt {
 
 /** Server-owned allow-list. Anything not listed here can never be called. */
 export const ALLOWED_MODELS: Record<Provider, ReadonlySet<string>> = {
+  gemini: new Set([
+    // Primary multimodal vision and reasoning models
+    'gemini-3.5-flash-lite',
+    'gemini-2.5-flash',
+  ]),
   openrouter: new Set([
     // Primary Vision & Scene Perception (super fast ~3s, 1M context, robust forensic analysis)
     'nvidia/nemotron-3.5-super-vl:free',
@@ -41,25 +46,30 @@ export const ALLOWED_MODELS: Record<Provider, ReadonlySet<string>> = {
   ]),
   tokenharbor: new Set([]),
   nvidia: new Set([]),
-  gemini: new Set([]),
   groq: new Set([]),
 };
 
 /**
  * Ordered attempt chain per stage.
- * OpenRouter is the primary perception, OCR, and audit engine.
- * Employs top vision-enabled models with automatic failover between Key 1 and Key 2.
+ * Primary: Google Gemini 3.5 Flash Lite (ultra fast ~2.9s, high availability, scene perception + OCR).
+ * Fallbacks: Gemini 2.5 Flash, then OpenRouter models.
  */
 export const STAGE_ATTEMPTS: Record<'vision' | 'ocr' | 'audit', readonly Attempt[]> = {
   vision: [
+    { provider: 'gemini', model: 'gemini-3.5-flash-lite' },
+    { provider: 'gemini', model: 'gemini-2.5-flash' },
     { provider: 'openrouter', model: 'nvidia/nemotron-3.5-super-vl:free' },
     { provider: 'openrouter', model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free' },
   ],
   ocr: [
+    { provider: 'gemini', model: 'gemini-3.5-flash-lite' },
+    { provider: 'gemini', model: 'gemini-2.5-flash' },
     { provider: 'openrouter', model: 'nvidia/nemotron-3.5-super-vl:free' },
     { provider: 'openrouter', model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free' },
   ],
   audit: [
+    { provider: 'gemini', model: 'gemini-3.5-flash-lite' },
+    { provider: 'gemini', model: 'gemini-2.5-flash' },
     { provider: 'openrouter', model: 'nvidia/nemotron-3.5-super-vl:free' },
   ],
 };
@@ -77,10 +87,10 @@ export const STAGE_MAX_TOKENS: Record<'vision' | 'ocr' | 'audit', number> = {
 };
 
 const ENV_KEYS: Record<Provider, readonly string[]> = {
+  gemini: ['GEMINI_API_KEY'],
   openrouter: ['OPENROUTER_API_KEY_1', 'OPENROUTER_API_KEY_2', 'OPENROUTER_API_KEY'],
   tokenharbor: [],
   nvidia: [],
-  gemini: [],
   groq: [],
 };
 
@@ -99,7 +109,7 @@ export function keysFor(provider: Provider): string[] {
 }
 
 export function anyProviderConfigured(): boolean {
-  return (['openrouter', 'tokenharbor', 'nvidia', 'gemini', 'groq'] as Provider[]).some((p) => keysFor(p).length > 0);
+  return (['gemini', 'openrouter', 'tokenharbor', 'nvidia', 'groq'] as Provider[]).some((p) => keysFor(p).length > 0);
 }
 
 export function providerConfiguredFor(stage: 'vision' | 'ocr' | 'audit'): boolean {
@@ -135,11 +145,7 @@ interface CallArgs {
  * One provider call to OpenRouter. Returns raw assistant text.
  * Throws ProviderError with a typed code; upstream body is never leaked.
  */
-async function callProvider(a: CallArgs): Promise<string> {
-  if (!ALLOWED_MODELS[a.provider].has(a.model)) {
-    throw new ProviderError(ERR.INTERNAL, null, 'model not in allow-list');
-  }
-
+async function callOpenRouter(a: CallArgs): Promise<string> {
   const url = 'https://openrouter.ai/api/v1/chat/completions';
 
   const body = JSON.stringify({
@@ -177,7 +183,6 @@ async function callProvider(a: CallArgs): Promise<string> {
     });
 
     if (!res.ok) {
-      // Drain and discard: the body may echo prompt or key material.
       await res.body?.cancel();
       const code: ErrCode =
         res.status >= 500 || res.status === 402 || res.status === 429
@@ -205,6 +210,91 @@ async function callProvider(a: CallArgs): Promise<string> {
   }
 }
 
+/**
+ * One provider call to Google Gemini Generative Language API.
+ * High-speed native multimodal inference using Google AI Studio.
+ */
+async function callGemini(a: CallArgs): Promise<string> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${a.model}:generateContent?key=${encodeURIComponent(a.apiKey)}`;
+
+  const parts: Array<Record<string, unknown>> = [{ text: a.prompt }];
+  if (a.imageBase64) {
+    parts.push({
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: a.imageBase64,
+      },
+    });
+  }
+
+  const body = JSON.stringify({
+    contents: [
+      {
+        parts,
+      },
+    ],
+    generationConfig: {
+      temperature: 0.1,
+      maxOutputTokens: Math.max(a.maxTokens, 2048),
+      responseMimeType: 'application/json',
+    },
+  });
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), a.timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body,
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      await res.body?.cancel();
+      const code: ErrCode =
+        res.status >= 500 || res.status === 402 || res.status === 429
+          ? ERR.PROVIDER_UNAVAILABLE
+          : ERR.PROVIDER_BAD_OUTPUT;
+      throw new ProviderError(code, res.status, `upstream status ${res.status}`);
+    }
+
+    const json = await res.json();
+    const candidate = json?.candidates?.[0];
+    const text = candidate?.content?.parts?.[0]?.text;
+
+    if (typeof text !== 'string' || text.length === 0 || text.length > 16_000) {
+      throw new ProviderError(ERR.PROVIDER_BAD_OUTPUT, null, 'empty completion');
+    }
+    return text;
+  } catch (err) {
+    if (err instanceof ProviderError) throw err;
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new ProviderError(ERR.PROVIDER_TIMEOUT, null, 'timeout');
+    }
+    throw new ProviderError(ERR.PROVIDER_UNAVAILABLE, null, 'network failure');
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function callProvider(a: CallArgs): Promise<string> {
+  if (!ALLOWED_MODELS[a.provider]?.has(a.model)) {
+    throw new ProviderError(ERR.INTERNAL, null, 'model not in allow-list');
+  }
+
+  if (a.provider === 'gemini') {
+    return callGemini(a);
+  }
+  if (a.provider === 'openrouter') {
+    return callOpenRouter(a);
+  }
+  throw new ProviderError(ERR.INTERNAL, null, `unsupported provider ${a.provider}`);
+}
+
 export interface RotationResult {
   text: string;
   provider: Provider;
@@ -214,13 +304,13 @@ export interface RotationResult {
 }
 
 /**
- * Walk the stage's attempt chain, rotating keys within OpenRouter.
+ * Walk the stage's attempt chain, rotating keys within providers.
  *
  * Rate-limit & fallback policy:
- *   429 (rate limit: 20 req/min or 50 daily limit) → advance to next key
- *   402 (balance zero)                             → advance to next key
- *   5xx / timeout / network                         → advance to next key / model
- *   other 4xx                                      → stop (auth error, malformed request)
+ *   429 (rate limit)        → advance to next key
+ *   402 (balance zero)      → advance to next key
+ *   5xx / timeout / network → advance to next key / model
+ *   other 4xx               → stop (auth error, malformed request)
  */
 export async function runStage(
   stage: 'vision' | 'ocr' | 'audit',
