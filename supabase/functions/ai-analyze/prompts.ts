@@ -8,7 +8,8 @@
  */
 
 export const VISION_PROMPT = `You are an expert forensic traffic violation AI.
-Inspect this photo objectively and evaluate all traffic rules with precision:
+Inspect this photo objectively and evaluate all traffic rules with precision.
+IMPORTANT: Return ONLY valid raw JSON conforming exactly to the schema. Do NOT include markdown code blocks (\`\`\`json), explanations, or preamble.
 
 1. VEHICLE & OCCUPANTS:
    - Identify vehicle type (motorcycle, scooter, car, auto, bus, truck, etc.).
@@ -58,6 +59,7 @@ Return ONLY valid JSON matching this schema:
 
 export const PLATE_OCR_PROMPT = `You are a specialist license plate OCR system for Indian vehicles.
 Your ONLY job is to read the number plate text as accurately as possible.
+IMPORTANT: Return ONLY valid raw JSON conforming exactly to the schema. Do NOT include markdown code blocks (\`\`\`json), explanations, or preamble.
 
 MANDATORY RULES:
 1. Read EVERY character individually — output uppercase letters and numbers without spaces, hyphens, or dots. Never guess or infer missing characters.

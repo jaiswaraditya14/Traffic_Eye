@@ -24,17 +24,21 @@ export const ALLOWED_MODELS: Record<Provider, ReadonlySet<string>> = {
     // Primary multimodal vision and reasoning models
     'gemini-3.5-flash-lite',
     'gemini-2.5-flash',
+    'gemini-flash-latest',
+    'gemini-2.5-flash-lite',
+    'gemini-2.0-flash',
   ]),
   openrouter: new Set([
-    // Primary Vision & Scene Perception (super fast ~3s, 1M context, robust forensic analysis)
+    // Primary Vision & Scene Perception (ultra-fast with zero-reasoning tokens)
     'nvidia/nemotron-3.5-super-vl:free',
-    // Secondary Multimodal Reasoning & Plate OCR (30B multimodal reasoning with character extraction)
+    // Secondary Multimodal Reasoning & Plate OCR
     'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
     // High-capability vision fallbacks
     'google/gemma-4-31b-it:free',
     'google/gemma-4-26b-a4b-it:free',
     'particle-ai/particle-1:free',
     'inclusionai/ling-3.2-flash:free',
+    'openrouter/free',
     // Text-only audit & consistency evaluation models
     'nvidia/nemotron-3.5-lightning:free',
     'nvidia/nemotron-3-ultra-550b-a55b:free',
@@ -51,8 +55,9 @@ export const ALLOWED_MODELS: Record<Provider, ReadonlySet<string>> = {
 
 /**
  * Ordered attempt chain per stage.
- * Primary: Google Gemini 3.5 Flash Lite (ultra fast ~2.9s, high availability, scene perception + OCR).
- * Fallbacks: Gemini 2.5 Flash, then OpenRouter models.
+ * Primary: Google Gemini 3.5 Flash Lite (ultra fast ~2.2s, native multimodal vision).
+ * Fallback 1: Gemini 2.5 Flash (high availability, robust forensic reasoning).
+ * Fallback 2: OpenRouter Key 1 -> Key 2 with Nemotron 3.5 Super VL & Nemotron 3 Nano Omni.
  */
 export const STAGE_ATTEMPTS: Record<'vision' | 'ocr' | 'audit', readonly Attempt[]> = {
   vision: [
@@ -75,15 +80,15 @@ export const STAGE_ATTEMPTS: Record<'vision' | 'ocr' | 'audit', readonly Attempt
 };
 
 export const STAGE_TIMEOUT_MS: Record<'vision' | 'ocr' | 'audit', number> = {
-  vision: 18_000,
-  ocr: 14_000,
+  vision: 15_000,
+  ocr: 12_000,
   audit: 10_000,
 };
 
 export const STAGE_MAX_TOKENS: Record<'vision' | 'ocr' | 'audit', number> = {
-  vision: 2048,
-  ocr: 2048,
-  audit: 1500,
+  vision: 1500,
+  ocr: 500,
+  audit: 800,
 };
 
 const ENV_KEYS: Record<Provider, readonly string[]> = {
@@ -148,7 +153,7 @@ interface CallArgs {
 async function callOpenRouter(a: CallArgs): Promise<string> {
   const url = 'https://openrouter.ai/api/v1/chat/completions';
 
-  const body = JSON.stringify({
+  const bodyObj: Record<string, unknown> = {
     model: a.model,
     messages: [
       {
@@ -162,9 +167,17 @@ async function callOpenRouter(a: CallArgs): Promise<string> {
       },
     ],
     temperature: 0.1,
-    max_tokens: Math.max(a.maxTokens, 2048),
+    max_tokens: a.maxTokens,
     top_p: 0.9,
-  });
+    // Disable reasoning token overhead so reasoning models output clean JSON fast
+    reasoning: { max_tokens: 0 },
+  };
+
+  if (a.jsonMode) {
+    bodyObj.response_format = { type: 'json_object' };
+  }
+
+  const body = JSON.stringify(bodyObj);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), a.timeoutMs);
@@ -193,12 +206,19 @@ async function callOpenRouter(a: CallArgs): Promise<string> {
 
     const json = await res.json();
     const choice = json?.choices?.[0];
-    const text = choice?.message?.content || choice?.message?.reasoning;
+    let text = choice?.message?.content;
+    if (typeof text !== 'string' || text.trim().length === 0) {
+      const reasoning = choice?.message?.reasoning;
+      if (typeof reasoning === 'string') {
+        const jsonMatch = reasoning.match(/\{[\s\S]*\}/);
+        if (jsonMatch) text = jsonMatch[0];
+      }
+    }
 
-    if (typeof text !== 'string' || text.length === 0 || text.length > 16_000) {
+    if (typeof text !== 'string' || text.trim().length === 0 || text.length > 16_000) {
       throw new ProviderError(ERR.PROVIDER_BAD_OUTPUT, null, 'empty completion');
     }
-    return text;
+    return text.trim();
   } catch (err) {
     if (err instanceof ProviderError) throw err;
     if (err instanceof DOMException && err.name === 'AbortError') {
@@ -235,7 +255,7 @@ async function callGemini(a: CallArgs): Promise<string> {
     ],
     generationConfig: {
       temperature: 0.1,
-      maxOutputTokens: Math.max(a.maxTokens, 2048),
+      maxOutputTokens: a.maxTokens,
       responseMimeType: 'application/json',
     },
   });
@@ -266,10 +286,10 @@ async function callGemini(a: CallArgs): Promise<string> {
     const candidate = json?.candidates?.[0];
     const text = candidate?.content?.parts?.[0]?.text;
 
-    if (typeof text !== 'string' || text.length === 0 || text.length > 16_000) {
+    if (typeof text !== 'string' || text.trim().length === 0 || text.length > 16_000) {
       throw new ProviderError(ERR.PROVIDER_BAD_OUTPUT, null, 'empty completion');
     }
-    return text;
+    return text.trim();
   } catch (err) {
     if (err instanceof ProviderError) throw err;
     if (err instanceof DOMException && err.name === 'AbortError') {
@@ -337,8 +357,22 @@ export async function runStage(
           timeoutMs: STAGE_TIMEOUT_MS[stage],
           jsonMode,
         });
+        // Clean markdown fences and whitespace
+        let clean = text
+          .replace(/<think>[\s\S]*?<\/think>/gi, '')
+          .replace(/```json\s*/gi, '')
+          .replace(/```\s*/g, '')
+          .trim();
+
+        // If the model enclosed JSON in other text, extract the outermost object
+        const first = clean.indexOf('{');
+        const lastBrace = clean.lastIndexOf('}');
+        if (first !== -1 && lastBrace !== -1 && lastBrace > first) {
+          clean = clean.substring(first, lastBrace + 1);
+        }
+
         return {
-          text,
+          text: clean,
           provider: attempt.provider,
           model: attempt.model,
           attempts,
@@ -351,7 +385,8 @@ export async function runStage(
           last.code === ERR.PROVIDER_TIMEOUT ||
           last.code === ERR.PROVIDER_UNAVAILABLE ||
           status === 429 ||
-          status === 402;
+          status === 402 ||
+          (status !== null && status >= 500);
         if (!transient) {
           const failure = last;
           failure.attempts = attempts;
