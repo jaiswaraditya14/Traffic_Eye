@@ -13,7 +13,7 @@ import { supabase } from '../../services';
 import { COLORS, GRADIENTS } from '../../utils/theme';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import { useNotifications } from '../../context/NotificationContext';
-import { officerJurisdictionFilters, sortOfficerQueue } from '../../utils/productExperience';
+import { officerJurisdictionFilters, sortOfficerQueue, formatOfficerGreeting } from '../../utils/productExperience';
 import { fetchPendingReports, fetchReviewedReports, subscribeToOfficerQueue } from '../../services/reports';
 
 // ── Design Tokens (Civic Authority — Officer Side) ──
@@ -52,8 +52,7 @@ export default function OfficerDashboard({ navigation }) {
     const [live, setLive] = useState(false);
     const [focusKey, setFocusKey] = useState(0);
     const requestSequence = useRef(0);
-    const officerName = profile?.full_name?.split(' ')[0] || 'Officer';
-    const officerTitle = profile?.badge_title || 'Traffic Inspector';
+    const officerGreeting = formatOfficerGreeting(profile?.badge_title, profile?.full_name);
     const officerZone = profile?.jurisdiction 
         ? `Station: ${profile.jurisdiction}` 
         : 'Traffic Authority';
@@ -186,7 +185,7 @@ export default function OfficerDashboard({ navigation }) {
                                         <Ionicons name="shield-checkmark" size={16} color={C.amber} />
                                     </View>
                                     <View>
-                                        <Text style={styles.officerName}>{officerTitle} {officerName}</Text>
+                                        <Text style={styles.officerName}>{officerGreeting}</Text>
                                         <Text style={styles.officerZone}>Traffic Authority, {officerZone}</Text>
                                     </View>
                                 </View>

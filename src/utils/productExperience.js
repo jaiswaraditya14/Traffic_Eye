@@ -101,3 +101,41 @@ export function rewardAvailability(reward, balance, redeemed = false) {
     return { disabled: missing > 0, label: missing ? 'Need ' + missing + ' more points' : 'Redeem' };
 }
 export const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+
+/**
+ * Format officer greeting cleanly, preventing duplicate honorifics such as "Traffic Inspector Inspector"
+ * @param {string} [badgeTitle] - Officer's rank / badge title, e.g. "Traffic Inspector", "Sub-Inspector"
+ * @param {string} [fullName]   - Officer's profile full name, e.g. "Aditya Jaiswal", "Inspector Aditya", "Inspector"
+ * @returns {string} Clean formatted greeting, e.g. "Traffic Inspector Aditya"
+ */
+export function formatOfficerGreeting(badgeTitle, fullName) {
+    const defaultTitle = 'Traffic Inspector';
+    const rawTitle = typeof badgeTitle === 'string' && badgeTitle.trim() ? badgeTitle.trim() : defaultTitle;
+    const rawName = typeof fullName === 'string' ? fullName.trim() : '';
+
+    if (!rawName) {
+        return rawTitle;
+    }
+
+    // Strip redundant leading prefixes that duplicate or conflict with officer title
+    const cleanedName = rawName
+        .replace(/^(traffic\s+inspector|sub-inspector|inspector|officer|constable|asi|si)\s*/i, '')
+        .trim();
+
+    // If after stripping prefixes the name is empty or identical to inspector/officer keywords
+    if (!cleanedName || /^(traffic\s+inspector|sub-inspector|inspector|officer)$/i.test(cleanedName)) {
+        return rawTitle;
+    }
+
+    // Extract first name token
+    const firstName = cleanedName.split(/\s+/)[0];
+
+    // Ensure the first name is not a repeat of the title's tokens (e.g. title="Traffic Inspector", name="Inspector")
+    const titleTokens = rawTitle.toLowerCase().split(/\s+/);
+    if (titleTokens.includes(firstName.toLowerCase())) {
+        return rawTitle;
+    }
+
+    return `${rawTitle} ${firstName}`;
+}
+

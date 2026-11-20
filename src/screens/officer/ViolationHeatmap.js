@@ -104,31 +104,38 @@ const CIRCLE_OPACITY_EXPR = [
 const HEATMAP_LAYER_STYLE = {
     heatmapWeight: [
         'interpolate', ['linear'], ['get', 'weight'],
-        1, 0.25,
-        4, 1.0,
+        1, 0.4,
+        4, 1.2,
     ],
     heatmapIntensity: [
         'interpolate', ['linear'], ['zoom'],
-        0, 0.4,
-        9, 1.2,
+        0, 0.9,
+        6, 1.5,
+        10, 2.2,
+        14, 3.0,
     ],
     heatmapRadius: [
         'interpolate', ['linear'], ['zoom'],
-        0, 18,
-        9, 40,
+        0, 22,
+        6, 36,
+        10, 52,
+        14, 68,
     ],
     heatmapOpacity: [
         'interpolate', ['linear'], ['zoom'],
-        7, 0.85,
-        12, 0.35,
+        5, 0.90,
+        9, 0.85,
+        12, 0.70,
+        15, 0.45,
     ],
     heatmapColor: [
         'interpolate', ['linear'],
         ['heatmap-density'],
         0,    'rgba(59,130,246,0)',
-        0.2,  'rgba(250,204,21,0.5)',
-        0.4,  'rgba(249,115,22,0.7)',
-        0.8,  'rgba(220,38,38,0.85)',
+        0.15, 'rgba(59,130,246,0.35)',
+        0.35, 'rgba(250,204,21,0.65)',
+        0.65, 'rgba(249,115,22,0.85)',
+        0.85, 'rgba(220,38,38,0.92)',
         1,    'rgba(185,28,28,1)',
     ],
 };
@@ -137,8 +144,10 @@ const HEATMAP_LAYER_STYLE = {
 const CIRCLE_LAYER_STYLE = {
     circleRadius: [
         'interpolate', ['linear'], ['zoom'],
-        8,  6,
-        14, 14,
+        6,  5.5,
+        9,  8,
+        12, 11,
+        15, 15,
     ],
     circleColor: SEVERITY_COLOR_EXPR,
     circleOpacity: CIRCLE_OPACITY_EXPR,
@@ -846,6 +855,18 @@ export default function ViolationHeatmap({ navigation }) {
         }
     }, [filteredPoints]);
 
+    // Auto-fit camera to reports on initial load so the officer does not have to manually zoom in
+    const hasAutoFittedRef = useRef(false);
+    useEffect(() => {
+        if (!hasAutoFittedRef.current && filteredPoints.length > 0 && cameraRef.current) {
+            hasAutoFittedRef.current = true;
+            const timer = setTimeout(() => {
+                handleFitReports();
+            }, 400);
+            return () => clearTimeout(timer);
+        }
+    }, [filteredPoints, handleFitReports]);
+
     return (
         <View style={[styles.container, isDark && styles.containerDark]}>
             <FocusAwareStatusBar barStyle={isDark ? 'light-content' : 'dark-content'} statusBgColor={isDark ? DARK_COLORS.background : COLORS.background} />
@@ -864,23 +885,30 @@ export default function ViolationHeatmap({ navigation }) {
                     initialViewState={INITIAL_CAMERA_VIEW}
                 />
 
+                {/* 1. Heatmap source: unclustered so heatmap renders all points seamlessly at all zoom levels */}
+                {showHeatmap && (
+                    <GeoJSONSource
+                        id="violations-heatmap-source"
+                        data={geoJSON}
+                        cluster={false}
+                    >
+                        <Layer
+                            id="violations-heatmap"
+                            type="heatmap"
+                            style={HEATMAP_LAYER_STYLE}
+                        />
+                    </GeoJSONSource>
+                )}
+
+                {/* 2. Interactive cluster & pin layer: unclusters at regional zoom (clusterMaxZoom=11) */}
                 <GeoJSONSource
                     id="violations"
                     data={geoJSON}
                     cluster={true}
-                    clusterRadius={50}
-                    clusterMaxZoom={14}
+                    clusterRadius={32}
+                    clusterMaxZoom={11}
                     onPress={handleSourcePress}
                 >
-                    {showHeatmap && (
-                        <Layer
-                            id="violations-heatmap"
-                            type="heatmap"
-                            filter={['!', ['has', 'point_count']]}
-                            style={HEATMAP_LAYER_STYLE}
-                        />
-                    )}
-
                     <Layer
                         id="violations-cluster-circle"
                         type="circle"

@@ -29,38 +29,80 @@ const C = {
 
 export default function OfficerProfile({ navigation }) {
     const { setIsAuthenticated, setUserRole, demoMode } = useAppContext();
-    const { profile, signOut } = useAuth();
+    const { profile, user, signOut } = useAuth();
     const [loggingOut, setLoggingOut] = useState(false);
     const [stats, setStats] = useState({ verified: 0, rejected: 0, thisMonth: 0 });
 
     const loadStats = useCallback(async () => {
-        if (!profile?.id) return;
+        const officerId = profile?.id || user?.id;
+        if (!officerId) return;
+
         try {
+            const now = new Date();
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+            // Run exact count queries scoped strictly to this officer's individual reviews
+            const [verifiedRes, rejectedRes, thisMonthRes] = await Promise.all([
+                supabase
+                    .from('officer_reviews')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('officer_id', officerId)
+                    .eq('decision', 'approved'),
+                supabase
+                    .from('officer_reviews')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('officer_id', officerId)
+                    .eq('decision', 'rejected'),
+                supabase
+                    .from('officer_reviews')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('officer_id', officerId)
+                    .gte('review_timestamp', startOfMonth),
+            ]);
+
+            // If exact count succeeded without error, use exact counts
+            if (verifiedRes.error == null && rejectedRes.error == null) {
+                setStats({
+                    verified: verifiedRes.count ?? 0,
+                    rejected: rejectedRes.count ?? 0,
+                    thisMonth: thisMonthRes.count ?? ((verifiedRes.count ?? 0) + (rejectedRes.count ?? 0)),
+                });
+                return;
+            }
+
+            // Resilient fallback: fetch records strictly filtered by this officer's ID
             const { data, error } = await supabase
                 .from('officer_reviews')
-                .select('decision, review_timestamp')
-                .eq('officer_id', profile.id);
-            
-            if (!error && data) {
-                let verified = 0, rejected = 0, thisMonth = 0;
-                const now = new Date();
-                data.forEach(r => {
-                    if (r.decision === 'approved') verified++;
-                    if (r.decision === 'rejected') rejected++;
-                    
-                    if (r.review_timestamp) {
-                        const d = new Date(r.review_timestamp);
-                        if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
-                            thisMonth++;
+                .select('decision, review_timestamp, created_at')
+                .eq('officer_id', officerId);
+
+            if (!error && Array.isArray(data)) {
+                let verified = 0;
+                let rejected = 0;
+                let thisMonth = 0;
+
+                for (const r of data) {
+                    const dec = (r.decision || '').toLowerCase();
+                    if (dec === 'approved') verified++;
+                    else if (dec === 'rejected') rejected++;
+
+                    const rawDate = r.review_timestamp || r.created_at;
+                    if (rawDate) {
+                        const d = new Date(rawDate);
+                        if (!isNaN(d.getTime())) {
+                            if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+                                thisMonth++;
+                            }
                         }
                     }
-                });
+                }
+
                 setStats({ verified, rejected, thisMonth });
             }
         } catch (error) {
             if (__DEV__) console.warn('[OfficerProfile] Statistics unavailable.');
         }
-    }, [profile?.id]);
+    }, [profile?.id, user?.id]);
 
     useFocusEffect(
         useCallback(() => {

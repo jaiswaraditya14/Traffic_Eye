@@ -1,5 +1,5 @@
 /* eslint-env jest */
-import { officerJurisdictionFilters, sortOfficerQueue } from '../../../utils/productExperience';
+import { officerJurisdictionFilters, sortOfficerQueue, formatOfficerGreeting } from '../../../utils/productExperience';
 test('severity priority, then oldest first; does not mutate input', () => {
     const input = [{ id: 'low', severity: 'low' }, { id: 'new', severity: 'high', submitted_at: '2026-09-12' }, { id: 'critical', severity: 'critical' }, { id: 'medium', severity: 'medium' }, { id: 'old', severity: 'high', submitted_at: '2026-09-01' }];
     expect(sortOfficerQueue(input).map(r => r.id)).toEqual(['critical', 'old', 'new', 'medium', 'low']); expect(input[0].id).toBe('low');
@@ -18,3 +18,31 @@ test('citizens and unassigned officers do not fabricate jurisdiction filters', (
     expect(officerJurisdictionFilters({ role: 'citizen', badge_id: '7', jurisdiction: 'North' })).toEqual([]);
     expect(officerJurisdictionFilters({ role: 'officer' })).toEqual([]);
 });
+
+describe('formatOfficerGreeting', () => {
+    test('eliminates duplicate "inspector" when full_name is "Inspector" or "traffic inspector"', () => {
+        expect(formatOfficerGreeting('Traffic Inspector', 'Inspector')).toBe('Traffic Inspector');
+        expect(formatOfficerGreeting('Traffic Inspector', 'inspector')).toBe('Traffic Inspector');
+        expect(formatOfficerGreeting('Traffic Inspector', 'traffic inspector inspector')).toBe('Traffic Inspector');
+        expect(formatOfficerGreeting(null, 'Inspector')).toBe('Traffic Inspector');
+    });
+
+    test('properly strips prefix and retains officer first name', () => {
+        expect(formatOfficerGreeting('Traffic Inspector', 'Inspector Aditya')).toBe('Traffic Inspector Aditya');
+        expect(formatOfficerGreeting('Traffic Inspector', 'Traffic Inspector Aditya Jaiswal')).toBe('Traffic Inspector Aditya');
+        expect(formatOfficerGreeting('Traffic Inspector', 'Officer Vikram')).toBe('Traffic Inspector Vikram');
+        expect(formatOfficerGreeting('Traffic Inspector', 'Aditya Jaiswal')).toBe('Traffic Inspector Aditya');
+    });
+
+    test('supports custom badge titles cleanly', () => {
+        expect(formatOfficerGreeting('Sub-Inspector', 'Sub-Inspector Sharma')).toBe('Sub-Inspector Sharma');
+        expect(formatOfficerGreeting('Senior Inspector', 'Inspector Rahul')).toBe('Senior Inspector Rahul');
+    });
+
+    test('falls back gracefully to default title when name is missing or empty', () => {
+        expect(formatOfficerGreeting(undefined, undefined)).toBe('Traffic Inspector');
+        expect(formatOfficerGreeting('Traffic Inspector', '')).toBe('Traffic Inspector');
+        expect(formatOfficerGreeting('Traffic Inspector', '   ')).toBe('Traffic Inspector');
+    });
+});
+
