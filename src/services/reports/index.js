@@ -9,6 +9,7 @@ const { EncodingType } = FileSystem;
 import { decode } from 'base64-arraybuffer';
 import { randomUUID } from 'expo-crypto';
 import { officerJurisdictionFilters } from '../../utils/productExperience';
+import { computeFileSha256 } from '../../utils/fileHash';
 
 // ── File validation helpers ────────────────────────────────────────────────
 
@@ -414,10 +415,18 @@ async function performReportSubmission({ userId, report, media, submission, sign
     if (duplicate.indeterminate) {
         return { data: null, error: submissionError('DUPLICATE_CHECK', 'Could not verify this plate. Please check your connection and try again.') };
     }
+    if (!report.image_hash && media?.uri && Number.isFinite(media.fileSize) && media.fileSize <= MAX_IN_MEMORY_UPLOAD_SIZE) {
+        try {
+            const hashRes = await computeFileSha256(media.uri);
+            if (hashRes?.sha256) {
+                report.image_hash = hashRes.sha256;
+            }
+        } catch (_) {}
+    }
     if (report.image_hash) {
         const imageDup = await checkImageDuplicate(report.image_hash);
         if (imageDup.isDuplicate) {
-            return { data: null, error: submissionError('DUPLICATE_IMAGE', 'Duplicate Photograph Detected: This exact photo has already been submitted to Traffic Eye.') };
+            return { data: null, error: submissionError('DUPLICATE_IMAGE', 'Incident already reported: This exact photo has already been submitted to Traffic Eye.') };
         }
         if (imageDup.indeterminate) {
             return { data: null, error: submissionError('DUPLICATE_CHECK', 'Could not verify evidence uniqueness. Please check your connection and try again.') };

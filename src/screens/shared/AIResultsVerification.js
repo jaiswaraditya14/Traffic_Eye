@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppContext, useAuth } from '../../context';
 import { reportService } from '../../services';
+import { checkImageDuplicate } from '../../services/reports';
+import { computeFileSha256 } from '../../utils/fileHash';
 import { COLORS } from '../../utils/theme';
 import { confidencePercent } from '../../utils/productExperience';
 import { isDemoEvidence } from '../../services/demoMode';
@@ -11,9 +13,49 @@ import { FocusAwareStatusBar, ProgressRing, PressableScale, FeedbackToast, AISta
 import { resolveReportLocation } from '../../services/reports/locationResolver';
 
 export default function AIResultsVerification({ navigation, route }) {
-    const { currentReport } = useAppContext();
+    const { currentReport, setCurrentReport } = useAppContext();
     const { user } = useAuth();
-    const { aiResults, authenticityResult: routeAuthResult, possibleDuplicate, duplicateExistingId } = route.params || {};
+    const {
+        aiResults,
+        authenticityResult: routeAuthResult,
+        possibleDuplicate,
+        duplicateExistingId,
+        isImageDuplicate: routeImageDuplicate,
+        imageHash: routeImageHash,
+    } = route.params || {};
+
+    const [isImageDuplicate, setIsImageDuplicate] = useState(Boolean(routeImageDuplicate));
+    const [imageDupChecking, setImageDupChecking] = useState(false);
+
+    useEffect(() => {
+        let active = true;
+        async function verifyImageHash() {
+            let hash = routeImageHash || currentReport?.imageHash;
+            if (!hash && currentReport?.image) {
+                try {
+                    const res = await computeFileSha256(currentReport.image);
+                    hash = res?.sha256 || null;
+                    if (hash && active && setCurrentReport) {
+                        setCurrentReport(prev => ({ ...prev, imageHash: hash }));
+                    }
+                } catch (_) {}
+            }
+            if (hash) {
+                setImageDupChecking(true);
+                try {
+                    const { isDuplicate } = await checkImageDuplicate(hash);
+                    if (active && isDuplicate) {
+                        setIsImageDuplicate(true);
+                    }
+                } catch (_) {
+                } finally {
+                    if (active) setImageDupChecking(false);
+                }
+            }
+        }
+        verifyImageHash();
+        return () => { active = false; };
+    }, [currentReport?.image, currentReport?.imageHash, routeImageHash]);
 
     const [vehicleNumber, setVehicleNumber] = useState(() => {
         const raw = aiResults?.vehicleNumber || currentReport?.vehiclePlate || '';
@@ -57,6 +99,14 @@ export default function AIResultsVerification({ navigation, route }) {
     const aiDescription = aiResults?.description || null;
 
     const handleSubmit = async () => {
+        if (isImageDuplicate) {
+            Alert.alert(
+                'Incident already reported',
+                'This exact photograph has already been submitted to Traffic Eye. Duplicate submissions cannot be accepted.',
+                [{ text: 'OK' }]
+            );
+            return;
+        }
         if (!vehicleNumber.trim()) {
             Alert.alert('Error', 'Please enter a vehicle number');
             return;
@@ -93,6 +143,15 @@ export default function AIResultsVerification({ navigation, route }) {
                 existingSource: currentReport?.locationSource,
             });
 
+            const cleanImageUri = currentReport?.image || '';
+            let finalImageHash = routeImageHash || currentReport?.imageHash || null;
+            if (!finalImageHash && cleanImageUri) {
+                try {
+                    const hashRes = await computeFileSha256(cleanImageUri);
+                    finalImageHash = hashRes?.sha256 || null;
+                } catch (_) {}
+            }
+
             // Report payload WITHOUT user_id/image_url/image_storage_path — the
             // service fills those in from the authenticated user and the uploaded
             // object, so there is exactly one place that knows the storage layout.
@@ -111,12 +170,10 @@ export default function AIResultsVerification({ navigation, route }) {
                 authenticity_check:    routeAuthResult || currentReport?.authenticityResult || null,
                 possible_duplicate:    possibleDuplicate || false,
                 duplicate_report_id:   duplicateExistingId || null,
-                image_hash:            currentReport?.imageHash || null,
+                image_hash:            finalImageHash,
                 captured_at:           currentReport?.capturedAt || null,
                 stale_evidence:        Boolean(currentReport?.staleEvidence),
             };
-
-            const cleanImageUri = currentReport?.image || '';
             const media = cleanImageUri
                 ? { uri: cleanImageUri, fileType: 'image', mimeType: currentReport?.mimeType, fileName: currentReport?.fileName, fileSize: currentReport?.fileSize }
                 : null;
@@ -181,8 +238,21 @@ export default function AIResultsVerification({ navigation, route }) {
                         )}
                     </View>
 
-                    {/* Possible Duplicate Warning Banner */}
-                    {possibleDuplicate && (
+                    {/* Exact Duplicate Image Warning Banner — Hard Block */}
+                    {isImageDuplicate && (
+                        <View style={[styles.duplicateBanner, { backgroundColor: '#FEF2F2', borderColor: 'rgba(239, 68, 68, 0.4)' }]}>
+                            <Ionicons name="close-circle" size={20} color={COLORS.error} />
+                            <View style={{ flex: 1 }}>
+                                <Text style={[styles.duplicateBannerTitle, { color: COLORS.error }]}>Incident already reported</Text>
+                                <Text style={[styles.duplicateBannerText, { color: '#991B1B' }]}>
+                                    This exact photograph has already been submitted to Traffic Eye. Duplicate submissions for the same incident cannot be submitted.
+                                </Text>
+                            </View>
+                        </View>
+                    )}
+
+                    {/* Possible Plate Duplicate Warning Banner */}
+                    {!isImageDuplicate && possibleDuplicate && (
                         <View style={styles.duplicateBanner}>
                             <Ionicons name="warning" size={18} color={COLORS.secondaryDark} />
                             <View style={{ flex: 1 }}>
@@ -370,18 +440,29 @@ export default function AIResultsVerification({ navigation, route }) {
                 {/* Footer Action */}
                 <View style={styles.footer}>
                     <TouchableOpacity
-                        style={[styles.primaryBtn, submitting && { opacity: 0.7 }]}
+                        style={[
+                            styles.primaryBtn,
+                            (submitting || isImageDuplicate || imageDupChecking) && styles.primaryBtnDisabled,
+                            isImageDuplicate && { shadowOpacity: 0, elevation: 0 }
+                        ]}
                         onPress={handleSubmit}
-                        disabled={submitting}
+                        disabled={submitting || isImageDuplicate || imageDupChecking}
+                        accessibilityLabel={isImageDuplicate ? 'Incident already reported' : 'Confirm & Submit'}
                         activeOpacity={0.88}
                     >
-                        <View style={styles.primaryBtnInner}>
+                        <View style={[styles.primaryBtnInner, isImageDuplicate && { backgroundColor: '#CBD5E1' }]}>
                             {submitting ? (
                                 <ActivityIndicator color={COLORS.white} size="small" />
                             ) : (
                                 <>
-                                    <Text style={styles.primaryBtnText}>Confirm & Submit</Text>
-                                    <Ionicons name="checkmark-circle" size={18} color={COLORS.white} />
+                                    <Text style={[styles.primaryBtnText, isImageDuplicate && { color: '#64748B' }]}>
+                                        {isImageDuplicate ? 'Incident already reported' : 'Confirm & Submit'}
+                                    </Text>
+                                    <Ionicons
+                                        name={isImageDuplicate ? 'lock-closed' : 'checkmark-circle'}
+                                        size={18}
+                                        color={isImageDuplicate ? '#64748B' : COLORS.white}
+                                    />
                                 </>
                             )}
                         </View>
@@ -593,6 +674,11 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.25,
         shadowRadius: 16,
         elevation: 8
+    },
+    primaryBtnDisabled: {
+        opacity: 0.7,
+        shadowOpacity: 0,
+        elevation: 0,
     },
     primaryBtnInner: { flexDirection: 'row', paddingVertical: 18, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: COLORS.primaryDark },
     primaryBtnText: { fontSize: 17, fontFamily: 'Nunito-ExtraBold', color: COLORS.white, letterSpacing: 0.5 },

@@ -47,7 +47,7 @@ const isAiUnavailable = (results) =>
 
 export default function AIProcessing({ navigation }) {
     const reduced = useReducedMotion();
-    const { currentReport } = useAppContext();
+    const { currentReport, setCurrentReport } = useAppContext();
     const { user } = useAuth();
 
     const pulseAnim    = useRef(new Animated.Value(1)).current;
@@ -159,18 +159,33 @@ export default function AIProcessing({ navigation }) {
                 try {
                     const hashRes = await computeFileSha256(rawUri);
                     imageHash = hashRes?.sha256 || null;
+                    if (imageHash && setCurrentReport) {
+                        setCurrentReport(prev => ({ ...prev, imageHash }));
+                    }
                 } catch (_) {}
             }
 
             if (imageHash) {
-                const { isDuplicate, indeterminate: dupIndeterminate } = await checkImageDuplicate(imageHash);
+                const { isDuplicate, indeterminate: dupIndeterminate, existingReportId } = await checkImageDuplicate(imageHash);
                 if (signal.aborted) return;
                 if (isDuplicate) {
                     if (live()) {
                         Alert.alert(
                             'Duplicate Photograph Detected',
                             'This exact photo has already been submitted to Traffic Eye. Please take a new photograph of the incident.',
-                            [{ text: 'OK', style: 'default', onPress: () => navigation.goBack() }]
+                            [
+                                { text: 'OK', style: 'default', onPress: () => navigation.goBack() },
+                                {
+                                    text: 'View Details',
+                                    onPress: () => navigation.replace('AIResultsVerification', {
+                                        aiResults: buildManualReviewResult(),
+                                        possibleDuplicate: true,
+                                        duplicateExistingId: existingReportId || null,
+                                        isImageDuplicate: true,
+                                        imageHash,
+                                    }),
+                                },
+                            ]
                         );
                     }
                     return;
@@ -275,6 +290,8 @@ export default function AIProcessing({ navigation }) {
                 aiResults: results,
                 possibleDuplicate,
                 duplicateExistingId,
+                imageHash,
+                isImageDuplicate: false,
             });
 
         } catch (err) {
