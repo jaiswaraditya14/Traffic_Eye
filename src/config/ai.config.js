@@ -23,7 +23,7 @@ export const AI_CONFIG = {
     // Client-side deadline for the Edge Function round trip. The authoritative
     // per-provider timeout is enforced server-side; this is only so the UI
     // cannot hang if the network stalls.
-    edgeFunctionTimeoutMs: 25000,
+    edgeFunctionTimeoutMs: 35000,
 
     // Name of the Edge Function that owns all provider access.
     analyzeFunctionName: 'ai-analyze',

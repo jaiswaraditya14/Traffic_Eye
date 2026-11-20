@@ -98,8 +98,18 @@ const isNotUsable = (field) =>
     field === VS.NOT_APPLICABLE;
 
 const normalizePlate = (value) => typeof value === 'string'
-    ? value.replace(/\s+/g, '').toUpperCase()
+    ? value.replace(/[-\s.]+/g, '').toUpperCase()
     : '';
+
+const getDetectedViolationList = (evidence) => {
+    if (!Array.isArray(evidence?.detected_violations)) return [];
+    return evidence.detected_violations.map(v => {
+        if (typeof v === 'object' && v !== null) {
+            return String(v.violation_type || v.violation || v.type || '').toUpperCase();
+        }
+        return String(v).toUpperCase();
+    }).filter(Boolean);
+};
 
 // ─── Individual rule evaluators ───────────────────────────────────────────────
 
@@ -118,10 +128,8 @@ export function evaluateTripleRiding(evidence) {
         return { result: 'no_evidence', reason: 'Vehicle is not a two-wheeler.' };
     }
 
-    const detectedList = Array.isArray(evidence.detected_violations)
-        ? evidence.detected_violations.map(v => String(v).toUpperCase())
-        : [];
-    const hasExplicitTripleViolation = detectedList.includes('TRIPLE_RIDING') || detectedList.includes('TRIPLE RIDING');
+    const detectedList = getDetectedViolationList(evidence);
+    const hasExplicitTripleViolation = detectedList.some(v => v.includes('TRIPLE'));
 
     const riderCount    = Number(evidence.rider_count ?? null);
     const riderConfRaw  = 'rider_count_confidence' in evidence
@@ -175,10 +183,8 @@ export function evaluateNoHelmet(evidence) {
         return { result: 'no_evidence', reason: 'Helmet rule applies only to two-wheelers.' };
     }
 
-    const detectedList = Array.isArray(evidence.detected_violations)
-        ? evidence.detected_violations.map(v => String(v).toUpperCase())
-        : [];
-    const hasExplicitNoHelmetViolation = detectedList.includes('NO_HELMET') || detectedList.includes('NO HELMET') || detectedList.includes('WITHOUT_HELMET');
+    const detectedList = getDetectedViolationList(evidence);
+    const hasExplicitNoHelmetViolation = detectedList.some(v => v.includes('HELMET'));
 
     const helmetStatus = evidence.helmet_status ?? evidence.helmetStatus;
     const helmetConf   = conf(evidence.helmet_confidence ?? evidence.helmetConfidence ?? (hasExplicitNoHelmetViolation ? 0.95 : 0));
@@ -222,10 +228,26 @@ export function evaluateNoSeatbelt(evidence) {
         return { result: 'no_evidence', reason: 'Seatbelt rule does not apply to two-wheelers.' };
     }
 
-    const seatbeltStatus = evidence.seatbelt_status ?? evidence.seatbeltStatus;
-    const seatbeltConf   = conf(evidence.seatbelt_confidence ?? evidence.seatbeltConfidence ?? 0);
+    const detectedList = getDetectedViolationList(evidence);
+    const hasExplicitViolation = detectedList.some(v => v.includes('SEATBELT') || v.includes('SEAT_BELT'));
 
-    if (isNotUsable(seatbeltStatus)) {
+    const seatbeltStatus = evidence.seatbelt_status ?? evidence.seatbeltStatus;
+    const seatbeltConf   = conf(evidence.seatbelt_confidence ?? evidence.seatbeltConfidence ?? (hasExplicitViolation ? 0.95 : 0));
+
+    if (hasExplicitViolation || isConfirmedAbsent(seatbeltStatus)) {
+        if (seatbeltConf >= CONF_HIGH || hasExplicitViolation) {
+            return {
+                result:    'confirmed',
+                reason:    `Seatbelt absence identified, confidence ${Math.round((seatbeltConf || 0.95) * 100)}%.`,
+                violation: 'No Seat Belt',
+            };
+        }
+        return {
+            result: 'uncertain',
+            reason: `Seatbelt absence confidence too low (${Math.round(seatbeltConf * 100)}% < ${CONF_HIGH * 100}% threshold).`,
+        };
+    }
+if (isNotUsable(seatbeltStatus)) {
         return {
             result: 'no_evidence',
             reason: `Seatbelt status is "${seatbeltStatus || 'unknown'}" — occupant torso may be occluded or out of frame.`,
@@ -259,11 +281,21 @@ export function evaluateNoSeatbelt(evidence) {
  * @returns {{ result: string, reason: string, violation?: string }}
  */
 export function evaluateMobilePhoneUse(evidence) {
+    const detectedList = getDetectedViolationList(evidence);
+    const hasExplicitViolation = detectedList.some(v => v.includes('PHONE') || v.includes('MOBILE'));
+
     const phoneStatus   = evidence.phone_status ?? evidence.phoneStatus;
-    const phoneConf     = conf(evidence.phone_confidence ?? evidence.phoneConfidence ?? 0);
+    const phoneConf     = conf(evidence.phone_confidence ?? evidence.phoneConfidence ?? (hasExplicitViolation ? 0.95 : 0));
     const phoneEvidence = evidence.phone_evidence ?? evidence.phoneEvidence ?? '';
 
-    if (isNotUsable(phoneStatus) || phoneStatus !== 'CONFIRMED_IN_USE') {
+    if (hasExplicitViolation || phoneStatus === 'CONFIRMED_IN_USE') {
+        return {
+            result:    'confirmed',
+            reason:    `Mobile phone usage while driving identified, confidence ${Math.round((phoneConf || 0.95) * 100)}%.`,
+            violation: 'Mobile Phone Use',
+        };
+    }
+if (isNotUsable(phoneStatus) || phoneStatus !== 'CONFIRMED_IN_USE') {
         return {
             result: 'no_evidence',
             reason: `Phone status is "${phoneStatus || 'unknown'}" — not confirmed in use.`,
@@ -305,11 +337,21 @@ export function evaluateMobilePhoneUse(evidence) {
  * @returns {{ result: string, reason: string, violation?: string }}
  */
 export function evaluateWrongWay(evidence) {
+    const detectedList = getDetectedViolationList(evidence);
+    const hasExplicitViolation = detectedList.some(v => v.includes('WRONG_SIDE') || v.includes('WRONG_WAY') || v.includes('OPPOSING'));
+
     const roadDirEstablished = evidence.road_direction_established ?? evidence.roadDirectionEstablished;
     const vehicleOpposing    = evidence.vehicle_travel_opposing   ?? evidence.vehicleTravelOpposing;
-    const wrongWayConf       = conf(evidence.wrong_way_confidence ?? evidence.wrongWayConfidence ?? 0);
+    const wrongWayConf       = conf(evidence.wrong_way_confidence ?? evidence.wrongWayConfidence ?? (hasExplicitViolation ? 0.95 : 0));
 
-    if (!roadDirEstablished || roadDirEstablished === VS.UNCERTAIN || roadDirEstablished === false) {
+    if (hasExplicitViolation) {
+        return {
+            result:    'confirmed',
+            reason:    `Wrong side driving identified, confidence ${Math.round((wrongWayConf || 0.95) * 100)}%.`,
+            violation: 'Wrong Side Driving',
+        };
+    }
+if (!roadDirEstablished || roadDirEstablished === VS.UNCERTAIN || roadDirEstablished === false) {
         return { result: 'no_evidence', reason: 'Road direction not clearly established from image context.' };
     }
 
@@ -341,11 +383,21 @@ export function evaluateWrongWay(evidence) {
  * @returns {{ result: string, reason: string, violation?: string }}
  */
 export function evaluateRedLight(evidence) {
+    const detectedList = getDetectedViolationList(evidence);
+    const hasExplicitViolation = detectedList.some(v => v.includes('RED_LIGHT') || v.includes('SIGNAL_JUMP') || v.includes('RED LIGHT'));
+
     const signalState    = evidence.traffic_light_state ?? evidence.trafficLightState;
     const vehiclePosition = evidence.vehicle_position   ?? evidence.vehiclePosition;
-    const redLightConf   = conf(evidence.red_light_confidence ?? evidence.redLightConfidence ?? 0);
+    const redLightConf   = conf(evidence.red_light_confidence ?? evidence.redLightConfidence ?? (hasExplicitViolation ? 0.95 : 0));
 
-    if (!signalState || signalState === VS.UNCERTAIN || signalState === VS.NOT_VISIBLE) {
+    if (hasExplicitViolation) {
+        return {
+            result:    'confirmed',
+            reason:    `Red light violation identified, confidence ${Math.round((redLightConf || 0.95) * 100)}%.`,
+            violation: 'Red Light Violation',
+        };
+    }
+if (!signalState || signalState === VS.UNCERTAIN || signalState === VS.NOT_VISIBLE) {
         return { result: 'no_evidence', reason: 'Traffic signal state not clearly visible.' };
     }
 
@@ -586,7 +638,27 @@ export function applyRules(evidence, verbose = false) {
         }
     }
 
-    // ── Plate info ─────────────────────────────────────────────────────────────
+        // ── Additional direct vision perceptions (Parking, Speeding, Overloading, etc.) ──
+    const detectedList = getDetectedViolationList(evidence);
+    const KNOWN_EXTRA_VIOLATIONS = [
+        [['PARKING', 'WRONG_PARKING', 'NO_PARKING', 'ILLEGAL_PARKING'], 'Wrong Parking'],
+        [['SPEEDING', 'OVER_SPEEDING'], 'Speeding'],
+        [['DANGEROUS', 'RASH_DRIVING', 'DANGEROUS_DRIVING'], 'Dangerous Driving'],
+        [['DRUNK', 'DRUNK_DRIVING'], 'Drunk Driving'],
+        [['LANE_CUTTING', 'LANE_VIOLATION'], 'Lane Cutting'],
+        [['OVERLOAD', 'OVERLOADING'], 'Overloading'],
+        [['FOOTPATH', 'PAVEMENT'], 'Footpath Driving'],
+    ];
+
+    for (const [aliases, violationName] of KNOWN_EXTRA_VIOLATIONS) {
+        if (aliases.some(alias => detectedList.some(d => d.includes(alias)))) {
+            if (!confirmedViolations.includes(violationName)) {
+                confirmedViolations.push(violationName);
+            }
+        }
+    }
+
+// ── Plate info ─────────────────────────────────────────────────────────────
     const plateText = evidence.plate_text ?? evidence.plateText ??
                       evidence.vehicle_number ?? evidence.vehicleNumber ?? 'PLATE_NOT_READABLE';
     const plateConf = conf(evidence.plate_confidence ?? evidence.plateConfidence ?? 0);
