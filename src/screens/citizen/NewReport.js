@@ -18,6 +18,7 @@ import * as Location from 'expo-location';
 import { extractImageLocation } from '../../utils';
 import { computeFileSha256 } from '../../utils/fileHash';
 import { extractExifCaptureDate, isStaleEvidence } from '../../utils/exifParser';
+import { checkImageDuplicate } from '../../services/reports';
 
 // ── Design Tokens ──
 const C = {
@@ -74,10 +75,12 @@ export default function NewReport({ navigation }) {
     const { setCurrentReport, demoMode, demoLoading } = useAppContext();
     const [permissionDenied, setPermissionDenied] = useState(null);
     const [imageMetadata, setImageMetadata] = useState({});
+    const [isImageDuplicate, setIsImageDuplicate] = useState(false);
+    const [duplicateChecking, setDuplicateChecking] = useState(false);
     const demoReport = demoMode ? buildDemoReport() : null;
     const evidenceImage = demoReport?.image || image;
     const errors = validateNewReport(demoReport || { image: image || video, location, address });
-    const canContinue = !demoLoading && !loadingLocation && !['reading', 'extracting'].includes(autoFillStatus) && Object.keys(errors).length === 0;
+    const canContinue = !demoLoading && !loadingLocation && !['reading', 'extracting'].includes(autoFillStatus) && Object.keys(errors).length === 0 && !isImageDuplicate && !duplicateChecking;
     const openSettings = () => Linking.openSettings().catch(() => Alert.alert('Settings unavailable', 'Open your device settings and select Traffic Eye permissions.'));
 
     const showBanner = useCallback((status) => {
@@ -140,6 +143,25 @@ export default function NewReport({ navigation }) {
                 staleEvidence,
             }));
 
+            if (imageHash) {
+                setDuplicateChecking(true);
+                try {
+                    const { isDuplicate } = await checkImageDuplicate(imageHash);
+                    if (generation === extractionGeneration.current) {
+                        setIsImageDuplicate(Boolean(isDuplicate));
+                    }
+                } catch (_) {
+                } finally {
+                    if (generation === extractionGeneration.current) {
+                        setDuplicateChecking(false);
+                    }
+                }
+            } else {
+                if (generation === extractionGeneration.current) {
+                    setIsImageDuplicate(false);
+                }
+            }
+
             if (locResult && locResult.gpsFound && locResult.latitude != null && locResult.longitude != null) {
                 showBanner('extracting');
                 const geocodeRes = await reverseGeocodeFromCoords(
@@ -200,6 +222,8 @@ export default function NewReport({ navigation }) {
         const permission = await ImagePicker.requestCameraPermissionsAsync();
         if (!permission.granted) { setPermissionDenied('Camera'); return; }
         setPermissionDenied(null);
+        setIsImageDuplicate(false);
+        setDuplicateChecking(false);
         const result = await captureFromCamera();
         if (result?.uri) {
             setVideo(null);
@@ -220,6 +244,8 @@ export default function NewReport({ navigation }) {
     };
 
     const handlePickImage = async () => {
+        setIsImageDuplicate(false);
+        setDuplicateChecking(false);
         const result = await pickFromGallery();
         if (result?.uri) {
             setVideo(null);
@@ -241,6 +267,14 @@ export default function NewReport({ navigation }) {
 
     const handleSubmit = () => {
         Keyboard.dismiss();
+        if (isImageDuplicate) {
+            Alert.alert(
+                'Incident Already Reported',
+                'This exact image has already been used to report an incident. Duplicate submissions for the same incident cannot be accepted.',
+                [{ text: 'OK' }]
+            );
+            return;
+        }
         if (!canContinue) return;
         if (demoMode) {
             setCurrentReport(buildDemoReport());
@@ -373,6 +407,19 @@ export default function NewReport({ navigation }) {
                             <Text style={image ? styles.retakeBtnText : styles.mediaBtnOutlineText}>{image ? 'Choose Another' : 'Gallery'}</Text>
                         </TouchableOpacity>
                     </View>
+
+                    {/* ── Exact Duplicate Image Warning Banner ── */}
+                    {isImageDuplicate && (
+                        <View style={[styles.staleEvidenceBanner, { backgroundColor: '#FEF2F2', borderColor: 'rgba(239, 68, 68, 0.4)' }]}>
+                            <Ionicons name="close-circle" size={20} color={C.error} />
+                            <View style={{ flex: 1 }}>
+                                <Text style={[styles.staleEvidenceTitle, { color: C.error }]}>Incident Already Reported</Text>
+                                <Text style={[styles.staleEvidenceSub, { color: '#991B1B' }]}>
+                                    This exact image has already been used to report an incident. Duplicate submissions for the same incident cannot be submitted.
+                                </Text>
+                            </View>
+                        </View>
+                    )}
 
                     {/* ── Stale Evidence (>24h) Banner ── */}
                     {Boolean(imageMetadata?.staleEvidence) && (

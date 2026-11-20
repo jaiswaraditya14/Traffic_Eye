@@ -40,6 +40,10 @@ jest.mock('../../../services/reports/locationResolver', () => ({
 jest.mock('../../../utils/fileHash', () => ({
     computeFileSha256: jest.fn().mockResolvedValue({ sha256: 'mock-hash-1234567890123456' }),
 }));
+jest.mock('expo-image-picker', () => ({
+    requestMediaLibraryPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
+    launchImageLibraryAsync: jest.fn().mockResolvedValue({ canceled: true, assets: [] }),
+}));
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('../../../components', () => ({
     FocusAwareStatusBar: () => null,
@@ -139,5 +143,55 @@ describe('AIResultsVerification duplicate image detection', () => {
 
         expect(reportService.submitReportWithMedia).toHaveBeenCalledTimes(1);
         expect(navigation.replace).toHaveBeenCalledWith('ReportSuccess', expect.any(Object));
+    });
+
+    test('restores Confirm & Submit button when duplicate image is replaced with a unique image', async () => {
+        checkImageDuplicate
+            .mockResolvedValueOnce({ isDuplicate: true, indeterminate: false })
+            .mockResolvedValueOnce({ isDuplicate: false, indeterminate: false });
+
+        let view;
+        await act(async () => {
+            view = renderer.create(
+                <AIResultsVerification
+                    navigation={navigation}
+                    route={{
+                        params: {
+                            aiResults: {
+                                violationDetected: true,
+                                vehicleNumber: 'MH12AB1234',
+                                violationType: 'NO_HELMET',
+                                allViolations: ['NO_HELMET'],
+                                severity: 'Medium',
+                                confidence: 95,
+                            },
+                            isImageDuplicate: true,
+                        },
+                    }}
+                />
+            );
+        });
+
+        // Initially disabled
+        let submitBtn = view.root.findByProps({ accessibilityLabel: 'Incident already reported' });
+        expect(submitBtn.props.disabled).toBe(true);
+
+        // User taps "Choose Another Photo"
+        const changePhotoBtn = view.root.findByProps({ accessibilityLabel: 'Choose another photo' });
+        expect(changePhotoBtn).toBeTruthy();
+
+        const ImagePicker = require('expo-image-picker');
+        ImagePicker.launchImageLibraryAsync.mockResolvedValueOnce({
+            canceled: false,
+            assets: [{ uri: 'file:///new-unique-photo.jpg' }],
+        });
+
+        await act(async () => {
+            await changePhotoBtn.props.onPress();
+        });
+
+        // Submit button should now be restored to enabled state
+        submitBtn = view.root.findByProps({ accessibilityLabel: 'Confirm & Submit' });
+        expect(submitBtn.props.disabled).toBe(false);
     });
 });

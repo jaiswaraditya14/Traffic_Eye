@@ -415,18 +415,28 @@ async function performReportSubmission({ userId, report, media, submission, sign
     if (duplicate.indeterminate) {
         return { data: null, error: submissionError('DUPLICATE_CHECK', 'Could not verify this plate. Please check your connection and try again.') };
     }
-    if (!report.image_hash && media?.uri && Number.isFinite(media.fileSize) && media.fileSize <= MAX_IN_MEMORY_UPLOAD_SIZE) {
-        try {
-            const hashRes = await computeFileSha256(media.uri);
-            if (hashRes?.sha256) {
-                report.image_hash = hashRes.sha256;
-            }
-        } catch (_) {}
+    if (!report.image_hash && media?.uri) {
+        let size = media.fileSize;
+        if (size == null) {
+            try {
+                const info = await FileSystem.getInfoAsync(media.uri, { size: true });
+                size = info?.exists === false ? 0 : info?.size;
+            } catch (_) {}
+        }
+        if (Number.isFinite(size) && size > 0 && size <= MAX_IN_MEMORY_UPLOAD_SIZE) {
+            try {
+                const hashRes = await computeFileSha256(media.uri);
+                if (hashRes?.sha256) {
+                    report.image_hash = hashRes.sha256;
+                }
+            } catch (_) {}
+        }
     }
     if (report.image_hash) {
+        report.image_hash = String(report.image_hash).trim().toLowerCase();
         const imageDup = await checkImageDuplicate(report.image_hash);
         if (imageDup.isDuplicate) {
-            return { data: null, error: submissionError('DUPLICATE_IMAGE', 'Incident already reported: This exact photo has already been submitted to Traffic Eye.') };
+            return { data: null, error: submissionError('DUPLICATE_IMAGE', 'Incident Already Reported: This exact photo has already been submitted to Traffic Eye.') };
         }
         if (imageDup.indeterminate) {
             return { data: null, error: submissionError('DUPLICATE_CHECK', 'Could not verify evidence uniqueness. Please check your connection and try again.') };
@@ -483,6 +493,24 @@ async function performReportSubmission({ userId, report, media, submission, sign
         return finish(response.data);
     }
     const code = response?.error?.code;
+    const msg = response?.error?.message || '';
+    const details = response?.error?.details || '';
+    const hint = response?.error?.hint || '';
+    const isDuplicateConflict = (code === '23505' && (hint === 'DUPLICATE_IMAGE_HASH' || details.includes('image_hash') || msg.includes('image_hash') || msg.includes('Incident Already Reported'))) ||
+        hint === 'DUPLICATE_IMAGE_HASH' ||
+        msg.includes('Incident Already Reported');
+
+    if (isDuplicateConflict) {
+        submission.uncertain = false;
+        const cleanup = await removeReportMedia(submission.uploaded.storagePath);
+        if (!cleanup.error) {
+            submission.uploaded = null;
+            submission.uploadStarted = false;
+            submission.fingerprint = null;
+        }
+        return { data: null, error: submissionError('DUPLICATE_IMAGE', 'Incident Already Reported: This exact photo has already been submitted to Traffic Eye.') };
+    }
+
     // Only definite PostgreSQL validation/permission rejections prove no commit.
     // Network, missing response, and PK conflicts must be reconciled on retry.
     if (typeof code === 'string' && /^(22|23|42)/.test(code) && code !== '23505') {

@@ -164,7 +164,7 @@ export default function useImagePicker() {
                     height: asset.height,
                     mimeType: asset.mimeType || null,
                     fileName: asset.fileName || null,
-                    fileSize: asset.fileSize || null,
+                    fileSize: fileSize ?? asset.fileSize ?? null,
                 };
             }
             return null;
@@ -196,6 +196,7 @@ export default function useImagePicker() {
 
             if (!result.canceled && result.assets?.length > 0) {
                 const asset = result.assets[0];
+                const fileSize = await getAssetFileSize(asset);
                 // Evidence metadata may contain private GPS or access-bearing URIs; never log it.
                 if (mounted.current) setExifData(asset.exif || null);
                 return {
@@ -206,7 +207,7 @@ export default function useImagePicker() {
                     height: asset.height,
                     mimeType: asset.mimeType || null,
                     fileName: asset.fileName || null,
-                    fileSize: asset.fileSize || null,
+                    fileSize: fileSize ?? asset.fileSize ?? null,
                 };
             }
             return null;

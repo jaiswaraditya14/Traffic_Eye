@@ -189,6 +189,19 @@ describe('canonical submission', () => {
         expect(result.error.code).toBe('DUPLICATE_IMAGE');
         expect(supabase.storage.__upload).not.toHaveBeenCalled();
     });
+    test('handles concurrent duplicate insert collision by purging storage media and returning DUPLICATE_IMAGE error', async () => {
+        supabase.from.mockReturnValueOnce(allow()).mockReturnValueOnce(chain({
+            data: null,
+            error: { code: '23505', message: 'duplicate key value violates unique constraint "uq_image_reports_image_hash"', hint: 'DUPLICATE_IMAGE_HASH' },
+        }));
+        const result = await submitReportWithMedia(args({ report: {
+            ...REPORT,
+            image_hash: '11112222333344445555666677778888',
+        } }));
+        expect(result.error).toBeTruthy();
+        expect(result.error.code).toBe('DUPLICATE_IMAGE');
+        expect(supabase.storage.__remove).toHaveBeenCalled();
+    });
     test.each([
         { userId: null }, { report: null }, { report: [] },
         { report: { ...REPORT, latitude: null } }, { report: { ...REPORT, longitude: 181 } },
