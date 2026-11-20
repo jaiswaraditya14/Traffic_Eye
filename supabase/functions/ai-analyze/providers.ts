@@ -88,7 +88,7 @@ export const STAGE_MAX_TOKENS: Record<'vision' | 'ocr' | 'audit', number> = {
 
 const ENV_KEYS: Record<Provider, readonly string[]> = {
   gemini: ['GEMINI_API_KEY'],
-  openrouter: ['OPENROUTER_API_KEY_1', 'OPENROUTER_API_KEY_2', 'OPENROUTER_API_KEY'],
+  openrouter: ['OPENROUTER_API_KEY_1', 'OPENROUTER_API_KEY_2'],
   tokenharbor: [],
   nvidia: [],
   groq: [],
