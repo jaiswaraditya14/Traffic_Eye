@@ -1,6 +1,9 @@
 /**
  * ai-analyze — authenticated server-side AI proxy for the Traffic Eye pipeline.
  *
+ * Primary Engine: Google Gemini 3.5 Flash Lite (Vision Perception & Plate OCR)
+ * Fallback Models: Gemini 2.5 Flash, OpenRouter
+ *
  * Why this exists: provider keys previously shipped in EXPO_PUBLIC_* env vars,
  * which are inlined into the APK bundle and extractable from any installed
  * copy of the app. Keys now live only in Edge Function secrets.

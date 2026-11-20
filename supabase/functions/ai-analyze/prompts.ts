@@ -14,7 +14,7 @@ Inspect this photo objectively and evaluate all traffic rules with precision:
    - Identify vehicle type (motorcycle, scooter, car, auto, bus, truck, etc.).
    - TWO-WHEELERS: Count all riders by inspecting heads along the seat line (driver, middle, pillion) and legs along the sides. Check helmets (caps/hats/bare heads = helmet_status "CONFIRMED_ABSENT").
    - FOUR-WHEELERS: Set helmet_status "NOT_APPLICABLE". Check driver/passenger seatbelts (bare torso without belt = seatbelt_status "CONFIRMED_ABSENT").
-   - Read exact license plate characters if legible.
+   - Read exact license plate characters in uppercase without spaces, dots, or dashes (e.g. MH12AB1234). If unreadable, return "PLATE_NOT_READABLE".
 
 2. VIOLATIONS (0, 1, or Multiple):
    - If NO violations observed -> detected_violations = [].
@@ -46,7 +46,7 @@ Return ONLY valid JSON matching this schema:
   },
   "detected_violations": [
     {
-      "violation_type": "NO_HELMET|TRIPLE_RIDING|PHONE_USAGE|WRONG_SIDE|RED_LIGHT|NO_SEATBELT|OTHER",
+      "violation_type": "NO_HELMET|TRIPLE_RIDING|PHONE_USAGE|WRONG_SIDE|RED_LIGHT|NO_SEATBELT|WRONG_PARKING|OVERLOADING|DANGEROUS_DRIVING|OTHER",
       "severity": "HIGH|MEDIUM|LOW",
       "confidence": 0.95,
       "violator": "Rider|Pillion|Both|Driver|All",
@@ -60,7 +60,7 @@ export const PLATE_OCR_PROMPT = `You are a specialist license plate OCR system f
 Your ONLY job is to read the number plate text as accurately as possible.
 
 MANDATORY RULES:
-1. Read EVERY character individually — never guess or infer missing characters.
+1. Read EVERY character individually — output uppercase letters and numbers without spaces, hyphens, or dots. Never guess or infer missing characters.
 2. Common lookalike pairs: 0/O, 1/I/l, 8/B, 5/S, 6/G, 2/Z, 4/A, 7/T
 3. Use "?" for any genuinely unreadable character position.
 4. Focus ONLY on the PRIMARY vehicle's plate — ignore background plates.
