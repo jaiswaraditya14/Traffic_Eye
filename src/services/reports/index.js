@@ -816,13 +816,20 @@ export async function fetchHeatmapPoints(bboxOrOptions = null, legacyDaysBack = 
         bbox = bboxOrOptions;
     }
 
+    // Normalize 'verified' → 'approved' so the RPC gets the correct DB status value.
+    // MAP_STATUS_THEME uses 'approved' as the key, but guard against any legacy callers
+    // that may pass 'verified' directly.
+    const normalizedStatuses = statuses && statuses.length > 0
+        ? statuses.map(s => (typeof s === 'string' && s.toLowerCase() === 'verified' ? 'approved' : s))
+        : null;
+
     const params = {
         p_min_lat:         bbox?.minLat ?? null,
         p_max_lat:         bbox?.maxLat ?? null,
         p_min_lng:         bbox?.minLng ?? null,
         p_max_lng:         bbox?.maxLng ?? null,
         p_days_back:       daysBack || 3650,
-        p_statuses:        statuses && statuses.length > 0 ? statuses : null,
+        p_statuses:        normalizedStatuses,
         p_severities:      severities && severities.length > 0 ? severities.map(s => s.toLowerCase()) : null,
         p_violation_types: violationTypes && violationTypes.length > 0 ? violationTypes : null,
         p_search_area:     searchArea && searchArea.trim() ? searchArea.trim() : null,
@@ -958,10 +965,8 @@ export function subscribeToApprovedMapReports(onChange) {
             schema: 'public',
             table: 'image_reports',
         }, (payload) => {
-            // Only refresh if the report was just approved (or is approved)
-            if (payload?.new?.status === 'approved') {
-                onChange(payload);
-            }
+            // Refresh on any status change (approved, pending, rejected) so all filters stay live
+            onChange(payload);
         })
         .subscribe();
 }

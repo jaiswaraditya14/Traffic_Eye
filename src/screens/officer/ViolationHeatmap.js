@@ -1027,17 +1027,14 @@ export default function ViolationHeatmap({ navigation }) {
                         })}
                     </ScrollView>
 
-                    {/* Result count & Clear All banner */}
-                    <View style={styles.resultsRow}>
-                        <Text style={[styles.resultCountText, isDark && { color: '#94A3B8' }]}>
-                            <Text style={[styles.resultCountBold, isDark && { color: '#F8FAFC' }]}>{filteredPoints.length}</Text> violations displayed
-                        </Text>
-                        {activeFilterCount > 0 && (
+                    {/* Clear All banner (count text removed) */}
+                    {activeFilterCount > 0 && (
+                        <View style={styles.resultsRow}>
                             <TouchableOpacity onPress={handleResetFilters} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
                                 <Text style={styles.clearAllLink}>Clear all</Text>
                             </TouchableOpacity>
-                        )}
-                    </View>
+                        </View>
+                    )}
                 </View>
             </SafeAreaView>
 

@@ -13,7 +13,7 @@ import { supabase } from '../../services';
 import { COLORS, GRADIENTS } from '../../utils/theme';
 import useReducedMotion from '../../hooks/useReducedMotion';
 import { useNotifications } from '../../context/NotificationContext';
-import { officerJurisdictionFilters, sortOfficerQueue, formatOfficerGreeting } from '../../utils/productExperience';
+import { sortOfficerQueue, formatOfficerGreeting } from '../../utils/productExperience';
 import { fetchPendingReports, fetchReviewedReports, subscribeToOfficerQueue } from '../../services/reports';
 
 // ── Design Tokens (Civic Authority — Officer Side) ──
@@ -77,34 +77,15 @@ export default function OfficerDashboard({ navigation }) {
             const pending = sortOfficerQueue(activePending || []).slice(0, 5);
 
             // Build jurisdiction-scoped count filters (same as fetchPendingReports)
-            let approvedQuery = supabase
-                .from('image_reports')
-                .select('id', { count: 'exact', head: true })
-                .eq('status', 'approved');
-            let rejectedQuery = supabase
-                .from('image_reports')
-                .select('id', { count: 'exact', head: true })
-                .eq('status', 'rejected');
-
-            // Apply same OR-based jurisdiction filter so counts match the officer's area
-            const filters = officerJurisdictionFilters(profile);
-            if (filters.length > 0) {
-                const orStr = filters.join(',');
-                approvedQuery = approvedQuery.or(orStr);
-                rejectedQuery = rejectedQuery.or(orStr);
-            }
-
-            const [{ count: aCount, error: aError }, { count: rCount, error: rError }] = await Promise.all([
-                approvedQuery,
-                rejectedQuery,
-            ]);
-
-            if (aError || rError) throw aError || rError;
-            // Fetch routed reviewed reports (filtered to rejected in UI logic)
+            // Use fetchReviewedReports so the count is derived from the exact same
+            // data source and jurisdiction filter that the Verified/Rejected queues use.
             const { data: allReviewed, error: reviewedError } = await fetchReviewedReports(profile);
-            const rejected = allReviewed ? allReviewed.filter(r => r.status === 'rejected').slice(0, 5) : [];
-
             if (reviewedError) throw reviewedError;
+
+            const aCount = (allReviewed || []).filter(r => r.status === 'approved').length;
+            const rCount = (allReviewed || []).filter(r => r.status === 'rejected').length;
+            const rejected = (allReviewed || []).filter(r => r.status === 'rejected').slice(0, 5);
+
             if (request !== requestSequence.current) return;
             setLoadError(false); setTotalPending((activePending || []).length);
             setPendingReports(pending || []);
