@@ -111,6 +111,9 @@ export default function AIResultsVerification({ navigation, route }) {
                 authenticity_check:    routeAuthResult || currentReport?.authenticityResult || null,
                 possible_duplicate:    possibleDuplicate || false,
                 duplicate_report_id:   duplicateExistingId || null,
+                image_hash:            currentReport?.imageHash || null,
+                captured_at:           currentReport?.capturedAt || null,
+                stale_evidence:        Boolean(currentReport?.staleEvidence),
             };
 
             const cleanImageUri = currentReport?.image || '';
@@ -186,6 +189,19 @@ export default function AIResultsVerification({ navigation, route }) {
                                 <Text style={styles.duplicateBannerTitle}>⚠️ Possible Duplicate</Text>
                                 <Text style={styles.duplicateBannerText}>
                                     This vehicle number plate has already been reported. The officer will review both reports independently. You may still submit.
+                                </Text>
+                            </View>
+                        </View>
+                    )}
+
+                    {/* Stale Evidence (>24h) Banner */}
+                    {Boolean(currentReport?.staleEvidence) && (
+                        <View style={[styles.duplicateBanner, { backgroundColor: '#FFFBEB', borderColor: 'rgba(217, 119, 6, 0.3)' }]}>
+                            <Ionicons name="time-outline" size={18} color={COLORS.secondaryDark} />
+                            <View style={{ flex: 1 }}>
+                                <Text style={[styles.duplicateBannerTitle, { color: COLORS.secondaryDark }]}>⚠️ Delayed Submission</Text>
+                                <Text style={styles.duplicateBannerText}>
+                                    This photo was captured more than 24 hours ago. It will require manual officer verification before action is taken.
                                 </Text>
                             </View>
                         </View>

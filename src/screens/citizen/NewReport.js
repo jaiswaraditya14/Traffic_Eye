@@ -16,6 +16,8 @@ import { COLORS } from '../../utils/theme';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { extractImageLocation } from '../../utils';
+import { computeFileSha256 } from '../../utils/fileHash';
+import { extractExifCaptureDate, isStaleEvidence } from '../../utils/exifParser';
 
 // ── Design Tokens ──
 const C = {
@@ -122,7 +124,21 @@ export default function NewReport({ navigation }) {
             const locResult = await extractImageLocation(asset);
             if (generation !== extractionGeneration.current) return;
             setMetadataStatus(locResult?.status || 'FILE_ACCESS_FAILED');
-            setImageMetadata(previous => ({ ...previous, locationMetadataStatus: locResult?.status, locationProvenance: locResult?.provenance }));
+            const capturedAt = extractExifCaptureDate(asset) || locResult?.capturedAt || null;
+            const staleEvidence = isStaleEvidence(capturedAt, 24);
+            let imageHash = null;
+            try {
+                const hashRes = await computeFileSha256(asset.uri);
+                imageHash = hashRes?.sha256 || null;
+            } catch (_) {}
+            setImageMetadata(previous => ({
+                ...previous,
+                locationMetadataStatus: locResult?.status,
+                locationProvenance: locResult?.provenance,
+                imageHash,
+                capturedAt,
+                staleEvidence,
+            }));
 
             if (locResult && locResult.gpsFound && locResult.latitude != null && locResult.longitude != null) {
                 showBanner('extracting');
@@ -189,7 +205,16 @@ export default function NewReport({ navigation }) {
             setVideo(null);
             setMediaType('image');
             setImage(result.uri);
-            setImageMetadata({ mimeType: result.mimeType, fileName: result.fileName, fileSize: result.fileSize });
+            const capturedAt = extractExifCaptureDate(result);
+            const staleEvidence = isStaleEvidence(capturedAt, 24);
+            setImageMetadata(prev => ({
+                ...prev,
+                mimeType: result.mimeType,
+                fileName: result.fileName,
+                fileSize: result.fileSize,
+                capturedAt,
+                staleEvidence,
+            }));
             await handleLocationExtraction(result);
         }
     };
@@ -200,7 +225,16 @@ export default function NewReport({ navigation }) {
             setVideo(null);
             setMediaType('image');
             setImage(result.uri);
-            setImageMetadata({ mimeType: result.mimeType, fileName: result.fileName, fileSize: result.fileSize });
+            const capturedAt = extractExifCaptureDate(result);
+            const staleEvidence = isStaleEvidence(capturedAt, 24);
+            setImageMetadata(prev => ({
+                ...prev,
+                mimeType: result.mimeType,
+                fileName: result.fileName,
+                fileSize: result.fileSize,
+                capturedAt,
+                staleEvidence,
+            }));
             await handleLocationExtraction(result);
         }
     };
@@ -239,6 +273,9 @@ export default function NewReport({ navigation }) {
             locationSource: locationSource || (location ? 'MANUAL' : 'NOT_FOUND'),
             trustLevel: trustLevel || 'Needs Verification / Manual Location',
             timestamp: new Date(),
+            imageHash: imageMetadata?.imageHash || null,
+            capturedAt: imageMetadata?.capturedAt || null,
+            staleEvidence: Boolean(imageMetadata?.staleEvidence),
         });
         navigation.navigate('AIProcessing');
     };
@@ -336,6 +373,19 @@ export default function NewReport({ navigation }) {
                             <Text style={image ? styles.retakeBtnText : styles.mediaBtnOutlineText}>{image ? 'Choose Another' : 'Gallery'}</Text>
                         </TouchableOpacity>
                     </View>
+
+                    {/* ── Stale Evidence (>24h) Banner ── */}
+                    {Boolean(imageMetadata?.staleEvidence) && (
+                        <View style={styles.staleEvidenceBanner}>
+                            <Ionicons name="time-outline" size={18} color={C.warning} />
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.staleEvidenceTitle}>PHOTO CAPTURED &gt;24 HOURS AGO</Text>
+                                <Text style={styles.staleEvidenceSub}>
+                                    Evidence captured over 24 hours ago requires manual officer verification.
+                                </Text>
+                            </View>
+                        </View>
+                    )}
 
                     {/* ── Auto Fill / Location Extraction Banner ── */}
                     {autoFillStatus && (
@@ -888,6 +938,31 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontFamily: 'Nunito-SemiBold',
         color: C.navyMid,
+    },
+
+    staleEvidenceBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        backgroundColor: C.warningSurface,
+        borderWidth: 1,
+        borderColor: 'rgba(217, 119, 6, 0.3)',
+        borderRadius: 12,
+        padding: 12,
+        marginTop: 10,
+        marginBottom: 10,
+    },
+    staleEvidenceTitle: {
+        fontSize: 11,
+        fontFamily: 'Nunito-ExtraBold',
+        color: C.warning,
+        letterSpacing: 0.5,
+    },
+    staleEvidenceSub: {
+        fontSize: 12,
+        fontFamily: 'Nunito-Medium',
+        color: C.textSecondary,
+        marginTop: 2,
     },
 
     descBox: {

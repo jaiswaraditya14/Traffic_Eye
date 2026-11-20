@@ -5,13 +5,14 @@ import renderer, { act } from 'react-test-renderer';
 import { aiStageIndex } from '../../../utils/productExperience';
 import AIProcessing, { AI_STAGES } from '../AIProcessing';
 import { aiService } from '../../../services';
-import { checkPlateDuplicate, checkUserRateLimit } from '../../../services/reports';
+import { checkPlateDuplicate, checkUserRateLimit, checkImageDuplicate } from '../../../services/reports';
 
 jest.mock('@react-native-async-storage/async-storage', () => require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 jest.mock('../../../hooks/useReducedMotion', () => () => false);
 jest.mock('../../../context', () => ({ useAppContext: () => ({ currentReport: { image: 'file:///synthetic.jpg?access=yes' } }), useAuth: () => ({ user: { id: 'synthetic-user' } }) }));
 jest.mock('../../../services', () => ({ aiService: { analyzeViolationImage: jest.fn() } }));
-jest.mock('../../../services/reports', () => ({ checkPlateDuplicate: jest.fn(), checkUserRateLimit: jest.fn() }));
+jest.mock('../../../services/reports', () => ({ checkPlateDuplicate: jest.fn(), checkUserRateLimit: jest.fn(), checkImageDuplicate: jest.fn() }));
+jest.mock('../../../utils/fileHash', () => ({ computeFileSha256: jest.fn().mockResolvedValue({ sha256: 'mocked-hash-1234567890' }) }));
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('../../../components', () => {
     const React = require('react');
@@ -39,6 +40,7 @@ beforeEach(() => {
     jest.spyOn(console, 'warn').mockImplementation(() => {});
     jest.spyOn(console, 'error').mockImplementation(() => {});
     checkUserRateLimit.mockResolvedValue({ allowed: true, indeterminate: false });
+    checkImageDuplicate.mockResolvedValue({ isDuplicate: false, indeterminate: false });
     checkPlateDuplicate.mockResolvedValue({ isDuplicate: false, indeterminate: false });
     aiService.analyzeViolationImage.mockResolvedValue({ violationDetected: true, vehicleNumber: 'MH12AB1234' });
 });
@@ -70,6 +72,28 @@ test('failed activity validation blocks all AI and navigation', async () => {
     expect(aiService.analyzeViolationImage).not.toHaveBeenCalled();
     expect(navigation.replace).not.toHaveBeenCalled();
     expect(Alert.alert).toHaveBeenCalled();
+});
+test('exact duplicate photograph blocks all AI analysis and alerts citizen', async () => {
+    checkImageDuplicate.mockResolvedValue({ isDuplicate: true, indeterminate: false, existingReportId: 'existing-dup' });
+    await mount();
+    expect(aiService.analyzeViolationImage).not.toHaveBeenCalled();
+    expect(navigation.replace).not.toHaveBeenCalled();
+    expect(Alert.alert).toHaveBeenCalledWith(
+        'Duplicate Photograph Detected',
+        expect.stringContaining('exact photo has already been submitted'),
+        expect.any(Array)
+    );
+});
+test('indeterminate photo duplicate check blocks progression and alerts user', async () => {
+    checkImageDuplicate.mockResolvedValue({ isDuplicate: false, indeterminate: true });
+    await mount();
+    expect(aiService.analyzeViolationImage).not.toHaveBeenCalled();
+    expect(navigation.replace).not.toHaveBeenCalled();
+    expect(Alert.alert).toHaveBeenCalledWith(
+        'Couldn\'t Verify Evidence',
+        expect.stringContaining('couldn\'t verify whether this photo was previously submitted'),
+        expect.any(Array)
+    );
 });
 test('indeterminate duplicate lookup does not advance', async () => {
     checkPlateDuplicate.mockResolvedValue({ isDuplicate: false, indeterminate: true });

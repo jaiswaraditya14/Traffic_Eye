@@ -61,6 +61,8 @@ function getConfig(type) {
             return { icon: 'time', color: C.warning, bg: C.warningSurface, category: 'report', label: 'Under Review' };
         case 'report_submitted':
             return { icon: 'cloud-upload', color: C.navyMid, bg: '#D7E2FF', category: 'report', label: 'Report Submitted' };
+        case 'new_report_pending':
+            return { icon: 'alert-circle', color: '#EA580C', bg: '#FFEDD5', category: 'report', label: 'New Report Pending' };
         // Rewards
         case 'points_earned':
             return { icon: 'trophy', color: C.amber, bg: C.amberSurface, category: 'system', label: 'Points Earned' };
@@ -82,7 +84,7 @@ function getConfig(type) {
 }
 
 // Report notifications that support deep-link navigation to ReportDetail
-const REPORT_TYPES = new Set(['report_approved', 'report_rejected', 'report_pending', 'report_submitted']);
+const REPORT_TYPES = new Set(['report_approved', 'report_rejected', 'report_pending', 'report_submitted', 'new_report_pending']);
 
 // Filter tab definitions
 const TABS = [

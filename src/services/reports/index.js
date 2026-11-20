@@ -159,52 +159,70 @@ export async function fetchReportMedia(reportId) {
 // ── Duplicate detection ────────────────────────────────────────────────────
 
 /**
- * @deprecated LEGACY — no longer called from the UI.
- * Hash-based duplicate detection has been replaced by checkPlateDuplicate()
- * (plate-OCR + Supabase DB matching). This function is kept for backwards
- * compatibility with the existing image_hash DB column and check_image_duplicate RPC.
+ * Check whether an exact photograph (by SHA-256 hash) has already been submitted.
+ * Uses a SECURITY DEFINER RPC to check across ALL citizens' reports.
+ *
+ * FAIL-CLOSED: duplicate prevention is a safety control. If the check cannot
+ * be performed (RPC error / thrown exception), we return `indeterminate: true`
+ * rather than silently reporting "unique".
+ *
+ * @param {string} hash - 64-char hex SHA-256 fingerprint
+ * @returns {Promise<{ isDuplicate: boolean, indeterminate: boolean, existingReportId: string|null, reason?: string }>}
+ */
+export async function checkImageDuplicate(hash) {
+    const unavailable = reason => ({ isDuplicate: false, indeterminate: true, existingReportId: null, reason });
+    if (!hash || typeof hash !== 'string') {
+        return { isDuplicate: false, indeterminate: false, existingReportId: null };
+    }
+    const cleanHash = hash.trim().toLowerCase();
+    if (cleanHash.length < 16) {
+        return { isDuplicate: false, indeterminate: false, existingReportId: null };
+    }
+    try {
+        const { data, error } = await supabase.rpc('check_image_duplicate', { p_hash: cleanHash });
+        if (error) {
+            safeDiagnostic('IMAGE_DUPLICATE_RPC_FAILED');
+            // Direct query fallback under current permissions
+            const { data: directData, error: directError } = await supabase
+                .from('image_reports')
+                .select('id, status')
+                .eq('image_hash', cleanHash)
+                .neq('status', 'rejected')
+                .limit(1)
+                .maybeSingle();
+            if (directError) {
+                return unavailable('CHECK_FAILED');
+            }
+            if (directData) {
+                return { isDuplicate: true, indeterminate: false, existingReportId: directData.id };
+            }
+            return { isDuplicate: false, indeterminate: false, existingReportId: null };
+        }
+        const record = Array.isArray(data) ? data[0] : data;
+        if (!record || typeof record.is_duplicate !== 'boolean') {
+            safeDiagnostic('IMAGE_DUPLICATE_INVALID_RESPONSE');
+            return unavailable('INVALID_RESPONSE');
+        }
+        return {
+            isDuplicate: record.is_duplicate,
+            indeterminate: false,
+            existingReportId: record.is_duplicate ? (record.existing_report_id || null) : null,
+        };
+    } catch {
+        safeDiagnostic('IMAGE_DUPLICATE_EXCEPTION');
+        return unavailable('EXCEPTION');
+    }
+}
+
+/**
+ * Backwards compatibility wrapper for checkImageDuplicate.
  *
  * @param {string} hash - 64-char hex SHA-256 fingerprint
  * @returns {Promise<{ isDuplicate: boolean, existingReportId: string|null }>}
  */
 export async function checkImageHashExists(hash) {
-    if (!hash) return { isDuplicate: false, existingReportId: null };
-    try {
-        // Strategy 1: Try SECURITY DEFINER RPC function (bypasses citizen RLS restrictions across all users)
-        const { data: rpcData, error: rpcError } = await supabase.rpc('check_image_duplicate', { p_hash: hash });
-
-        if (!rpcError && rpcData && rpcData.length > 0) {
-            const result = rpcData[0];
-            if (result?.is_duplicate) {
-                return { isDuplicate: true, existingReportId: result.existing_report_id };
-            }
-            return { isDuplicate: false, existingReportId: null };
-        }
-
-        // Strategy 2: Direct table select fallback
-        const { data, error } = await supabase
-            .from('image_reports')
-            .select('id, status, submitted_at')
-            .eq('image_hash', hash)
-            .neq('status', 'rejected')  // Rejected reports don't block re-submission
-            .limit(1)
-            .maybeSingle();
-
-        if (error) {
-            if (error.code === '42703' || error.message?.includes('image_hash')) {
-                return { isDuplicate: false, existingReportId: null };
-            }
-            return { isDuplicate: false, existingReportId: null };
-        }
-
-        if (data) {
-            return { isDuplicate: true, existingReportId: data.id };
-        }
-
-        return { isDuplicate: false, existingReportId: null };
-    } catch (err) {
-        return { isDuplicate: false, existingReportId: null };
-    }
+    const result = await checkImageDuplicate(hash);
+    return { isDuplicate: result.isDuplicate, existingReportId: result.existingReportId };
 }
 
 /**
@@ -396,6 +414,15 @@ async function performReportSubmission({ userId, report, media, submission, sign
     if (duplicate.indeterminate) {
         return { data: null, error: submissionError('DUPLICATE_CHECK', 'Could not verify this plate. Please check your connection and try again.') };
     }
+    if (report.image_hash) {
+        const imageDup = await checkImageDuplicate(report.image_hash);
+        if (imageDup.isDuplicate) {
+            return { data: null, error: submissionError('DUPLICATE_IMAGE', 'Duplicate Photograph Detected: This exact photo has already been submitted to Traffic Eye.') };
+        }
+        if (imageDup.indeterminate) {
+            return { data: null, error: submissionError('DUPLICATE_CHECK', 'Could not verify evidence uniqueness. Please check your connection and try again.') };
+        }
+    }
     if (signal?.aborted) return { data: null, error: submissionError('CANCELLED', 'Submission cancelled before saving.') };
     // A confirmed possible duplicate retains the established officer-review flow.
     if (!submission.uploaded) {
@@ -427,6 +454,9 @@ async function performReportSubmission({ userId, report, media, submission, sign
         vehicle_number: typeof report.vehicle_number === 'string' ? report.vehicle_number.replace(/\s+/g, '').toUpperCase() || null : null,
         possible_duplicate: duplicate.isDuplicate,
         duplicate_report_id: duplicate.existingReportId,
+        image_hash: report.image_hash || null,
+        captured_at: report.captured_at || null,
+        stale_evidence: Boolean(report.stale_evidence),
         status: 'pending', reward_amount: 0, reviewed_at: null,
     };
     delete payload.submitted_at;

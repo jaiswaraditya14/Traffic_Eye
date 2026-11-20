@@ -58,7 +58,7 @@ export function NotificationProvider({ children, navigationRef }) {
             onUpdate: () => { setRevision(value => value + 1); refreshUnread(); },
             notify: (row, isCurrent) => sendLocalNotification('Traffic Eye update', 'Open the app to see your latest update.', {
                 userId: id, notifId: row.id,
-                reportId: /^report_/.test(row.type || '') ? row.reference_id : null,
+                reportId: /(?:report_|new_report)/.test(row.type || '') ? row.reference_id : null,
             }, isCurrent),
         });
     }, [user?.id, refreshUnread]);

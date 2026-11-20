@@ -1,23 +1,21 @@
 /**
- * ai/index.js — Traffic Eye Production AI Analysis Pipeline (v3)
+ * ai/index.js — Traffic Eye Production AI Analysis Pipeline (v4 - Dual-Key OpenRouter)
  *
  * Architecture: AI SEES → CODE DECIDES → CONSISTENCY AUDIT → UNCERTAINTY → MANUAL REVIEW
  *
  * ┌─────────────────────────────────────────────────────────┐
  * │ Stage 0  — Local Preprocessing & Integrity              │ 0 API calls
- * │ Stage 1  — OpenRouter Vision (primary perception)       │ 12s max, 1 attempt
- * │ Stage 1F — Fallback Vision (TokenHarbor/NVIDIA/Gemini)  │ 12s max, 1 attempt
+ * │ Stage 1  — OpenRouter Vision (Key 1 / Key 2 failover)   │ 18s max
  * │ Stage RE — Local Deterministic Rule Engine              │ 0ms, pure code
- * │ Stage 2  — Conditional OCR (only when plate unresolved) │ 10s max, lazy
- * │ Stage 3  — Consistency Audit (text)                     │ 8s max, no image
+ * │ Stage 2  — Conditional OCR (Key 1 / Key 2 failover)     │ 14s max, lazy
+ * │ Stage 3  — Consistency Audit (Text-only)                │ 10s max, no image
  * └─────────────────────────────────────────────────────────┘
  *
  * Fail-closed policy:
  *   Any uncertain result → MANUAL_REVIEW_REQUIRED
- *   Any provider failure → next stage or fail-closed
+ *   Any provider failure → failover key, next model, or fail-closed
  *   No LLM may directly assert a legal violation
  *   No LLM may invent vehicle registration numbers
- *   Groq never receives image payloads
  *
  * ── Security boundary ───────────────────────────────────────────────────────
  * This module holds no provider credentials and contacts no provider endpoint.
@@ -212,11 +210,10 @@ export const aiService = {
      *
      * Pipeline stages:
      *   Stage 0  — Local preprocessing, integrity check, image normalization
-     *   Stage 1  — NVIDIA Vision primary perception (12s max)
-     *   Stage 1F — Gemini fallback perception (12s max, only on NVIDIA failure)
+     *   Stage 1  — OpenRouter Vision perception (Key 1 → Key 2 failover)
      *   Stage RE — Local deterministic rule engine (0ms)
-     *   Stage 2  — Conditional OCR (10s max, only when plate unresolved)
-     *   Stage 3  — Groq text-only consistency audit (8s max)
+     *   Stage 2  — Conditional OCR (Key 1 → Key 2 failover, only when plate needed)
+     *   Stage 3  — Consistency Audit (text-only)
      *
      * @param {string}   imageUri    - Local file URI from camera/gallery
      * @param {object}   [options]

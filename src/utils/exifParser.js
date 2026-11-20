@@ -20,6 +20,53 @@ export function logExifDiagnostics({ exifExists, coordinates, isOriginal, sha256
         isOriginal: Boolean(isOriginal), hashAvailable: Boolean(sha256Result?.sha256),
     });
 }
+
+/**
+ * Extract original photo capture timestamp from EXIF or asset metadata.
+ * Prioritizes DateTimeOriginal -> DateTimeDigitized -> DateTime -> creationTime.
+ * Returns an ISO-8601 string or null if unavailable.
+ */
+export function extractExifCaptureDate(assetOrExif) {
+    if (!assetOrExif) return null;
+    const exif = assetOrExif.exif || (typeof assetOrExif === 'object' && !assetOrExif.uri ? assetOrExif : null);
+    let rawDate = null;
+
+    if (exif && typeof exif === 'object') {
+        rawDate = exif.DateTimeOriginal || exif.DateTimeDigitized || exif.DateTime ||
+                  exif['{Exif}']?.DateTimeOriginal || exif['{Exif}']?.DateTimeDigitized ||
+                  exif['{TIFF}']?.DateTime || null;
+    }
+
+    if (!rawDate && Number.isFinite(assetOrExif.creationTime) && assetOrExif.creationTime > 0) {
+        const d = new Date(assetOrExif.creationTime);
+        if (!isNaN(d.getTime())) return d.toISOString();
+    }
+
+    if (!rawDate || typeof rawDate !== 'string') return null;
+
+    // Standard EXIF format: "YYYY:MM:DD HH:MM:SS" or "YYYY-MM-DD HH:MM:SS"
+    const match = rawDate.trim().match(/^(\d{4})[:\-](\d{2})[:\-](\d{2})[\sT](\d{2}):(\d{2}):(\d{2})/);
+    if (match) {
+        const [ , y, m, d, hh, mm, ss ] = match;
+        const parsed = new Date(Number(y), Number(m) - 1, Number(d), Number(hh), Number(mm), Number(ss));
+        if (!isNaN(parsed.getTime())) return parsed.toISOString();
+    }
+
+    const general = new Date(rawDate);
+    if (!isNaN(general.getTime())) return general.toISOString();
+    return null;
+}
+
+/**
+ * Determine if the captured timestamp is older than the threshold in hours (default 24h).
+ */
+export function isStaleEvidence(capturedAt, thresholdHours = 24) {
+    if (!capturedAt) return false;
+    const date = typeof capturedAt === 'string' || typeof capturedAt === 'number' ? new Date(capturedAt) : capturedAt;
+    if (!date || isNaN(date.getTime())) return false;
+    const ageMs = Date.now() - date.getTime();
+    return ageMs > thresholdHours * 60 * 60 * 1000;
+}
 async function hashBytes(bytes) {
     try {
         const digest = await Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256, bytes);
@@ -168,6 +215,8 @@ export async function extractExifFromImage(assetOrUri) {
         source: gpsSource, method: extractionMethod, uri: gpsSource === 'EXIF_ORIGINAL' ? originalUri : pickerUri,
         assetId: gpsSource === 'EXIF_ORIGINAL' ? assetId : null,
     } : null;
+    const capturedAt = extractExifCaptureDate(asset);
+    const staleEvidence = isStaleEvidence(capturedAt, 24);
     return {
         status, hasExif, hasGps: Boolean(coords), metadataAccessible: accessible, provenance,
         originalInspected, metadataProvenance: originalInspected ? 'ORIGINAL_BYTES' : (accessible ? 'PICKER_METADATA' : 'INACCESSIBLE'),
@@ -175,6 +224,7 @@ export async function extractExifFromImage(assetOrUri) {
         lat: coords?.latitude ?? null, lng: coords?.longitude ?? null,
         source: gpsSource, gpsSource, gpsFound: Boolean(coords), reason: coords ? null : status,
         extractionMethod, sha256, hashSource, pickerUri,
+        capturedAt, staleEvidence, isStale: staleEvidence,
         originalUri, originalContentUri: originalUri, mediaStoreId: assetId,
         displayName, mediaPathType, isOriginal: gpsSource === 'EXIF_ORIGINAL',
         isOriginalBytes: hashSource === 'ORIGINAL_BYTES',

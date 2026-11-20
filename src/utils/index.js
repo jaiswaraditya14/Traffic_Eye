@@ -42,6 +42,8 @@ export {
     hasValidGpsValues,
     extractImageLocation,
     extractExifFromImage,
+    extractExifCaptureDate,
+    isStaleEvidence,
     parseJpegBinaryExif,
     logExifDiagnostics,
 } from './exifParser';

@@ -7,7 +7,8 @@ import { useAppContext, useAuth } from '../../context';
 import { aiService } from '../../services';
 import { COLORS, DARK_COLORS } from '../../utils/theme';
 import { buildManualReviewResult } from '../../services/ai/manualReview';
-import { checkPlateDuplicate, checkUserRateLimit } from '../../services/reports';
+import { checkPlateDuplicate, checkUserRateLimit, checkImageDuplicate } from '../../services/reports';
+import { computeFileSha256 } from '../../utils/fileHash';
 import { FocusAwareStatusBar, PressableScale, ConfirmationModal, StepIndicator } from '../../components';
 
 
@@ -149,6 +150,45 @@ export default function AIProcessing({ navigation }) {
 
             // Preserve the selected evidence URI, including access-bearing query parameters.
             const rawUri = currentReport.image;
+
+            // ══════════════════════════════════════════════════════════════════
+            // STAGE -0.5 — Exact SHA-256 Image Duplicate Check (Hard Block)
+            // ══════════════════════════════════════════════════════════════════
+            let imageHash = currentReport?.imageHash;
+            if (!imageHash && rawUri) {
+                try {
+                    const hashRes = await computeFileSha256(rawUri);
+                    imageHash = hashRes?.sha256 || null;
+                } catch (_) {}
+            }
+
+            if (imageHash) {
+                const { isDuplicate, indeterminate: dupIndeterminate } = await checkImageDuplicate(imageHash);
+                if (signal.aborted) return;
+                if (isDuplicate) {
+                    if (live()) {
+                        Alert.alert(
+                            'Duplicate Photograph Detected',
+                            'This exact photo has already been submitted to Traffic Eye. Please take a new photograph of the incident.',
+                            [{ text: 'OK', style: 'default', onPress: () => navigation.goBack() }]
+                        );
+                    }
+                    return;
+                }
+                if (dupIndeterminate) {
+                    if (live()) {
+                        Alert.alert(
+                            'Couldn\'t Verify Evidence',
+                            'We couldn\'t verify whether this photo was previously submitted. Please check your connection and try again.',
+                            [
+                                { text: 'Go Back', style: 'cancel', onPress: () => navigation.goBack() },
+                                { text: 'Try Again', style: 'default', onPress: () => startAnalysis() },
+                            ]
+                        );
+                    }
+                    return;
+                }
+            }
 
             // ═══════════════════════════════════════════════════════════════════
             // Vision Violation Detection — with live stage callbacks and a signal

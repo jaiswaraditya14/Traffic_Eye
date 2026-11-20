@@ -6,6 +6,8 @@ import { NativeModules, Platform } from 'react-native';
 import {
     applyRef,
     extractImageLocation,
+    extractExifCaptureDate,
+    isStaleEvidence,
     hasValidGpsValues,
     logExifDiagnostics,
     parseCoordinateComponent,
@@ -283,6 +285,49 @@ describe('EXIF diagnostics privacy', () => {
         const logs = JSON.stringify([console.log.mock.calls, console.warn.mock.calls, console.error.mock.calls]);
         expect(logs.includes(pickerUri)).toBe(false);
         expect(logs.includes(originalUri)).toBe(false);
+    });
+});
+
+describe('EXIF capture timestamp extraction & 24h stale evidence validation', () => {
+    test.each([
+        ['standard EXIF colon format', { DateTimeOriginal: '2026:11:18 14:30:00' }, '2026-11-18'],
+        ['hyphenated datetime format', { DateTimeDigitized: '2026-11-18 14:30:00' }, '2026-11-18'],
+        ['nested {Exif} block', { '{Exif}': { DateTimeOriginal: '2026:10:20 09:15:30' } }, '2026-10-20'],
+        ['ISO timestamp', { DateTime: '2026-11-01T12:00:00.000Z' }, '2026-11-01'],
+    ])('parses capture date from %s', (_desc, exif, expectedDatePrefix) => {
+        const iso = extractExifCaptureDate({ exif });
+        expect(iso).toBeTruthy();
+        expect(iso.startsWith(expectedDatePrefix)).toBe(true);
+    });
+
+    test('extracts from asset creationTime epoch timestamp', () => {
+        const timestamp = new Date('2026-11-10T10:00:00.000Z').getTime();
+        const iso = extractExifCaptureDate({ creationTime: timestamp });
+        expect(iso).toBe(new Date(timestamp).toISOString());
+    });
+
+    test.each([
+        ['null asset', null],
+        ['empty exif', { exif: {} }],
+        ['missing date tags', { exif: { Make: 'Camera' } }],
+        ['invalid date string', { exif: { DateTimeOriginal: 'not-a-date' } }],
+    ])('returns null for %s', (_desc, input) => {
+        expect(extractExifCaptureDate(input)).toBeNull();
+    });
+
+    test('isStaleEvidence flags timestamps older than 24 hours', () => {
+        const thirtyHoursAgo = new Date(Date.now() - 30 * 60 * 60 * 1000).toISOString();
+        expect(isStaleEvidence(thirtyHoursAgo, 24)).toBe(true);
+    });
+
+    test('isStaleEvidence allows timestamps within 24 hours', () => {
+        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+        expect(isStaleEvidence(twoHoursAgo, 24)).toBe(false);
+    });
+
+    test('isStaleEvidence returns false when no timestamp is present', () => {
+        expect(isStaleEvidence(null, 24)).toBe(false);
+        expect(isStaleEvidence(undefined, 24)).toBe(false);
     });
 });
 

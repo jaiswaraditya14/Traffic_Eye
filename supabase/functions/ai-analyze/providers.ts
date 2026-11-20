@@ -21,93 +21,81 @@ export interface Attempt {
 /** Server-owned allow-list. Anything not listed here can never be called. */
 export const ALLOWED_MODELS: Record<Provider, ReadonlySet<string>> = {
   openrouter: new Set([
+    // Primary Vision & Scene Perception (super fast ~3s, 1M context, robust forensic analysis)
     'nvidia/nemotron-3.5-super-vl:free',
+    // Secondary Multimodal Reasoning & Plate OCR (30B multimodal reasoning with character extraction)
     'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+    // High-capability vision fallbacks
     'google/gemma-4-31b-it:free',
     'google/gemma-4-26b-a4b-it:free',
-    'nvidia/nemotron-3-super-120b-a12b:free',
+    'particle-ai/particle-1:free',
+    'inclusionai/ling-3.2-flash:free',
+    // Text-only audit & consistency evaluation models
     'nvidia/nemotron-3.5-lightning:free',
+    'nvidia/nemotron-3-ultra-550b-a55b:free',
+    'nvidia/nemotron-3-super-120b-a12b:free',
     'meta-llama/llama-3.2-11b-vision-instruct:free',
     'meta-llama/llama-3.2-11b-vision-instruct',
-    'qwen/qwen-2.5-vl-72b-instruct:free',
     'google/gemini-2.0-flash-001',
     'google/gemini-2.5-flash',
   ]),
-  tokenharbor: new Set([
-    'claude-sonnet-4.6',
-    'gemini-3.8-flash',
-    'gemini-3.7-flash',
-    'qwen3.7-max',
-    'mimo-v2.5',
-    'mimo-v2.5:free',
-    'deepseek-v4.1-flash',
-  ]),
-  nvidia: new Set([
-    'nvidia/llama-3.1-nemotron-nano-vl-8b-v1',
-    'meta/llama-3.2-11b-vision-instruct',
-  ]),
-  gemini: new Set(['gemini-3.5-flash']),
-  groq: new Set(['openai/gpt-oss-20b', 'openai/gpt-oss-120b', 'llama-3.3-70b-versatile']),
+  tokenharbor: new Set([]),
+  nvidia: new Set([]),
+  gemini: new Set([]),
+  groq: new Set([]),
 };
 
-/** Ordered attempt chain per stage: OpenRouter primary first, followed by fallbacks. */
+/**
+ * Ordered attempt chain per stage.
+ * OpenRouter is the primary perception, OCR, and audit engine.
+ * Employs top vision-enabled models with automatic failover between Key 1 and Key 2.
+ */
 export const STAGE_ATTEMPTS: Record<'vision' | 'ocr' | 'audit', readonly Attempt[]> = {
   vision: [
     { provider: 'openrouter', model: 'nvidia/nemotron-3.5-super-vl:free' },
     { provider: 'openrouter', model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free' },
-    { provider: 'openrouter', model: 'google/gemma-4-31b-it:free' },
-    { provider: 'tokenharbor', model: 'claude-sonnet-4.6' },
-    { provider: 'tokenharbor', model: 'gemini-3.8-flash' },
-    { provider: 'nvidia', model: 'nvidia/llama-3.1-nemotron-nano-vl-8b-v1' },
-    { provider: 'nvidia', model: 'meta/llama-3.2-11b-vision-instruct' },
-    { provider: 'gemini', model: 'gemini-3.5-flash' },
   ],
   ocr: [
     { provider: 'openrouter', model: 'nvidia/nemotron-3.5-super-vl:free' },
     { provider: 'openrouter', model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free' },
-    { provider: 'openrouter', model: 'google/gemma-4-31b-it:free' },
-    { provider: 'tokenharbor', model: 'claude-sonnet-4.6' },
-    { provider: 'tokenharbor', model: 'gemini-3.8-flash' },
-    { provider: 'nvidia', model: 'nvidia/llama-3.1-nemotron-nano-vl-8b-v1' },
-    { provider: 'nvidia', model: 'meta/llama-3.2-11b-vision-instruct' },
-    { provider: 'gemini', model: 'gemini-3.5-flash' },
   ],
-  // Text audit: OpenRouter primary, Token Harbor mimo-v2.5:free secondary, Groq fallback.
   audit: [
     { provider: 'openrouter', model: 'nvidia/nemotron-3.5-super-vl:free' },
-    { provider: 'openrouter', model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free' },
-    { provider: 'openrouter', model: 'nvidia/nemotron-3-super-120b-a12b:free' },
-    { provider: 'tokenharbor', model: 'mimo-v2.5:free' },
-    { provider: 'tokenharbor', model: 'claude-sonnet-4.6' },
-    { provider: 'groq', model: 'openai/gpt-oss-20b' },
   ],
 };
 
 export const STAGE_TIMEOUT_MS: Record<'vision' | 'ocr' | 'audit', number> = {
   vision: 18_000,
-  ocr: 12_000,
+  ocr: 14_000,
   audit: 10_000,
 };
 
 export const STAGE_MAX_TOKENS: Record<'vision' | 'ocr' | 'audit', number> = {
   vision: 2048,
-  ocr: 1024,
+  ocr: 2048,
   audit: 1500,
 };
 
 const ENV_KEYS: Record<Provider, readonly string[]> = {
   openrouter: ['OPENROUTER_API_KEY_1', 'OPENROUTER_API_KEY_2', 'OPENROUTER_API_KEY'],
-  tokenharbor: ['TOKENHARBOR_API_KEY_1'],
-  nvidia: ['NVIDIA_API_KEY_1', 'NVIDIA_API_KEY_2'],
-  gemini: ['GEMINI_API_KEY_1'],
-  groq: ['GROQ_API_KEY_1', 'GROQ_API_KEY_2'],
+  tokenharbor: [],
+  nvidia: [],
+  gemini: [],
+  groq: [],
 };
 
-/** Keys configured for a provider, in rotation order. Values never logged. */
+/** Keys configured for a provider, in rotation order. Deduplicated and never logged. */
 export function keysFor(provider: Provider): string[] {
-  return ENV_KEYS[provider]
-    .map((name) => Deno.env.get(name) || (name.startsWith('OPENROUTER_') || name.startsWith('TOKENHARBOR_') || name.startsWith('NVIDIA_') || name.startsWith('GEMINI_') || name.startsWith('GROQ_') ? undefined : name))
-    .filter((v): v is string => typeof v === 'string' && v.length > 0);
+  const seen = new Set<string>();
+  const keys: string[] = [];
+  for (const name of ENV_KEYS[provider]) {
+    const val = Deno.env.get(name)?.trim();
+    if (val && !seen.has(val)) {
+      seen.add(val);
+      keys.push(val);
+    }
+  }
+  return keys;
 }
 
 export function anyProviderConfigured(): boolean {
@@ -144,70 +132,33 @@ interface CallArgs {
 }
 
 /**
- * One provider call. Returns the raw assistant text.
- * Throws ProviderError with a typed code; the upstream body is never attached.
+ * One provider call to OpenRouter. Returns raw assistant text.
+ * Throws ProviderError with a typed code; upstream body is never leaked.
  */
 async function callProvider(a: CallArgs): Promise<string> {
   if (!ALLOWED_MODELS[a.provider].has(a.model)) {
     throw new ProviderError(ERR.INTERNAL, null, 'model not in allow-list');
   }
 
-  const oaiCompatible = a.provider === 'openrouter' || a.provider === 'groq' || a.provider === 'nvidia' || a.provider === 'tokenharbor';
-  const isGpt120b = a.model === 'openai/gpt-oss-120b';
+  const url = 'https://openrouter.ai/api/v1/chat/completions';
 
-  const url =
-    a.provider === 'openrouter'
-      ? 'https://openrouter.ai/api/v1/chat/completions'
-      : a.provider === 'tokenharbor'
-        ? 'https://tokenharbor.ai/v1/chat/completions'
-        : a.provider === 'groq'
-          ? 'https://api.groq.com/openai/v1/chat/completions'
-          : a.provider === 'nvidia'
-            ? 'https://integrate.api.nvidia.com/v1/chat/completions'
-            : `https://generativelanguage.googleapis.com/v1beta/models/${a.model}:generateContent`;
-
-  const body = oaiCompatible
-    ? JSON.stringify({
-        model: a.model,
-        messages: [
-          {
-            role: 'user',
-            content: a.imageBase64
-              ? [
-                  { type: 'text', text: a.prompt },
-                  { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${a.imageBase64}` } },
-                ]
-              : a.prompt,
-          },
-        ],
-        ...(a.jsonMode && a.provider === 'groq' ? { response_format: { type: 'json_object' } } : {}),
-        temperature: isGpt120b ? 1 : 0.1,
-        ...(a.provider === 'groq'
-          ? { max_completion_tokens: a.maxTokens }
-          : a.provider === 'openrouter'
-            ? { max_tokens: Math.max(a.maxTokens, 4096) }
-            : { max_tokens: a.maxTokens }),
-        top_p: isGpt120b ? 1 : 0.9,
-        ...(isGpt120b ? { reasoning_effort: 'medium' } : {}),
-      })
-    : JSON.stringify({
-        contents: [
-          {
-            parts: a.imageBase64
-              ? [
-                  { text: a.prompt },
-                  { inline_data: { mime_type: 'image/jpeg', data: a.imageBase64 } },
-                ]
-              : [{ text: a.prompt }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: a.maxTokens,
-          candidateCount: 1,
-          responseMimeType: a.jsonMode ? 'application/json' : 'text/plain',
-        },
-      });
+  const body = JSON.stringify({
+    model: a.model,
+    messages: [
+      {
+        role: 'user',
+        content: a.imageBase64
+          ? [
+              { type: 'text', text: a.prompt },
+              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${a.imageBase64}` } },
+            ]
+          : a.prompt,
+      },
+    ],
+    temperature: 0.1,
+    max_tokens: Math.max(a.maxTokens, 2048),
+    top_p: 0.9,
+  });
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), a.timeoutMs);
@@ -217,17 +168,16 @@ async function callProvider(a: CallArgs): Promise<string> {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // Gemini takes the key in a header so it never appears in a URL that
-        // could be captured by proxy access logs.
-        ...(oaiCompatible ? { Authorization: `Bearer ${a.apiKey}` } : { 'x-goog-api-key': a.apiKey }),
-        ...(a.provider === 'openrouter' ? { 'HTTP-Referer': 'https://trafficeye.app', 'X-Title': 'Traffic Eye AI' } : {}),
+        Authorization: `Bearer ${a.apiKey}`,
+        'HTTP-Referer': 'https://trafficeye.app',
+        'X-Title': 'Traffic Eye AI',
       },
       body,
       signal: controller.signal,
     });
 
     if (!res.ok) {
-      // Drain and discard: the body may echo the prompt or key material.
+      // Drain and discard: the body may echo prompt or key material.
       await res.body?.cancel();
       const code: ErrCode =
         res.status >= 500 || res.status === 402 || res.status === 429
@@ -238,9 +188,7 @@ async function callProvider(a: CallArgs): Promise<string> {
 
     const json = await res.json();
     const choice = json?.choices?.[0];
-    const text = oaiCompatible
-      ? (choice?.message?.content || choice?.message?.reasoning)
-      : json?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const text = choice?.message?.content || choice?.message?.reasoning;
 
     if (typeof text !== 'string' || text.length === 0 || text.length > 16_000) {
       throw new ProviderError(ERR.PROVIDER_BAD_OUTPUT, null, 'empty completion');
@@ -266,13 +214,13 @@ export interface RotationResult {
 }
 
 /**
- * Walk the stage's attempt chain, rotating keys within a provider.
+ * Walk the stage's attempt chain, rotating keys within OpenRouter.
  *
- * Retry policy mirrors the previous client behaviour:
- *   5xx / timeout / network  → advance
- *   429 / quota              → advance (next key is a different account)
- *   402 / balance zero       → advance to next attempt in chain
- *   other 4xx                → stop (auth, billing, malformed request)
+ * Rate-limit & fallback policy:
+ *   429 (rate limit: 20 req/min or 50 daily limit) → advance to next key
+ *   402 (balance zero)                             → advance to next key
+ *   5xx / timeout / network                         → advance to next key / model
+ *   other 4xx                                      → stop (auth error, malformed request)
  */
 export async function runStage(
   stage: 'vision' | 'ocr' | 'audit',
@@ -314,7 +262,12 @@ export async function runStage(
           last.code === ERR.PROVIDER_UNAVAILABLE ||
           status === 429 ||
           status === 402;
-        if (!transient) break; // hard 4xx — rotating keys will not help
+        if (!transient) {
+          const failure = last;
+          failure.attempts = attempts;
+          failure.latencyMs = Date.now() - started;
+          throw failure;
+        }
       }
     }
   }

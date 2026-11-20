@@ -293,6 +293,9 @@ export default function ImageReportReview({ route, navigation }) {
     const submitted = report?.submitted_at
         ? new Date(report.submitted_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
         : '—';
+    const captured = report?.captured_at
+        ? new Date(report.captured_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+        : null;
 
     return (
         <View style={s.container}>
@@ -409,6 +412,28 @@ export default function ImageReportReview({ route, navigation }) {
                                     </Text>
                                 </TouchableOpacity>
                             )}
+                        </View>
+                    )}
+
+                    {/* ── Stale Evidence Warning for Officers (>24h delayed submission) ── */}
+                    {report?.stale_evidence && (
+                        <View style={{
+                            backgroundColor: '#FFFBEB',
+                            borderColor: '#F59E0B',
+                            borderWidth: 1.5,
+                            borderRadius: 14,
+                            padding: 14,
+                            marginBottom: 16,
+                        }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                <Ionicons name="time" size={18} color="#D97706" />
+                                <Text style={{ fontSize: 14, fontFamily: 'Nunito-ExtraBold', color: '#B45309' }}>
+                                    DELAYED SUBMISSION (&gt;24H)
+                                </Text>
+                            </View>
+                            <Text style={{ fontSize: 12, fontFamily: 'Nunito-Medium', color: '#92400E' }}>
+                                This evidence was captured more than 24 hours before submission. Please verify whether this incident is still actionable.
+                            </Text>
                         </View>
                     )}
 
@@ -559,6 +584,14 @@ export default function ImageReportReview({ route, navigation }) {
                     <View style={s.card}>
                         <Text style={s.cardTitle}>Submission Details</Text>
                         <InfoRow label="Reported At"  value={submitted} />
+                        <InfoRow label="Photo Captured At" value={captured || 'Not available (EXIF date missing)'} />
+                        {report?.stale_evidence && (
+                            <InfoRow label="Evidence Timeliness" value="Delayed (>24h from capture)" />
+                        )}
+                        <InfoRow label="Plate Duplicate Check" value={report?.possible_duplicate ? 'Reported within last 24h' : 'Unique (No 24h duplicate)'} />
+                        {report?.image_hash && (
+                            <InfoRow label="Image Fingerprint" value={`${report.image_hash.slice(0, 16)}…`} mono />
+                        )}
                         <InfoRow label="Location"     value={report?.location_address} />
                         {Number.isFinite(report?.latitude) && Number.isFinite(report?.longitude) && (
                             <InfoRow label="Coordinates" value={`${report.latitude?.toFixed(5)}, ${report.longitude?.toFixed(5)}`} />

@@ -39,26 +39,19 @@ describe('server-owned AI provider transport', () => {
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
-    test('configuration is checked for the requested stage, not an unrelated provider', () => {
+    test('configuration is checked for the requested stage', () => {
         expect(providerConfiguredFor('vision')).toBe(false);
         expect(providerConfiguredFor('ocr')).toBe(false);
         expect(providerConfiguredFor('audit')).toBe(false);
-        secrets.GROQ_API_KEY_1 = 'synthetic-groq-key';
-        expect(providerConfiguredFor('audit')).toBe(true);
-        expect(providerConfiguredFor('vision')).toBe(false);
-        expect(providerConfiguredFor('ocr')).toBe(false);
-        secrets.GEMINI_API_KEY_1 = 'synthetic-gemini-key';
-        expect(providerConfiguredFor('vision')).toBe(true);
-        expect(providerConfiguredFor('ocr')).toBe(true);
-        secrets.OPENROUTER_API_KEY_1 = 'synthetic-openrouter-key';
+        secrets.OPENROUTER_API_KEY_1 = 'synthetic-openrouter-key-1';
         expect(providerConfiguredFor('vision')).toBe(true);
         expect(providerConfiguredFor('ocr')).toBe(true);
         expect(providerConfiguredFor('audit')).toBe(true);
     });
 
     test('OpenRouter is primary for vision and includes required headers and model without leaking credentials', async () => {
-        secrets.OPENROUTER_API_KEY_1 = 'synthetic-openrouter-key';
-        secrets.TOKENHARBOR_API_KEY_1 = 'synthetic-tokenharbor-key';
+        secrets.OPENROUTER_API_KEY_1 = 'synthetic-openrouter-key-1';
+        secrets.OPENROUTER_API_KEY_2 = 'synthetic-openrouter-key-2';
         fetchMock.mockResolvedValue(goodResponse('{"vehicle":{"type":"motorcycle"}}'));
 
         const result = await runStage('vision', 'Synthetic prompt', 'synthetic-image', false);
@@ -72,7 +65,7 @@ describe('server-owned AI provider transport', () => {
         });
         const [url, options] = fetchMock.mock.calls[0];
         expect(url).toBe('https://openrouter.ai/api/v1/chat/completions');
-        expect(options.headers.Authorization).toBe('Bearer synthetic-openrouter-key');
+        expect(options.headers.Authorization).toBe('Bearer synthetic-openrouter-key-1');
         expect(options.headers['HTTP-Referer']).toBe('https://trafficeye.app');
         expect(options.headers['X-Title']).toBe('Traffic Eye AI');
         expect(JSON.parse(options.body)).toMatchObject({
@@ -85,74 +78,48 @@ describe('server-owned AI provider transport', () => {
                 ],
             }],
         });
-        expect(JSON.stringify(result)).not.toContain('synthetic-openrouter-key');
+        expect(JSON.stringify(result)).not.toContain('synthetic-openrouter-key-1');
     });
 
-    test('OpenRouter is primary for audit and falls back to secondary provider if OpenRouter fails', async () => {
-        secrets.OPENROUTER_API_KEY_1 = 'synthetic-openrouter-key';
-        secrets.GROQ_API_KEY_1 = 'synthetic-groq-key';
-        // 3 OpenRouter models fail with 429, then Groq succeeds
+    test('OpenRouter rotates from Key 1 to Key 2 on 429 rate limit', async () => {
+        secrets.OPENROUTER_API_KEY_1 = 'synthetic-key-1';
+        secrets.OPENROUTER_API_KEY_2 = 'synthetic-key-2';
+        // Key 1 fails with 429, Key 2 succeeds on the same model
         fetchMock
-            .mockResolvedValueOnce({ ok: false, status: 429, body: { cancel: async () => {} } })
-            .mockResolvedValueOnce({ ok: false, status: 429, body: { cancel: async () => {} } })
             .mockResolvedValueOnce({ ok: false, status: 429, body: { cancel: async () => {} } })
             .mockResolvedValueOnce(goodResponse('{"audit":"ok"}'));
 
         const result = await runStage('audit', 'Synthetic prompt', null, true);
 
-        expect(result.provider).toBe('groq');
-        expect(result.attempts).toBe(4);
+        expect(result.provider).toBe('openrouter');
+        expect(result.attempts).toBe(2);
         expect(fetchMock.mock.calls[0][0]).toBe('https://openrouter.ai/api/v1/chat/completions');
+        expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer synthetic-key-1');
         expect(fetchMock.mock.calls[1][0]).toBe('https://openrouter.ai/api/v1/chat/completions');
-        expect(fetchMock.mock.calls[2][0]).toBe('https://openrouter.ai/api/v1/chat/completions');
-        expect(fetchMock.mock.calls[3][0]).toBe('https://api.groq.com/openai/v1/chat/completions');
+        expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe('Bearer synthetic-key-2');
     });
 
-    test('audit uses the fixed Groq endpoint/model and does not return credentials or full provider payloads', async () => {
-        secrets.GROQ_API_KEY_1 = 'synthetic-test-key';
-        fetchMock.mockResolvedValue(goodResponse());
+    test('OpenRouter falls back to next model when all keys encounter 429 upstream pool exhaustion', async () => {
+        secrets.OPENROUTER_API_KEY_1 = 'synthetic-key-1';
+        secrets.OPENROUTER_API_KEY_2 = 'synthetic-key-2';
+        // Model 1 fails on both Key 1 & Key 2 with 429, then Model 2 succeeds on Key 1
+        fetchMock
+            .mockResolvedValueOnce({ ok: false, status: 429, body: { cancel: async () => {} } })
+            .mockResolvedValueOnce({ ok: false, status: 429, body: { cancel: async () => {} } })
+            .mockResolvedValueOnce(goodResponse('{"vehicle":{"type":"motorcycle"}}'));
 
-        const result = await runStage('audit', 'Synthetic prompt', null, true);
+        const result = await runStage('vision', 'Synthetic prompt', 'synthetic-image', false);
 
-        expect(result).toEqual({
-            text: '{"plate":"TEST123"}',
-            provider: 'groq',
-            model: 'openai/gpt-oss-20b',
-            attempts: 1,
-            latencyMs: expect.any(Number),
-        });
-        const [url, options] = fetchMock.mock.calls[0];
-        expect(url).toBe('https://api.groq.com/openai/v1/chat/completions');
-        expect(options.headers.Authorization).toBe('Bearer synthetic-test-key');
-        expect(JSON.parse(options.body)).toMatchObject({
-            model: 'openai/gpt-oss-20b',
-            messages: [{ role: 'user', content: 'Synthetic prompt' }],
-            response_format: { type: 'json_object' },
-        });
-        expect(JSON.stringify(result)).not.toContain('synthetic-test-key');
-    });
-
-    test('Gemini credentials are sent only as a header, never in the URL or returned result', async () => {
-        secrets.GEMINI_API_KEY_1 = 'synthetic-gemini-test-key';
-        fetchMock.mockResolvedValue({
-            ok: true,
-            status: 200,
-            json: async () => ({ candidates: [{ content: { parts: [{ text: '{}' }] } }], privateDetail: 'synthetic private metadata' }),
-        });
-
-        const result = await runStage('vision', 'Synthetic prompt', 'synthetic-image', true);
-        const [url, options] = fetchMock.mock.calls[0];
-        expect(url).toMatch(/^https:\/\/generativelanguage\.googleapis\.com\/v1beta\/models\/[A-Za-z0-9.-]+:generateContent$/);
-        expect(url).not.toContain('synthetic-gemini-test-key');
-        expect(options.headers['x-goog-api-key']).toBe('synthetic-gemini-test-key');
-        expect(JSON.stringify(result)).not.toContain('synthetic');
+        expect(result.provider).toBe('openrouter');
+        expect(result.model).toBe('nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free');
+        expect(result.attempts).toBe(3);
     });
 
     test.each([
         [401, ERR.PROVIDER_BAD_OUTPUT],
         [500, ERR.PROVIDER_UNAVAILABLE],
     ])('HTTP %s discards provider error bodies without parsing or leaking them', async (status, code) => {
-        secrets.GROQ_API_KEY_1 = 'synthetic-test-key';
+        secrets.OPENROUTER_API_KEY_1 = 'synthetic-test-key';
         const bodyCancel = jest.fn().mockResolvedValue(undefined);
         const json = jest.fn().mockResolvedValue({ secret: 'synthetic-test-key', prompt: 'Synthetic prompt' });
         const text = jest.fn().mockResolvedValue('Synthetic provider response');
@@ -168,17 +135,17 @@ describe('server-owned AI provider transport', () => {
         expect(JSON.stringify(failure)).not.toContain('synthetic');
     });
 
-    test('an HTTP 401 does not rotate through more keys for the same audit attempt', async () => {
-        secrets.GROQ_API_KEY_1 = 'synthetic-key-one';
-        secrets.GROQ_API_KEY_2 = 'synthetic-key-two';
+    test('an HTTP 401 does not rotate through more keys for the same attempt', async () => {
+        secrets.OPENROUTER_API_KEY_1 = 'synthetic-key-one';
+        secrets.OPENROUTER_API_KEY_2 = 'synthetic-key-two';
         fetchMock.mockResolvedValue({ ok: false, status: 401, body: { cancel: async () => {} } });
         await expect(runStage('audit', 'Synthetic prompt', null, true)).rejects.toMatchObject({ code: ERR.PROVIDER_BAD_OUTPUT });
         expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
-    test('a transient quota response can rotate to the next configured key without returning the failed response', async () => {
-        secrets.GROQ_API_KEY_1 = 'synthetic-key-one';
-        secrets.GROQ_API_KEY_2 = 'synthetic-key-two';
+    test('a transient quota response (429) can rotate to the next configured key without returning the failed response', async () => {
+        secrets.OPENROUTER_API_KEY_1 = 'synthetic-key-one';
+        secrets.OPENROUTER_API_KEY_2 = 'synthetic-key-two';
         fetchMock
             .mockResolvedValueOnce({ ok: false, status: 429, body: { cancel: async () => {} } })
             .mockResolvedValueOnce(goodResponse('{}'));
@@ -189,7 +156,7 @@ describe('server-owned AI provider transport', () => {
 
     test.each([{}, { choices: [] }, { choices: [{ message: { content: '' } }] }, { choices: [{ message: { content: 42 } }] }])(
         'invalid completion shapes fail closed (%j)', async (json) => {
-            secrets.GROQ_API_KEY_1 = 'synthetic-test-key';
+            secrets.OPENROUTER_API_KEY_1 = 'synthetic-test-key';
             fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => json });
             await expect(runStage('audit', 'Synthetic prompt', null, true)).rejects.toMatchObject({
                 code: ERR.PROVIDER_BAD_OUTPUT, message: 'empty completion',
@@ -198,7 +165,7 @@ describe('server-owned AI provider transport', () => {
     );
 
     test('non-JSON successful HTTP responses are sanitized', async () => {
-        secrets.GROQ_API_KEY_1 = 'synthetic-test-key';
+        secrets.OPENROUTER_API_KEY_1 = 'synthetic-test-key';
         fetchMock.mockResolvedValue({
             ok: true,
             status: 200,
@@ -210,13 +177,13 @@ describe('server-owned AI provider transport', () => {
     });
 
     test('oversized completion text fails closed', async () => {
-        secrets.GROQ_API_KEY_1 = 'synthetic-test-key';
+        secrets.OPENROUTER_API_KEY_1 = 'synthetic-test-key';
         fetchMock.mockResolvedValue(goodResponse('x'.repeat(16_001)));
         await expect(runStage('audit', 'Synthetic prompt', null, true)).rejects.toMatchObject({ code: ERR.PROVIDER_BAD_OUTPUT });
     });
 
     test('network errors never expose URLs, tokens, or upstream details', async () => {
-        secrets.GROQ_API_KEY_1 = 'synthetic-test-key';
+        secrets.OPENROUTER_API_KEY_1 = 'synthetic-test-key';
         fetchMock.mockRejectedValue(new Error('synthetic secret in an upstream URL'));
         await expect(runStage('audit', 'Synthetic prompt', null, true)).rejects.toMatchObject({
             code: ERR.PROVIDER_UNAVAILABLE, status: null, message: 'network failure',
@@ -225,7 +192,7 @@ describe('server-owned AI provider transport', () => {
 
     test('provider deadline aborts in-flight requests and returns the typed timeout', async () => {
         jest.useFakeTimers();
-        secrets.GROQ_API_KEY_1 = 'synthetic-test-key';
+        secrets.OPENROUTER_API_KEY_1 = 'synthetic-test-key';
         fetchMock.mockImplementation((_url, { signal }) => new Promise((_resolve, reject) => {
             signal.addEventListener('abort', () => reject(new DOMException('Synthetic timeout', 'AbortError')), { once: true });
         }));

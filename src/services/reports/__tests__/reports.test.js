@@ -3,7 +3,7 @@ import { supabase } from '../../supabase';
 import * as FileSystem from 'expo-file-system/legacy';
 import { decode } from 'base64-arraybuffer';
 import { createReportSubmission, submitReportWithMedia, checkUserRateLimit,
-    checkPlateDuplicate, removeReportMedia, validateMediaFile } from '../index';
+    checkPlateDuplicate, checkImageDuplicate, checkImageHashExists, removeReportMedia, validateMediaFile } from '../index';
 
 jest.mock('../../supabase', () => {
     const upload = jest.fn(), getPublicUrl = jest.fn(), remove = jest.fn();
@@ -107,6 +107,38 @@ describe('duplicate validation', () => {
     });
 });
 
+describe('image hash duplicate validation', () => {
+    const HASH = 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2';
+    test('returns confirmed match from RPC', async () => {
+        supabase.rpc.mockResolvedValue({ data: [{ is_duplicate: true, existing_report_id: 'report-123' }], error: null });
+        expect(await checkImageDuplicate(HASH)).toEqual({
+            isDuplicate: true, indeterminate: false, existingReportId: 'report-123',
+        });
+        expect(supabase.rpc).toHaveBeenCalledWith('check_image_duplicate', { p_hash: HASH });
+    });
+    test('returns non-duplicate when RPC confirms unique', async () => {
+        supabase.rpc.mockResolvedValue({ data: [{ is_duplicate: false, existing_report_id: null }], error: null });
+        expect(await checkImageDuplicate(HASH)).toEqual({
+            isDuplicate: false, indeterminate: false, existingReportId: null,
+        });
+    });
+    test.each([null, undefined, '', 'abc', '12345'])('returns non-duplicate without RPC for short hash %j', async h => {
+        expect(await checkImageDuplicate(h)).toEqual({
+            isDuplicate: false, indeterminate: false, existingReportId: null,
+        });
+        expect(supabase.rpc).not.toHaveBeenCalled();
+    });
+    test('fails closed on RPC error without falling through to bypass', async () => {
+        supabase.rpc.mockResolvedValue({ data: null, error: new Error('RPC fail') });
+        supabase.from.mockReturnValue(chain({ error: new Error('DB fail') }, true));
+        expect(await checkImageDuplicate(HASH)).toMatchObject({ indeterminate: true, isDuplicate: false });
+    });
+    test('checkImageHashExists backward compatible alias works', async () => {
+        supabase.rpc.mockResolvedValue({ data: [{ is_duplicate: true, existing_report_id: 'r-456' }], error: null });
+        expect(await checkImageHashExists(HASH)).toEqual({ isDuplicate: true, existingReportId: 'r-456' });
+    });
+});
+
 describe('canonical submission', () => {
     test.each([[12.5, 45.25], [0, 0]])('extracted (%s,%s) survives upload and storage insertion', async (latitude, longitude) => {
         const insert = chain({ data: CREATED, error: null }), link = chain({ data: {}, error: null });
@@ -118,12 +150,23 @@ describe('canonical submission', () => {
     test('validates before upload, normalizes final plate and strips privileged workflow input', async () => {
         const insert = chain({ data: CREATED, error: null }), link = chain({ data: {}, error: null });
         supabase.from.mockReturnValueOnce(allow()).mockReturnValueOnce(insert).mockReturnValueOnce(link);
-        const result = await submitReportWithMedia(args({ report: { ...REPORT, status: 'approved', reward_amount: 999, submitted_at: 'forged' } }));
+        const result = await submitReportWithMedia(args({ report: {
+            ...REPORT,
+            status: 'approved',
+            reward_amount: 999,
+            submitted_at: 'forged',
+            image_hash: 'abc123def4567890abc123def4567890',
+            captured_at: '2026-11-20T10:00:00.000Z',
+            stale_evidence: true,
+        } }));
         expect(result).toEqual({ data: CREATED, error: null });
         expect(supabase.rpc).toHaveBeenCalledWith('check_plate_duplicate', { p_vehicle_number: 'MH12AB1234' });
         expect(insert.insert).toHaveBeenCalledWith([expect.objectContaining({
             id: CREATED.id, user_id: 'u1', status: 'pending', reward_amount: 0,
             vehicle_number: 'MH12AB1234', image_storage_path: 'u1/' + CREATED.id + '.jpg',
+            image_hash: 'abc123def4567890abc123def4567890',
+            captured_at: '2026-11-20T10:00:00.000Z',
+            stale_evidence: true,
         })]);
         expect(insert.insert.mock.calls[0][0][0]).not.toHaveProperty('submitted_at');
         expect(FileSystem.readAsStringAsync).toHaveBeenCalledWith(MEDIA.uri, { encoding: 'base64' });
@@ -131,6 +174,20 @@ describe('canonical submission', () => {
             { contentType: 'image/jpeg', upsert: false });
         expect(link.insert).toHaveBeenCalledWith(expect.objectContaining({ id: CREATED.id, report_id: CREATED.id, file_size: 3 }));
         expect(supabase.storage.__remove).not.toHaveBeenCalled();
+    });
+    test('blocks exact duplicate image hash before uploading media', async () => {
+        supabase.from.mockReturnValueOnce(allow());
+        supabase.rpc.mockImplementation((rpcName) => {
+            if (rpcName === 'check_image_duplicate') return Promise.resolve({ data: [{ is_duplicate: true, existing_report_id: 'dup-123' }], error: null });
+            return Promise.resolve({ data: { is_duplicate: false, existing_report_id: null }, error: null });
+        });
+        const result = await submitReportWithMedia(args({ report: {
+            ...REPORT,
+            image_hash: '11112222333344445555666677778888',
+        } }));
+        expect(result.error).toBeTruthy();
+        expect(result.error.code).toBe('DUPLICATE_IMAGE');
+        expect(supabase.storage.__upload).not.toHaveBeenCalled();
     });
     test.each([
         { userId: null }, { report: null }, { report: [] },
